@@ -1,6 +1,7 @@
 // d’Autremont Hall, Pacific School of Religion (Holy Hill): buff stucco wings with red-tile roofs harmonising with PSR’s
 // 1920s buildings. No reliable photo was available; massing from the 2021 LiDAR (frame 6°).
 import { hallBuild, chimney } from './lib/b08c-halls.js';
+import { rectRuns, finishGround } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'd-autremont-hall',
@@ -19,9 +20,11 @@ export async function build(ctx) {
     { u0: -17.5, u1: -5.5, v0: 11.0, v1: 15.0, g: 0.3, eave: 3.8, ridge: 4.6, axis: 'u', roof: 'flat' },
     { u0: -15.5, u1: -12.5, v0: -3.5, v1: 0.5, g: 4.0, eave: 13.0, ridge: 14.3, axis: 'v', faces: { E: false } },
   ];
-  const { object3d, colliders } = hallBuild(ctx, 6, 'seminary', blocks, (K) => {
+  let G = { colliders: [], walkables: [] };
+  const { object3d, colliders } = hallBuild(ctx, 6, 'seminary', blocks, (K, st) => {
+    G = finishGround(K, ctx, rectRuns(K, blocks.map((b) => ({ ...b, floor: b.g + 0.5 }))), { door: 'wood', n: 2, entry: { w: 1.9, h: 2.9, surround: K.M.concreteDark, sw: 0.32 }, bikes: 3, bench: true, plant: { h: 0.9, depth: 1.3 } });
 
   });
   object3d.name = 'd-autremont-hall';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders: [...colliders, ...G.colliders], walkables: G.walkables };
 }

@@ -2,6 +2,7 @@
 // low roof, with projecting stair/lounge bays along its north side. No reliable photo was available; massing from the
 // 2021 LiDAR (frame -9°).
 import { hallBuild, chimney } from './lib/b08c-halls.js';
+import { rectRuns, finishGround } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'parsons-hall',
@@ -21,9 +22,11 @@ export async function build(ctx) {
     { u0: 10.0, u1: 16.5, v0: -6.0, v1: -3.0, g: 0.0, eave: 12.2, ridge: 12.8, axis: 'u', roof: 'flat', faces: { S: false } },
     { u0: 22.5, u1: 29.5, v0: -6.0, v1: -3.0, g: 0.0, eave: 12.2, ridge: 12.8, axis: 'u', roof: 'flat', faces: { S: false } },
   ];
-  const { object3d, colliders } = hallBuild(ctx, -9, 'midcentury', blocks, (K) => {
+  let G = { colliders: [], walkables: [] };
+  const { object3d, colliders } = hallBuild(ctx, -9, 'midcentury', blocks, (K, st) => {
+    G = finishGround(K, ctx, rectRuns(K, blocks.map((b) => ({ ...b, floor: b.g + 0.5 }))), { door: 'glass', n: 2, entry: { w: 2.4, h: 2.8, surround: K.M.concrete, canopy: { d: 2.0, t: 0.2 } }, bikes: 4, bench: true, plant: { h: 0.8, depth: 1.1 } });
 
   });
   object3d.name = 'parsons-hall';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders: [...colliders, ...G.colliders], walkables: G.walkables };
 }
