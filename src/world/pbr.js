@@ -149,7 +149,7 @@ function bakeAshlar(ga, gn, S, outS) {
     const dx = Math.min(fu, 1 - fu) * 1.0, dy = Math.min(fv, 1 - fv) * CH; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
     // per-block texture offset so neighbouring blocks never show the same grain
     const ox = Math.floor(h(col, row) * S), oy = Math.floor(h(row, col + 7) * S);
-    const sx = (Math.floor(x * S * 4 / N) + ox) % S, sy = (Math.floor(y * S * 4 / N) + oy) % S; // granite set = 0.45 m -> ~0.5 m grain period const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
+    const sx = (Math.floor(x * S * 4 / N) + ox) % S, sy = (Math.floor(y * S * 4 / N) + oy) % S; /* granite set = 0.45 m -> ~0.5 m grain period */ const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
     const tone = 1.0;
     const j = Math.max(0, Math.min(1, (jw + 1.2 - d) / 2.4)); // 1 in the joint
     const bev = Math.max(0, Math.min(1, (d - jw) / (jw * 2.5)));
