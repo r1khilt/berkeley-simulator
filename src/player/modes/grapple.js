@@ -6,6 +6,7 @@
 //  Cost when idle: one coarse ray cast per frame for the crosshair (tens of microseconds); meshes are only ray cast on fire.
 import * as THREE from 'three';
 import { GrappleWorld } from './grapple-world.js';
+import { U } from '../../materials.js';
 
 const RANGE = 120;        // max hook distance (m)
 const MIN_HOOK = 2.5;     // ignore targets closer than this
@@ -42,9 +43,9 @@ class Grapple {
     this.tip = new THREE.Vector3(); this.tipFrom = new THREE.Vector3(); this.hookDist = 0; this.hookTravel = 0;
     this.len = 0; this.lenTarget = 0; this.reelRate = 0; this.taut = false; this.grounded = false;
     this.qHeld = false; this.mHeld = false; this.allowEnter = false; this.prevMode = 'walk';
-    this.aim = { ok: false, hit: null, t: 0 }; this.camK = 0; this.userDist = null; this.lastSetDist = null; this.baseFov = null; this.frustFov = 0;
+    this.aim = { ok: false, hit: null }; this.camK = 0; this.userDist = null; this.lastSetDist = null; this.frustFov = 0; this.fovActive = false;
     this.perch = null; this.perchOff = 0; this.safeT = 0; this.slideT = 0; this.lastPos = new THREE.Vector3(); this.speed = 0; this.wave = 0; this.retractT = 0;
-    this.hand = new THREE.Vector3(); this.stats = { coarseMs: 0, refineMs: 0, fires: 0, attaches: 0, rescues: 0, slides: 0 };
+    this.stats = { coarseMs: 0, refineMs: 0, fires: 0, attaches: 0, rescues: 0, slides: 0 };
     this._o = new THREE.Vector3(); this._d = new THREE.Vector3();
     this._buildVisuals();
     this._bindInput();
@@ -146,8 +147,7 @@ class Grapple {
     const job = this.job, fine = this.world.result(job), hit = this.coarse; this.stats.refineMs += job.ms; this.job = null;
     // the visible surface wins when it is in front of (or within 12 m behind) the collider we hit
     if (fine && this._inRange(fine.p) && (!hit || job.magnet || fine.t < hit.t + 12)) {
-      const p = job.magnet ? fine.p : fine.p;
-      this.target = { p: new THREE.Vector3(...p), n: new THREE.Vector3(...fine.n), tag: hit && (job.magnet || fine.t > hit.t - 1) ? hit.tag : 'mesh', kind: 'mesh' };
+      this.target = { p: new THREE.Vector3(...fine.p), n: new THREE.Vector3(...fine.n), tag: hit && (job.magnet || fine.t > hit.t - 1) ? hit.tag : 'mesh', kind: 'mesh' };
       this._retarget(); return;
     }
     // a landmark's collision box is often bigger than its visible shape (spires, towers): look sideways for the surface
@@ -193,7 +193,7 @@ class Grapple {
   _exit(p, next) {
     if (next === 'grapple') return;
     const ev = window.event; this._exitEvt = ev && ev.type === 'keydown' && ev.code === 'KeyQ' ? ev : null; this._exitSub = this.sub;
-    if (this.state === 'attached' || this.state === 'flying') { this.state = 'retract'; this.retractT = 0; }
+    if (this.state === 'attached' || this.state === 'flying') { this.state = 'retract'; this.retractT = 0; this.job = null; }
     this.sub = null; this.grounded = false; this.safeT = 4; p.bike.root.visible = next === 'bike';
     if (this.avTilt) { p.avatar.root.quaternion.identity(); this.avTilt = false; }
   }
@@ -260,7 +260,7 @@ class Grapple {
         if (top) { p.pos.y = Math.max(p.pos.y, top.y1); this._perchOn(top); } this.safeT = 4;
       } else if (this.perchOff > 0.6) this._unperch();
     }
-    if (this.safeT > 0) { this.safeT -= dt; if (p.mode !== 'fly' && p.mode !== 'grapple') this._unstick(p, false); }
+    if (this.safeT > 0) { this.safeT -= dt; if (p.mode !== 'fly' && p.mode !== 'grapple') this._unstick(p); }
     if (this.state === 'idle' && p.mode !== 'grapple') { this.rope.visible = false; this.hookMesh.visible = false; if (this.windG) this._wind(0); }
     else if (p.mode !== 'grapple') this._drawRope(p, null);
   }
@@ -286,9 +286,9 @@ class Grapple {
       else if (inp.down) { this.len = Math.min(RANGE, this.len + PAYOUT * dt); this.lenTarget = Math.max(this.lenTarget, this.len); }
       if (this.lenTarget < this.len - 0.01) this.len = Math.max(this.lenTarget, this.len - TUG * dt);
       const dist = v1.set(pos.x, pos.y + BODY, pos.z).distanceTo(this.anchor);
-      if (dist + 1.2 < this.len) this.len = dist + 1.2; // take up slack
       if (this.blocked && this.len < dist - 0.05) this.len = dist - 0.05; // pinned against a wall: don't keep hauling into it
-      this.reelRate = Math.max(0, (len0 - this.len) / dt);
+      this.reelRate = Math.max(0, (len0 - this.len) / dt); // active pull only (not the slack take-up below)
+      if (dist + 1.2 < this.len) this.len = dist + 1.2; // take up slack
       // vault: reeled right up to a ledge -> pop over onto the roof
       if (reel && dist < 2.4) { const roof = this.world.topIn(this.anchor.x - this.anchorN.x * 0.6, this.anchor.z - this.anchorN.z * 0.6, this.anchor.y - 0.8, this.anchor.y + 2.6); if (roof) { v.y = Math.max(v.y, 7.5); v.x = -this.anchorN.x * 3.5; v.z = -this.anchorN.z * 3.5; this.release(); } }
     }
@@ -345,7 +345,7 @@ class Grapple {
     // never stay inside a solid volume: climb onto it if we are near its top, else step out sideways
     const bur = world.buriedIn(nx, nz, ny + 0.05, ny + H);
     if (bur) {
-      if (bur.y1 - ny < 1.2 || oy >= bur.y1 - 0.4) { ny = bur.y1; if (v.y < 0) v.y = 0; landed = true; on = bur; }
+      if ((bur.y1 - ny < 1.2 || oy >= bur.y1 - 0.4) && (!bur.lm || this._roofOk(bur, nx, nz))) { ny = bur.y1; if (v.y < 0) v.y = 0; landed = true; on = bur; }
       else { const e = world.freePoint(bur, nx, nz, ny + 0.05, ny + H, R); const qx = e[0] - nx, qz = e[1] - nz, ql = Math.hypot(qx, qz) || 1; const vn = (v.x * qx + v.z * qz) / ql; if (vn < 0) { v.x -= qx / ql * vn; v.z -= qz / ql * vn; } nx = e[0]; nz = e[1]; ny = Math.max(ny, ph.groundAt(nx, nz, ny + 0.5).y); this.blocked = true; this.stats.rescues++; (this.stats.log || (this.stats.log = [])).push([bur.tag, Math.round(nx), Math.round(ny), Math.round(nz)]); if (this.stats.log.length > 20) this.stats.log.shift(); }
     }
     pos.set(nx, ny, nz);
@@ -359,10 +359,10 @@ class Grapple {
     const ok = !!hit; c.set(k, ok); return ok;
   }
   // safety net for a few seconds after leaving the swing (other modes don't know about roofs)
-  _unstick(p, force) {
+  _unstick(p) {
     const w = this.world, bur = w.buriedIn(p.pos.x, p.pos.z, p.pos.y + 0.05, p.pos.y + H);
     if (bur) {
-      if (bur.y1 - p.pos.y < 1.6) { p.pos.y = bur.y1; this._perchOn(bur); }
+      if (bur.y1 - p.pos.y < 1.6 && (!bur.lm || this._roofOk(bur, p.pos.x, p.pos.z))) { p.pos.y = bur.y1; this._perchOn(bur); }
       else { const e = w.freePoint(bur, p.pos.x, p.pos.z, p.pos.y + 0.05, p.pos.y + H, R); p.pos.x = e[0]; p.pos.z = e[1]; p.pos.y = this.ph.groundAt(e[0], e[1], p.pos.y + 0.5).y; }
       p.vel.set(0, Math.min(0, p.vel.y), 0); this.stats.rescues++;
     }
@@ -419,7 +419,7 @@ class Grapple {
       const prong = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 5, 10, Math.PI * 0.62), steel);
       const a = (i / 3) * Math.PI * 2; const pv = new THREE.Group(); pv.rotation.y = a; prong.rotation.set(0, 0, Math.PI * 0.42); prong.position.set(0.075, 0.0, 0); pv.add(prong); hk.add(pv);
     }
-    hk.visible = false; this.hookMesh = hk; scene.add(hk);
+    hk.visible = false; this.hookMesh = hk; scene.add(hk); if (this.ctx.setupMaterials) this.ctx.setupMaterials(hk); // CSM-aware lighting
     // crosshair (inside the HUD so photo mode / title screen hide it)
     const st = document.createElement('style');
     st.textContent = `.gh-ret{position:absolute;left:50%;top:calc(50% - 8.5vh);width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;opacity:0;transition:opacity .18s}
@@ -450,8 +450,10 @@ class Grapple {
     const cam = this.ctx.camera.position, N = this.N, P = this.rope.geometry.attributes.position.array;
     const dx = end.x - hand.x, dy = end.y - hand.y, dz = end.z - hand.z, L = Math.hypot(dx, dy, dz) || 1e-3;
     // slack sag (rope longer than the gap) and a decaying wave after firing / releasing
-    const slack = this.state === 'attached' ? Math.max(0, this.len - (L + 0.0)) : 0;
-    const sag = Math.min(6, Math.sqrt(Math.max(0, slack) * L) * 0.5) + (this.state === 'retract' ? L * 0.04 : 0);
+    // slack is measured on the constraint itself (body point), so a loaded rope draws dead straight
+    let slack = 0;
+    if (this.state === 'attached' && !this.taut && this.reelRate === 0) slack = Math.max(0, this.len - v3.set(p.pos.x, p.pos.y + BODY, p.pos.z).distanceTo(this.anchor) - 0.25);
+    const sag = Math.min(4, Math.sqrt(slack * L) * 0.35) + (this.state === 'retract' ? L * 0.04 : 0);
     const wave = this.wave * Math.min(1.2, L * 0.03);
     const side = v1.set(dz, 0, -dx).normalize();
     let px = 0, py = 0, pz = 0;
@@ -468,6 +470,7 @@ class Grapple {
       px = x; py = y; pz = z;
     }
     this.rope.geometry.attributes.position.needsUpdate = true;
+    const night = U.uNight ? U.uNight.value : 0; this.rope.material.color.setHex(0xf3c254).multiplyScalar(1 - 0.72 * night); // unlit, so dim it after dark
     this.rope.visible = true;
     // grapnel at the rope end, pointing along the rope (prongs dug into the surface once attached)
     const hk = this.hookMesh; hk.visible = true; hk.position.copy(end);
@@ -485,7 +488,7 @@ class Grapple {
     const body = v1.set(p.pos.x, p.pos.y + BODY, p.pos.z);
     const ropeDir = v2.copy(this.anchor).sub(body).normalize();
     const up = v3.copy(UP);
-    if (attached && !this.grounded) up.lerp(ropeDir, this.taut ? 0.75 : 0.35).normalize();
+    if (attached && !this.grounded) up.lerp(ropeDir, this.taut ? 0.85 : 0.4).normalize();
     else if (!this.grounded) { const hv = Math.hypot(p.vel.x, p.vel.z); up.set(p.vel.x * 0.012, 1, p.vel.z * 0.012).normalize(); if (hv < 0.1) up.copy(UP); }
     q1.setFromUnitVectors(UP, up); q2.setFromAxisAngle(UP, p.yaw);
     av.root.quaternion.copy(q1).multiply(q2); this.avTilt = true;
@@ -497,8 +500,14 @@ class Grapple {
       p.bike.animate(p.bikeDist, p.pedal);
     } else {
       // legs: relaxed tuck while swinging, trailing when flying free
-      for (const s of [-1, 1]) { P['hip' + s].rotation.x = attached ? -0.55 + s * 0.15 : -0.25 + s * 0.25; P['kn' + s].rotation.x = attached ? 0.85 : 0.55; }
-      P.spine.rotation.x = attached ? -0.12 : -0.25;
+      const fwdV = -(p.vel.x * Math.sin(p.yaw) + p.vel.z * Math.cos(p.yaw)), trail = Math.max(-0.5, Math.min(0.7, fwdV * 0.025));
+      this.legT = (this.legT || 0) + dt * (1.5 + Math.min(3, this.speed * 0.08));
+      for (const s of [-1, 1]) {
+        const sc = Math.sin(this.legT + (s > 0 ? 0 : Math.PI)) * 0.12;
+        P['hip' + s].rotation.x = attached ? -0.35 + trail + sc : -0.2 + trail * 0.6 + s * 0.22; P['kn' + s].rotation.x = attached ? 0.55 + Math.max(0, sc) * 1.5 : 0.5;
+        P['hip' + s].rotation.z = s * 0.06;
+      }
+      P.spine.rotation.x = attached ? -0.1 : -0.25;
     }
     // right arm reaches up the rope; left arm out for balance
     av.root.updateMatrixWorld(true);
