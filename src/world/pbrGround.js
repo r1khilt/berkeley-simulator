@@ -32,7 +32,7 @@ void groundShadePBR(vec2 w, float dist) {
   vec4 n0 = texture(uNoise, w * 0.013); vec4 n1 = texture(uNoise, w * 0.071); vec4 n2 = texture(uNoise, w * 0.37);
   float sp = floor(texture(uSpecial, (w + (vec2(n2.r, n1.g) - 0.5) * 1.4 - uGround.xy) / uGround.zw).r * 255.0 + 0.5);
   float fade = clamp(dist / 120.0, 0.0, 1.0);
-  float near = 1.0 - smoothstep(180.0, 280.0, dist);
+  float near = 1.0 - (uPbrHQ > 0.5 ? smoothstep(180.0, 280.0, dist) : smoothstep(110.0, 170.0, dist));
   float det = 1.0 - smoothstep(25.0, 90.0, dist);         // small decals (joints, cracks, gum)
   float edgeN = (n1.g - 0.5) * 0.9 + (n2.b - 0.5) * 0.35;
   float dA = (s.r - 0.5) * 6.0, dP = (s.g - 0.5) * 6.0, dG = (s.b - 0.5) * 6.0, dD = (s.a - 0.5) * 6.0;

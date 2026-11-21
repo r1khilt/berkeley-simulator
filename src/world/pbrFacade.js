@@ -80,7 +80,7 @@ void wallPBR(int s, vec3 wallC, float u, float v, float seed, float topH, float 
     }
   }
   // splash-zone grime at the foot of the wall (true height above the local ground)
-  float hg = vWPosF.y - groundAt(vWPosF.xz);
+  float hg = v < 4.0 ? vWPosF.y - groundAt(vWPosF.xz) : 99.0;  // only the lowest storey can touch the ground
   float gN = texture(uNoise, vec2(u * 0.35, 0.5) + seed).r;
   float grime = 1.0 - smoothstep(0.05, 0.45 + 0.7 * gN, hg);
   c = mix(c, c * vec3(0.62, 0.58, 0.52) + vec3(0.012, 0.010, 0.007), grime * 0.75);

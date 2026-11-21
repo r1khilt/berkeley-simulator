@@ -19,7 +19,7 @@ export const L = Object.fromEntries(LAYERS.map(([n], i) => [n, i]));
 export const SIZE_M = Object.fromEntries(LAYERS.map(([n, m]) => [n, m]));
 
 export const PBR = {
-  uA: { value: null }, uN: { value: null }, uOn: { value: 0 },
+  uA: { value: null }, uN: { value: null }, uOn: { value: 0 }, uHQ: { value: 0 }, // uHQ: ultra-only extras (anti-tiling 2nd tap)
   // ground height lookup so any material can find "height above ground" (grime at wall bases); set by CoreTerrain
   uGH: { value: null }, uGHRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uGHSize: { value: new THREE.Vector2(1, 1) },
   ready: null, res: 0, maps: {},
@@ -30,7 +30,7 @@ export const PBR_ENABLED = qs.get('pbr') !== '0';
 // GLSL #defines for layer ids + shared helpers. Include once per shader (after <common>).
 export const PBR_GLSL = /* glsl */`
 ${LAYERS.map(([n], i) => `#define L_${n.toUpperCase()} ${i}.0`).join('\n')}
-uniform highp sampler2DArray uPbrA, uPbrN; uniform float uPbrOn;
+uniform highp sampler2DArray uPbrA, uPbrN; uniform float uPbrOn, uPbrHQ;
 const vec3 PBR_MEAN[${LAYERS.length}] = vec3[](${LAYERS.map(([, , m]) => `vec3(${m.map((v) => v.toFixed(4)).join(',')})`).join(',')});
 struct PS { vec3 c; float r; vec2 g; float h; };
 // one tap: c albedo (linear), r roughness, g surface slope along +u/+v of the uv used (image-up = -v), h height 0..1
@@ -41,6 +41,7 @@ PS pbrTap(vec2 uv, float Lr) {
 PS pbrMix(PS a, PS b, float w) { a.c = mix(a.c, b.c, w); a.r = mix(a.r, b.r, w); a.g = mix(a.g, b.g, w); a.h = mix(a.h, b.h, w); return a; }
 // isotropic surfaces: blend with a rotated + offset copy where k (low-frequency noise 0..1) says so -> no visible repeat
 PS pbrIso(vec2 p, float size, float Lr, float k) {
+  if (uPbrHQ < 0.5) return pbrTap(p / size, Lr);   // perf gate: single tap below ultra
   float w0 = smoothstep(0.32, 0.68, k);
   vec2 q = vec2(0.766 * p.x - 0.643 * p.y, 0.643 * p.x + 0.766 * p.y) / size + vec2(0.31, 0.57);
   if (w0 <= 0.0) return pbrTap(p / size, Lr);
@@ -65,7 +66,7 @@ float groundAt(vec2 w) { vec2 f = (w - uGHRect.xy) / uGHRect.z; f = clamp(f, vec
   float a = texelFetch(uGH, i, 0).r, b = texelFetch(uGH, i + ivec2(1, 0), 0).r, c = texelFetch(uGH, i + ivec2(0, 1), 0).r, d = texelFetch(uGH, i + ivec2(1, 1), 0).r;
   return mix(mix(a, b, t.x), mix(c, d, t.x), t.y); }
 `;
-export function pbrUniforms(target) { target.uPbrA = PBR.uA; target.uPbrN = PBR.uN; target.uPbrOn = PBR.uOn; return target; }
+export function pbrUniforms(target) { target.uPbrA = PBR.uA; target.uPbrN = PBR.uN; target.uPbrOn = PBR.uOn; target.uPbrHQ = PBR.uHQ; return target; }
 export function ghUniforms(target) { target.uGH = PBR.uGH; target.uGHRect = PBR.uGHRect; target.uGHSize = PBR.uGHSize; return target; }
 
 // ---- 2D maps for the shared landmark materials. materials.js hands over its existing (procedural) Texture objects;
@@ -169,6 +170,7 @@ export function initPBR(quality = 'high') {
   if (PBR.ready) return PBR.ready;
   if (!PBR_ENABLED) { PBR.ready = Promise.resolve(false); return PBR.ready; }
   const S = (quality === 'low' || quality === 'medium') ? 512 : 1024; PBR.res = S;
+  PBR.uHQ.value = (quality === 'ultra' || qs.get('pbrhq') === '1') ? 1 : 0;
   PBR.res2 = quality === 'ultra' ? 1024 : 512; // 2D landmark maps (ashlar always at the array resolution)
   const base = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/pbr/';
   const t0 = performance.now();
