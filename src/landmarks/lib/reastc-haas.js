@@ -13,7 +13,7 @@ export function haasMats(M) {
   if (_cache.has(M)) return _cache.get(M);
   const clone = (base, hex, name, extra = {}) => { const m = M[base].clone(); m.color = new THREE.Color(hex); m.name = 'haas-' + name; Object.assign(m, extra); return m; };
   const b = boardTex();
-  const siding = new THREE.MeshStandardMaterial({ color: 0xcfc6b8, roughness: 0.9, map: b.map, normalMap: b.normalMap }); siding.normalScale = new THREE.Vector2(0.45, 0.45); siding.name = 'haas-siding';
+  const siding = new THREE.MeshStandardMaterial({ color: 0xb3a99e, roughness: 0.9, map: b.map, normalMap: b.normalMap }); siding.normalScale = new THREE.Vector2(0.45, 0.45); siding.name = 'haas-siding';
   const X = {
     stucco: clone('stuccoWhite', 0xebdabd, 'stucco'),       // smooth sand-beige render (~#D8C9AE)
     cast: clone('stuccoWhite', 0xf8eedb, 'cast'),          // lighter cast-stone trim, plinths, voussoirs (~#E3D5BC)
@@ -21,7 +21,7 @@ export function haasMats(M) {
     roof: clone('slate', 0xb9a596, 'roof', { roughness: 0.8 }),  // dark charcoal-brown slate/concrete tile (~#3B3633)
     fascia: new THREE.MeshStandardMaterial({ color: 0x8a4a32, roughness: 0.55, metalness: 0.25, name: 'haas-fascia' }), // copper-brown eave band
     teal: new THREE.MeshStandardMaterial({ color: 0x4f7a63, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
-    steel: new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.45, metalness: 0.55, name: 'haas-steel' }),   // pergola / trellis
+    steel: new THREE.MeshStandardMaterial({ color: 0xede3cc, roughness: 0.6, metalness: 0.1, name: 'haas-steel' }),     // cream-painted pergola / trellis
   };
   _cache.set(M, X); return X;
 }
@@ -108,7 +108,8 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
 export function loggia(K, R, s0, s1, g, h, { X, pitch = 4.2, rec = 2.4, pier = 0.8, pd = 1.8, pergola = true, yBase } = {}) {
   const M = K.M; const L = s1 - s0; const n = Math.max(1, Math.round(L / pitch)); const bw = L / n;
   const yb = yBase ?? g - 0.8;
-  for (let i = 0; i <= n; i++) { const c = Math.min(s1 - pier / 2, Math.max(s0 + pier / 2, s0 + bw * i)); K.rbox(R, X.stucco, c - pier / 2, yb, -pier, c + pier / 2, g + h, 0.02); K.rbox(R, X.cast, c - pier / 2 - 0.06, g + h - 0.35, -pier - 0.04, c + pier / 2 + 0.06, g + h - 0.1, 0.08); }
+  for (let i = 0; i <= n; i++) { const c = Math.min(s1 - pier / 2, Math.max(s0 + pier / 2, s0 + bw * i)); K.rbox(R, X.stucco, c - pier / 2, yb, -pier, c + pier / 2, g + h, 0.02); K.rbox(R, X.cast, c - pier / 2 - 0.06, g + h - 0.35, -pier - 0.04, c + pier / 2 + 0.06, g + h - 0.1, 0.08);
+    if (i > 0 && i < n) { K.rbox(R, X.cast, c - 0.75, yb, 0.02, c + 0.75, g + 0.5, 0.75, { detail: true }); K.rbox(R, M.soil || M.turf, c - 0.65, g + 0.4, 0.1, c + 0.65, g + 0.52, 0.67, { detail: true }); } }
   K.rbox(R, X.cast, s0, g + h, -rec, s1, g + h + 0.45, 0.06);                       // lintel band over the piers
   K.rbox(R, X.cast, s0, g + h - 0.02, -rec, s1, g + h + 0.02, -0.2);                // soffit
   K.rbox(R, X.cast, s0, yb, -rec, s1, g - 0.1, 0.03);                                // plinth under the loggia floor
@@ -121,8 +122,8 @@ export function loggia(K, R, s0, s1, g, h, { X, pitch = 4.2, rec = 2.4, pier = 0
   if (pergola) { // light steel pergola: outriggers at every pier, an edge beam and slats (chunky enough to read at distance)
     const yP = g + h + 0.1;
     for (let i = 0; i <= n; i++) { const c = Math.min(s1 - 0.2, Math.max(s0 + 0.2, s0 + bw * i)); K.rbox(R, X.steel, c - 0.1, yP, 0.02, c + 0.1, yP + 0.32, pd); }
-    K.rbox(R, X.steel, s0, yP + 0.04, pd - 0.18, s1, yP + 0.32, pd);
-    const ns = Math.max(1, Math.round(L / 0.6)); for (let i = 0; i <= ns; i++) { const s = s0 + L * i / ns; K.rbox(R, X.steel, s - 0.05, yP + 0.32, 0.05, s + 0.05, yP + 0.46, pd, { detail: true }); }
+    K.rbox(R, X.steel, s0, yP + 0.12, pd - 0.12, s1, yP + 0.32, pd);
+    const ns = Math.max(1, Math.round(L / 0.4)); for (let i = 0; i <= ns; i++) { const s = s0 + L * i / ns; K.rbox(R, X.steel, s - 0.04, yP + 0.32, 0.05, s + 0.04, yP + 0.52, pd + 0.15, { detail: true }); }
   }
 }
 

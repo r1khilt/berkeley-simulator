@@ -55,12 +55,12 @@ export async function build(ctx) {
     }
     if (lg) {
       for (let i = 0; i < nb; i++) { const s0 = bw * i, s1 = bw * (i + 1); const gl = gb[i];
-        loggia(K, R, s0, s1, gl + 0.1, Math.max(3.4, yU - gl - 0.55), { X, pitch: bw, rec: 2.3, pier: 0.75, pd: 1.6, yBase: yB });
-        if (yU - gl - 0.1 < GF - 0.1) K.rbox(R, X.stucco, s0, yU - 0.1, -2.3, s1, gl + GF, 0.02); }
-      K.rbox(R, X.stucco, 0, yB, -2.9, L, Math.min(...gb) + 0.1, -2.3);
+        loggia(K, R, s0, s1, gl + 0.1, Math.max(3.4, yU - gl - 0.55), { X, pitch: bw, rec: 1.4, pier: 0.9, pd: 1.8, yBase: yB });
+        if (yU - gl - 0.1 < GF - 0.1) K.rbox(R, X.stucco, s0, yU - 0.1, -1.4, s1, gl + GF, 0.02); }
+      K.rbox(R, X.stucco, 0, yB, -2.0, L, Math.min(...gb) + 0.1, -1.4);
     }
     // pier strips between the window pairs (full height above the base), cast belt + frieze, brackets, fascia
-    for (let i = 0; i <= nb; i++) { const s = Math.min(L - 0.3, Math.max(0.3, bw * i)); K.rbox(R, X.stucco, s - 0.3, lg ? yU : yB, 0, s + 0.3, eave - 0.5, 0.36); }
+    for (let i = 0; i <= nb; i++) { const s = Math.min(L - 0.3, Math.max(0.3, bw * i)); if (lg) K.rbox(R, X.cast, s - 0.08, yU, 0, s + 0.08, eave - 0.5, 0.06); else K.rbox(R, X.stucco, s - 0.3, yB, 0, s + 0.3, eave - 0.5, 0.36); }
     K.rbox(R, X.cast, -0.05, eave - 0.55, 0, L + 0.05, eave - 0.25, 0.42);
     const nbr = Math.max(2, Math.round(L / 1.5)); for (let i = 0; i <= nbr; i++) { const s = 0.25 + (L - 0.5) * i / nbr; K.rbox(R, X.cast, s - 0.08, eave - 0.85, 0.42, s + 0.08, eave - 0.1, 0.85, { detail: true }); }
     if (!lg) K.rbox(R, X.cast, -0.05, yB, 0, L + 0.05, gMin + 0.6, 0.08);
