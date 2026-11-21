@@ -374,7 +374,7 @@ function buildBark(sk, d, lod) {
   }
   if (lod === 0) for (const t of sk.twigs) tube(acc, t.pts.length > 2 && d.arche !== 'pollard' ? [t.pts[0], t.pts[t.pts.length - 1]] : t.pts, t.pts.length > 2 && d.arche !== 'pollard' ? [t.rads[0], t.rads[t.rads.length - 1]] : t.rads, 3);
   else if (d.arche === 'pollard') sk.twigs.forEach((t, i) => { if (i % 3 === 0) tube(acc, [t.pts[0], t.pts[t.pts.length - 1]], [t.rads[0] * 1.5, t.rads[t.rads.length - 1] * 1.5], 3); }); // keep the whip silhouette
-  for (const k of sk.knobs) ico(acc, k.c, k.r, 0.85);
+  for (const k of sk.knobs) { ico(acc, k.c, k.r, 0.85); if (d.arche === 'pollard' && k.r > 0.2) ico(acc, k.c.clone().add(V3(k.r * 0.45, k.r * 0.3, -k.r * 0.3)), k.r * 0.7, 0.9); } // lumpy pollard fists
   return acc;
 }
 
@@ -583,7 +583,7 @@ const SPECIES_DEF = {
     aoLift: 0.25, lod2K: 1.12, name: 'Pollarded London plane', arche: 'pollard', leaf: 'plane', bark: 'plane', seed: 303, typical: { height: 5.5, crownR: 2.8 },
     trunk: { h: 2.3, r0: 0.26, r1: 0.22, lean: 0.01, flare: 0.2, wiggle: 0.02, seg: 8 },
     crown: { base: 2.6, top: 5.5, R: 2.8, shape: ['superegg', 0.45, 2.5], irr: 0.1 },
-    pollard: { limbs: 5, reach: [1.3, 1.9], height: [3.0, 3.5], limbR: 0.12, knobR: 0.22, whips: 14, whipLen: [0.6, 2.4], whipR: 0.016, clumpR: 0.3 }, // a year's whips: brooms on every fist
+    pollard: { limbs: 5, reach: [1.3, 1.9], height: [3.0, 3.5], limbR: 0.13, knobR: 0.3, whips: 14, whipLen: [0.6, 2.4], whipR: 0.016, clumpR: 0.3 }, // a year's whips: brooms on every fist
     cardK: 0.35, cards: { n: 1500, size: 0.9, vbias: 0.6, out: 0.6, face: 0.5, jit: 0.6 },
     normal: 'ellipsoid', seasonal: 'pollard',
     look: { twig: '#6e6553', rough: 0.8, transBack: 0.7, transWrap: 0.3, blobK: 0.71, sway: 0.006, flutter: 0.0018, tintK: 0.3 },
