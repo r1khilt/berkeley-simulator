@@ -39,6 +39,7 @@ export function runSign(K, R, mat, s, y, w, h, d) {
 }
 
 // ---------- shrubs / planting ----------
+export function blobGeo(r, seed) { return blob(r, seed); }
 function blob(r, seed) { const g = new THREE.IcosahedronGeometry(r, 1); const p = g.attributes.position; let s = seed;
   for (let i = 0; i < p.count; i++) { s = (s * 16807) % 2147483647; const k = 0.82 + (s % 1000) / 1000 * 0.32; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.8, p.getZ(i) * k); }
   g.computeVertexNormals(); return g; }
