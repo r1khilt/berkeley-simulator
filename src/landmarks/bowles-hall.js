@@ -114,43 +114,47 @@ export async function build(ctx) {
     }
   }
 
-  // ---------- battlemented entrance tower + stair turret at the inside corner ----------
+  // ---------- battlemented entrance tower at the inside corner (per LiDAR): a ~4 m keep to ~29 m beside a lower battlemented
+  // stair hall (~25.7 m), a slim corner turret and the flagpole; pointed-arch entrance from the court ----------
   {
-    const u0 = -8.5, u1 = -0.3, v0 = -4.1, v1 = 3.3, yTop = 30.6;
-    const yG = K.gMin(u0, v0, u1, v1) - 1.2; const g0 = K.g((u0 + u1) / 2, v1 + 0.5) + 0.15;
-    K.box(M.concreteDark, u0 + 0.5, yG, v0 + 0.5, u1 - 0.5, yTop - 0.1, v1 - 0.5);
-    const faces = [[[u0, v1], [u1, v1]], [[u1, v1], [u1, v0]], [[u1, v0], [u0, v0]], [[u0, v0], [u0, v1]]];
-    faces.forEach(([a, b], fi) => {
-      const R = K.run(a, b, 0.02); const L = R.L, c = L / 2;
-      const ops = [];
-      for (let y = g0 + 7.0; y < yTop - 2.6; y += 6.1) ops.push({ s0: c - 1.1, s1: c + 1.1, y0: y, y1: y + 1.8, grp: true });
-      if (fi === 0) ops.push({ s0: c - 1.45, s1: c + 1.45, y0: g0, y1: g0 + 4.5, arch: 'gothic', rise: 1.5, doorTop: g0 + 3.0, sill: false });
-      if (fi === 1) ops.push({ s0: c - 1.2, s1: c + 1.2, y0: g0, y1: g0 + 3.9, arch: 'gothic', rise: 1.0, doorTop: g0 + 2.75, sill: false });
-      K.wall(R, W, 0, L, yG, yTop, ops, 0.5);
-      for (const o of ops) { if (o.arch) { K.fill(R, o, { kind: 'door', rev: 0.45, door: M.woodDark, frame: T }); K.rbox(R, T, o.s0 - 0.35, o.y1 + 0.05, 0, o.s1 + 0.35, o.y1 + 0.25, 0.15); } else mullGroup(K, R, o, { n: 3, stone: T, sash: SA, depth: 0.5, panes: 1, tranAt: o.y0 + 1.25 }); }
-      K.rbox(R, T, -0.1, yTop - 0.6, 0, L + 0.1, yTop - 0.35, 0.18); // corbel course
-      battlement(K, R, T, -0.15, L + 0.15, yTop - 0.35, 0.75, 0.75, 0.8, 1.25, -0.45, 0.12);
-      K.rbox(R, T, -0.1, g0 + 6.3, 0, L + 0.1, g0 + 6.5, 0.1);
-    });
-    K.box(M.concreteDark, u0 + 0.3, yTop - 0.4, v0 + 0.3, u1 - 0.3, yTop - 0.3, v1 - 0.3);
-    // stair turret rising on the tower's court-side corner
-    const t0 = -3.1, t1 = -0.3, s0 = 0.5, s1 = 3.3, tTop = 32.3;
-    K.box(W, t0, yTop - 1.0, s0, t1, tTop, s1);
-    for (const [a, b] of [[[t0, s1], [t1, s1]], [[t1, s1], [t1, s0]], [[t1, s0], [t0, s0]], [[t0, s0], [t0, s1]]]) {
-      const R = K.run(a, b); const o = { s0: R.L / 2 - 0.25, s1: R.L / 2 + 0.25, y0: yTop + 0.3, y1: yTop + 1.5, sill: false };
-      K.fill(R, o, { rev: -0.03, frame: SA, mull: 0, muntins: 2 });
-      battlement(K, R, T, -0.1, R.L + 0.1, tTop, 0.55, 0.6, 0.55, 0.9, -0.35, 0.1);
+    const g0 = K.g(-3.4, 2.6) + 0.15;
+    const parts = [
+      { u0: -9.4, u1: -5.2, v0: -5.4, v1: 1.0, top: 25.7, door: false },
+      { u0: -5.4, u1: -1.3, v0: -2.8, v1: 1.9, top: 29.0, door: true },
+    ];
+    for (const Pt of parts) {
+      const yG = K.gMin(Pt.u0, Pt.v0, Pt.u1, Pt.v1) - 1.2;
+      K.box(M.concreteDark, Pt.u0 + 0.5, yG, Pt.v0 + 0.5, Pt.u1 - 0.5, Pt.top - 0.1, Pt.v1 - 0.5);
+      const faces = [[[Pt.u0, Pt.v1], [Pt.u1, Pt.v1]], [[Pt.u1, Pt.v1], [Pt.u1, Pt.v0]], [[Pt.u1, Pt.v0], [Pt.u0, Pt.v0]], [[Pt.u0, Pt.v0], [Pt.u0, Pt.v1]]];
+      faces.forEach(([a, b], fi) => {
+        const R = K.run(a, b, 0.02); const L = R.L, c = L / 2;
+        const ops = [];
+        for (let y = g0 + 7.3; y < Pt.top - 2.4; y += 3.05) ops.push({ s0: c - 0.75, s1: c + 0.75, y0: y, y1: y + 1.7 });
+        if (Pt.door && fi === 0) ops.push({ s0: c - 1.25, s1: c + 1.25, y0: g0, y1: g0 + 4.1, arch: 'gothic', rise: 1.35, doorTop: g0 + 2.8, sill: false });
+        K.wall(R, W, 0, L, yG, Pt.top, ops, 0.5);
+        for (const o of ops) { if (o.arch) { K.fill(R, o, { kind: 'door', rev: 0.45, door: M.woodDark, frame: T }); K.rbox(R, T, o.s0 - 0.35, o.y1 + 0.05, 0, o.s1 + 0.35, o.y1 + 0.25, 0.15); } else mullGroup(K, R, o, { n: 2, stone: T, sash: SA, depth: 0.5, panes: 1, tranAt: o.y0 + 1.2 }); }
+        K.rbox(R, T, -0.1, Pt.top - 0.6, 0, L + 0.1, Pt.top - 0.35, 0.2); // corbel course
+        battlement(K, R, T, -0.15, L + 0.15, Pt.top - 0.35, 0.7, 0.7, 0.75, 1.15, -0.45, 0.12);
+      });
+      K.box(M.concreteDark, Pt.u0 + 0.3, Pt.top - 0.4, Pt.v0 + 0.3, Pt.u1 - 0.3, Pt.top - 0.3, Pt.v1 - 0.3);
+      col(Pt.u0, Pt.v0, Pt.u1, Pt.v1, Pt.top + 1);
     }
-    K.cyl(M.whitePaint, (u0 + t0) / 2, yTop - 0.3, (v0 + v1) / 2, 0.08, 0.05, 7.5, 8, { detail: true });
-    col(u0, v0, u1, v1, 34);
+    // slim corner turret rising above the keep, with its own battlement, and the flagpole
+    const t0 = -4.3, t1 = -2.7, s0 = -2.4, s1 = -0.8, tTop = 31.4;
+    K.box(W, t0, 28.6, s0, t1, tTop, s1);
+    for (const [a, b] of [[[t0, s1], [t1, s1]], [[t1, s1], [t1, s0]], [[t1, s0], [t0, s0]], [[t0, s0], [t0, s1]]]) {
+      const R = K.run(a, b); K.fill(R, { s0: R.L / 2 - 0.2, s1: R.L / 2 + 0.2, y0: 29.9, y1: 30.9, sill: false }, { rev: -0.03, frame: SA, mull: 0, muntins: 1 });
+      battlement(K, R, T, -0.08, R.L + 0.08, tTop, 0.45, 0.5, 0.45, 0.8, -0.3, 0.08);
+    }
+    K.cyl(M.whitePaint, (t0 + t1) / 2, tTop + 0.4, (s0 + s1) / 2, 0.07, 0.045, 6.5, 8, { detail: true });
     // entrance steps down to the court
-    const gl = K.g((u0 + u1) / 2, v1 + 4);
-    if (g0 - gl > 0.25) { const n = Math.max(2, Math.round((g0 - gl) / 0.16)); walkables.push(K.stairs(T, u0 + 1.2, v1, u1 - 1.2, v1 + n * 0.32, gl, g0, '-v', n)); }
+    const gl = K.g(-3.35, 1.9 + 4);
+    if (g0 - gl > 0.25) { const n = Math.max(2, Math.round((g0 - gl) / 0.16)); walkables.push(K.stairs(T, -4.9, 1.9, -1.8, 1.9 + n * 0.32, gl, g0, '-v', n)); }
   }
 
   // ---------- terrace along the arcade, steps down to the court lawn, lamp standards ----------
   {
-    const t0 = Bw.u1 + 0.2, t1 = P.u0 - 0.2, tv0 = A.v1, tv1 = A.v1 + 3.4, yT = base - 0.04;
+    const t0 = -1.2, t1 = P.u0 - 0.2, tv0 = A.v1, tv1 = A.v1 + 3.4, yT = base - 0.04;
     K.box(M.paving, t0, yT - 1.4, tv0, t1, yT, tv1);
     K.box(T, t0, yT - 1.4, tv1 - 0.05, t1, yT + 0.02, tv1 + 0.25);
     walkables.push(K.walkPoly([[t0, tv0], [t1, tv0], [t1, tv1 + 0.25], [t0, tv1 + 0.25]], yT));

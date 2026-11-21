@@ -158,7 +158,7 @@ export async function build(ctx) {
   {
     const u0 = 6.5, u1 = 18.5, v0 = -14.5, v1 = -1.5, cu = 12.5, cv = -8.0;
     const yG = K.gMin(u0, v0, u1, v1) - 1.5;
-    const ySh = 33.2, yB1 = 38.7, yPar = 39.5;
+    const ySh = 33.2, yB1 = 38.0, yPar = 38.8;
     K.box(M.concreteDark, u0 + 0.5, yG, v0 + 0.5, u1 - 0.5, ySh - 0.05, v1 - 0.5);
     const runs4 = (a0, a1, b0, b1) => [[[a0, b1], [a1, b1]], [[a1, b1], [a1, b0]], [[a1, b0], [a0, b0]], [[a0, b0], [a0, b1]]];
     for (const [a, b] of runs4(u0, u1, v0, v1)) {
@@ -180,12 +180,12 @@ export async function build(ctx) {
     K.box(M.concreteDark, b0u + 1.0, ySh, b0v + 1.0, b1u - 1.0, yB1, b1v - 1.0);
     for (const [a, b] of runs4(b0u, b1u, b0v, b1v)) {
       const R = K.run(a, b); const L = R.L, c = L / 2;
-      const bo = [-1, 0, 1].map((sg) => ({ s0: c + sg * 2.45 - 0.66, s1: c + sg * 2.45 + 0.66, y0: ySh + 0.75, y1: ySh + 4.75, arch: true, sill: false }));
+      const bo = [-1, 0, 1].map((sg) => ({ s0: c + sg * 2.45 - 0.7, s1: c + sg * 2.45 + 0.7, y0: ySh + 0.6, y1: ySh + 4.2, arch: true, sill: false }));
       K.wall(R, S, 0, L, ySh, yB1, bo, 1.0);
       for (const o of bo) { K.fill(R, o, { glass: B.voidDark, frame: B.frameDark, mull: 0, rev: 0.95 }); K.rbox(R, S, o.s0 - 0.15, o.y0 - 0.25, -0.2, o.s1 + 0.15, o.y0, 0.12); }
       // pilaster piers at the belfry corners and between the arches
       for (const s of [0.45, L - 0.45]) K.rbox(R, S, s - 0.45, ySh, 0, s + 0.45, yB1, 0.22);
-      K.mould(R, S, 0, L, [[0, ySh + 4.0], [0.12, ySh + 4.05], [0.12, ySh + 4.25], [0, ySh + 4.3]]);
+      K.mould(R, S, 0, L, [[0, ySh + 3.5], [0.12, ySh + 3.55], [0.12, ySh + 3.75], [0, ySh + 3.8]]);
       K.mould(R, S, 0, L, [[0, yB1 - 0.45], [0.15, yB1 - 0.38], [0.3, yB1 - 0.15], [0.34, yB1], [0, yB1]]);
       // parapet + scalloped centre panel
       K.rbox(R, S, -0.1, yB1, -0.4, L + 0.1, yPar, 0.0);
@@ -200,11 +200,11 @@ export async function build(ctx) {
     }
     for (const [pu, pv] of [[b0u, b0v], [b1u, b0v], [b1u, b1v], [b0u, b1v]]) { K.box(S, pu - 0.4, yB1, pv - 0.4, pu + 0.4, yPar + 0.45, pv + 0.4); K.lathe(S, [[0.28, 0], [0.28, 0.12], [0.16, 0.28], [0.24, 0.55], [0.001, 1.0]], pu, yPar + 0.45, pv, 10); }
     // short drum + stilted dome in plain cream stucco
-    K.cyl(S, cu, yB1 - 0.2, cv, 4.62, 4.62, 1.2, 36);
-    K.cyl(S, cu, yB1 + 1.0, cv, 4.78, 4.85, 0.3, 36);
-    const prof = []; const R0 = 4.7, st = 0.92, yD = yB1 + 1.3;
+    K.cyl(S, cu, yB1 - 0.2, cv, 4.85, 4.85, 1.2, 40);
+    K.cyl(S, cu, yB1 + 1.0, cv, 5.0, 5.08, 0.3, 40);
+    const prof = []; const R0 = 4.98, st = 1.0, yD = yB1 + 1.3;
     for (let i = 0; i <= 14; i++) { const t = (i / 14) * Math.PI / 2; prof.push([R0 * Math.cos(t), R0 * st * Math.sin(t)]); }
-    K.lathe(S, prof, cu, yD, cv, 36);
+    K.lathe(S, prof, cu, yD, cv, 40);
     K.lathe(S, [[0.3, 0], [0.3, 0.1], [0.2, 0.22], [0.24, 0.42], [0.001, 0.62]], cu, yD + R0 * st - 0.06, cv, 10);
     col(u0, v0, u1, v1, 45);
   }

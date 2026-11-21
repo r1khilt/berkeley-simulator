@@ -18,7 +18,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
-  const CON = concreteMat(0xb1a47b, 'board', { rough: 0.9 });   // monolithic board-formed concrete, khaki buff
+  const CON = concreteMat(0xb8aa7e, 'smooth', { rough: 0.88 });   // monolithic weathered cast concrete, khaki buff
   const CONd = concreteMat(0x9c9277, 'smooth');    // slab edges, shadowed planes
   const PAVE = (() => { const m = M.concrete.clone(); m.color = new THREE.Color(0xd2cbbd); m.roughness = 0.95; return m; })(); // warm grey plaza concrete
   const FR = M.darkBronze, GL = M.windowNight;
@@ -35,7 +35,7 @@ export async function build(ctx) {
     let gMin = Infinity, gMax = -Infinity; for (let k = 0; k <= 8; k++) { const p = R.at(R.L * k / 8, 0.3); const g = K.g(p[0], p[1]); gMin = Math.min(gMin, g); gMax = Math.max(gMax, g); }
     const zone = mid[1] < 24.5 ? 'deck' : (mid[1] > 60.0 && Math.abs(mid[0]) < 23 ? 'lobe' : 'wing');
     const yt = zone === 'lobe' ? 18.0 : PZ;
-    const bands = R.L > 3 ? BANDS.filter((bd) => bd.y0 > gMax + 0.5) : [];
+    const bands = R.L > 3 && gMax < 6.0 ? BANDS.filter((bd) => bd.y0 > gMax + 0.5) : []; // window bands only where the hillside falls away (west/north)
     bandWall(K, R, CON, gMin - 1.5, yt, bands, { depth: 0.45, rev: 0.32, pitch: 1.55, margin: Math.min(1.2, R.L * 0.15), frame: FR, glass: GL });
     for (const bd of bands) fascia(K, R, CON, bd.y1, bd.y1 + 0.75, 0.5, { s0: 0, s1: R.L, back: 0.45 });
     if (zone === 'deck') { // parapet with coping around the plaza
@@ -115,10 +115,9 @@ export async function build(ctx) {
     // folded-plate exhibit hall: steep battered concrete faces rising straight off the plaza, a lower-pitched upper fold,
     // then a small vertical-sided crown box on the plateau (LiDAR: edge ~19 m, crown ~21.8–22.5 m)
     const r1 = offsetRing(base, -2.7), r2 = offsetRing(base, -5.9);
-    frustum(K, CON, base, r1, PZ, 19.8, { cap: false, uvMode: "roof" });
-    frustum(K, CON, r1, r2, 19.8, 22.4, { cap: true, uvMode: 'roof' });
+    frustum(K, CON, base, r2, PZ, 22.4, { cap: true, uvMode: 'roof' }); // one continuous battered plane, small flat top
     // crisp fold ribs down the hips (detail)
-    for (let i = 0; i < base.length; i++) { const a = base[i], b = r1[i]; const L = Math.hypot(b[0] - a[0], 19.8 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 19.8, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 19.8) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
+    for (let i = 0; i < base.length; i++) { const a = base[i], b = r2[i]; const L = Math.hypot(b[0] - a[0], 22.4 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 22.4, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 22.4) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
     colliders.push(K.colPoly(base, PZ - 1, 21.8));
   }
   // south stair/service blocks (flat roofs at the spine height)

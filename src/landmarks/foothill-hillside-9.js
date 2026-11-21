@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const RM = rmats(ctx.M); const look = { mats: { cedar: RM.fhCedar, roof: RM.fhRoof }, stagger: 1.4, rise: 1.6, bay: 4.4 }; // refine-east-b look
+  const RM = rmats(ctx.M); const look = { mats: { cedar: RM.fhCedar, roof: RM.fhRoof, fret: RM.fhFret }, stagger: 1.4, rise: 1.6, bay: 4.4 }; // refine-east-b look
   const blocks = [
     { u0: -11.5, u1: 11.5, v0: -6.5, v1: 6.5, g: 0.1, eave: 9.6, ridge: 12.8, axis: 'u', split: false },
   ];

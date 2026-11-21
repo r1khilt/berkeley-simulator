@@ -55,16 +55,34 @@ function cedarTex(base = [112, 80, 56], warmth = [22, 12, 6]) {
     for (let r = 0; r < rows; r++) {
       let x = -rnd() * 40;
       while (x < W) {
-        const w = 22 + rnd() * 48; const k = 0.82 + rnd() * 0.3; const warm = rnd();
+        const w = 22 + rnd() * 48; const k = 0.9 + rnd() * 0.14; const warm = rnd();
         c.fillStyle = `rgb(${Math.round((base[0] + warm * warmth[0]) * k)},${Math.round((base[1] + warm * warmth[1]) * k)},${Math.round((base[2] + warm * warmth[2]) * k)})`;
         c.fillRect(x, r * rh, w, rh);
-        c.fillStyle = 'rgba(30,20,14,0.22)'; c.fillRect(x + w - 1.2, r * rh + rh * 0.35, 1.2, rh * 0.65);
+        c.fillStyle = 'rgba(30,20,14,0.07)'; c.fillRect(x + w - 1, r * rh + rh * 0.4, 1, rh * 0.6);
         for (let g = 0; g < 3; g++) { c.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.04})`; c.fillRect(x + rnd() * w, r * rh, 1, rh); }
         x += w;
       }
-      const gr = c.createLinearGradient(0, r * rh + rh * 0.7, 0, (r + 1) * rh);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(20,12,8,0.45)');
-      c.fillStyle = gr; c.fillRect(0, r * rh + rh * 0.7, W, rh * 0.3);
+      const gr = c.createLinearGradient(0, r * rh + rh * 0.55, 0, (r + 1) * rh);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(20,14,10,0.35)');
+      c.fillStyle = gr; c.fillRect(0, r * rh + rh * 0.55, W, rh * 0.45);
+      c.fillStyle = 'rgba(18,12,8,0.75)'; c.fillRect(0, (r + 1) * rh - 3, W, 3); // crisp butt-edge shadow of the course above
+    }
+  }, { repeat: true });
+}
+
+// Horizontal lap siding (stained redwood boards): 13 boards per 2 m, light-to-dark gradient per board, shadow line, faint grain.
+function lapTex(base) {
+  return canvasTex(512, 512, (c, W, H) => {
+    const n = 13, bh = H / n;
+    for (let j = 0; j < n; j++) {
+      const k = 0.9 + hash(j, 3, 1) * 0.16; const y = j * bh;
+      const g = c.createLinearGradient(0, y, 0, y + bh);
+      g.addColorStop(0, `rgb(${Math.round(base[0] * k * 1.08)},${Math.round(base[1] * k * 1.08)},${Math.round(base[2] * k * 1.08)})`);
+      g.addColorStop(0.85, `rgb(${Math.round(base[0] * k * 0.92)},${Math.round(base[1] * k * 0.92)},${Math.round(base[2] * k * 0.92)})`);
+      g.addColorStop(1, `rgb(${Math.round(base[0] * 0.45)},${Math.round(base[1] * 0.45)},${Math.round(base[2] * 0.45)})`);
+      c.fillStyle = g; c.fillRect(0, y, W, bh);
+      for (let i = 0; i < 30; i++) { c.fillStyle = `rgba(0,0,0,${0.03 + hash(i, j, 2) * 0.05})`; c.fillRect(hash(i, j, 4) * W, y + hash(i, j, 5) * bh * 0.8, 20 + hash(i, j, 6) * 120, 1); }
+      for (let i = 0; i < 2; i++) { c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(hash(i, j, 8) * W, y, 1.5, bh); } // rare butt joints
     }
   }, { repeat: true });
 }
@@ -84,11 +102,11 @@ export function rmats(M) {
     sashDark: std({ color: 0x2f2c29, roughness: 0.55 }),
     loggia: std({ color: 0x2a2724, roughness: 0.95 }),
     // I-House: bright smooth off-white stucco
-    ihStucco: std({ color: 0xece4d3, roughness: 0.9 }), // smooth warm-cream stucco, near-white in sun
+    ihStucco: std({ color: 0xe9ddc2, roughness: 0.9 }), // smooth warm-cream stucco
     ihTrim: tinted(M.stuccoWhite, 0xe9e2d2, 0.9),
     rafter: std({ color: 0x4a3a2e, roughness: 0.8 }),
     ihSash: std({ color: 0x6a4e3a, roughness: 0.6 }),
-    ihTile: tinted(M.redTile, 0xd8f0ff, 0.82),
+    ihTile: tinted(M.redTile, 0xfff2ea, 0.8), // bright orange terracotta barrel tile
     brickRed: tinted(M.brick, 0xe0a898, 0.9),
     // SLMath: flat, uniform warm orange-brown brick; dark bronze sash
     slBrick: std({ map: brickTex(['#9a5a3c', '#9d5d3e', '#97583b', '#a0603f', '#985a3d'], '#a88a76'), roughness: 0.9 }),
@@ -96,10 +114,11 @@ export function rmats(M) {
     coping: std({ color: 0x6e5c50, roughness: 0.5, metalness: 0.4 }),
     concreteLight: tinted(M.concrete, 0xe3ded2, 0.95),
     // Foothill v2: weathered cedar shingle walls, warm dark composition-shingle roofs
-    fhCedar: std({ map: cedarTex(), roughness: 0.93 }),
+    fhCedar: std({ map: cedarTex([98, 80, 64], [14, 8, 4]), roughness: 0.93 }),
+    fhFret: (() => { const t = canvasTex(256, 256, (c, W, H) => { c.clearRect(0, 0, W, H); c.strokeStyle = '#f0efe9'; c.lineWidth = 18; for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * W / 2, 0); c.lineTo(k * W / 2 + W, H); c.stroke(); c.beginPath(); c.moveTo(k * W / 2 + W, 0); c.lineTo(k * W / 2, H); c.stroke(); } c.lineWidth = 14; c.strokeRect(0, 0, W, H); }, { repeat: true }); return new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6 }); })(), // white diagonal lattice
     fhRoof: tinted(M.shingle, 0x5e544c, 0.92),
     // Julia Morgan Hall / Botanical Garden halls: dark grey-brown stained redwood shingle, light grey composition roof
-    jmShingle: std({ map: cedarTex([74, 66, 60], [10, 6, 4]), roughness: 0.9 }),
+    jmShingle: std({ map: lapTex([74, 68, 62]), roughness: 0.88 }),
     jmRoof: tinted(M.shingle, 0xb8b9b6, 0.9),
     jmTrim: std({ color: 0x2f2c29, roughness: 0.7 }),
     jmSash: std({ color: 0x3a3632, roughness: 0.6 }),

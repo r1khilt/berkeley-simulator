@@ -33,12 +33,12 @@ export async function build(ctx) {
   gothRange(K, { ...common, ...east, ridge: 0, bay: 2.6, lights: () => 3, lightW: 0.42, skip: (f, s) => f === 'W' && s > 6.0 });
   // shingled hip roofs, moderate eaves with thin dark fascias
   for (const b of [main, west, east]) {
-    const ov = 0.6, span = Math.min(b.u1 - b.u0, b.v1 - b.v0) / 2 + ov;
+    const ov = 0.95, span = Math.min(b.u1 - b.u0, b.v1 - b.v0) / 2 + ov;
     K.hip(RF, b.u0 - ov, b.v0 - ov, b.u1 + ov, b.v1 + ov, b.eave - 0.12, (b.ridge - b.eave) / span);
     for (const [a, c] of [[[b.u0 - ov, b.v1 + ov], [b.u1 + ov, b.v1 + ov]], [[b.u1 + ov, b.v1 + ov], [b.u1 + ov, b.v0 - ov]], [[b.u1 + ov, b.v0 - ov], [b.u0 - ov, b.v0 - ov]], [[b.u0 - ov, b.v0 - ov], [b.u0 - ov, b.v1 + ov]]]) {
       const Rr = K.run(a, c); K.rbox(Rr, TR, 0, b.eave - 0.3, -0.02, Rr.L, b.eave - 0.12, 0.03);
     }
-    K.box(M.woodDark, b.u0 - 0.55, b.eave - 0.16, b.v0 - 0.55, b.u1 + 0.55, b.eave - 0.12, b.v1 + 0.55); // soffit
+    K.box(M.woodDark, b.u0 - 0.9, b.eave - 0.16, b.v0 - 0.9, b.u1 + 0.9, b.eave - 0.12, b.v1 + 0.9); // soffit
     col(b.u0, b.v0, b.u1, b.v1, b.ridge + 0.5);
   }
   // small gablet at the west end of the main ridge

@@ -13,7 +13,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const RM = rmats(ctx.M); const look = { mats: { cedar: RM.fhCedar, roof: RM.fhRoof }, stagger: 1.4, rise: 1.6, bay: 4.4 }; // refine-east-b look
+  const RM = rmats(ctx.M); const look = { mats: { cedar: RM.fhCedar, roof: RM.fhRoof, fret: RM.fhFret }, stagger: 1.4, rise: 1.6, bay: 4.4 }; // refine-east-b look
   const a = foothillBuild(ctx, 24, [
     { u0: -91.5, u1: -26.5, v0: -24.0, v1: -12.0, g: 0.1, eave: 14.0, ridge: 18.2, axis: 'u' },
   ], (K, F) => { fhBalconyBay(K, F, K.run([-91.5, -12.0], [-26.5, -12.0]), 20.0, 4.6, 0.6, 14.0, { d: 1.8 }); fhBoxBay(K, F, K.run([-91.5, -12.0], [-26.5, -12.0]), 44.0, 3.4, 0.6 + 3.85, 2); }, look);
