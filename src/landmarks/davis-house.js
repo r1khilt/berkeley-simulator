@@ -16,13 +16,14 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -8.4); const M = ctx.M;
-  const ST = coopMat('stucco', '#e9e4d6'), BR = M.brick, TL = coopMat('paint', '#3f6e62'), FAS = coopMat('paint', '#2f4f45'), RF = coopMat('roof', '#5e5850');
-  const cas = { w: 0.62, h: 1.6, sill: 0.8, pattern: [2, 3, 2, 1], gap: 0.1, mull: 0, tran: 0.65, muntins: 2, rev: 0.16, casing: 0.1, frame: TL };
-  const wins = [{ ...cas, pattern: [2, 1, 2], h: 1.5 }, { ...cas }, { ...cas, pattern: [3, 2, 1, 2] }, { ...cas, h: 1.25 }];
-  const floors = [1.0, 4.4, 7.6, 10.4, 12.9];
+  const ST = coopMat('stucco', '#ede4cc'), BR = M.brick, TL = coopMat('paint', '#2f5a4c'), FAS = coopMat('paint', '#1f4a3a'), RF = coopMat('roof', '#5e5850');
+  const cas = { w: 0.6, h: 1.8, sill: 0.7, pattern: [3, 4, 3], gap: 0.1, mull: 0, tran: 0.72, muntins: 2, rev: 0.16, casing: 0.12, frame: TL };
+  // tall brick ground storey (French doors/windows), then two full stucco storeys of grouped casement ribbons + attic
+  const wins = [{ ...cas, pattern: [2, 2], h: 2.3, sill: 0.4, w: 0.7 }, { ...cas }, { ...cas, pattern: [4, 3, 4] }, { ...cas, h: 1.2, pattern: [3] }];
+  const floors = [1.0, 4.6, 7.8, 10.6, 12.9];
   const hip = (sl, ov = 1.0) => ({ type: 'hip', slope: sl, overhang: ov, mat: RF, fascia: FAS, soffitMat: FAS, fasciaH: 0.3, tails: true, tailMat: FAS, tailSp: 0.7 });
-  const main = K.block({ u0: -9.45, u1: 18.53, v0: -7.64, v1: 6.06, floors, wall: ST, wallMats: [BR, BR], trim: TL, wins, bay: 3.4, roof: hip(0.45), belts: [4.4], beltMat: TL });
-  const west = K.block({ u0: -18.13, u1: -9.45, v0: -7.64, v1: 7.24, floors: [1.0, 4.2, 7.2], wall: ST, wallMats: [BR, BR], trim: TL, wins, bay: 3.2, roof: hip(0.32, 0.8) });
+  const main = K.block({ u0: -9.45, u1: 18.53, v0: -7.64, v1: 6.06, floors, wall: ST, wallMats: [BR], trim: TL, wins, bay: 3.6, roof: hip(0.36, 0.95), belts: [4.6], beltMat: TL });
+  const west = K.block({ u0: -18.13, u1: -9.45, v0: -7.64, v1: 7.24, floors: [1.0, 4.6, 7.8], wall: ST, wallMats: [BR], trim: TL, wins, bay: 3.2, roof: hip(0.32, 0.9) });
   const bay = K.block({ u0: -9.45, u1: 11.24, v0: 6.06, v1: 8.27, floors: [1.0, 4.4, 7.5], wall: ST, wallMats: [BR, BR], trim: TL, wins: [wins[0], { ...cas, pattern: [2, 1, 2, 1, 2], w: 0.7, h: 2.1, sill: 0.15 }], bay: 3.4,
     roof: { type: 'flat', parapet: 0, overhang: 0.25, eaveMat: FAS, eaveH: 0.3 }, faces: { S: { doors: [{ s: 10.3, w: 1.6, h: 2.6, door: coopMat('paint', '#5b3b28'), frame: TL }] } } });
   K.buildBlocks();
@@ -33,12 +34,19 @@ export async function build(ctx) {
     K.rbox(R, coopMat('paint', '#5a4030'), 7.9, 4.0, 0.15, 12.7, 4.35, 0.6);
     for (const s of [8.9, 11.7]) K.lathe(M.iron, [[0.02, 0], [0.14, 0.15], [0.16, 0.45], [0.06, 0.6], [0.001, 0.62]], 0, 0, 0, 8, { detail: true }) && null; }
   // second iron balcony on the west wing's south face
-  // half-timber accents on the top floor at the east end of the Bancroft Steps front
-  { const R = main.runS; const DK = coopMat('paint', '#4a3a2c');
-    for (const [s0, s1, y0, y1] of [[R.L - 9.5, R.L - 0.4, 7.65, 12.75], [0.4, 7.0, 10.45, 12.75]]) {
-      for (let s = s0; s <= s1 + 0.01; s += 1.3) K.rbox(R, DK, s - 0.08, y0, 0, s + 0.08, y1, 0.06);
-      for (const y of [y0 + 0.05, (y0 + y1) / 2, y1 - 0.05]) K.rbox(R, DK, s0 - 0.1, y - 0.08, 0, s1 + 0.1, y + 0.08, 0.06);
-      for (let s = s0; s < s1 - 1.2; s += 2.6) { const L = Math.hypot(1.3, (y1 - y0) / 2), g = new THREE.BoxGeometry(L, 0.12, 0.05); g.rotateZ(Math.atan2((y1 - y0) / 2, 1.3)); g.translate(s + 0.65, y0 + (y1 - y0) * 0.25, 0.03); K.addRun(R, DK, g, { detail: true }); } } }
+  // half-timber accents on the east half of the Bancroft Steps front: broad dark boards in large rectangular panels
+  { const R = main.runS; const DK = coopMat('paint', '#2b3a2f');
+    const s0 = R.L - 11.0, s1 = R.L - 0.4, y0 = 7.85, y1 = 12.75;
+    for (let s = s0; s <= s1 + 0.01; s += 1.2) K.rbox(R, DK, s - 0.1, y0, 0, s + 0.1, y1, 0.07);
+    for (const y of [y0 + 0.1, 10.55, y1 - 0.1]) K.rbox(R, DK, s0 - 0.1, y - 0.1, 0, s1 + 0.1, y + 0.1, 0.07); }
+  // green pent skirt between the brick storey and the stucco above (front and the west bay)
+  for (const R of [main.runS, west.runS]) { K.rbox(R, FAS, -0.2, 4.55, 0, R.L + 0.2, 4.8, 0.65); K.rbox(R, FAS, -0.2, 4.4, 0.45, R.L + 0.2, 4.55, 0.65); }
+  // full-width wrought-iron balcony on deep brackets across the projecting west bay, French door behind it
+  { const R = west.runS; const y = 4.85;
+    K.rbox(R, FAS, 0.2, y - 0.2, 0, R.L - 0.2, y, 0.95);
+    for (let s = 0.6; s < R.L - 0.3; s += (R.L - 1.2) / 4) K.rbox(R, FAS, s - 0.09, y - 0.85, 0, s + 0.09, y - 0.2, 0.85);
+    K._rail(R, 0.3, R.L - 0.3, 0.9, y, M.iron, 1.0);
+    K.walkables.push(K.walkRun(R, 0.2, R.L - 0.2, 0, 0.95, () => y)); }
   K.chimney(4.0, -3.0, 0.9, 0.8, 16.9, BR);
   return K.done('davis-house');
 }

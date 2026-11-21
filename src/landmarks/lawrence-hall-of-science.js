@@ -18,9 +18,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
-  const CON = concreteMat(0xcfc39d, 'smooth', { rough: 0.95 });   // khaki-tan cast concrete
-  const CONd = concreteMat(0xaaa186, 'smooth');    // roofs, slab edges, shadowed planes
-  const PAVE = concreteMat(0x8e8f8b, 'smooth', { rough: 0.95, normal: 0.4 }); // weathered grey plaza deck
+  const CON = concreteMat(0xa59d80, 'board', { rough: 0.95 });   // monolithic board-formed concrete, khaki/olive grey
+  const CONd = concreteMat(0x8f8870, 'smooth');    // slab edges, shadowed planes
+  const PAVE = concreteMat(0xc6c2b8, 'smooth', { rough: 0.95, normal: 0.4 }); // light weathered plaza paving
   const FR = M.darkBronze, GL = M.windowNight;
   const PZ = 12.0;                                  // plaza / exhibit-hall floor level
   const colliders = [], walkables = [], interactions = [];
@@ -48,15 +48,23 @@ export async function build(ctx) {
   }
   // cubic piers on the parapet every ~16 m
   deckEdges.slice().sort((p, q) => q.L - p.L).slice(0, 4).forEach((R) => { const s = R.L / 2; K.rbox(R, CON, s - 1.0, PZ, -2.0, s + 1.0, PZ + 2.4, 0.05); });
-  // plaza deck + podium collider + painted line grid
+  // plaza deck + podium collider + expansion-joint grid
   K.flat(PAVE, fp, PZ);
+  {
+    const inside = (x, z) => { let c = false; for (let i = 0, j = fp.length - 1; i < fp.length; j = i++) { const [xi, zi] = fp[i], [xj, zj] = fp[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+    const JM = concreteMat(0x8a877f, 'smooth', { rough: 0.95, normal: 0.2 }); const step = 4.5;
+    for (let x = -42; x <= 42; x += step) for (let z = -66; z < 24; z += step) {
+      if (inside(x, z + step / 2) && inside(x, z) && inside(x, z + step)) K.box(JM, x - 0.04, PZ, z, x + 0.04, PZ + 0.012, z + step, { detail: true });
+      if (inside(x + step / 2, z) && inside(x, z) && inside(x + step, z)) K.box(JM, x, PZ, z - 0.04, x + step, PZ + 0.012, z + 0.04, { detail: true });
+    }
+  }
   colliders.push({ type: 'poly', pts: fp.map((p) => p.map((q) => +q.toFixed(3))), y0: -3, y1: PZ - 0.05 });
   walkables.push({ type: 'poly', pts: fp.map((p) => p.map((q) => +q.toFixed(3))), y: PZ });
   // ---------- monolithic faceted concrete masses: blind board-formed walls rising straight from the plaza, then steep
   // facets up to a truncated top (no eaves; same concrete for walls and facets) ----------
   const ring4 = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
   const oct = (u0, v0, u1, v1, c) => [[u0 + c, v0], [u1 - c, v0], [u1, v0 + c], [u1, v1 - c], [u1 - c, v1], [u0 + c, v1], [u0, v1 - c], [u0, v0 + c]];
-  const FAC = concreteMat(0xd6c290, 'smooth', { rough: 1.0 }); // facets: same concrete, warmer tint offsets the sky light on the slopes
+  const FAC = CON; // walls and roof facets read as one monolithic concrete mass (no eaves, same material)
   const mass = (ring, topInset, y0, yWall, yTop, holes = null) => {
     if (holes) { const r = facadeRing(ring); r.forEach((a, i) => { const b = r[(i + 1) % r.length]; const R = K.run(a, b); if (R.L <= 0.2) return; const ops = holes(a, b, R) || []; K.wall(R, CON, 0, R.L, y0, yWall, ops, 0.6); for (const o of ops) if (!o.door) { K.rbox(R, GL, o.s0, o.y0, -0.42, o.s1, o.y1, -0.38); K.rbox(R, CONd, o.s0 - 0.05, o.y0 - 0.1, -0.42, o.s1 + 0.05, o.y0, 0.05); } }); K.prism(CONd, offsetRing(ring, -0.6), y0, yWall - 0.02, {}); }
     else frustum(K, CON, ring, ring, y0, yWall, { cap: false, uvMode: 'box' });
@@ -68,10 +76,9 @@ export async function build(ctx) {
   {
     const ring = oct(-14.0, -3.8, 16.0, 19.6, 3.4);
     let RN = null;
-    mass(ring, 3.3, PZ - 0.1, 17.2, 21.2, (a, b, R) => {
+    mass(ring, 5.4, PZ - 0.1, 18.0, 21.0, (a, b, R) => {
       if (Math.abs(a[1] + 3.8) < 1e-6 && Math.abs(b[1] + 3.8) < 1e-6) { RN = R; const sc = a[0] - 0.0; return [{ s0: sc - 1.7, s1: sc + 1.7, y0: PZ, y1: PZ + 4.4, door: true }]; }
-      if (Math.max(a[1], b[1]) > 19) return [];
-      return R.L > 8 ? slits(R, PZ + 0.6, PZ + 4.2, 7.5) : [];
+      return []; // blind board-formed walls apart from the entrance
     });
     // deep entrance recess lined in rust-orange, glass doors at the back
     const RED = plainMat(0xb5612e, { roughness: 0.8 });
@@ -105,7 +112,7 @@ export async function build(ctx) {
   ];
   for (const base of wings) {
     K.prism(CONd, offsetRing(base, 0.5), PZ - 0.2, PZ + 0.45); // ledge where the hall meets the podium roof
-    mass(base, 6.8, PZ, 16.4, 21.8, (a, b, R) => (Math.abs((a[0] + b[0]) / 2) < 14 || R.L < 8 ? [] : slits(R, PZ + 0.9, PZ + 3.9, 6.0, 0.5)));
+    mass(base, 7.4, PZ, 17.8, 22.0); // blind exhibit-hall walls, low concrete hip over each hall
     colliders.push(K.colPoly(base, PZ - 1, 21.8));
   }
   // south stair/service blocks (flat roofs at the spine height)

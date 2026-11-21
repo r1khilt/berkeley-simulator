@@ -23,16 +23,40 @@ function clayTileTex(palette) {
   }, { repeat: true });
 }
 
+// Running-bond brick with a custom palette (one 2 m tile = 9 bricks x 27 courses, like the shared brick).
+function brickTex(palette, mortar) {
+  return canvasTex(512, 512, (c, W, H) => {
+    c.fillStyle = mortar; c.fillRect(0, 0, W, H);
+    const nx = 9, ny = 27, bw = W / nx, bh = H / ny;
+    for (let j = 0; j < ny; j++) for (let i = -1; i <= nx; i++) {
+      const x = i * bw + (j % 2) * bw * 0.5, y = j * bh; const k = hash(i, j, 5);
+      c.fillStyle = palette[Math.floor(k * palette.length) % palette.length]; c.fillRect(x + 1.2, y + 1.6, bw - 2.4, bh - 2.2);
+      c.fillStyle = `rgba(0,0,0,${hash(i, j, 7) * 0.12})`; c.fillRect(x + 1.2, y + 1.6, bw - 2.4, bh - 2.2);
+    }
+  }, { repeat: true });
+}
+
+// Board-formed cast concrete: low-contrast warm grey with horizontal lift lines (0.67 m), faint board grain and grime streaks.
+function castConcreteTex(base) {
+  return canvasTex(512, 512, (c, W, H) => {
+    c.fillStyle = base; c.fillRect(0, 0, W, H);
+    for (let i = 0; i < 2400; i++) { const x = hash(i, 1, 2) * W, y = hash(i, 2, 3) * H, r = 1 + hash(i, 3, 4) * 5; c.fillStyle = `rgba(${hash(i, 4, 5) > 0.5 ? '255,255,255' : '0,0,0'},${0.025 + hash(i, 5, 6) * 0.03})`; c.fillRect(x, y, r * 3, r); }
+    for (let k = 0; k < 40; k++) { const y = (k / 40) * H; c.fillStyle = `rgba(0,0,0,${0.015 + hash(k, 7, 8) * 0.02})`; c.fillRect(0, y, W, 2); }
+    for (let k = 0; k < 3; k++) { const y = (k / 3) * H; c.fillStyle = 'rgba(60,55,48,0.22)'; c.fillRect(0, y, W, 3); c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(0, y + 3, W, 2); }
+    for (let k = 0; k < 14; k++) { const x = hash(k, 9, 1) * W, w = 6 + hash(k, 9, 2) * 18; const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(70,64,56,0.10)'); g.addColorStop(1, 'rgba(70,64,56,0.0)'); c.fillStyle = g; c.fillRect(x, 0, w, H * (0.4 + hash(k, 9, 3) * 0.6)); }
+  }, { repeat: true });
+}
+
 export function rmats(M) {
   if (_mats.has(M)) return _mats.get(M);
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const tinted = (base, color, rough) => { const m = base.clone(); m.color = new THREE.Color(color); if (rough != null) m.roughness = rough; return m; };
   const o = {
     // Bowles Hall: board-formed concrete scored like ashlar, warm light grey-beige; smooth cast trim; variegated clay tile
-    bowWall: tinted(M.ashlar, 0xebe5d9, 0.92),
+    bowWall: std({ map: castConcreteTex('#c3bcae'), roughness: 0.88 }),
     bowTrim: tinted(M.stuccoWhite, 0xd8d1c2, 0.9),
     bowShade: tinted(M.concrete, 0xc9c2b4, 0.95),
-    clayTile: std({ map: clayTileTex(['#b5543d', '#c9714f', '#8e3e2e', '#a9583f', '#bf6446', '#9d4a35', '#b86a4c', '#a44b37']), roughness: 0.82 }),
+    clayTile: std({ map: clayTileTex(['#9e4a35', '#b35e3e', '#7e3b2c', '#a4553d', '#8f4632', '#b0654a', '#94503a', '#a85a40']), roughness: 0.85 }),
     sash: std({ color: 0xe8e6df, roughness: 0.5 }),
     sashDark: std({ color: 0x2f2c29, roughness: 0.55 }),
     loggia: std({ color: 0x2a2724, roughness: 0.95 }),
@@ -40,7 +64,14 @@ export function rmats(M) {
     ihStucco: tinted(M.stuccoWhite, 0xf4efe3, 0.93),
     ihTrim: tinted(M.stuccoWhite, 0xe9e2d2, 0.9),
     rafter: std({ color: 0x4a3a2e, roughness: 0.8 }),
+    ihSash: std({ color: 0x6a4e3a, roughness: 0.6 }),
+    ihTile: tinted(M.redTile, 0xd8f0ff, 0.82),
     brickRed: tinted(M.brick, 0xe0a898, 0.9),
+    // SLMath: flat, uniform warm orange-brown brick; dark bronze sash
+    slBrick: std({ map: brickTex(['#9c5a3c', '#a5603f', '#935438', '#a86a47', '#985a40'], '#b3a593'), roughness: 0.9 }),
+    bronze: std({ color: 0x2f2b27, roughness: 0.45, metalness: 0.5 }),
+    coping: std({ color: 0x6e5c50, roughness: 0.5, metalness: 0.4 }),
+    concreteLight: tinted(M.concrete, 0xe3ded2, 0.95),
   };
   _mats.set(M, o);
   return o;

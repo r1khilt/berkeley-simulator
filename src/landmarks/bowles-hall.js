@@ -24,7 +24,7 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const W = B.bowWall, T = B.bowTrim, RT = B.clayTile, SA = B.sash;
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
-  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4 };
+  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.14 };
 
   // ---------- ranges ----------
   const A = { u0: -15.0, u1: 36.5, v0: -12.6, v1: -1.0, eave: 20.6, ridge: 27.6, axis: 'u' };

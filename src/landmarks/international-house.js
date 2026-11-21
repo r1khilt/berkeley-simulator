@@ -23,9 +23,10 @@ export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-8.8));
   const colliders = [], walkables = [];
   const S = RM.ihStucco; // bright smooth off-white stucco
-  const SASH = RM.sash;   // white-painted double-hung sash
+  const SASH = RM.ihSash; // brown-painted double-hung sash
+  const TM = RM.ihTile;   // muted terracotta barrel tile
   // every stucco block: off-white walls, white sash, deeper eaves
-  const stuccoBlock = (K, sp) => stuccoBlock0(K, { mat: S, frame: SASH, overhang: 0.85, ...sp });
+  const stuccoBlock = (K, sp) => stuccoBlock0(K, { mat: S, frame: SASH, overhang: 0.85, roofMat: TM, ...sp });
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
   const win = { w: 1.2, h: 1.55, mull: 1, muntins: 1 };
   const gwin = { w: 1.3, h: 2.0, mull: 1, muntins: 1, tran: 0.72 };
@@ -35,11 +36,11 @@ export async function build(ctx) {
     // u0, u1, v0, v1, eave, ridge, faces
     { u0: -26.0, u1: 5.3, v0: -35.2, v1: -19.2, eave: 12.0, ridge: 14.4, faces: { E: false, W: false } },  // north range
     { u0: -31.0, u1: -26.0, v0: -35.2, v1: -19.2, eave: 7.4, ridge: 9.0, faces: { E: false } },           // its low west end
-    { u0: -34.9, u1: -26.6, v0: -13.5, v1: -0.3, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u' },          // NW wing (forecourt arm)
+    { u0: -34.9, u1: -26.6, v0: -13.5, v1: -0.3, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u', cornice: false },          // NW wing (forecourt arm)
     { u0: -34.9, u1: -26.6, v0: -19.2, v1: -13.5, eave: 7.0, ridge: 8.4, faces: { E: false, S: false } },   // low NW corner
     { u0: -26.6, u1: 5.3, v0: -15.0, v1: -2.6, eave: 15.8, ridge: 18.4, faces: { E: false } },            // central range
     { u0: -26.6, u1: -13.1, v0: -2.6, v1: 20.6, eave: 15.8, ridge: 18.4, faces: { N: false, S: false }, gal: true }, // range behind the pavilion
-    { u0: -35.2, u1: -26.6, v0: 20.2, v1: 32.9, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u' },          // SW wing (forecourt arm)
+    { u0: -35.2, u1: -26.6, v0: 20.2, v1: 32.9, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u', cornice: false },          // SW wing (forecourt arm)
     { u0: -26.6, u1: 5.3, v0: 20.6, v1: 33.6, eave: 15.8, ridge: 18.4, faces: { E: false } },             // south range
   ];
   for (const b of blocks) {
@@ -57,7 +58,7 @@ export async function build(ctx) {
     const ops = []; for (let s = 1.6; s < R.L - 1.5; s += 3.1) ops.push({ s0: s - 0.9, s1: s + 0.9, y0: g + 0.3, y1: g + 3.0, arch: true, sill: false });
     K.wall(R, S, 0, R.L, g - 1.5, 7.4, ops, 0.5);
     for (const o of ops) K.fill(R, o, { frame: B.frameDark, mull: 1, rev: 0.4 });
-    shedRoof(K, M.redTile, -13.4, hi === 'v0' ? v0 : v0 - 0.5, 5.3, hi === 'v0' ? v1 + 0.5 : v1, 7.3, 8.6, hi);
+    shedRoof(K, TM, -13.4, hi === 'v0' ? v0 : v0 - 0.5, 5.3, hi === 'v0' ? v1 + 0.5 : v1, 7.3, 8.6, hi);
   }
   // inner courtyard paving
   { const g = K.gMin(-13.1, 1.3, 5.3, 17.1); K.box(M.paving, -13.1, g - 0.6, 1.3, 5.3, g + 0.05, 17.1); }
@@ -88,7 +89,7 @@ export async function build(ctx) {
     K.box(B.frameDark, vu0 - 0.05, yF + 2.75, vv0 - 0.05, u0, yF + 3.05, vv1 + 0.05);
     K.box(B.frameDark, vu0, yF + 2.1, vv0, vu0 + 0.08, yF + 2.18, vv1);
     // shed tile roof with exposed rafter tails
-    shedRoof(K, M.redTile, u0 - 0.7, v0, u1 + 0.1, v1, 6.55, 7.45, 'u1', { rafters: 0.6, rafterMat: M.woodDark, thick: 0.25 });
+    shedRoof(K, TM, u0 - 0.7, v0, u1 + 0.1, v1, 6.55, 7.45, 'u1', { rafters: 0.6, rafterMat: M.woodDark, thick: 0.25 });
     // lanterns either side of the vestibule
     for (const v of [vv0 - 0.7, vv1 + 0.7]) { K.box(M.iron, u0 - 0.35, 3.3, v - 0.12, u0 - 0.05, 3.9, v + 0.12, { detail: true }); K.box(M.lampGlow, u0 - 0.33, 3.4, v - 0.1, u0 - 0.07, 3.8, v + 0.1, { detail: true }); }
     // forecourt landing + brick steps down to Piedmont Avenue
@@ -123,7 +124,7 @@ export async function build(ctx) {
     K.box(W, u - P - 0.08, yB, v0, u - P + 0.32, yB + 0.25, v1);         // beam
     K.box(W, u - P + 0.02, yG + 0.92, v0, u - P + 0.26, yG + 1.02, v1); // handrail
     for (let v = v0 + 0.25; v < v1 - 0.1; v += 0.2) K.box(W, u - P + 0.1, yG, v - 0.025, u - P + 0.17, yG + 0.92, v + 0.025, { detail: true });
-    shedRoof(K, M.redTile, u - P - 0.6, v0 - 0.4, u, v1 + 0.4, yB + 0.3, yB + 1.0, 'u1', { thick: 0.3, rafters: 0.5, rafterMat: W });
+    shedRoof(K, TM, u - P - 0.6, v0 - 0.4, u, v1 + 0.4, yB + 0.3, yB + 1.0, 'u1', { thick: 0.3, rafters: 0.5, rafterMat: W });
   }
 
   // ================= north–south spine (6–8 storeys) =================
@@ -170,7 +171,7 @@ export async function build(ctx) {
     for (const [pu, pv] of [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]) {
       const su = pu < cu ? 1 : -1, sv = pv < cv ? 1 : -1;
       K.box(S, Math.min(pu, pu + su * 1.5), ySh, Math.min(pv, pv + sv * 1.5), Math.max(pu, pu + su * 1.5), ySh + 0.5, Math.max(pv, pv + sv * 1.5));
-      K.hip(M.redTile, Math.min(pu, pu + su * 1.5) - 0.15, Math.min(pv, pv + sv * 1.5) - 0.15, Math.max(pu, pu + su * 1.5) + 0.15, Math.max(pv, pv + sv * 1.5) + 0.15, ySh + 0.5, 0.6);
+      K.hip(TM, Math.min(pu, pu + su * 1.5) - 0.15, Math.min(pv, pv + sv * 1.5) - 0.15, Math.max(pu, pu + su * 1.5) + 0.15, Math.max(pv, pv + sv * 1.5) + 0.15, ySh + 0.5, 0.6);
     }
     // belfry stage
     const b0u = 7.6, b1u = 17.4, b0v = -12.9, b1v = -3.1;
