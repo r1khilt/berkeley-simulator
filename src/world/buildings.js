@@ -391,7 +391,7 @@ void facade(vec3 wallC){
     vec3 refl = mix(streetR, skyR, smoothstep(skyline - 0.06, skyline + 0.06, Rf.y));
     float wobble = (texture(uNoise, vec2(bi * 0.37 + seed, fi * 0.21)).b - 0.5) * 0.15;
     refl *= 1.0 + wobble;
-    float kRefl = mix(mix(0.16, 0.9, F), mix(0.25, 0.95, F), lodW);
+    float kRefl = mix(mix(0.2, 0.9, F), mix(0.25, 0.95, F), lodW);
     fEmis = interior * vec3(0.9, 0.94, 0.94) * wmask * (1.0 - kRefl * 0.8) * (1.0 - rec*0.3) + refl * kRefl * wmask * 0.85;
     col = mix(col, vec3(0.02, 0.025, 0.03), wmask); rough = mix(rough, 0.4, wmask); fMetal = mix(fMetal, 0.0, wmask);
     // far LOD: average window coverage
@@ -415,7 +415,7 @@ function makeWallMaterial() {
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = fMetal;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;');
   };
-  mat.customProgramCacheKey = () => 'facade-v5-interiors';
+  mat.customProgramCacheKey = () => 'facade-v5-interiors' + IR.level;
   return mat;
 }
 function makeRoofMaterial() {

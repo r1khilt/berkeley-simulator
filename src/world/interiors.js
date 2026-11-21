@@ -18,12 +18,14 @@ function defaultLevel() {
   } catch (e) { return 2; }
 }
 export const IR = { uInteriors: { value: defaultLevel() } };
+IR.level = IR.uInteriors.value;   // compiled level: furniture code is only compiled in at level 2 (high/ultra)
 if (typeof window !== 'undefined') window.BSIM_IR = IR;
 // building uses (packed into the façade attribute / landmark glass attribute)
 export const USE = { academic: 0, office: 1, science: 2, residential: 3, library: 4, commercial: 5, house: 6, industrial: 7, assembly: 8 };
 
 // GLSL. Requires the host to declare `uniform float uNight;` before this chunk and to bind IR.uInteriors.
 export const INTERIOR_GLSL = /* glsl */`
+#define IR_LEVEL ${IR.level}
 uniform float uInteriors;
 #define IR_OFFICE 0
 #define IR_CLASS 1
@@ -423,12 +425,12 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
     ao = 0.6 + 0.4 * smoothstep(0.0, 0.8, e);
   } else ao = 0.72 + 0.28 * smoothstep(0.0, 0.6, p.y - yF) + 0.1 * max(n.y, 0.0);
   ao *= irAO;
-  return alb * (lit * lamp * lampC * 0.72 + day * vec3(0.3, 0.31, 0.33) + vec3(0.006)) * ao + em;
+  return alb * (lit * lamp * lampC * mix(0.3, 0.72, uNight) + day * vec3(0.19, 0.195, 0.21) + vec3(0.006)) * ao + em * mix(0.65, 1.0, uNight);   // interiors are far dimmer than sunlit façades by day
 }
 // approximate average room radiance (for tiny/far windows)
 vec3 irAverage(int t, float seed, float lit, vec3 lampC) {
-  vec3 base = irWallTint(seed) * 0.62;
-  return base * (lit * lampC * 0.5 + (1.0 - uNight) * 0.15 + 0.006) + lampC * lit * (t == IR_DORM || t == IR_LIVING ? 0.05 : 0.15);
+  vec3 base = irWallTint(seed) * 0.5; float dk = 1.0 - uNight;   // dim by day (glass reads dark from a distance), glowing at night
+  return base * (lit * lampC * mix(0.55, 0.2, dk) + dk * 0.09 + 0.005) + lampC * lit * mix(0.12, 0.025, dk) * (t == IR_DORM || t == IR_LIVING ? 0.5 : 1.0);
 }
 // blinds / roller shades / curtains hanging just behind the glass. win = (x0, y0, x1, y1) in room space.
 vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
@@ -454,7 +456,7 @@ vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
     float bottom = win.w - (0.1 + 0.75 * r.y * r.y) * wh;
     if (r.y > 0.96) bottom = win.y - 0.2;
     float c = step(bottom, q.y) * step(win.x - 0.1, q.x) * step(q.x, win.z + 0.1);
-    bool ven = r.z < 0.6;
+    bool ven = r.z < 0.75;
     vec3 bc = ven ? mix(vec3(0.8, 0.79, 0.76), vec3(0.58, 0.6, 0.62), step(0.7, r.w)) : mix(vec3(0.74, 0.71, 0.64), vec3(0.32, 0.33, 0.35), step(0.6, r.w));
     float sl = 1.0;
     if (ven) { float f = fract(q.y / 0.07); sl = mix(0.5 + 0.5 * smoothstep(0.05, 0.25, f) * (1.0 - smoothstep(0.8, 0.97, f)), 0.78, smoothstep(0.008, 0.02, irPx)); }
@@ -484,6 +486,7 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
   irMat = irNrm.y > 0.5 ? IM_FLOOR : (irNrm.y < -0.5 ? IM_CEIL : IM_WALL);
   irPS = ro + rd * irT; irOnFloor = irMat == IM_FLOOR; irBLo = lo; irBHi = R;
   bool furn = uInteriors > 1.5 && (win.z - win.x) > px * 22.0;   // furniture only when the window is big enough on screen to show it
+#if IR_LEVEL >= 2
   if (furn) irLayout(t, R, seed, lit, yF);
   if (furn && win.y > 0.45 && t != IR_LECTURE && t != IR_CAFE && t != IR_RETAIL) { // interior sill + things people leave on it
     vec4 k = irH4(wseed + 3.7);
@@ -494,8 +497,11 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
     if (k.w < 0.2) { float x = mix(win.x + 0.08, win.z - 0.4, fract(k.y + 0.5));
       irTest(vec3(x, win.y, 0.04), vec3(x + 0.32, win.y + 0.1 + 0.12 * k.z, 0.24), IM_GOODS); }
   }
+#endif
   vec3 col = irShade(t, R, yF, seed, lit, lampC);
-  return mix(col, cov.rgb, cov.a);
+  // by day, show close rooms clearly but let distant windows fall back to dark glass
+  float nearK = 1.0 - smoothstep(0.035, 0.08, px);   // px ~ 0.0024 m per metre of distance at 720p
+  return mix(col, cov.rgb, cov.a) * mix(1.0, mix(0.75, 1.35, nearK), 1.0 - uNight);
 }
 `;
 
@@ -603,10 +609,11 @@ vec3 irGlass(float px) {
      float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
      vec3 rdv = normalize(vIrP - vIrC); float ry = -rdv.y;   // reflected ray rises when we look down at the glass
      vec3 sky = mix(uSkyHor * 0.35, mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, ry)), smoothstep(-0.12, 0.08, ry));
-     totalEmissiveRadiance = irE * (1.0 - F) * vec3(0.84, 0.88, 0.88) + sky * F * 0.7;
+     float Fr = mix(0.1, 0.3, smoothstep(0.015, 0.12, irPxL)) + 0.9 * F;   // distant windows read mostly as reflection
+     totalEmissiveRadiance = irE * (1.0 - Fr) * vec3(0.86, 0.9, 0.9) + sky * Fr * 0.75;
    } }`);
   };
-  m.customProgramCacheKey = () => 'irglass-v1';
+  m.customProgramCacheKey = () => 'irglass-v1-' + IR.level;
   _irMats.set(src.uuid, m);
   return m;
 }
