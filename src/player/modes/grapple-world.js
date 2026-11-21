@@ -15,7 +15,7 @@ export class GrappleWorld {
     this.ph = physics; this.scene = scene; this.lm = lm;
     this.prisms = []; this.pgrid = new Map(); this.nSeg = 0; this.lmVersion = ''; this.hidden = new Set();
     this.raycaster = new THREE.Raycaster(); this.bboxCache = new WeakMap(); this.bgroup = null;
-    this._tmp = []; this._tmp2 = []; this._seen = new Set(); this._seenP = new Set(); this._seenW = new Set();
+    this._tmp = []; this._tmp2 = []; this._seen = new Set(); this._seenP = new Set(); this._seenW = new Set(); this._syncs = 0;
     this.sync();
   }
   // ---------------------------------------------------------------- prism index
@@ -39,6 +39,8 @@ export class GrappleWorld {
       i = Math.max(j, i + 1);
     }
     this.nSeg = n;
+    // landmarks stream in and out; every so often drop the volumes of unloaded ones from the index
+    if (++this._syncs % 900 === 0) { let dead = 0; for (const pr of this.prisms) if (pr.seg.y0 === Infinity) dead++; if (dead > 1500) this._compact(); }
     // landmark stand-ins: hidden OSM boxes whose colliders stay in physics; ignore them for roofs and inside tests
     const placed = this.lm ? this.lm.placed : [];
     const ver = placed.length + ':' + (placed.length ? placed[placed.length - 1].id : '');
@@ -59,6 +61,11 @@ export class GrappleWorld {
     for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
       const k = key(i, j); let l = this.pgrid.get(k); if (!l) this.pgrid.set(k, (l = [])); l.push(pr.idx);
     }
+  }
+  _compact() {
+    const keep = this.prisms.filter((pr) => pr.seg.y0 !== Infinity); this.prisms = []; this.pgrid = new Map();
+    for (const pr of keep) { pr.idx = this.prisms.length; this.prisms.push(pr);
+      for (let i = Math.floor(pr.b[0] / CELL); i <= Math.floor(pr.b[2] / CELL); i++) for (let j = Math.floor(pr.b[1] / CELL); j <= Math.floor(pr.b[3] / CELL); j++) { const k = key(i, j); let l = this.pgrid.get(k); if (!l) this.pgrid.set(k, (l = [])); l.push(pr.idx); } }
   }
   _hasWalkInside(pr) {
     for (const w of this.ph.walk) {
@@ -105,6 +112,14 @@ export class GrappleWorld {
     }
     return [bx, bz, bd];
   }
+  // nearest spot outside every solid volume for a body spanning [y0, y1]: the prism's own nearest edge first, then a
+  // widening ring search (handles clusters of touching blocks)
+  freePoint(pr, x, z, y0, y1, r) {
+    const ok = (px, pz) => !this.buriedIn(px, pz, y0, y1) && !this.ph.resolve(px, pz, r, y0, y1 - y0)[2];
+    const e = this.exitPoint(pr, x, z, r); if (ok(e[0], e[1])) return e;
+    for (let d = 1; d <= 40; d += 1) for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d; if (ok(px, pz)) return [px, pz, d]; }
+    return e;
+  }
   // ---------------------------------------------------------------- coarse ray cast
   // o, d: origin and unit direction (THREE.Vector3). Returns {t, p, n, kind, tag} or null.
   castCoarse(o, d, tMin, tMax) {
@@ -142,6 +157,20 @@ export class GrappleWorld {
         }
       }
     });
+    // tree crowns (the hook grabs a branch inside the canopy)
+    if (this.tgrid) {
+      const T = this.trees, c = this._c || (this._c = [0, 0, 0, 0]), seenT = this._seenT || (this._seenT = new Set()); seenT.clear();
+      this._dda(o, d, tMin, () => best, CELL, (ci, cj) => {
+        { const l = this.tgrid.get(key(ci, cj)); if (!l) return;
+          for (const i of l) {
+            if (seenT.has(i)) continue; seenT.add(i); this._crown(T, i, c);
+            const fx = o.x - c[0], fy = o.y - c[1], fz = o.z - c[2], b = fx * d.x + fy * d.y + fz * d.z, cc = fx * fx + fy * fy + fz * fz - c[3] * c[3], disc = b * b - cc;
+            if (disc < 0) continue; const t = -b - Math.sqrt(disc); if (t < tMin || t >= best) continue;
+            best = t; hit = { t, kind: 'tree', tag: 'tree', n: [(o.x + d.x * t - c[0]) / c[3], (o.y + d.y * t - c[1]) / c[3], (o.z + d.z * t - c[2]) / c[3]], tree: i, centre: [c[0], c[1], c[2]] };
+          }
+        }
+      });
+    }
     // flat tops seen from above: solid roofs and walkable decks
     if (d.y < -1e-4) {
       const seenP = this._seenP; seenP.clear();
@@ -167,6 +196,7 @@ export class GrappleWorld {
     }
     if (!hit) return null;
     hit.p = [o.x + d.x * hit.t, o.y + d.y * hit.t, o.z + d.z * hit.t];
+    if (hit.kind === 'tree') for (let k = 0; k < 3; k++) hit.p[k] += (hit.centre[k] - hit.p[k]) * 0.45;
     if (!hit.n) { // terrain normal from central differences
       const e = 0.8, h0 = hAt(hit.p[0] - e, hit.p[2]), h1 = hAt(hit.p[0] + e, hit.p[2]), h2 = hAt(hit.p[0], hit.p[2] - e), h3 = hAt(hit.p[0], hit.p[2] + e);
       _v.set(h0 - h1, 2 * e, h2 - h3).normalize(); hit.n = [_v.x, _v.y, _v.z];
@@ -203,8 +233,25 @@ export class GrappleWorld {
     _ray.origin.copy(job.o); _ray.direction.copy(job.d);
     if (!_ray.intersectBox(b, _v)) return null; const t = _v.distanceTo(job.o); return t <= job.tMax ? Math.max(t, job.tMin) : null;
   }
-  // background warm-up: building chunk boxes, one per call (cheap; keeps the first fire hitch-free)
-  warm() { const bg = this._buildings(); if (!bg) return; const ms = bg.children; for (let k = 0; k < ms.length; k++) { const m = ms[(this._warmI = ((this._warmI || 0) + 1) % ms.length)]; if (m.isMesh && !this.bboxCache.has(m)) { this._worldBox(m); return; } } this.warmDone = true; }
+  // background warm-up, a slice per frame until done: building chunk boxes, then the tree-crown index
+  warm() {
+    const bg = this._buildings();
+    if (bg && !this._boxesDone) { const ms = bg.children; for (let k = 0; k < ms.length; k++) { const m = ms[k]; if (m.isMesh && !this.bboxCache.has(m)) { this._worldBox(m); return; } } this._boxesDone = true; }
+    const T = window.BSIM && window.BSIM.trees; if (!T || !T.px) { this.warmDone = !!this._boxesDone; return; }
+    if (!this._tg) this._tg = { grid: new Map(), i: 0 };
+    const tg = this._tg, n = T.px.length, end = Math.min(n, tg.i + 6000);
+    const c = [0, 0, 0, 0];
+    for (let i = tg.i; i < end; i++) {
+      const h = T.ht[i]; if (h < 7 || (T.hidden && T.hidden.has(i))) continue;
+      this._crown(T, i, c); // register in every cell the crown overlaps
+      for (let a = Math.floor((c[0] - c[3]) / CELL); a <= Math.floor((c[0] + c[3]) / CELL); a++) for (let b = Math.floor((c[2] - c[3]) / CELL); b <= Math.floor((c[2] + c[3]) / CELL); b++) {
+        const k = key(a, b); let l = tg.grid.get(k); if (!l) tg.grid.set(k, (l = [])); l.push(i);
+      }
+    }
+    tg.i = end; if (end >= n) { this.trees = T; this.tgrid = tg.grid; this.warmDone = true; }
+  }
+  // a tree crown as a sphere: centre near the top of the tree, radius from the crown size
+  _crown(T, i, out) { const h = T.ht[i], rc = Math.max(1.0, Math.min(T.rad[i], h * 0.35) * 0.72); out[0] = T.px[i]; out[1] = T.py[i] + h - rc * 1.05; out[2] = T.pz[i]; out[3] = rc; return out; }
   startRefine(o, d, tMin, tMax) {
     const job = { o: o.clone(), d: d.clone(), tMin, tMax, list: [], best: null, done: false, ms: 0 };
     const hl = Math.hypot(d.x, d.z);

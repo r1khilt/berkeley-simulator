@@ -18,3 +18,4 @@ Register in src/player/modes/index.js (one import + one install call per plugin)
 - hidden: true keeps a mode out of the HUD mode bar and the Controls sheet.
 - tool: true for always-on abilities that are not modes (e.g. a grappling hook): listed under Controls, not in the mode bar.
 Plugins with a key, label or icon appear in the mode bar automatically (clicking a segment calls player.setMode); no UI changes needed.
+Grappling hook (grapple.js, mode 'grapple'): hold Q or right mouse in walk, bike or any plugin mode. A plugin can set `grapple: false` to switch it off in its mode. When a swing lands, the player is returned to the mode they fired from (via setMode, so canEnter still applies). For the HUD it sets label, icon (an inline SVG string that uses currentColor) and hint (one line of help text).

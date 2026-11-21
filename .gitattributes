@@ -1,3 +1,4 @@
 src/player/modes/index.js merge=union
 public/assets/CREDITS.md merge=union
 public/data/landmarks/manifest.json merge=ours
+src/player/modes/README.md merge=union
