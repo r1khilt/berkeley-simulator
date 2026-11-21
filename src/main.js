@@ -78,6 +78,7 @@ async function boot() {
   const heightAt = (x, z) => hf.heightAt(x, z);
   const terrain = new CoreTerrain({ heights, meta: metaCore, sdf, special: specRes, aux, ortho: orthoCore });
   scene.add(terrain.group); phase('terrainDecode');
+  BS.terrain = terrain; // exposes the ground SDF (asphalt/path/grass/dirt) for surface-aware effects, e.g. horse hoof sounds
   const coreRect = { x0: c.x0, x1: c.x0 + c.nx * c.step, z0: c.z0, z1: c.z0 + c.nz * c.step };
   const tex = (img) => { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8; t.needsUpdate = true; return t; };
   const texMid = tex(orthoMid), texFar = tex(orthoFar);
