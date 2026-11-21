@@ -5,7 +5,7 @@ let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
 import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
-import { INTERIOR_GLSL, buildingUse } from './interiors.js'; // furnished window interiors
+import { INTERIOR_GLSL, buildingUse, IR } from './interiors.js'; // furnished window interiors
 import { PBR_GLSL, GH_GLSL, pbrUniforms, ghUniforms } from './pbr.js'; // gfx-materials: PBR wall/roof surfaces
 import { FACADE_PBR_GLSL, ROOF_PBR_GLSL } from './pbrFacade.js';
 
@@ -362,15 +362,17 @@ void facade(vec3 wallC){
     float lit = irLitOf(rType, fract(rseed * 0.618 + 0.11));
     vec3 litC = irLampColor(rType, fract(rseed * 0.618));
     vec3 interior = vec3(0.0);
-    if (lodW < 0.95 && abs(vWNF.y) < 0.5 && win > 0.001) {
+    float farK = smoothstep(0.15, 0.6, pxu / bw * 8.0);   // tiny windows: average room colour, skip the trace
+    if (farK > 0.0 || uInteriors < 0.5) interior = irAverage(rType, rseed, lit, litC);
+    if (lodW < 0.95 && abs(vWNF.y) < 0.5 && win > 0.001 && farK < 0.999 && uInteriors > 0.5) {
       vec3 N = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tu = vec3(-N.z, 0.0, N.x);   // Tu: direction of increasing u
       vec3 Vd = vWPosF - cameraPosition; float camD = length(Vd); vec3 V = Vd / max(camD, 1e-4);
       float Wr = min(span, nb - ri * span) * bw, Hr = fh - 0.3;
       float bx = (bi - ri * span) * bw + bw * 0.5;
       vec3 ro = vec3(u - ri * span * bw, min(fv * fh, Hr - 0.01), 0.0);
-      interior = irRoom(ro, vec3(dot(V, Tu), V.y, -dot(V, N)), vec3(Wr, Hr, irDepthOf(rType, fract(rseed * 0.31))), rType, rseed,
+      vec3 rm = irRoom(ro, vec3(dot(V, Tu), V.y, -dot(V, N)), vec3(Wr, Hr, irDepthOf(rType, fract(rseed * 0.31))), rType, rseed,
                         h21(vec2(bi * 3.1 + seed, fi * 7.3)) * 911.0, lit, vec4(bx - hwx, y0, bx + hwx, y1), max(pxu, pxv), camD);
-      interior = mix(interior, irAverage(rType, rseed, lit, litC), smoothstep(0.15, 0.6, pxu / bw * 8.0));   // tiny windows: average
+      interior = mix(rm, interior, farK);
     }
     // mullions
     float mul = 0.0;
@@ -388,13 +390,13 @@ void facade(vec3 wallC){
     float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
     float cl = textureLod(uNoise, Rf.xz / max(0.3, Rf.y + 0.45) * 0.03 + seed, 2.0).r;
     vec3 skyR = mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, Rf.y)) * (0.9 + 0.35 * smoothstep(0.55, 0.75, cl));
-    float ang = atan(Rf.x, Rf.z); float skyline = 0.04 + 0.22 * texture(uNoise, vec2(ang * 0.8, seed)).g;
+    float ang = atan(Rf.x, Rf.z); float skyline = 0.05 + 0.14 * textureLod(uNoise, vec2(ang * 0.5, seed), 2.5).g;   // smooth: reads as a soft reflection over the interiors
     vec3 streetR = mix(uSkyHor * 0.08, uSkyHor * 0.22, smoothstep(-0.4, 0.0, Rf.y)) * (0.75 + 0.5 * textureLod(uNoise, vec2(ang * 0.6, seed), 1.0).r);
-    vec3 refl = Rf.y > skyline ? skyR : streetR;
+    vec3 refl = mix(streetR, skyR, smoothstep(skyline - 0.06, skyline + 0.06, Rf.y));
     float wobble = (texture(uNoise, vec2(bi * 0.37 + seed, fi * 0.21)).b - 0.5) * 0.15;
     refl *= 1.0 + wobble;
-    float kRefl = mix(mix(0.1, 0.9, F), mix(0.25, 0.95, F), lodW);
-    fEmis = interior * wmask * (1.0 - kRefl * 0.8) * (1.0 - rec*0.3) + refl * kRefl * wmask * 0.85;
+    float kRefl = mix(mix(0.2, 0.9, F), mix(0.25, 0.95, F), lodW);
+    fEmis = interior * vec3(0.9, 0.94, 0.94) * wmask * (1.0 - kRefl * 0.8) * (1.0 - rec*0.3) + refl * kRefl * wmask * 0.85;
     col = mix(col, vec3(0.02, 0.025, 0.03), wmask); rough = mix(rough, 0.4, wmask); fMetal = mix(fMetal, 0.0, wmask);
     // far LOD: average window coverage
     float cover = ww*wh;
@@ -408,6 +410,7 @@ function makeWallMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials
+    sh.uniforms.uInteriors = IR.uInteriors; // interiors.js detail level
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFac = aFac; vUvF = uv; vWPosF = (modelMatrix*vec4(transformed,1.0)).xyz; vWNF = normalize(mat3(modelMatrix)*normal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + PBR_GLSL + GH_GLSL + FACADE_GLSL.replace('vec3 fCol; float fRough;', FACADE_PBR_GLSL + 'vec3 fCol; float fRough;')) // gfx-materials
@@ -417,7 +420,7 @@ function makeWallMaterial() {
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * step(0.5, fRough), 0.0)).xyz);'); // gfx-materials: wall relief (not on glass)
   };
-  mat.customProgramCacheKey = () => 'facade-v5-interiors-pbr1';
+  mat.customProgramCacheKey = () => 'facade-v5-interiors-pbr1-' + IR.level;
   return mat;
 }
 function makeRoofMaterial() {

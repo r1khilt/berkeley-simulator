@@ -59,6 +59,8 @@ const bres = buildBuildings(data, { heightAt: () => 0 });
 const dbg = (qs.get('dbg') || '').split(',');
 const REP = { noblind: ['vec4 cov = irCover(t, win, wseed, lit, lampC);', 'vec4 cov = vec4(0.0);'], noint: ['interior = mix(interior, irAverage(', 'interior = 0.0 * mix(interior, irAverage('],
   norefl: ['+ refl * kRefl * wmask * 0.85;', ';'], rox: ['vec3 col = irShade(t, R, yF, seed, lit, lampC);', 'vec3 col = vec3(fract(ro.x), fract(ro.y), 0.0) * 0.4;'],
+  mat: ['vec3 col = irShade(t, R, yF, seed, lit, lampC);', 'vec3 col = (irMat <= 2 ? vec3(0.15) + 0.1 * vec3(irNrm.x, irNrm.y, -irNrm.z) : vec3(fract(float(irMat) * 0.37), fract(float(irMat) * 0.71), fract(float(irMat) * 0.13)) * 0.6);'],
+  lab: ['int rType = irFloorType(bUse, fi,', 'int rType = IR_LAB + 0 * irFloorType(bUse, fi,'], office: ['int rType = irFloorType(bUse, fi,', 'int rType = IR_OFFICE + 0 * irFloorType(bUse, fi,'],
   rdx: ['vec3 col = irShade(t, R, yF, seed, lit, lampC);', 'vec3 col = (rd * 0.5 + 0.5) * 0.4;'], tdbg: ['vec3 col = irShade(t, R, yF, seed, lit, lampC);', 'vec3 col = vec3(fract(irT), fract(irT * 0.25), 0.0) * 0.4;'], flat: ['vec3 col = irShade(t, R, yF, seed, lit, lampC);', 'vec3 col = (irNrm * 0.5 + 0.5) * 0.3;'] };
 for (const mat of [bres.wallMat]) { const prev = mat.onBeforeCompile; mat.onBeforeCompile = (sh, r) => { prev(sh, r); for (const d of dbg) if (REP[d]) { if (!sh.fragmentShader.includes(REP[d][0])) console.warn('dbg pattern missing', d); sh.fragmentShader = sh.fragmentShader.replace(REP[d][0], REP[d][1]); } }; mat.customProgramCacheKey = () => 'facade-dbg-' + dbg.join('-'); }
 scene.add(bres.group);
