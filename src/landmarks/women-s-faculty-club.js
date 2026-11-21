@@ -62,12 +62,13 @@ export async function build(ctx) {
   K.box(M.concreteDark, wx0 + 0.35, gMin - 1.2, wz0 + 0.35, wx1 - 0.35, EAVE2, mz0 + 0.4);
   // low hip roofs with boxed eaves and cream fascia
   const slope = 0.36;
-  hipRoof(K, ROOF, mx0, mz0, mx1, mz1, EAVE - 0.4, slope, 0.4, { soffit: MAROON });
+  const hipR = (mat, u0, v0, u1, v1, yE, sl, ov, soff) => { const ye = yE - ov * sl; K.hip(mat, u0 - ov, v0 - ov, u1 + ov, v1 + ov, ye, sl); K.box(soff, u0 - ov, ye - 0.07, v0 - ov, u1 + ov, ye - 0.02, v1 + ov); }; // refine-east: avoids the mirrored kit soffit
+  hipR(ROOF, mx0, mz0, mx1, mz1, EAVE - 0.4, slope, 0.4, MAROON);
   { const c0 = mx0 + 8.6, c1 = mx0 + 25.2, cz = mz1 + 0.8; const R = K.run([c0, cz], [c1, cz]);
     K.box(M.concreteDark, c0 + 0.3, gMin - 1.2, mz1 - 0.5, c1 - 0.3, EAVE, cz - 0.32);
     for (const [a, b] of [[[c1, mz1], [c1, cz]], [[c0, cz], [c0, mz1]]]) { const R2 = K.run(a, b); K.rbox(R2, SH, 0, SH0, -0.3, R2.L, EAVE, 0); K.rbox(R2, M.stuccoWhite, 0, gMin - 1.2, -0.3, R2.L, SH0, 0.04); }
-    hipRoof(K, ROOF, c0, mz0 + 1.5, c1, cz, EAVE + 0.05, slope, 0.42, { soffit: MAROON }); }
-  hipRoof(K, ROOF, wx0, wz0, wx1, mz0 + 2.0, EAVE2 + 0.05, slope, 0.4, { soffit: MAROON });
+    hipR(ROOF, c0, mz0 + 1.5, c1, cz, EAVE + 0.05, slope, 0.42, MAROON); }
+  hipR(ROOF, wx0, wz0, wx1, mz0 + 2.0, EAVE2 + 0.05, slope, 0.4, MAROON);
   for (const [a, b] of [[[mx0 - 0.4, mz1 + 0.4], [mx1 + 0.4, mz1 + 0.4]], [[mx1 + 0.4, mz0 - 0.4], [mx0 - 0.4, mz0 - 0.4]]]) { const R = K.run(a, b); K.rbox(R, MAROON, -0.4, EAVE - 0.55, 0, R.L + 0.4, EAVE - 0.36, 0.06); }
   K.cyl(M.iron, 9, EAVE + 1.4, 2.5, 0.06, 0.06, 1.0, 6, { detail: true });
   colliders.push(K.colPoly([[mx0, mz0], [mx1, mz0], [mx1, mz1], [mx0, mz1]], gMin - 1.2, EAVE + 2), K.colPoly([[wx0, wz0], [wx1, wz0], [wx1, mz0], [wx0, mz0]], gMin - 1.2, EAVE + 2));
