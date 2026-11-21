@@ -4,6 +4,8 @@
 // eaves ~13.5 m / ridge ~17 m, angled wing ~18.5 m.
 import * as THREE from 'three';
 import { Kit, punchedBlock, grid, runsOf, flatRoof, colFromXZ, tint, plain, glassTint } from './lib/b04-kit.js';
+import { pathEntrances, entry, planting, rnMats, propAt } from './lib/rn-kit.js';
+import { gAt } from './lib/b03-kit.js';
 
 export const info = {
   id: 'donner-laboratory',
@@ -15,11 +17,11 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16.5)); const M = ctx.M;
-  const C = tint(M, 'concrete', 0xd8d3c8), FR = plain(M, 0x3b3d3c, { rough: 0.5, metal: 0.5 }), Cf = tint(M, 'concrete', 0xa29b8e), Ci = tint(M, 'concrete', 0xcdc2aa), Lv = plain(M, 0x5a5c5a, { rough: 0.5, metal: 0.5 });
+  const C = tint(M, 'stuccoWhite', 0xe8e3d8), FR = plain(M, 0x8f9493, { rough: 0.45, metal: 0.5 }), Cf = tint(M, 'concrete', 0xd2cdc3), Ci = tint(M, 'stuccoWhite', 0xdcd6c9), Lv = plain(M, 0x5a5c5a, { rough: 0.5, metal: 0.5 });
   const colliders = [], walkables = [];
   // original block (south bar) with red-tile hip roof
-  const rows = [{ y0: 0.6, h: 2.6, w: 1.5, mull: 1, tran: 0.7, muntins: 2 }, { y0: 4.9, h: 2.5, w: 1.5, mull: 1, tran: 0.7, muntins: 2 }, { y0: 9.2, h: 2.4, w: 1.5, mull: 1, muntins: 2 }];
-  const runs = punchedBlock(K, -20.8, 6.7, 29.3, 21.2, { y0: -2.5, eave: 12.9, mat: C, frame: FR, bay: 3.3, rows, plinth: { h: 0.5, mat: Ci }, cornice: { P: 0.4, H: 0.5, mat: C }, roof: { type: 'hip', slope: 0.42, overhang: 0.7 }, faces: { N: { skip: [0, 1, 2, 3, 4, 5] } } });
+  const rows = [{ y0: 0.8, h: 2.0, w: 1.45, mull: 3, muntins: 2 }, { y0: 4.9, h: 2.5, w: 1.6, mull: 3, tran: 0.72, muntins: 3 }, { y0: 9.2, h: 2.4, w: 1.6, mull: 3, muntins: 3 }];
+  const runs = punchedBlock(K, -20.8, 6.7, 29.3, 21.2, { y0: -2.5, eave: 12.9, mat: C, frame: FR, bay: 3.3, rows, plinth: { h: 0.5, mat: Ci }, cornice: { P: 0.4, H: 0.5, mat: C }, roof: { type: 'hip', slope: 0.38, overhang: 0.7, mat: tint(M, 'redTile', 0xd9c3bb) }, faces: { N: { skip: [0, 1, 2, 3, 4, 5] } } });
   // stripped-classical articulation: channel-rusticated base, shallow pilaster strips between bays, belt course
   for (const R of Object.values(runs)) {
     const nb = Math.max(1, Math.round((R.L - 1.6) / 3.3)); const w = (R.L - 1.6) / nb;
@@ -36,7 +38,17 @@ export async function build(ctx) {
   }
   K.prism(M.concreteDark, wing.slice().reverse().map(([u, v]) => [u, v]), -2.0, 18.3);
   flatRoof(K, wing, 18.4, { parapet: 0.0, mat: Cf });
+  // copper ridge ventilator on the original block
+  { const uc = 4.25, vc = 13.95, yR = 12.9 + 0.38 * Math.min(29.3 + 20.8, 21.2 - 6.7) / 2; K.box(M.copper, uc - 1.5, yR - 0.4, vc - 1.0, uc + 1.5, yR + 0.8, vc + 1.0); K.box(M.copper, uc - 1.8, yR + 0.8, vc - 1.25, uc + 1.8, yR + 0.95, vc + 1.25); }
+  // entrance(s) where the paths arrive on the original block: concrete surround, steps to the plaza, lamp, planting, brick walk
+  { const X = rnMats(M); const RR = Object.values(runs); const ents = pathEntrances(K, ctx, RR).slice(0, 2); const skips = new Map();
+    for (const e of ents) { const g = gAt(K, e.R, e.s, 1.8); const fl = Math.max(g, -0.2);
+      const r = entry(K, e.R, e.s, { w: 2.4, h: 3.2, floor: fl, surround: Ci, sw: 0.45, sp: 0.35, frame: FR, stepMat: tint(M, 'concrete', 0xcfcac0), landing: 1.4, stairW: 5.0, canopy: false });
+      walkables.push(...r.walkables); colliders.push(...r.colliders); const p = e.R.at(e.s + 3.6, 2.4); colliders.push(propAt(K, 'campusLamp', p[0], p[1], 0));
+      skips.set(e.R, [...(skips.get(e.R) || []), [e.s - 3.4, e.s + 3.4]]); }
+    for (const R of [runs.S, runs.W, runs.E].filter(Boolean)) { planting(K, R, 0.8, R.L - 0.8, { d0: 0.15, depth: 1.2, h: 0.9, skip: skips.get(R) || [], seed: 31 });
+      const brick = tint(M, 'brick', 0xd9a596); for (let s = -1.5; s < R.L + 1.5; s += 1.5) { const g = Math.max(gAt(K, R, s, 2.4), gAt(K, R, s + 1.5, 2.4)); K.rbox(R, brick, s, g - 0.6, 1.45, s + 1.55, g + 0.04, 3.4, { detail: true }); } } }
   colliders.push(colFromXZ(ctx.footprints[0].outer, -3, 19));
   const object3d = K.finish(); object3d.name = 'donner-laboratory';
-  return { object3d, colliders, walkables };
+  return { object3d, colliders: colliders.filter(Boolean), walkables };
 }
