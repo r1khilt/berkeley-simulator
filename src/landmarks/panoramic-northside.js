@@ -30,7 +30,7 @@ export async function build(ctx) {
   K.block({ u0: -13.29, u1: 12.93, v0: -4.5, v1: 5.4, floors, wall: RU, wallMats: [M.concreteDark, FR], trim: FR, wins, bay: 3.1, depth: 0.35, roof: flat(0.7, RU),
     faces: { E: { doors: [{ s: 5.0, w: 2.0, h: 3.0, door: FR, leaf: 2.9, frame: FR, steps: false }] } } });
   // glazed slot
-  K.block({ u0: -12.0, u1: 11.6, v0: 5.4, v1: 6.6, floors: [GF, top - 0.2], wall: FR, trim: FR, bay: 1.2, win: { w: 0.85, h: top - GF - 1.2, sill: 0.3, pair: 1, mull: 0, tran: 0, rev: 0.1, casing: 0, frame: FR, glass: SLOT }, roof: flat(0.4, FR), collide: false });
+  K.block({ u0: -12.0, u1: 11.6, v0: 5.4, v1: 6.6, floors: [GF, top - 0.2], wall: FR, trim: FR, bay: 1.2, win: { glass: ctx.M.windowNight, w: 0.85, h: top - GF - 1.2, sill: 0.3, pair: 1, mull: 0, tran: 0, rev: 0.1, casing: 0, frame: FR, glass: SLOT }, roof: flat(0.4, FR), collide: false });
   // south (left) charcoal block, recessed
   K.block({ u0: -13.29, u1: 12.33, v0: 6.6, v1: 16.59, floors, wall: CH, wallMats: [M.concreteDark, FR], trim: FR, wins, bay: 3.1, depth: 0.35, roof: flat(0.7, CH) });
   K.buildBlocks();

@@ -17,9 +17,9 @@ export const info = {
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.1); const M = ctx.M;
   const style = {
-    wall: shingleMat(ctx.M, 0x4e3b2e), trim: coopMat('paint', '#e8e4d8'), fascia: coopMat('paint', '#3a2e26'),
+    wall: shingleMat(ctx.M, 0x5a4636), trim: coopMat('paint', '#e8e4d8'), fascia: coopMat('paint', '#3a2e26'),
     rail: coopMat('paint', '#5a4a3c', { rough: 0.85 }), roofMat: coopMat('roof', '#5a5a58'), fh: 2.9, overhang: 0.75, bay: 3.4,
-    win: { w: 1.0, h: 1.25, sill: 0.9, pattern: [2, 1, 3, 2, 1], gap: 0.06, mull: 1, rev: 0.12, casing: 0.07, frame: coopMat('paint', '#e8e4d8') },
+    win: { glass: ctx.M.windowNight, w: 1.0, h: 1.25, sill: 0.9, pattern: [2, 1, 3, 2, 1], gap: 0.06, mull: 1, rev: 0.12, casing: 0.07, frame: coopMat('paint', '#e8e4d8') },
   };
   const ALT = shingleMat(ctx.M, 0x5a4838); // refine-south-west: photos show weathered shingle throughout (no stucco); alt blocks get a silvered tone
   const rects = [
