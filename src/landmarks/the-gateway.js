@@ -132,7 +132,6 @@ export async function build(ctx) {
   {
     const arcRuns = (pts) => { const out = []; for (let i = 0; i < pts.length - 1; i++) out.push(K.run(pts[i], pts[i + 1])); return out; };
     for (let k = 3; k <= 4; k++) for (const R of arcRuns(arcOf(k))) ribbonStorey(K, R, 0, R.L, FL[k], FL[k + 1], mats);
-    for (const R of arcRuns(arcOf(4, 12))) K.rbox(R, mats.silver, -0.03, FL[4] - 0.5, -0.05, R.L + 0.03, FL[4] + 0.12, 0.3);
     // upper-tier soffits (cool, unlit): lunes between successive arcs
     for (let k = 3; k <= 4; k++) {
       const upper = k + 1; const lower = arcOf(k);
@@ -142,7 +141,7 @@ export async function build(ctx) {
     // the double-height opening: the L3 slab edge (sign band) is the lip, concave in plan; a warm uplit vault curves up from the
     // passage ceiling (deep back arc on the L2 slab line) to that lip
     const NA = 40; const A3 = arcOf(3, NA), B2 = arcOf(2, NA);
-    const yLip = FL[3] - 1.0; const lipY = () => yLip;   // level in elevation: the photo's 'smile' is the concave plan seen from below
+    const yLip = FL[3] - 0.3, S3 = 1.3; const lipY = (t) => yLip - S3 * (1 - (2 * Math.min(1, Math.max(0, t)) - 1) ** 2);   // the lip sags in a shallow catenary-like smile
     const yBack = FL[2] - 0.6; const NV = 8;
     const VP = (ii, jj) => { const v = jj / NV, f = v * v; const a = A3[ii], b = B2[ii]; return [b[0] + (a[0] - b[0]) * v, yBack + (lipY(ii / NA) - yBack) * f, b[1] + (a[1] - b[1]) * v]; };
     { const vp = [], vi = []; for (let i = 0; i <= NA; i++) for (let j = 0; j <= NV; j++) vp.push(...VP(i, j));
@@ -151,9 +150,17 @@ export async function build(ctx) {
     // downlight dots in the vault (detail)
     for (let i = 3; i < NA - 2; i += 4) for (const j of [3, 6]) { const p = VP(i, j); const c = new THREE.CircleGeometry(0.14, 8); c.rotateX(Math.PI / 2); c.translate(p[0], p[1] - 0.04, p[2]); K.add(M.lampGlow, c, { uvMode: 'keep', detail: true }); }
     // arched aluminium sign band on the L3 slab edge (face + underside), name following the arch
-    const arc3 = (t) => { const p0 = onS(sC - PORT[3][0]), p1 = onS(sC + PORT[3][0]); const kk = 1 - (2 * t - 1) ** 2; return [p0[0] + (p1[0] - p0[0]) * t - sN[0] * PORT[3][1] * kk, p0[1] + (p1[1] - p0[1]) * t - sN[1] * PORT[3][1] * kk]; };
-    const nrmAt = (t) => { const a = arc3(Math.max(0, t - 0.01)), b = arc3(Math.min(1, t + 0.01)); const tx = b[0] - a[0], tz = b[1] - a[1]; const L = Math.hypot(tx, tz); return [-tz / L, tx / L]; };
-    const bandTop = FL[3] + 0.45; const bp = []; const NB = 40;
+    const arcK = (k, t) => { const p0 = onS(sC - PORT[k][0]), p1 = onS(sC + PORT[k][0]); const kk = 1 - (2 * t - 1) ** 2; return [p0[0] + (p1[0] - p0[0]) * t - sN[0] * PORT[k][1] * kk, p0[1] + (p1[1] - p0[1]) * t - sN[1] * PORT[k][1] * kk]; };
+    const arc3 = (t) => arcK(3, t);
+    const nrmK = (k, t) => { const a = arcK(k, Math.max(0, t - 0.01)), b = arcK(k, Math.min(1, t + 0.01)); const tx = b[0] - a[0], tz = b[1] - a[1]; const L = Math.hypot(tx, tz); return [-tz / L, tx / L]; };
+    const nrmAt = (t) => nrmK(3, t);
+    // L4 slab edge over the portal: a smaller smile (nested, shallower going up)
+    { const S4 = 0.7, NB4 = 24, o = 0.3, p4 = []; for (let i = 0; i < NB4; i++) { const ta = i / NB4, tb = (i + 1) / NB4; const pa = arcK(4, ta), pb = arcK(4, tb), na = nrmK(4, ta), nb = nrmK(4, tb);
+        const A = [pa[0] + na[0] * o, pa[1] + na[1] * o], B = [pb[0] + nb[0] * o, pb[1] + nb[1] * o]; const ya = FL[4] - 0.45 - S4 * (1 - (2 * ta - 1) ** 2), yb = FL[4] - 0.45 - S4 * (1 - (2 * tb - 1) ** 2), yt = FL[4] + 0.15;
+        p4.push(A[0], ya, A[1], B[0], yb, B[1], B[0], yt, B[1], A[0], ya, A[1], B[0], yt, B[1], A[0], yt, A[1]);
+        p4.push(pa[0], ya, pa[1], pb[0], yb, pb[1], B[0], yb, B[1], pa[0], ya, pa[1], B[0], yb, B[1], A[0], ya, A[1]); }
+      const g4 = new THREE.BufferGeometry(); g4.setAttribute('position', new THREE.Float32BufferAttribute(p4, 3)); g4.computeVertexNormals(); K.add(mats.band, g4); }
+    const bandTop = FL[3] + 0.8; const bp = []; const NB = 40;
     for (let i = 0; i < NB; i++) {
       const ta = i / NB, tb = (i + 1) / NB; const pa = arc3(ta), pb = arc3(tb), na = nrmAt(ta), nb = nrmAt(tb); const o = 0.18;
       const A = [pa[0] + na[0] * o, pa[1] + na[1] * o], B = [pb[0] + nb[0] * o, pb[1] + nb[1] * o]; const ya = lipY(ta), yb = lipY(tb);
@@ -166,7 +173,7 @@ export async function build(ctx) {
     for (let i = 0; i < n; i++) {
       const ta = t0 + (t1 - t0) * i / n, tb = t0 + (t1 - t0) * (i + 1) / n; const pa = arc3(ta), pb = arc3(tb), na = nrmAt(ta), nb = nrmAt(tb); const o = 0.22;
       const A = [pa[0] + na[0] * o, pa[1] + na[1] * o], B = [pb[0] + nb[0] * o, pb[1] + nb[1] * o];
-      const a0 = lipY(ta) + 0.22, b0 = lipY(tb) + 0.22, a1 = a0 + 1.15, b1 = b0 + 1.15; const u0 = i / n, u1 = (i + 1) / n;
+      const a0 = lipY(ta) + 0.16, b0 = lipY(tb) + 0.16, a1 = a0 + 1.05, b1 = b0 + 1.05; const u0 = i / n, u1 = (i + 1) / n;
       pos.push(A[0], a0, A[1], B[0], b0, B[1], B[0], b1, B[1], A[0], a0, A[1], B[0], b1, B[1], A[0], a1, A[1]);
       uv.push(u0, 0, u1, 0, u1, 1, u0, 0, u1, 1, u0, 1);
     }
