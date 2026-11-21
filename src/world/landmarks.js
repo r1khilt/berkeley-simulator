@@ -57,6 +57,7 @@ export class LandmarkManager {
       l.anchors = {}; for (const [k, v] of Object.entries(res.anchors || {})) if (Array.isArray(v)) l.anchors[k] = [v[0] + a.x, v[1] + a.y, v[2] + a.z];
       Object.assign(l, { obj, res, details, packetAnchor: a, info: mod.info || {} });
       this.standins && this.standins.setHidden(l.replaces, true);
+      if (this.physics.suspendTag) for (const id of l.replaces) this.physics.suspendTag(id, true); // new-buildings: the hidden stand-in's walls go too
       l.state = 'ready'; this.placed.push(l);
       this.onLoaded && this.onLoaded(l);
     } catch (e) { console.warn('landmark failed', l.id, e); l.state = 'failed'; }
@@ -66,6 +67,7 @@ export class LandmarkManager {
     l.obj.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.geometry && o.geometry.dispose(); } });
     this.physics.removeTag('lm:' + l.id);
     this.standins && this.standins.setHidden(l.replaces, false);
+    if (this.physics.suspendTag) for (const id of l.replaces) this.physics.suspendTag(id, false);
     this.placed = this.placed.filter((x) => x !== l);
     l.state = 'idle'; l.obj = null; l.res = null; l.details = [];
     this.onUnloaded && this.onUnloaded(l);
