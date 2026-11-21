@@ -1,258 +1,286 @@
 // Grimes Engineering Center (SOM, 2025): the transformed 1980 Bechtel Engineering Center at the heart of the engineering
-// neighbourhood, north-east of Memorial Glade. The old Brutalist concrete base (half-sunken, precast-panel walls, glazed
-// storefronts) carries a wraparound terrace with white picket rails; on it stands a two-storey glass-and-steel pavilion
-// (floor-to-ceiling glazing on slim white mullions, a white floor band between storeys) under a thin, flat white roof
-// canopy whose louvred perimeter cantilevers 4-7 m past the glass. Slender white round columns stand outside the glass on an
-// 8 m grid, linked by the signature zig-zag of thin shape-memory-alloy tension rods (one V per bay, 36 rods in all).
-// A clerestory skylight box rises from the canopy over the three-storey Shyh Wang Forum; a white steel stair climbs the
-// south face to the terrace and a sloped walk rises along the east side.
-// Plan from 2025-26 aerial imagery (canopy ~61 x 37 m, rotated like the old Bechtel outline) and SOM / Berkeley sources:
-// 4 storeys, 60 ft, 82,880 gsf. The 2021 LiDAR in the packet shows the old Bechtel and is NOT used for massing.
+// neighbourhood, north-east of Memorial Glade (McLaughlin Hall to the west, Davis Hall abutting the north side, Evans Hall
+// to the south-east). Four storeys, 60 ft, read from the plaza as stacked, receding layers:
+//  1. the old concrete podium pushed forward (warm greige precast panels, near full-height storefront glazing between piers,
+//     a deep precast band with the GRIMES ENGINEERING CENTER letters over the centred entrance) with planters on top;
+//  2. a set-back, white-clad, fully glazed storey under a white fascia band;
+//  3. the wraparound terrace (white picket rails) and a two-storey glass-and-steel pavilion (floor-to-ceiling glass on slim
+//     white mullions, a white floor band, warm wood ceilings), under
+//  4. a thin white louvred roof canopy that oversails the glass, most dramatically at the west end.
+// Slender white round columns stand outside the glass on a ~8-9 m grid, each with the signature V of two tension rods rising
+// from its foot to the canopy beams, a shape-memory-alloy cable sleeve near the top of every rod (18 columns, 36 rods). A white steel stair and a white sign box sit on the west
+// (Glade-facing) front, a red-brick stair drops toward the Glade, and a sloped walk climbs the east side.
+// Plan from 2025-26 aerial imagery (canopy ~61 x 34 m, rotated like the old Bechtel outline) plus SOM / Berkeley sources and
+// Dave Burk / SOM photos. The packet's 2021 LiDAR shows the old Bechtel and is NOT used for massing.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { grimesMats, strut, pickets, sign } from './lib/grimes-kit.js';
 
+const _A = THREE.MathUtils.degToRad(-15.787), _c = Math.cos(_A), _s = Math.sin(_A);   // building frame (u,v) -> local (x,z)
+const _rect = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => [+(u * _c - v * _s).toFixed(2), +(u * _s + v * _c).toFixed(2)]);
 export const info = {
   id: 'grimes-engineering-center',
   name: 'Grimes Engineering Center',
   subtitle: 'SOM · 2025',
-  blurb: 'SOM transformed the 1980 Bechtel Engineering Center into this student hub by setting a glass-and-steel pavilion on the old concrete base. The zig-zag rods around its perimeter carry shape-memory-alloy cables that pull the building back into shape after an earthquake.',
+  blurb: 'SOM transformed the 1980 Bechtel Engineering Center into this student hub by setting a glass-and-steel pavilion on the old concrete base. The V-shaped tension rods around its perimeter carry shape-memory-alloy cables that pull the building back to plumb after an earthquake.',
   replaces: ['w/25079275'],
+  // New outline (2025 aerial imagery; landmark-local x,z) replacing the old Bechtel OSM outline for tree hiding and the map,
+  // and areas where the 2021 LiDAR trees no longer stand: inside the new base, and the open paving west of it (the two
+  // ~26 m trees there are gone in the 2025 imagery), and the re-landscaped strip in front of the west half of the south front
+  // (gravel beds and a walk in the 2025 SOM photos where the 2021 LiDAR has three 4-8 m trees).
+  footprint: [[-34.9, -7.06], [28.5, -24.96], [39.5, 14.04], [-23.9, 32.04]],
+  clear: [_rect(-33.2, -17.8, 35.7, 25.8), _rect(-44.5, -1.0, -33.2, 21.5), _rect(-36.0, 25.8, 6.0, 34.0)],
 };
 
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-15.787);
   const K = new Kit(ctx, ANG); const M = ctx.M; const G = grimesMats(M);
   const colliders = [], walkables = [];
-  // ---- levels (y = 0 is the lowest grade on the old footprint; the south plaza is ~0.0-0.9)
-  const TER = 6.0;   // terrace on the old base = pavilion level 2 floor
-  const F4 = 10.4;   // pavilion upper floor
-  const RF = 14.6;   // top of pavilion glazing
-  const CU = 15.35;  // canopy underside (beams)
-  const CT = 16.0;   // canopy top
+  // ---- levels (y = 0 is the lowest grade on the old footprint; the plazas around are ~0.0-0.9)
+  const P1 = 5.8;    // podium roof = old Bechtel roof (2021 LiDAR top ~6.0 incl. its landscaping) = new level-1 floor
+  const TER = 9.9;   // terrace = pavilion lower floor (level 2)
+  const F4 = 13.7;   // pavilion upper floor (level 3)
+  const RF = 17.5;   // top of pavilion glazing
+  const CU = 18.0;   // canopy underside (beams)
+  const CT = 18.6;   // canopy top (~61 ft)
   // ---- plan (building frame: u along the long axis ~ESE, v ~SSW-wards, metres)
-  const bN = -16.3, bS = 24.0, bW = -29.4, bE = 30.8;   // concrete base (old Bechtel + south infill)
-  const pW = -21.6, pE = 24.3, pN = -6.5, pS = 20.0;    // glass pavilion
-  const cW = -22.8, cE = 25.5, cN = -7.7, cS = 21.2;    // perimeter column lines (8.05 m bays on the long sides)
-  const kW = -29.6, kE = 31.4, kN = -10.5, kS = 26.8;   // roof canopy outline
+  const bN = -16.3, bS = 24.0, bW = -29.4, bE = 30.8;   // podium (old Bechtel lower level + south infill)
+  const sS = 21.0, sW = -26.4;                          // set-back level-1 faces (south, west); east and north are flush
+  const pW = -22.8, pE = 24.3, pN = -6.0, pS = 19.2;    // glass pavilion (south glass ~1.8 m behind the level-1 face, per the SOM south photo)
+  const cW = -23.75, cE = 26.1, cN = -7.8, cS = 20.15;  // perimeter column lines (~1-1.8 m outside the glass, ~8.3 m bays)
+  const kW = -29.6, kE = 31.4, kN = -10.0, kS = 23.6;   // roof canopy outline
   const gMin = (u0, v0, u1, v1) => K.gMin(u0, v0, u1, v1, 8);
+  const quad = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+  const railCol = (a, b, y0, y1, w = 0.06) => { const nx = b[1] - a[1], nz = a[0] - b[0], L = Math.hypot(nx, nz) || 1; colliders.push(K.colPoly([[a[0] + nx / L * w, a[1] + nz / L * w], [b[0] + nx / L * w, b[1] + nz / L * w], [b[0] - nx / L * w, b[1] - nz / L * w], [a[0] - nx / L * w, a[1] - nz / L * w]], y0, y1)); };
+  const bays = (s0, s1, bay, y0, y1, pier = 0.2) => { const n = Math.max(1, Math.round((s1 - s0) / bay)); const bw = (s1 - s0) / n; const ops = []; for (let i = 0; i < n; i++) ops.push({ s0: s0 + bw * i + pier, s1: s0 + bw * (i + 1) - pier, y0, y1, sill: false, fw: 0.07 }); return ops; };
+  const glaze = (R, o, frame = G.frame, rev = 0.45) => K.fill(R, o, { rev, glass: G.storeGlass, frame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.5) - 1), tran: [o.y1 - 0.7] });
 
-  // =============================== BASE ===============================
-  const basePoly = [[bW, bN], [bE, bN], [bE, bS], [bW, bS]];
-  // storefront helper on a run: glazed bays between precast piers
-  const storefront = (R, s0, s1, y0, y1, bay = 6.2, opt = {}) => {
-    const n = Math.max(1, Math.round((s1 - s0) / bay)); const bw = (s1 - s0) / n; const ops = [];
-    for (let i = 0; i < n; i++) ops.push({ s0: s0 + bw * i + (opt.pier ?? 0.45), s1: s0 + bw * (i + 1) - (opt.pier ?? 0.45), y0, y1, sill: false, fw: 0.08 });
-    return ops;
-  };
-  const faces = [];
-  { // south face (west -> east), the Memorial Glade side
-    const R = K.run([bW, bS], [bE, bS]); const gl = gMin(bW, bS, bE, bS + 1.5);
-    const ops = [];
-    ops.push(...storefront(R, 2.0, 16.5, 0.35, 3.7, 4.8));                        // behind the exterior stair
-    ops.push({ s0: 27.6, s1: 41.0, y0: 0.6, y1: 4.5, sill: false, entry: true });   // main entrance glazing
-    ops.push(...storefront(R, 42.5, 59.2, 0.7, 4.3, 5.6));                          // east storefronts
-    faces.push({ R, gl, ops });
-  }
-  { // east face (south -> north)
-    const R = K.run([bE, bS], [bE, bN]); const gl = gMin(bE, bN, bE + 1.5, bS);
-    faces.push({ R, gl, ops: storefront(R, 1.5, 18.5, 0.9, 3.9, 5.7) });
-  }
-  { // west face (north -> south)
-    const R = K.run([bW, bN], [bW, bS]); const gl = gMin(bW - 1.5, bN, bW, bS);
-    faces.push({ R, gl, ops: storefront(R, 14.0, 38.5, 0.5, 3.9, 6.1) });
-  }
-  for (const f of faces) {
-    const { R, gl, ops } = f; const y0 = gl - 1.2;
-    K.wall(R, G.panel, 0, R.L, y0, TER - 0.95, ops, 0.45);
-    for (const o of ops) {
-      if (o.entry) {
-        // main entrance: tall storefront with two pairs of glazed doors, white frames
-        K.rbox(R, M.windowNight, o.s0, o.y0, -0.42, o.s1, o.y1, -0.38);
-        const n = 9; for (let i = 0; i <= n; i++) { const s = o.s0 + (o.s1 - o.s0) * i / n; K.rbox(R, G.frame, s - 0.04, o.y0, -0.4, s + 0.04, o.y1, -0.3, { detail: i > 0 && i < n }); }
-        K.rbox(R, G.frame, o.s0, o.y0 + 2.6, -0.4, o.s1, o.y0 + 2.7, -0.3, { detail: true });
-        for (const dc of [o.s0 + (o.s1 - o.s0) * 0.3, o.s0 + (o.s1 - o.s0) * 0.7]) { K.rbox(R, G.frame, dc - 1.0, o.y0, -0.39, dc + 1.0, o.y0 + 2.45, -0.36, { detail: true }); K.rbox(R, M.windowNight, dc - 0.92, o.y0 + 0.08, -0.37, dc + 0.92, o.y0 + 2.37, -0.355); }
-        K.rbox(R, G.deck, o.s0, o.y0 - 0.25, -0.45, o.s1, o.y0, 1.6);
-      } else K.fill(R, o, { rev: 0.4, glass: M.windowNight, frame: G.darkFrame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.55) - 1), tran: [o.y1 - 0.9] });
+  // =============================== 1. PODIUM ===============================
+  K.box(M.concreteDark, bW + 3.7, -1.0, bN + 0.6, bE - 0.6, P1 - 0.3, bS - 1.6);   // interior fill, kept behind the recessed storefronts
+  const BAND0 = 3.7;           // underside of the deep precast band over the recessed ground floor
+  const PAR = P1 + 0.55;       // band / parapet top (the hedge planters sit on it) (the podium-roof planters sit behind it)
+  // Old Bechtel ground floor: square board-formed piers flush with the face, storefront glazing recessed `rec` behind
+  // them, and a deep two-row precast band above (panel texture = 3.0 x 1.5 m panels with dark joints).
+  const arcade = (a, b, { rec = 1.0, piers, ent = null, top = PAR, corner = 1.5, pw = 0.6, raise = null, bandMat = G.panel, band0 = BAND0 }) => {
+    const R = K.run(a, b), Ri = K.run(a, b, -rec); const L = R.L;
+    const gl = gMin(Math.min(a[0], b[0]) - 0.5, Math.min(a[1], b[1]) - 0.5, Math.max(a[0], b[0]) + 0.5, Math.max(a[1], b[1]) + 0.5);
+    const ps = [0, ...piers, L]; const ops = [];
+    for (let i = 0; i < ps.length - 1; i++) {
+      const s0 = ps[i] + (i === 0 ? corner : pw / 2), s1 = ps[i + 1] - (i === ps.length - 2 ? corner : pw / 2);
+      if (s1 - s0 < 0.8) continue;
+      const entry = ent != null && Math.abs((s0 + s1) / 2 - ent) < 1.5;
+      ops.push({ s0, s1, y0: entry ? 0.3 : 0.3, y1: band0 - 0.1, sill: false, fw: 0.06, entry });
     }
-    // white fascia band at the terrace edge (slab edge + parapet base)
+    K.wall(Ri, G.panel, 0, L, gl - 1.2, band0 + 0.3, ops, 0.3);
+    for (const o of ops) {
+      if (!o.entry) { K.fill(Ri, o, { rev: 0.18, glass: G.storeGlass, frame: G.frame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.5) - 1), tran: [] }); continue; }
+      K.rbox(Ri, G.storeGlass, o.s0, o.y0, -0.12, o.s1, o.y1, -0.08);
+      for (let i = 0; i <= 4; i++) { const s = o.s0 + (o.s1 - o.s0) * i / 4; K.rbox(Ri, G.frame, s - 0.06, o.y0, -0.1, s + 0.06, o.y1, 0.03); }
+      K.rbox(Ri, G.frame, o.s0, o.y0 + 2.45, -0.1, o.s1, o.y0 + 2.57, 0.03);
+      K.rbox(R, G.deck, o.s0 - 3, o.y0 - 0.3, -rec, o.s1 + 3, o.y0, 3.0);                  // entry apron under the band
+    }
+    for (const s of piers) K.rbox(R, G.panel, s - pw / 2, gl - 1.2, -pw, s + pw / 2, band0 + 0.05, 0);
+    K.rbox(R, G.panel, 0, gl - 1.2, -rec, corner, band0 + 0.05, 0); K.rbox(R, G.panel, L - corner, gl - 1.2, -rec, L, band0 + 0.05, 0);
+    const cut = raise ? raise.s0 : L;
+    K.rbox(R, bandMat, -0.02, band0, -rec - 0.05, cut, top, 0.02);                            // deep band (underside = arcade soffit)
+    K.rbox(R, G.slab, -0.06, top, -0.45, cut, top + 0.07, 0.06);                              // thin light coping
+    if (raise) {   // taller block east of the entrance, band pushed slightly forward
+      K.rbox(R, G.panel, raise.s0, band0 - 0.25, -rec - 0.05, L + 0.02, top + raise.h, 0.3);
+      K.rbox(R, G.slab, raise.s0 - 0.06, top + raise.h, -0.6, L + 0.06, top + raise.h + 0.07, 0.36);
+    }
+    return R;
+  };
+  {
+    // south front: recessed storefront between square piers, centred glass entrance under the band
+    const R = arcade([bW, bS], [bE, bS], { rec: 1.0, piers: [7.65, 13.8, 19.95, 26.1, 33.1, 41.6, 50.2], ent: 29.6, raise: { s0: 33.4, h: 0.95 } });
+    sign(K, R, 'GRIMES ENGINEERING CENTER', 29.6, (BAND0 + PAR) / 2 + 0.05, 0.42, { color: '#57534d', metal: 0.35, weight: '500', spacing: 0.16, d: 0.05 });
+  }
+  { // east face: tall plain concrete wall with a band of storefront at the plaza end (podium + level 2 flush)
+    const R = K.run([bE, bS], [bE, bN]); const gl = gMin(bE, bN, bE + 1.5, bS);
+    const ops = bays(1.0, 13.0, 6.0, 0.9, 3.6);
+    K.wall(R, G.panel, 0, R.L, gl - 1.2, TER - 0.95, ops, 0.45); for (const o of ops) glaze(R, o);
     K.rbox(R, G.metalPanel, -0.15, TER - 0.95, -0.2, R.L + 0.15, TER + 0.18, 0.14);
   }
-  // north face abuts Davis Hall: plain wall + interior fill so nothing reads hollow
+  const WS = { v0: -16.0, vT: -3.4, vT1: -0.6 };   // west stair stations (north -> south): one straight flight + top landing
+  { // west face (toward Memorial Glade): glazing recessed deep under the deck edge, behind square piers
+    arcade([bW, bN], [bW, bS], { rec: 3.0, piers: [5.0, 10.5, 16.0, 21.5, 27.0, 32.5], top: P1 + 0.02, pw: 0.7, corner: 1.2, bandMat: G.whitePanel, band0: P1 - 1.2 });
+  }
   { const R = K.run([bE, bN], [bW, bN]); K.wall(R, G.panel, 0, R.L, gMin(bW, bN - 1, bE, bN) - 1.2, TER + 0.18, [], 0.45); }
-  K.box(M.concreteDark, bW + 0.4, -1.0, bN + 0.4, bE - 0.4, TER - 0.3, bS - 0.4);
-  // terrace deck on the old roof (around the pavilion)
-  const pavPoly = [[pW, pN], [pE, pN], [pE, pS], [pW, pS]];
-  K.flat(G.deck, basePoly, TER, [pavPoly]);
-  K.box(G.slab, bW, TER - 0.3, bN, bE, TER - 0.02, bS);
-  walkables.push(K.walkPoly(basePoly, TER));
-  colliders.push(K.colPoly(basePoly, -3, TER - 0.05));
-  // picket guardrails along the open terrace edges (gap where the stair lands)
-  const stairTop = [-12.6, -9.0];
-  const railSegs = [
-    [[bW + 0.12, bS - 0.12], [stairTop[0], bS - 0.12]], [[stairTop[1], bS - 0.12], [bE - 0.12, bS - 0.12]],
-    [[bE - 0.12, bS - 0.12], [bE - 0.12, -12.4]],
-    [[bW + 0.12, bN + 3.0], [bW + 0.12, bS - 0.12]],
-  ];
-  for (const [a, b] of railSegs) {
-    pickets(K, G.steel, a, b, TER + 0.18, 1.07, 0.13);
-    const nx = b[1] - a[1], nz = a[0] - b[0], L = Math.hypot(nx, nz) || 1, w = 0.06;
-    colliders.push(K.colPoly([[a[0] + nx / L * w, a[1] + nz / L * w], [b[0] + nx / L * w, b[1] + nz / L * w], [b[0] - nx / L * w, b[1] - nz / L * w], [a[0] - nx / L * w, a[1] - nz / L * w]], TER - 0.2, TER + 1.3));
+  // podium roof: planters along the south, a deck along the west with a picket guardrail
+  K.box(G.panel, bW, P1 - 0.3, sS, bE, P1, bS);
+  K.box(G.panel, bW, P1 - 0.3, bN, sW, P1, sS);
+  K.box(G.panel, bW + 0.1, P1, bS - 1.15, bE - 0.1, PAR - 0.25, bS - 0.9);                     // planter inner wall
+  K.box(G.mulch, bW + 0.25, PAR - 0.3, bS - 1.0, bW + 33.2, PAR - 0.28, bS - 0.15, { detail: true });
+  for (let u = bW + 0.9; u < bW + 32.8; u += 1.15) { const ico = new THREE.IcosahedronGeometry(0.42 + ((u * 7.3) % 1) * 0.12, 1); ico.scale(1.15, 0.75, 1); ico.translate(u, PAR + 0.0, bS - 0.58); K.add(G.planting, ico, { detail: true }); }
+  K.flat(G.deck, quad(bW, bN + 2.0, sW, sS), P1 + 0.01); K.flat(G.deck, quad(bW, sS, bE, bS - 1.15), P1 + 0.01);
+  walkables.push(K.walkPoly([[bW, bN + 2.0], [sW, bN + 2.0], [sW, sS], [bE, sS], [bE, bS], [bW, bS]], P1));
+  colliders.push(K.colPoly(quad(bW, bN, bE, bS), -3, P1 - 0.05));
+  const podRail = [[[bW + 0.1, bN + 2.0], [bW + 0.1, WS.vT - 0.05]], [[bW + 0.1, WS.vT1 + 0.05], [bW + 0.1, bS - 1.2]]];
+  for (const [a, b] of podRail) { pickets(K, G.steel, a, b, P1, 1.07, 0.12); railCol(a, b, P1 - 0.2, P1 + 1.3); }
+  railCol([bW + 0.2, bS - 1.15], [bE - 0.2, bS - 1.15], P1 - 0.2, P1 + 1.2);
+
+  // =============================== 2. SET-BACK LEVEL 2 ===============================
+  {
+    const runs = [{ R: K.run([sW, sS], [bE, sS]), bay: 8.1 }, { R: K.run([sW, bN], [sW, sS]), bay: 8.1, s0: 2.0 }];
+    for (const { R, bay, s0 = 0 } of runs) {
+      const y0 = P1, y1 = TER - 0.95;
+      const ops = bays(s0 + 0.4, R.L - 0.4, bay, y0 + 0.1, y1 - 0.08, 0.75);
+      K.wall(R, G.whitePanel, 0, R.L, y0 - 0.05, y1, ops, 0.4);
+      for (const o of ops) K.fill(R, o, { rev: 0.25, glass: G.storeGlass, frame: G.frame, mull: Math.max(2, Math.round((o.s1 - o.s0) / 1.6) - 1), tran: [] });
+      K.rbox(R, G.whitePanel, -0.15, TER - 1.1, -0.2, R.L + 0.15, TER + 0.18, 0.16);            // solid white fascia band
+    }
+    sign(K, runs[0].R, 'Grimes Engineering Center', runs[0].R.L - 10.5, TER - 0.42, 0.32, { color: '#5b5e60', metal: 0.3, spacing: 0.04, d: 0.18 });
+    colliders.push(K.colPoly([[sW, bN], [bE, bN], [bE, sS], [sW, sS]], P1 - 0.1, TER - 0.05));
+    K.box(M.concreteDark, sW + 0.5, P1, bN + 0.5, bE - 0.5, TER - 0.3, sS - 0.5);
   }
-  // planters on the terrace (low concrete boxes with shrubs)
-  for (const [u0, v0, u1, v1] of [[-27.6, -14.6, -23.4, -12.2], [-13.0, -14.6, -3.0, -12.4], [4.0, -14.6, 14.0, -12.4], [20.0, -14.6, 28.6, -12.4], [-28.6, 4.0, -26.2, 12.0], [26.6, 6.0, 29.6, 14.0]]) {
+
+  // =============================== 3. TERRACE + GLASS PAVILION ===============================
+  const terPoly = quad(sW, bN, bE, sS);
+  const pavPoly = quad(pW, pN, pE, pS);
+  K.flat(G.deck, terPoly, TER, [pavPoly]);
+  K.box(G.slab, sW, TER - 0.3, bN, bE, TER - 0.02, sS);
+  walkables.push(K.walkPoly(terPoly, TER));
+  const terRail = [[[sW + 0.12, sS - 0.12], [bE - 0.12, sS - 0.12]], [[bE - 0.12, sS - 0.12], [bE - 0.12, bN + 0.5]], [[sW + 0.12, bN + 0.5], [sW + 0.12, sS - 0.12]]];
+  for (const [a, b] of terRail) { pickets(K, G.steel, a, b, TER + 0.18, 1.07, 0.11); railCol(a, b, TER - 0.2, TER + 1.3); }
+  for (const [u0, v0, u1, v1] of [[-13.0, -14.8, -3.0, -12.8], [4.0, -14.8, 14.0, -12.8], [-26.1, 4.0, -24.5, 9.0], [27.6, -2.0, 29.8, 8.0]]) {
     K.box(G.panel, u0, TER, v0, u1, TER + 0.55, v1); K.box(G.planting, u0 + 0.15, TER + 0.55, v0 + 0.15, u1 - 0.15, TER + 0.95, v1 - 0.15, { detail: true });
-    colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], TER, TER + 0.6));
+    colliders.push(K.colPoly(quad(u0, v0, u1, v1), TER, TER + 0.6));
   }
-
-  // ===================== WHITE BOX + SIGNS (south entry) =====================
-  { const R = K.run([-9.0, bS], [-1.6, bS]);
-    K.box(G.metalPanel, -9.0, gMin(-9, bS, -1.6, bS + 1.6) - 0.6, bS - 0.2, -1.6, TER + 1.15, bS + 1.5);
-    const RF2 = K.run([-9.0, bS + 1.5], [-1.6, bS + 1.5]);
-    sign(K, RF2, 'Grimes Engineering Center', RF2.L / 2, 3.2, 0.36, { color: '#3a3c3e', metal: 0.2, weight: '500', spacing: 0.02 });
-    colliders.push(K.colPoly([[-9.0, bS - 0.2], [-1.6, bS - 0.2], [-1.6, bS + 1.5], [-9.0, bS + 1.5]], -2, TER + 1.15));
-    void R; }
-  { const R = faces[0].R; const sMid = (27.6 + 41.0) / 2; sign(K, R, 'GRIMES ENGINEERING CENTER', sMid, 5.05, 0.42, { color: '#d9d7d1', metal: 0.75, weight: '500', spacing: 0.14, d: 0.05 }); }
-
-  // ===================== EXTERIOR STAIR (south face, west part) =====================
-  {
-    const v0 = bS + 0.05, v1 = bS + 2.25; const gFoot = Math.max(-0.5, K.g(-27.8, bS + 1.2));
-    const uA = -27.8, uL0 = -21.0, uL1 = -19.0, uT = stairTop[0];
-    const yMid = (gFoot + TER) / 2;
-    const flight = (ua, ub, ya, yb) => { const n = Math.max(3, Math.round((yb - ya) / 0.165)); const tr = (ub - ua) / n; for (let i = 0; i < n; i++) { const yy = ya + (yb - ya) * (i + 1) / n; K.box(G.slab, ua + tr * i, yy - 0.06, v0, ua + tr * (i + 1) + 0.02, yy, v1); K.box(G.steel, ua + tr * i, yy - 0.06 - 0.17, v0, ua + tr * (i + 1) + 0.02, yy - 0.06, v0 + 0.25 * 0 + 0.04, { detail: true }); }
-      // sloped white steel plate underneath + solid white outer stringer/guard
-      const L = Math.hypot(ub - ua, yb - ya), a = Math.atan2(yb - ya, ub - ua);
-      const pl = new THREE.BoxGeometry(L, 0.12, v1 - v0); pl.rotateZ(a); pl.translate((ua + ub) / 2, (ya + yb) / 2 - 0.3, (v0 + v1) / 2); K.add(G.steel, pl);
-      const gd = new THREE.BoxGeometry(L, 1.45, 0.12); gd.rotateZ(a); gd.translate((ua + ub) / 2, (ya + yb) / 2 + 0.35, v1 + 0.06); K.add(G.metalPanel, gd);
-      const hr = new THREE.BoxGeometry(L, 0.05, 0.05); hr.rotateZ(a); hr.translate((ua + ub) / 2, (ya + yb) / 2 + 0.95, v0 + 0.08); K.add(G.steel, hr, { detail: true });
-      return n; };
-    flight(uA, uL0, gFoot, yMid); flight(uL1, uT, yMid, TER);
-    K.box(G.slab, uL0, yMid - 0.25, v0, uL1, yMid, v1); K.box(G.metalPanel, uL0, yMid - 0.5, v1, uL1, yMid + 1.1, v1 + 0.12);
-    K.box(G.slab, uT, TER - 0.3, v0, stairTop[1], TER + 0.0, v1); K.box(G.metalPanel, uT, TER - 0.6, v1, stairTop[1], TER + 1.15, v1 + 0.12);
-    // slender white posts under the landings
-    for (const [u, y] of [[uL0 + 0.3, yMid], [uL1 - 0.3, yMid], [uT + 0.3, TER], [stairTop[1] - 0.3, TER]]) K.cyl(G.steel, u, K.g(u, v1 - 0.3) - 0.3, v1 - 0.3, 0.09, 0.09, y - K.g(u, v1 - 0.3), 8);
-    const sp = { uA, uL0, uL1, uT, gFoot, yMid };
-    walkables.push(K.walkFn(uA, v0, stairTop[1], v1, (u, v) => {
-      if (u < sp.uA - 0.05 || u > stairTop[1] + 0.05 || v < v0 - 0.05 || v > v1 + 0.05) return null;
-      if (u <= sp.uL0) return sp.gFoot + (sp.yMid - sp.gFoot) * Math.max(0, (u - sp.uA) / (sp.uL0 - sp.uA));
-      if (u <= sp.uL1) return sp.yMid;
-      if (u <= sp.uT) return sp.yMid + (TER - sp.yMid) * (u - sp.uL1) / (sp.uT - sp.uL1);
-      return TER; }));
-    colliders.push(K.colPoly([[uA, v1], [stairTop[1], v1], [stairTop[1], v1 + 0.14], [uA, v1 + 0.14]], -2, TER + 1.2));
+  for (const [u, v] of [[-25.3, -4.5], [-25.3, -1.0], [27.8, -10], [27.8, -6], [-9, -10.5], [-3, -10.5], [9, -10.5], [17, -10.5]]) {
+    K.cyl(G.darkFrame, u, TER, v, 0.05, 0.05, 0.72, 6, { detail: true }); K.cyl(G.metalPanel, u, TER + 0.72, v, 0.45, 0.45, 0.04, 12, { detail: true });
   }
-
-  // ===================== EAST SLOPED WALK (plaza -> terrace) =====================
-  {
-    const u0 = bE + 0.05, u1 = bE + 3.1, vLo = bS - 1.0, vHi = -12.0; const yLo = Math.max(K.g(u1, vLo), 0.3);
-    const sh = new THREE.Shape(); const gb = gMin(u0, vHi, u1, vLo) - 1.0;
-    sh.moveTo(vLo, gb); sh.lineTo(vLo, yLo); sh.lineTo(vHi, TER); sh.lineTo(vHi, gb); sh.lineTo(vLo, gb);
-    const eg = new THREE.ExtrudeGeometry(sh, { depth: u1 - u0, bevelEnabled: false });
-    // shape (x=v, y=y), extrude z -> u : map (x,y,z) -> (u = u0 + z, y, v = x)
-    eg.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, u0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
-    K.add(G.panel, eg);
-    // outer parapet with white tube rail
-    const L = Math.hypot(vLo - vHi, TER - yLo), a = Math.atan2(TER - yLo, vLo - vHi);
-    const pw = new THREE.BoxGeometry(0.3, 0.9, L); pw.rotateX(a); pw.translate(u1 + 0.15, (TER + yLo) / 2 + 0.45, (vLo + vHi) / 2); K.add(G.panel, pw);
-    const tr = new THREE.BoxGeometry(0.07, 0.07, L); tr.rotateX(a); tr.translate(u1 + 0.15, (TER + yLo) / 2 + 1.1, (vLo + vHi) / 2); K.add(G.steel, tr, { detail: true });
-    for (let i = 0; i <= 12; i++) { const t = i / 12; const v = vLo + (vHi - vLo) * t, y = yLo + (TER - yLo) * t; K.box(G.steel, u1 + 0.12, y + 0.9, v - 0.03, u1 + 0.18, y + 1.1, v + 0.03, { detail: true }); }
-    walkables.push(K.walkFn(u0, vHi, u1, vLo, (u, v) => (u < u0 - 0.05 || u > u1 + 0.05 || v < vHi - 0.05 || v > vLo + 0.05) ? null : yLo + (TER - yLo) * (vLo - v) / (vLo - vHi)));
-    colliders.push(K.colPoly([[u1, vHi], [u1 + 0.3, vHi], [u1 + 0.3, vLo], [u1, vLo]], -2, TER + 1.2));
-  }
-
-  // =============================== GLASS PAVILION ===============================
   const pRuns = [K.run([pW, pS], [pE, pS]), K.run([pE, pS], [pE, pN]), K.run([pE, pN], [pW, pN]), K.run([pW, pN], [pW, pS])];
   for (const R of pRuns) {
     K.rbox(R, G.glass, 0, TER, -0.06, R.L, RF, -0.03);
-    // mullions every ~1.55 m
     const n = Math.max(2, Math.round(R.L / 1.55)); for (let i = 0; i <= n; i++) { const s = R.L * i / n; K.rbox(R, G.frame, s - 0.035, TER, -0.04, s + 0.035, RF, 0.12, { detail: i % 3 !== 0 }); }
-    // transoms (clerestory line) and sills
     for (const y of [TER + 3.05, F4 + 3.05]) K.rbox(R, G.frame, 0, y - 0.03, -0.04, R.L, y + 0.03, 0.1, { detail: true });
     K.rbox(R, G.frame, 0, TER, -0.04, R.L, TER + 0.08, 0.1, { detail: true });
-    // white floor band between storeys and roof-edge band
-    K.rbox(R, G.metalPanel, -0.02, F4 - 0.55, -0.1, R.L + 0.02, F4 + 0.4, 0.16);
-    K.rbox(R, G.metalPanel, -0.02, RF - 0.05, -0.1, R.L + 0.02, RF + 0.55, 0.16);
+    K.rbox(R, G.metalPanel, -0.02, F4 - 0.55, -0.1, R.L + 0.02, F4 + 0.45, 0.24);                // white floor band
+    K.rbox(R, G.metalPanel, -0.02, RF - 0.05, -0.1, R.L + 0.02, RF + 0.55, 0.24);                // roof edge band
   }
+  K.box(G.slab, pW - 0.1, RF + 0.1, pN - 0.1, pE + 0.1, RF + 0.5, pS + 0.1);                    // pavilion roof
   colliders.push(K.colPoly(pavPoly, TER - 0.5, CT));
-  // interior: upper floor with the forum void, warm wood ceilings, white cores (reads through the glass and glows at night)
-  { const ip = [[pW + 0.15, pN + 0.15], [pE - 0.15, pN + 0.15], [pE - 0.15, pS - 0.15], [pW + 0.15, pS - 0.15]];
-    const voidH = [[-6.0, -3.0], [10.0, -3.0], [10.0, 11.0], [-6.0, 11.0]];
+  { // interior read through the glass (glows at night)
+    const ip = quad(pW + 0.15, pN + 0.15, pE - 0.15, pS - 0.15);
+    const voidH = quad(-6.0, -2.5, 10.0, 9.5);
     K.prism(G.slab, ip, F4 - 0.45, F4 - 0.05, undefined, [voidH]);
     K.flat(G.ceiling, ip, F4 - 0.46, [voidH], true);
     K.flat(G.ceiling, ip, RF - 0.25, [], true);
     K.flat(G.deck, ip, F4 - 0.04, [voidH]);
-    for (const [u0, v0, u1, v1] of [[14.0, -5.6, 21.5, 1.0], [-20.4, 8.0, -15.0, 18.6], [-2.0, 13.5, 4.0, 18.8]]) K.box(G.interiorWall, u0, TER, v0, u1, RF - 0.25, v1);
-    // feature stair in the forum and glass guards
-    for (let i = 0; i < 14; i++) { const t = i / 14; K.box(G.steel, -4.5 + t * 7.0, TER + (F4 - TER) * t - 0.05, 9.2, -4.5 + t * 7.0 + 0.55, TER + (F4 - TER) * t + 0.25, 10.8, { detail: true }); }
-    // interior round columns
-    for (const u of [cW + 8.05, cW + 16.1, cW + 24.15, cW + 32.2, cW + 40.25]) for (const v of [1.5, 12.5]) if (!(u > -6.5 && u < 10.5 && v > -3.5 && v < 11.5)) K.cyl(G.steel, u, TER, v, 0.2, 0.2, RF - TER, 10, { detail: true });
+    for (const [u0, v0, u1, v1] of [[14.0, -5.2, 21.5, 1.0], [-18.0, 8.0, -13.5, 16.0], [-2.0, 12.5, 4.0, 16.4]]) K.box(G.interiorWall, u0, TER, v0, u1, RF - 0.25, v1);
+    for (let i = 0; i < 14; i++) { const t = i / 14; K.box(G.steel, -4.5 + t * 7.0, TER + (F4 - TER) * t - 0.05, 8.0, -4.5 + t * 7.0 + 0.55, TER + (F4 - TER) * t + 0.25, 9.4, { detail: true }); }
+    for (let u = pW + 3; u < pE - 3; u += 4.5) for (const [v, y] of [[pS - 1.6, TER], [pS - 1.6, F4], [pN + 1.6, F4], [pN + 1.6, TER]]) { K.box(G.metalPanel, u - 1.2, y + 0.72, v - 0.45, u + 1.2, y + 0.76, v + 0.45, { detail: true }); K.box(G.darkFrame, u - 0.05, y, v - 0.05, u + 0.05, y + 0.72, v + 0.05, { detail: true }); }
   }
 
   // ===================== COLUMNS + SHAPE-MEMORY-ALLOY ROD ZIG-ZAG =====================
   {
-    const ring = []; // perimeter column positions in order (clockwise from the south-west corner)
+    const ring = [];
     for (let k = 0; k <= 6; k++) ring.push([cW + (cE - cW) * k / 6, cS]);
     for (let j = 1; j <= 2; j++) ring.push([cE, cS + (cN - cS) * j / 3]);
     for (let k = 6; k >= 0; k--) ring.push([cW + (cE - cW) * k / 6, cN]);
     for (let j = 1; j <= 2; j++) ring.push([cW, cN + (cS - cN) * j / 3]);
     for (const [u, v] of ring) {
-      K.cyl(G.steel, u, TER, v, 0.19, 0.19, CU - TER, 14);
-      K.box(G.steel, u - 0.32, TER, v - 0.32, u + 0.32, TER + 0.05, v + 0.32, { detail: true });
-      K.box(G.steel, u - 0.25, CU - 0.35, v - 0.25, u + 0.25, CU, v + 0.25);
-      colliders.push(K.colCyl(u, v, 0.22, TER - 0.2, CU));
+      { const cg = new THREE.CylinderGeometry(0.25, 0.25, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
+      K.box(G.steel, u - 0.34, TER, v - 0.34, u + 0.34, TER + 0.06, v + 0.34, { detail: true });
+      K.box(G.steel, u - 0.3, CU - 0.4, v - 0.3, u + 0.3, CU, v + 0.3, { detail: true });
+      colliders.push(K.colCyl(u, v, 0.25, TER - 0.2, CU));
     }
-    const yTop = CU - 0.3, yLow = F4 - 0.1;
+    // SMA tension rods: a V on every column, apex at the column foot on the terrace, the two arms rising in the column
+    // plane to the canopy beams about a third of the way toward each neighbouring column (18 columns, 36 rods). Each rod
+    // carries a ~1.2 m sleeve of shape-memory-alloy cable near its top.
+    const yFoot = TER + 0.35, yTop = CU - 0.05;
     for (let i = 0; i < ring.length; i++) {
-      const a = ring[i], b = ring[(i + 1) % ring.length]; const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      strut(K, G.steel, [a[0], yTop, a[1]], [m[0], yLow, m[1]], 0.028, 6);
-      strut(K, G.steel, [b[0], yTop, b[1]], [m[0], yLow, m[1]], 0.028, 6);
-      // node plate + short outrigger back to the floor band at the glass line (the SMA fuse sits here)
-      const inward = [(pW + pE) / 2 - m[0], (pN + pS) / 2 - m[1]]; const il = Math.hypot(...inward);
-      const ax = Math.abs(a[1] - b[1]) < 0.01 ? [0, Math.sign(inward[1])] : [Math.sign(inward[0]), 0];
-      const dist = ax[0] ? Math.abs((ax[0] > 0 ? pW : pE) - m[0]) : Math.abs((ax[1] > 0 ? pN : pS) - m[1]);
-      strut(K, G.steel, [m[0], yLow, m[1]], [m[0] + ax[0] * dist, yLow, m[1] + ax[1] * dist], 0.05, 6);
-      K.cyl(G.darkFrame, m[0], yLow - 0.25, m[1], 0.07, 0.07, 0.5, 8, { detail: true });
-      void il;
+      const c = ring[i];
+      for (const nb of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
+        const t = [c[0] + (nb[0] - c[0]) * 0.32, c[1] + (nb[1] - c[1]) * 0.32];
+        const p0 = [c[0] + (nb[0] - c[0]) * 0.03, yFoot, c[1] + (nb[1] - c[1]) * 0.03], p1 = [t[0], yTop, t[1]];
+        strut(K, G.rod, p0, p1, 0.07, 6);
+        const f0 = 0.78, f1 = 0.9; const q = (f) => [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f, p0[2] + (p1[2] - p0[2]) * f];
+        strut(K, G.sleeve, q(f0), q(f1), 0.11, 8);
+      }
+      K.box(G.steel, c[0] - 0.32, TER + 0.06, c[1] - 0.32, c[0] + 0.32, yFoot + 0.12, c[1] + 0.32, { detail: true });   // rod anchor plate
     }
   }
 
-  // =============================== ROOF CANOPY ===============================
+  // =============================== 4. ROOF CANOPY (open louvred lattice) ===============================
   {
-    // solid roof over the column rectangle + white soffit
-    K.box(G.metalPanel, cW, CU + 0.05, cN, cE, CT - 0.05, cS);
-    K.box(G.slab, cW + 0.3, CT - 0.05, cN + 0.3, cE - 0.3, CT + 0.02, cS - 0.3);
-    // perimeter fascia
-    const fasc = (u0, v0, u1, v1) => K.box(G.steel, u0, CU + 0.1, v0, u1, CT + 0.05, v1);
-    fasc(kW, kS - 0.28, kE, kS); fasc(kW, kN, kE, kN + 0.28); fasc(kW, kN, kW + 0.28, kS); fasc(kE - 0.28, kN, kE, kS);
-    // inner ring beam at the column lines
-    const rb = (u0, v0, u1, v1) => K.box(G.steel, u0, CU, v0, u1, CT - 0.05, v1);
-    rb(cW, cS - 0.18, cE, cS + 0.18); rb(cW, cN - 0.18, cE, cN + 0.18); rb(cW - 0.18, cN, cW + 0.18, cS); rb(cE - 0.18, cN, cE + 0.18, cS);
-    // primary cantilever beams on the column grid + secondary ribs at third points
-    const beams = []; const sec = [];
-    for (let k = 0; k <= 6; k++) { const u = cW + (cE - cW) * k / 6; beams.push([u, cS, u, kS], [u, cN, u, kN]); if (k < 6) for (const f of [1 / 3, 2 / 3]) { const uu = u + (cE - cW) / 6 * f; sec.push([uu, cS, uu, kS], [uu, cN, uu, kN]); } }
-    for (let j = 0; j <= 3; j++) { const v = cS + (cN - cS) * j / 3; beams.push([cE, v, kE, v], [cW, v, kW, v]); if (j < 3) for (const f of [1 / 3, 2 / 3]) { const vv = v + (cN - cS) / 3 * f; sec.push([cE, vv, kE, vv], [cW, vv, kW, vv]); } }
-    // corner diagonals
-    beams.push([cE, cS, kE, kS], [cW, cS, kW, kS], [cE, cN, kE, kN], [cW, cN, kW, kN]);
-    for (const [u0, v0, u1, v1] of beams) { const L = Math.hypot(u1 - u0, v1 - v0), a = Math.atan2(v1 - v0, u1 - u0); K.obox(G.steel, (u0 + u1) / 2, (CU + CT) / 2 - 0.02, (v0 + v1) / 2, L, CT - CU - 0.04, 0.16, a); }
-    for (const [u0, v0, u1, v1] of sec) { const L = Math.hypot(u1 - u0, v1 - v0), a = Math.atan2(v1 - v0, u1 - u0); K.obox(G.steel, (u0 + u1) / 2, CT - 0.2, (v0 + v1) / 2, L, 0.3, 0.1, a, { detail: true }); }
-    // louvre blades running parallel to each edge across the open band
-    const blades = (along, a0, a1, c0, c1, horiz) => { const n = Math.max(2, Math.round(Math.abs(c1 - c0) / 0.42)); for (let i = 1; i < n; i++) { const c = c0 + (c1 - c0) * i / n;
-      if (horiz) K.box(G.louvre, a0, CT - 0.32, c - 0.035, a1, CT - 0.06, c + 0.035, { detail: along }); else K.box(G.louvre, c - 0.035, CT - 0.32, a0, c + 0.035, CT - 0.06, a1, { detail: along }); } };
-    blades(false, kW + 0.28, kE - 0.28, cS + 0.18, kS - 0.28, true);
-    blades(false, kW + 0.28, kE - 0.28, kN + 0.28, cN - 0.18, true);
-    blades(false, cN + 0.18, cS - 0.18, cE + 0.18, kE - 0.28, false);
-    blades(false, cN + 0.18, cS - 0.18, kW + 0.28, cW - 0.18, false);
-    // clerestory skylight box over the forum
-    const s0 = [-7.0, -6.0, 11.0, 1.0]; const yS = CT, yT = 17.75;
-    K.box(G.metalPanel, s0[0] - 0.4, yT - 0.05, s0[1] - 0.4, s0[2] + 0.4, yT + 0.3, s0[3] + 0.4);
-    const sr = [K.run([s0[0], s0[3]], [s0[2], s0[3]]), K.run([s0[2], s0[3]], [s0[2], s0[1]]), K.run([s0[2], s0[1]], [s0[0], s0[1]]), K.run([s0[0], s0[1]], [s0[0], s0[3]])];
-    for (const R of sr) { K.rbox(R, M.windowNight, 0, yS + 0.2, -0.05, R.L, yT - 0.05, 0); const n = Math.max(2, Math.round(R.L / 1.5)); for (let i = 0; i <= n; i++) { const s = R.L * i / n; K.rbox(R, G.frame, s - 0.05, yS, -0.05, s + 0.05, yT, 0.08); } K.rbox(R, G.steel, 0, yS, -0.05, R.L, yS + 0.25, 0.1); }
+    const fasc = (u0, v0, u1, v1) => K.box(G.steel, u0, CT - 0.26, v0, u1, CT + 0.05, v1);
+    fasc(kW, kS - 0.24, kE, kS); fasc(kW, kN, kE, kN + 0.24); fasc(kW, kN, kW + 0.24, kS); fasc(kE - 0.24, kN, kE, kS);
+    const beam = (u0, v0, u1, v1, d = CT - CU - 0.05, w = 0.18, mat = G.steel, opts) => { const L = Math.hypot(u1 - u0, v1 - v0), a = Math.atan2(v1 - v0, u1 - u0); K.obox(mat, (u0 + u1) / 2, CT - d / 2, (v0 + v1) / 2, L, d, w, a, opts); };
+    // primary grid on the column lines, carried out to the fascia
+    // full-depth between the column lines, slimmed to the 0.3 m edge depth over the cantilevers (thin white edge)
+    const TH = 0.3;
+    for (let k = 0; k <= 6; k++) { const u = cW + (cE - cW) * k / 6; beam(u, cN, u, cS); beam(u, kN, u, cN, TH); beam(u, cS, u, kS, TH); }
+    for (let j = 0; j <= 3; j++) { const v = cS + (cN - cS) * j / 3; beam(cW, v, cE, v); beam(kW, v, cW, v, TH); beam(cE, v, kE, v, TH); }
+    // (no diagonal corner beams: from the plaza they read as hip lines; the real canopy reads as one flat plane)
+    // secondary beams at third points
+    for (let k = 0; k < 6; k++) for (const f of [1 / 3, 2 / 3]) { const u = cW + (cE - cW) * (k + f) / 6; beam(u, kN, u, kS, 0.38, 0.1); }
+    for (const u of [kW + (cW - kW) / 3, kW + 2 * (cW - kW) / 3, cE + (kE - cE) / 2]) beam(u, kN, u, kS, 0.38, 0.1);
+    // louvre blades running perpendicular to the long facades (sky reads through them from the plaza)
+    // translucent white soffit veil just under the blades: from the plaza the louvre field reads as one pale, light plane
+    K.flat(G.veil, quad(kW + 0.24, kN + 0.24, kE - 0.24, kS - 0.24), CT - 0.23);
+    const n = Math.round((kE - kW) / 0.6);
+    for (let i = 1; i < n; i++) { const u = kW + (kE - kW) * i / n; K.box(G.louvre, u - 0.02, CT - 0.22, kN + 0.24, u + 0.02, CT - 0.04, kS - 0.24); }
   }
 
-  // =============================== SITE: planters on the south plaza ===============================
-  for (const [u0, v0, u1, v1] of [[2.0, 29.5, 12.0, 31.5], [16.0, 29.5, 27.0, 31.5], [-8.0, 30.0, -1.0, 32.0]]) {
-    const g = gMin(u0, v0, u1, v1); K.box(G.panel, u0, g - 0.5, v0, u1, g + 0.5, v1); K.box(G.planting, u0 + 0.15, g + 0.5, v0 + 0.15, u1 - 0.15, g + 0.8, v1 - 0.15, { detail: true });
-    colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], g - 1, g + 0.55));
+  // =============================== WEST FRONT: WHITE STAIR + SIGN BOX, BRICK STAIR ===============================
+  {
+    const u0 = bW - 2.1, u1 = bW - 0.05; const gFoot = Math.max(-0.5, K.g(u0 + 1, WS.v0));
+    const flight = (va, vb, ya, yb) => { const n = Math.max(3, Math.round((yb - ya) / 0.165)); const tr = (vb - va) / n;
+      for (let i = 0; i < n; i++) { const yy = ya + (yb - ya) * (i + 1) / n; K.box(G.slab, u0, yy - 0.06, va + tr * i, u1, yy, va + tr * (i + 1) + 0.02); K.box(G.steel, u0, yy - 0.22, va + tr * i, u1, yy - 0.06, va + tr * i + 0.04, { detail: true }); }
+      const L = Math.hypot(vb - va, yb - ya), a = Math.atan2(yb - ya, vb - va);
+      const pl = new THREE.BoxGeometry(u1 - u0, 0.16, L); pl.rotateX(-a); pl.translate((u0 + u1) / 2, (ya + yb) / 2 - 0.34, (va + vb) / 2); K.add(G.metalPanel, pl);   // closed soffit
+      const gd = new THREE.BoxGeometry(0.14, 1.7, L); gd.rotateX(-a); gd.translate(u0 - 0.07, (ya + yb) / 2 + 0.25, (va + vb) / 2); K.add(G.metalPanel, gd);    // solid white stringer/guard
+      const hr = new THREE.BoxGeometry(0.05, 0.05, L); hr.rotateX(-a); hr.translate(u1 - 0.1, (ya + yb) / 2 + 0.95, (va + vb) / 2); K.add(G.steel, hr, { detail: true }); };
+    flight(WS.v0, WS.vT, gFoot, P1);
+    K.box(G.slab, u0, P1 - 0.3, WS.vT, u1, P1, WS.vT1); K.box(G.metalPanel, u0 - 0.14, P1 - 0.65, WS.vT, u0, P1 + 1.1, WS.vT1);
+    for (const f of [0.45, 0.75]) { const v = WS.v0 + (WS.vT - WS.v0) * f, gg = K.g(u0 + 0.6, v), yy = gFoot + (P1 - gFoot) * f; K.box(G.metalPanel, u0 + 0.75, gg - 0.4, v - 0.15, u0 + 1.05, yy - 0.45, v + 0.15); }   // slim white posts under the flight
+    const sp = { gFoot };
+    walkables.push(K.walkFn(u0, WS.v0, u1, WS.vT1, (u, v) => {
+      if (u < u0 - 0.05 || u > u1 + 0.05 || v < WS.v0 - 0.05 || v > WS.vT1 + 0.05) return null;
+      if (v <= WS.vT) return sp.gFoot + (P1 - sp.gFoot) * Math.max(0, (v - WS.v0) / (WS.vT - WS.v0));
+      return P1; }));
+    railCol([u0 - 0.1, WS.v0], [u0 - 0.1, WS.vT1], -2, P1 + 1.2);
+    // low white sign box at the stair head, just below the deck guardrail
+    const bx = { v0: WS.vT1 + 0.3, v1: WS.vT1 + 4.8 };
+    K.box(G.metalPanel, bW - 1.4, P1 - 1.45, bx.v0, bW + 0.05, P1 + 1.07, bx.v1);
+    const RB = K.run([bW - 1.4, bx.v0], [bW - 1.4, bx.v1]);
+    sign(K, RB, 'Grimes Engineering Center', RB.L / 2, P1 - 0.1, 0.27, { color: '#3d3f41', metal: 0.2, spacing: 0.03 });
+    colliders.push(K.colPoly(quad(bW - 1.4, bx.v0, bW + 0.05, bx.v1), -2, P1 + 1.1));
+    // red-brick landscape stair down toward the Glade (south-west), concrete cheek walls, black handrails
+    const sv0 = 22.6, sv1 = 29.4, suTop = -36.6, suBot = -45.0; const yTop = K.g(suTop + 0.5, (sv0 + sv1) / 2), yBot = K.g(suBot - 0.5, (sv0 + sv1) / 2);
+    if (yTop - yBot > 0.45) {
+      const ns = Math.round((yTop - yBot) / 0.15);
+      walkables.push(K.stairs(G.brick, suBot, sv0, suTop, sv1, yBot, yTop, '-u', ns, { foot: 1.5 }));
+      for (const v of [sv0 - 0.5, sv1]) { K.box(G.panel, suBot - 0.3, yBot - 1.0, v, suTop + 0.3, yTop + 1.0, v + 0.5); colliders.push(K.colPoly(quad(suBot - 0.3, v, suTop + 0.3, v + 0.5), yBot - 1, yTop + 1)); }
+      for (const v of [sv0 + 0.4, (sv0 + sv1) / 2, sv1 - 0.4]) strut(K, G.darkFrame, [suBot, yBot + 0.9, v], [suTop, yTop + 0.9, v], 0.025, 5, { detail: true });
+    }
   }
+
+  // ===================== EAST SLOPED WALK (plaza -> level-2 entry at the north-east) =====================
+  {
+    const u0 = bE + 0.05, u1 = bE + 3.1, vLo = bS - 1.0, vHi = -12.0; const yLo = Math.max(K.g(u1, vLo), 0.3), yHi = P1;
+    const sh = new THREE.Shape(); const gb = gMin(u0, vHi, u1, vLo) - 1.0;
+    sh.moveTo(vLo, gb); sh.lineTo(vLo, yLo); sh.lineTo(vHi, yHi); sh.lineTo(vHi, gb); sh.lineTo(vLo, gb);
+    const eg = new THREE.ExtrudeGeometry(sh, { depth: u1 - u0, bevelEnabled: false });
+    eg.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, u0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+    K.add(G.panel, eg);
+    const L = Math.hypot(vLo - vHi, yHi - yLo), a = Math.atan2(yHi - yLo, vLo - vHi);
+    const pw = new THREE.BoxGeometry(0.3, 0.9, L); pw.rotateX(a); pw.translate(u1 + 0.15, (yHi + yLo) / 2 + 0.45, (vLo + vHi) / 2); K.add(G.panel, pw);
+    const tr = new THREE.BoxGeometry(0.07, 0.07, L); tr.rotateX(a); tr.translate(u1 + 0.15, (yHi + yLo) / 2 + 1.1, (vLo + vHi) / 2); K.add(G.steel, tr, { detail: true });
+    walkables.push(K.walkFn(u0, vHi, u1, vLo, (u, v) => (u < u0 - 0.05 || u > u1 + 0.05 || v < vHi - 0.05 || v > vLo + 0.05) ? null : yLo + (yHi - yLo) * (vLo - v) / (vLo - vHi)));
+    colliders.push(K.colPoly(quad(u1, vHi, u1 + 0.3, vLo), -2, yHi + 1.2));
+  }
+
+  // =============================== SITE ===============================
+  const tree = (u, v, g, h) => { K.cyl(G.darkFrame, u, g, v, 0.07, 0.05, h * 0.55, 6, { detail: true });
+    for (const [du, dv, dy, r] of [[0, 0, 0.72, 0.36], [0.6, 0.35, 0.62, 0.26], [-0.5, -0.35, 0.64, 0.26]]) { const ico = new THREE.IcosahedronGeometry(h * r, 1); ico.scale(1, 0.75, 1); ico.translate(u + du, g + h * dy, v + dv); K.add(G.planting, ico, { detail: true }); } };
+  for (const [u0, v0, u1, v1, tr] of [[36.0, 18.0, 39.0, 24.0, 1], [6.5, 30.5, 12.5, 32.5, 0]]) {
+    const g = gMin(u0, v0, u1, v1); K.box(G.panel, u0, g - 0.5, v0, u1, g + 0.75, v1); K.box(G.mulch, u0 + 0.15, g + 0.75, v0 + 0.15, u1 - 0.15, g + 0.8, v1 - 0.15, { detail: true });
+    if (tr) tree((u0 + u1) / 2, (v0 + v1) / 2, g + 0.75, 5.5);
+    colliders.push(K.colPoly(quad(u0, v0, u1, v1), g - 1, g + 0.8));
+  }
+  for (const [u, v] of [[-31.5, -15.0], [-31.5, 6.0], [-4.0, 26.0], [21.0, 26.0], [34.5, 23.5]]) { const g = K.g(u, v); K.cyl(M.blackPaint, u, g, v, 0.07, 0.055, 3.9, 8); K.lathe(M.lampGlow, [[0.06, 0], [0.2, 0.12], [0.22, 0.45], [0.1, 0.62], [0.001, 0.66]], u, g + 3.9, v, 10, { detail: true }); colliders.push(K.colCyl(u, v, 0.12, g - 0.5, g + 4)); }
 
   const object3d = K.finish(); object3d.name = 'grimes-engineering-center';
   return { object3d, colliders, walkables };
