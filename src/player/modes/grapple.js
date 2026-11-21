@@ -43,7 +43,7 @@ class Grapple {
     this.len = 0; this.lenTarget = 0; this.reelRate = 0; this.taut = false; this.grounded = false;
     this.qHeld = false; this.mHeld = false; this.allowEnter = false; this.prevMode = 'walk';
     this.aim = { ok: false, hit: null, t: 0 }; this.camK = 0; this.userDist = null; this.lastSetDist = null; this.baseFov = null; this.frustFov = 0;
-    this.perch = null; this.perchOff = 0; this.safeT = 0; this.lastPos = new THREE.Vector3(); this.speed = 0; this.wave = 0; this.retractT = 0;
+    this.perch = null; this.perchOff = 0; this.safeT = 0; this.slideT = 0; this.lastPos = new THREE.Vector3(); this.speed = 0; this.wave = 0; this.retractT = 0;
     this.hand = new THREE.Vector3(); this.stats = { coarseMs: 0, refineMs: 0, fires: 0, attaches: 0, rescues: 0, slides: 0 };
     this._o = new THREE.Vector3(); this._d = new THREE.Vector3();
     this._buildVisuals();
@@ -51,16 +51,23 @@ class Grapple {
     const self = this;
     this.plugin = {
       label: 'Grappling hook', icon: ICON, hint: 'Hold Q or right mouse to swing · Space reel in · C let out',
-      // player.js toggles a plugin's mode when its key is pressed. The hook fires from onKey instead, so the toggle is
-      // refused by canEnter while not swinging, and the key is hidden while swinging so Q can re-fire mid-air.
-      get key() { return player.mode === 'grapple' ? undefined : 'KeyQ'; },
+      // player.js toggles a plugin's mode when its key is pressed. The hook fires from onKey instead: the toggle into
+      // 'grapple' is refused by canEnter, and while swinging the key reads as undefined for the length of that one key
+      // event, so Q re-fires mid-air instead of dropping you into walk mode. Everyone else always sees 'KeyQ'.
+      get key() { return self._suppressKey ? undefined : 'KeyQ'; },
       canEnter: () => self.allowEnter,
       enter: (p) => self._enter(p),
       exit: (p, next) => self._exit(p, next),
       update: (p, dt, inp, fwd, right) => self._update(p, dt, inp, fwd, right),
       always: (p, dt, inp, fwd, right) => self._always(p, dt, inp, fwd, right),
       pose: (p, av, dt) => self._pose(p, av, dt),
-      onKey: (e, p) => { if (e.code === 'KeyQ' && !e.repeat) { self.qHeld = true; self.fire(); } },
+      onKey: (e, p) => {
+        if (e.code !== 'KeyQ') return;
+        self._suppressKey = false;
+        // fallback for key events aimed straight at window (the capture listener can't run first): undo the toggle
+        if (self._exitEvt === e && p.mode === 'walk' && self._exitSub) { const prev = self.prevMode, sub = self._exitSub; self.allowEnter = true; p.setMode('grapple'); self.allowEnter = false; self.prevMode = prev; self.sub = sub; }
+        if (!e.repeat) { self.qHeld = true; self.fire(); }
+      },
       onMouse: (e, p, down) => {
         if (e.button !== 2) return;
         if (down) { if (document.pointerLockElement !== p.dom && e.target !== p.dom) return; self.mHeld = true; self.fire(); }
@@ -70,6 +77,7 @@ class Grapple {
   }
   // ------------------------------------------------------------------ input
   _bindInput() {
+    addEventListener('keydown', (e) => { this._suppressKey = e.code === 'KeyQ' && this.p.mode === 'grapple'; if (this._suppressKey) setTimeout(() => { this._suppressKey = false; }, 0); }, { capture: true });
     addEventListener('keyup', (e) => { if (e.code === 'KeyQ') { this.qHeld = false; this._checkRelease(); } });
     addEventListener('blur', () => { this.qHeld = this.mHeld = false; this._checkRelease(); });
     this.p.dom.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -166,7 +174,7 @@ class Grapple {
       this.allowEnter = true; const ok = p.setMode('grapple'); this.allowEnter = false;
       if (ok === false || p.mode !== 'grapple') { this.state = 'retract'; this.retractT = 0; return; }
     }
-    this.sub = 'swing'; this.grounded = false;
+    this.sub = 'swing'; this.grounded = false; this.slideT = 0;
     this._sfx('attach');
   }
   release() {
@@ -184,6 +192,7 @@ class Grapple {
   _enter(p) { this.sub = 'swing'; this.lastPos.copy(p.pos); if (this.userDist == null) { this.userDist = p.camDistT; this.lastSetDist = null; } }
   _exit(p, next) {
     if (next === 'grapple') return;
+    const ev = window.event; this._exitEvt = ev && ev.type === 'keydown' && ev.code === 'KeyQ' ? ev : null; this._exitSub = this.sub;
     if (this.state === 'attached' || this.state === 'flying') { this.state = 'retract'; this.retractT = 0; }
     this.sub = null; this.grounded = false; this.safeT = 4; p.bike.root.visible = next === 'bike';
     if (this.avTilt) { p.avatar.root.quaternion.identity(); this.avTilt = false; }
@@ -195,13 +204,21 @@ class Grapple {
     const ok = p.setMode(next); if (ok === false || p.mode === 'grapple') p.setMode('walk');
     p.onGround = true;
   }
-  // a roof we landed on becomes a temporary walkable so the normal walk / bike modes can use it
+  // a roof we landed on becomes a temporary walkable so the normal walk / bike modes can use it. Neighbouring roofs at a
+  // similar height (row houses, wings of the same landmark) join in, so you can walk across them.
   _perchOn(pr) {
-    if (this.perch && this.perch.pr === pr) return;
+    if (this.perch && this.perch.members.includes(pr)) return;
     this._unperch();
-    const world = this.world;
-    const w = { type: 'fn', tag: 'grapple-perch', bounds: [pr.b[0] - 0.01, pr.b[1] - 0.01, pr.b[2] + 0.01, pr.b[3] + 0.01], heightAt: (x, z) => (world.inside(pr, x, z) ? pr.y1 : null) };
-    this.ph.addWalkable(w); this.perch = { pr, w }; this.perchOff = 0;
+    const world = this.world, members = [pr], b = [pr.b[0] - 30, pr.b[1] - 30, pr.b[2] + 30, pr.b[3] + 30], seen = new Set([pr]);
+    for (let i = Math.floor(b[0] / 16); i <= Math.floor(b[2] / 16); i++) for (let j = Math.floor(b[1] / 16); j <= Math.floor(b[3] / 16); j++) {
+      const l = world.pgrid.get(i * 73856093 ^ j * 19349663); if (!l) continue;
+      for (const id of l) { const q = world.prisms[id]; if (seen.has(q)) continue; seen.add(q);
+        if (!q.solid || !world.alive(q) || Math.abs(q.y1 - pr.y1) > 4 || (q.lm && q.tag !== pr.tag)) continue;
+        if (q.b[2] < b[0] || q.b[0] > b[2] || q.b[3] < b[1] || q.b[1] > b[3]) continue; members.push(q); }
+    }
+    const bb = [1e9, 1e9, -1e9, -1e9]; for (const m of members) { bb[0] = Math.min(bb[0], m.b[0]); bb[1] = Math.min(bb[1], m.b[1]); bb[2] = Math.max(bb[2], m.b[2]); bb[3] = Math.max(bb[3], m.b[3]); }
+    const w = { type: 'fn', tag: 'grapple-perch', bounds: bb, heightAt: (x, z) => { let y = null; for (const m of members) if (world.alive(m) && (y === null || m.y1 > y) && world.inside(m, x, z)) y = m.y1; return y; } };
+    this.ph.addWalkable(w); this.perch = { pr, w, members }; this.perchOff = 0;
   }
   _unperch() { if (this.perch) { this.perch.w.dead = true; this.perch = null; } }
   // ------------------------------------------------------------------ per-frame (every mode)
@@ -232,11 +249,16 @@ class Grapple {
     // camera feel: pull back and widen a touch with speed while swinging
     const sw = p.mode === 'grapple';
     this.camK += ((sw ? 1 : 0) - this.camK) * Math.min(1, dt * (sw ? 3 : 2));
-    this._cameraFeel(p);
+    this._cameraFeel(p, dt);
     // perch bookkeeping + safety net after swinging
     if (this.perch) {
-      const pr = this.perch.pr, on = this.world.inside(pr, p.pos.x, p.pos.z) && p.pos.y > pr.y1 - 1.5;
-      this.perchOff = on ? 0 : this.perchOff + dt; if (this.perchOff > 0.6 || !this.world.alive(pr)) this._unperch();
+      const pr = this.perch.pr, on = this.perch.members.some((m) => this.world.inside(m, p.pos.x, p.pos.z) && p.pos.y > m.y1 - 1.5);
+      this.perchOff = on ? 0 : this.perchOff + dt;
+      if (on) this.safeT = Math.max(this.safeT, 1);
+      if (!this.world.alive(pr)) { // the roof's building was swapped for its landmark model: stand on whatever is there now
+        this._unperch(); const top = on && this.world.topIn(p.pos.x, p.pos.z, p.pos.y - 25, p.pos.y + 1.5);
+        if (top) { p.pos.y = Math.max(p.pos.y, top.y1); this._perchOn(top); } this.safeT = 4;
+      } else if (this.perchOff > 0.6) this._unperch();
     }
     if (this.safeT > 0) { this.safeT -= dt; if (p.mode !== 'fly' && p.mode !== 'grapple') this._unstick(p, false); }
     if (this.state === 'idle' && p.mode !== 'grapple') { this.rope.visible = false; this.hookMesh.visible = false; if (this.windG) this._wind(0); }
@@ -313,16 +335,18 @@ class Grapple {
     if (roof && roof.y1 >= gy) { gy = roof.y1; on = roof; if (roof.lm && !this._roofOk(roof, nx, nz)) slide = roof; }
     let landed = false;
     if (ny <= gy + 0.001) { ny = gy; if (v.y < 0) v.y = 0; landed = true; }
-    if (landed && slide) { // no visible roof up here (spire, steep roof): slide toward the nearest edge instead of standing
-      const e = world.exitPoint(slide, nx, nz, R + 0.4), qx = e[0] - nx, qz = e[1] - nz, ql = Math.hypot(qx, qz) || 1;
-      const along = (v.x * qx + v.z * qz) / ql, push = Math.max(5, along + 14 * h);
+    if (landed && slide && this.slideT < 2.5) { // no visible roof up here (spire, steep roof): slide off outward instead of standing
+      this.slideT += h; let qx, qz;
+      const l = slide.tag && world.lm && world.lm.byId.get(slide.tag.slice(3));
+      if (l) { qx = nx - l.anchor.x; qz = nz - l.anchor.z; } else { const e = world.exitPoint(slide, nx, nz, R + 0.4); qx = e[0] - nx; qz = e[1] - nz; }
+      const ql = Math.hypot(qx, qz) || 1, along = (v.x * qx + v.z * qz) / ql, push = Math.max(5, along + 14 * h);
       v.x += (qx / ql) * (push - along); v.z += (qz / ql) * (push - along); landed = false; on = null; this.stats.slides++;
-    }
+    } else if (!slide) this.slideT = 0;
     // never stay inside a solid volume: climb onto it if we are near its top, else step out sideways
     const bur = world.buriedIn(nx, nz, ny + 0.05, ny + H);
     if (bur) {
       if (bur.y1 - ny < 1.2 || oy >= bur.y1 - 0.4) { ny = bur.y1; if (v.y < 0) v.y = 0; landed = true; on = bur; }
-      else { const e = world.exitPoint(bur, nx, nz, R); const qx = e[0] - nx, qz = e[1] - nz, ql = Math.hypot(qx, qz) || 1; const vn = (v.x * qx + v.z * qz) / ql; if (vn < 0) { v.x -= qx / ql * vn; v.z -= qz / ql * vn; } nx = e[0]; nz = e[1]; ny = Math.max(ny, ph.groundAt(nx, nz, ny + 0.5).y); this.blocked = true; this.stats.rescues++; (this.stats.log || (this.stats.log = [])).push([bur.tag, Math.round(nx), Math.round(ny), Math.round(nz)]); if (this.stats.log.length > 20) this.stats.log.shift(); }
+      else { const e = world.freePoint(bur, nx, nz, ny + 0.05, ny + H, R); const qx = e[0] - nx, qz = e[1] - nz, ql = Math.hypot(qx, qz) || 1; const vn = (v.x * qx + v.z * qz) / ql; if (vn < 0) { v.x -= qx / ql * vn; v.z -= qz / ql * vn; } nx = e[0]; nz = e[1]; ny = Math.max(ny, ph.groundAt(nx, nz, ny + 0.5).y); this.blocked = true; this.stats.rescues++; (this.stats.log || (this.stats.log = [])).push([bur.tag, Math.round(nx), Math.round(ny), Math.round(nz)]); if (this.stats.log.length > 20) this.stats.log.shift(); }
     }
     pos.set(nx, ny, nz);
     return landed ? (on || true) : false;
@@ -339,15 +363,24 @@ class Grapple {
     const w = this.world, bur = w.buriedIn(p.pos.x, p.pos.z, p.pos.y + 0.05, p.pos.y + H);
     if (bur) {
       if (bur.y1 - p.pos.y < 1.6) { p.pos.y = bur.y1; this._perchOn(bur); }
-      else { const e = w.exitPoint(bur, p.pos.x, p.pos.z, R); p.pos.x = e[0]; p.pos.z = e[1]; p.pos.y = this.ph.groundAt(e[0], e[1], p.pos.y + 0.5).y; }
+      else { const e = w.freePoint(bur, p.pos.x, p.pos.z, p.pos.y + 0.05, p.pos.y + H, R); p.pos.x = e[0]; p.pos.z = e[1]; p.pos.y = this.ph.groundAt(e[0], e[1], p.pos.y + 0.5).y; }
       p.vel.set(0, Math.min(0, p.vel.y), 0); this.stats.rescues++;
     }
     const g = this.ph.heightAt(p.pos.x, p.pos.z);
     if (p.pos.y < g - 1.5 && !this.ph.inHole(p.pos.x, p.pos.z)) { p.pos.y = this.ph.groundAt(p.pos.x, p.pos.z).y; p.vel.y = 0; this.stats.rescues++; }
   }
   // ------------------------------------------------------------------ camera
-  _cameraFeel(p) {
+  _cameraFeel(p, dt) {
     const k = this.camK, sp = Math.min(1, (this.speed || 0) / 40);
+    // gentle auto-follow: when the mouse has been still for a moment, ease the view round to the direction of travel
+    const touched = this._yawSet != null && (Math.abs(p.camYaw - this._yawSet) > 1e-5 || Math.abs(p.camPitch - this._pitchSet) > 1e-5);
+    this.lookIdle = touched ? 0 : (this.lookIdle || 0) + dt;
+    const hs = Math.hypot(p.vel.x, p.vel.z);
+    if (p.mode === 'grapple' && p.view === 'third' && this.lookIdle > 0.8 && hs > 9) {
+      let d = Math.atan2(-p.vel.x, -p.vel.z) - p.camYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      p.camYaw += d * Math.min(1, dt * 1.1 * k * Math.min(1, (hs - 9) / 12));
+    }
+    this._yawSet = p.camYaw; this._pitchSet = p.camPitch;
     if (k > 0.002 || this.userDist != null) {
       if (this.userDist == null) this.userDist = p.camDistT;
       if (this.lastSetDist != null && Math.abs(p.camDistT - this.lastSetDist) > 1e-3) this.userDist = Math.max(1.6, p.camDistT - (this.lastSetDist - this.userDist)); // user zoomed
@@ -356,10 +389,13 @@ class Grapple {
       if (k < 0.002) { p.camDistT = this.userDist; this.userDist = null; this.lastSetDist = null; }
     }
     const cam = this.ctx.camera, base = (window.BSIM && window.BSIM.settings && window.BSIM.settings.fov) || 62;
-    const fov = base + 7 * k * sp;
-    if (Math.abs(cam.fov - fov) > 0.01 && (k > 0.002 || Math.abs(cam.fov - base) < 8)) {
-      cam.fov = fov; cam.updateProjectionMatrix();
-      if (Math.abs(fov - this.frustFov) > 0.75 || (k <= 0.002 && fov !== this.frustFov)) { this.frustFov = fov; window.BSIM && window.BSIM.csm && window.BSIM.csm.updateFrustums && window.BSIM.csm.updateFrustums(); }
+    // a few degrees wider with speed; only touches the FOV while the effect is active, then restores it once
+    if (k > 0.002 || this.fovActive) {
+      const fov = k > 0.002 ? base + 7 * k * sp : base; this.fovActive = k > 0.002;
+      if (Math.abs(cam.fov - fov) > 0.01) {
+        cam.fov = fov; cam.updateProjectionMatrix();
+        if (Math.abs(fov - this.frustFov) > 0.75 || !this.fovActive) { this.frustFov = fov; const csm = window.BSIM && window.BSIM.csm; if (csm && csm.updateFrustums) csm.updateFrustums(); }
+      }
     }
   }
   // ------------------------------------------------------------------ visuals
@@ -368,10 +404,10 @@ class Grapple {
     // rope: a camera-facing ribbon (dark edges, light core) so it reads against sky and stone alike and stays ~3 px wide
     this.N = 28;
     const g = new THREE.BufferGeometry(), nv = this.N * 3; const pos = new Float32Array(nv * 3), col = new Float32Array(nv * 3), idx = [];
-    for (let i = 0; i < this.N; i++) { const e = 0.16, c = 0.95; col.set([e, e, e * 0.95, c, c, c * 0.96, e, e, e * 0.95], i * 9); }
+    for (let i = 0; i < this.N; i++) { const e = 0.22, c = 1.0; col.set([e, e, e, c, c, c, e, e, e], i * 9); }
     for (let i = 0; i < this.N - 1; i++) { const a = i * 3, b2 = a + 3; idx.push(a, a + 1, b2, a + 1, b2 + 1, b2, a + 1, a + 2, b2 + 1, a + 2, b2 + 2, b2 + 1); }
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
-    const m = new THREE.MeshBasicMaterial({ color: 0xf2eee6, vertexColors: true, side: THREE.DoubleSide });
+    const m = new THREE.MeshBasicMaterial({ color: 0xf3c254, vertexColors: true, side: THREE.DoubleSide }); // Cal-gold cord, dark edges
     this.rope = new THREE.Mesh(g, m); this.rope.frustumCulled = false; this.rope.castShadow = false; this.rope.receiveShadow = false; this.rope.visible = false; this.rope.name = 'grapple-rope';
     scene.add(this.rope);
     // grapnel head: shaft + three curved prongs
@@ -427,7 +463,7 @@ class Grapple {
       const tx = i ? x - px : dx, ty = i ? y - py : dy, tz = i ? z - pz : dz;
       const vx = cam.x - x, vy = cam.y - y, vz = cam.z - z, dc = Math.hypot(vx, vy, vz) || 1;
       let ex = ty * vz - tz * vy, ey = tz * vx - tx * vz, ez = tx * vy - ty * vx; const el = Math.hypot(ex, ey, ez) || 1;
-      const hw = Math.max(0.018, dc * 0.0022); ex = ex / el * hw; ey = ey / el * hw; ez = ez / el * hw;
+      const hw = Math.max(0.02, dc * 0.0026); ex = ex / el * hw; ey = ey / el * hw; ez = ez / el * hw;
       const o = i * 9; P[o] = x - ex; P[o + 1] = y - ey; P[o + 2] = z - ez; P[o + 3] = x; P[o + 4] = y; P[o + 5] = z; P[o + 6] = x + ex; P[o + 7] = y + ey; P[o + 8] = z + ez;
       px = x; py = y; pz = z;
     }
@@ -436,6 +472,7 @@ class Grapple {
     // grapnel at the rope end, pointing along the rope (prongs dug into the surface once attached)
     const hk = this.hookMesh; hk.visible = true; hk.position.copy(end);
     v1.set(dx, dy, dz).divideScalar(L); hk.quaternion.setFromUnitVectors(UP, v1);
+    hk.scale.setScalar(Math.max(1, end.distanceTo(cam) / 28)); // stays a few pixels big far away
   }
   // ------------------------------------------------------------------ pose (swing state only)
   _pose(p, av, dt) {
