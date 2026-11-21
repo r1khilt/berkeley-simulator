@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const K = new CoopKit(ctx, -8.4); const M = ctx.M;
   const ST = coopMat('stucco', '#ead9b8'), GR = coopMat('paint', '#3b4a3a'), CR = coopMat('paint', '#f0e8d6');
-  const win = { w: 0.95, h: 1.55, sill: 0.85, pair: 2, pattern: [2, 1, 2, 2, 1], gap: 0.14, mull: 1, tran: 0.6, muntins: 1, rev: 0.2, casing: 0.1, frame: GR, casingMat: CR };
+  const win = { glass: M.windowNight, w: 0.95, h: 1.55, sill: 0.85, pair: 2, pattern: [2, 1, 2, 2, 1], gap: 0.14, mull: 1, tran: 0.6, muntins: 1, rev: 0.2, casing: 0.1, frame: GR, casingMat: CR };
   const floors = [0.9, 3.75, 6.6, 9.45, 12.1];
   const roof = { type: 'hip', slope: 0.42, overhang: 0.7, mat: M.redTile, fascia: CR, soffitMat: CR, fasciaH: 0.22 };
   const H = K.block({ u0: -6.86, u1: 6.74, v0: -19.0, v1: 16.32, floors, wall: ST, wallMats: [M.concreteDark, M.concreteDark], trim: GR, win, bay: 3.2, roof,
