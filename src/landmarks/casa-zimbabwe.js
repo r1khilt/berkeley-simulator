@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
 import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
+import { panelMat } from './lib/rn-kit.js';
+import { letterPanel } from './lib/b08c-kit.js';
 
 export const info = {
   id: 'casa-zimbabwe',
@@ -17,7 +19,8 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.6); const M = ctx.M;
-  const YEL = coopMat('stucco', '#c9a352'), OCH = coopMat('stucco', '#ad7f33'), CON = M.concrete;
+  const YEL = coopMat('stucco', '#d4b04e'), OCH = coopMat('stucco', '#c38d33'); // board-formed concrete podium (horizontal 15 cm boards)
+  const CON = panelMat('czBoard', { pw: 2.4, ph: 0.15, span: 2.4, base: 0x9d998f, joint: 0x85817a, jw: 0.006, vary: 0.05, stagger: false, grain: 0.05 });
   const FR = coopMat('paint', '#2b2b2b'); const WOOD = coopMat('paint', '#8f735a', { rough: 0.85 });
   const rib = { w: 0.95, h: 1.3, sill: 0.85, pattern: [5, 1, 0, 2, 6, 0, 1], gap: 0.06, mull: 0, tran: 0, rev: 0.25, casing: 0, frame: FR };
   const flat = (par = 0.5, pm) => ({ type: 'flat', parapet: par, coping: coopMat('paint', '#8c7d5a'), parapetMat: pm });
@@ -31,7 +34,7 @@ export async function build(ctx) {
   const P = K.block({ u0: 9.6, u1: 16.6, v0: -7.0, v1: -0.6, floors: [19.8, 23.2], wall: OCH, trim: FR, win: { ...rib, pattern: [3] }, bay: 3.4, roof: flat(0.3, OCH), collide: false });
   K.buildBlocks();
   // projecting stucco sunshade slabs at the floor lines of the residential blocks
-  K.fins(E, [10.1, 13.3, 16.5], 0.6, 0.18, YEL, { wedge: true }); K.fins(W, [13.8, 17.0], 0.6, 0.18, YEL, { wedge: true }); K.fins(NW, [13.85, 17.1], 0.6, 0.18, YEL, { wedge: true }); K.fins(N, [10.6, 13.8], 0.9, 0.18, OCH, { wedge: true });
+  // (per-floor wrap fins removed: the real towers are plain stucco with stacked bays)
   // stack of three projecting bay boxes on the north face of the east block
   for (const y of [6.9, 10.1, 13.3, 16.5]) K.bay(E, 'N', 3.0, 5.6, 1.2, y + 0.2, y + 2.9, { win: { w: 0.8, h: 1.5, sill: 0.6, mull: 1, muntins: 1, rev: 0.1, frame: FR }, wall: OCH, roofMat: OCH });
   // tall timber slat sunscreen at the north-west corner of the ochre wing, rising past its roofline
@@ -43,6 +46,8 @@ export async function build(ctx) {
     for (const s of [sc - 2.2, sc + 2.2]) for (const d of [1.0, 4.0]) { K.rbox(R, CON, s - 0.2, gy - 0.5, d - 0.2, s + 0.2, gy + 0.5, d + 0.2); K.rbox(R, WOOD, s - 0.1, gy + 0.5, d - 0.1, s + 0.1, gy + 3.0, d + 0.1); K.colliders.push(K._colRun(R, s - 0.2, d - 0.2, s + 0.2, d + 0.2, gy - 1, gy + 3)); }
     for (const d of [1.0, 4.0]) K.rbox(R, WOOD, sc - 2.6, gy + 3.0, d - 0.1, sc + 2.6, gy + 3.3, d + 0.1);
     for (let s = sc - 2.4; s <= sc + 2.4; s += 0.4) K.rbox(R, WOOD, s - 0.04, gy + 3.3, 0.6, s + 0.04, gy + 3.45, 4.4, { detail: true }); }
+  // raised letters on the street box
+  { const R = N.runN; letterPanel(K, R, 'BERKELEY STUDENT COOPERATIVE', (N.u1 - N.u0) / 2 - 1.0, 17.02, 8.6, 0.46, 0.05, { color: '#ebe5d3', font: 'bold 150px Arial, sans-serif', spacing: 0.12, shadow: '#6e5420' }); }
   // solar arrays on A-frame racks
   K.solar(-17.5, 1.0, -6.0, 9.0, 20.3 + 0.5); K.solar(6.5, 2.0, 16.0, 19.0, 19.8 + 0.5); K.solar(-6.0, -19.0, 7.0, -10.0, 17.0 + 0.4);
   // rooftop exhaust stacks
