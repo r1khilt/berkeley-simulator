@@ -11,6 +11,21 @@ export function siteMat(M, key, opts) { const c = mc(M); if (c.has(key)) return 
 // one vertex-coloured foliage material for every shrub / planter fill (keeps draw calls down)
 export const shrubMat = (M) => siteMat(M, 'shrub', { color: 0xffffff, vertexColors: true, roughness: 0.95, flatShading: true });
 export function tintGeo(g, hex) { const c = new THREE.Color(hex); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
+// Kit merging strips vertex colours, so vertex-coloured foliage is collected per kit and added as one extra detail mesh
+// when the kit finishes (the instance's finish() is wrapped on first use).
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+export function addShrubGeo(K, g) {
+  if (!K._rswShrubs) {
+    K._rswShrubs = []; const fin = K.finish.bind(K);
+    K.finish = function () {
+      if (K._rswShrubs.length) { const parts = K._rswShrubs.map((x) => { const y = x.index ? x.toNonIndexed() : x; for (const k of Object.keys(y.attributes)) if (!['position', 'normal', 'color'].includes(k)) y.deleteAttribute(k); if (!y.attributes.normal) y.computeVertexNormals(); return y; });
+        const mg = mergeGeometries(parts, false); if (mg) { const mesh = new THREE.Mesh(mg, shrubMat(K.M)); mesh.userData.detail = true; mesh.castShadow = false; mesh.receiveShadow = true; mesh.name = 'rsw-planting'; K.extra.push(mesh); } }
+      K._rswShrubs = []; return fin();
+    };
+  }
+  K._rswShrubs.push(g);
+}
+export function addShrubRun(K, R, g) { g.applyMatrix4(R.m); addShrubGeo(K, g); }
 // kits may set K.siteMats = {galv, dark} to reuse their own frame / fascia materials for furniture
 const GALV = (K) => (K.siteMats && K.siteMats.galv) || galvMat(K.M);
 const DARK = (K) => (K.siteMats && K.siteMats.dark) || charcoalMat(K.M);
@@ -48,8 +63,8 @@ export function shrubRow(K, R, s0, s1, d, groundFn, { r = 0.55, gap = 0.85, hex 
   const M = K.M; let k = 0;
   for (let s = s0 + r; s <= s1 - r * 0.6; s += gap, k++) {
     const rr = r * (0.8 + ((k * 37 + seed) % 10) / 22); const hx = hexes ? hexes[(k + seed) % hexes.length] : hex;
-    const g = tintGeo(blob(rr, 1 + k * 131 + seed * 17), hx); g.translate(s, groundFn(s, d) + rr * 0.55, d + (((k * 53) % 7) - 3) * 0.06);
-    K.addRun(R, shrubMat(M), g, { detail: true, uvMode: 'keep' });
+    const g = tintGeo(blob(rr, 1 + k * 131 + seed * 17), hx); g.translate(s, groundFn(s, d) + rr * 0.45, d + (((k * 53) % 7) - 3) * 0.06);
+    addShrubRun(K, R, g);
   }
 }
 // raised planter bed with concrete curb and shrubs (run frame): s0..s1, d0..d1 (outward), top y
@@ -57,7 +72,7 @@ export function planterBed(K, R, s0, s1, d0, d1, yGround, { curb = 0.45, mat = n
   const M = K.M; const m = mat || M.concrete; const y = yGround;
   K.rbox(R, m, s0, y - 0.6, d0, s1, y + curb, d0 + 0.18); K.rbox(R, m, s0, y - 0.6, d1 - 0.18, s1, y + curb, d1);
   K.rbox(R, m, s0, y - 0.6, d0, s0 + 0.18, y + curb, d1); K.rbox(R, m, s1 - 0.18, y - 0.6, d0, s1, y + curb, d1);
-  { const g = tintGeo(new THREE.BoxGeometry(s1 - s0 - 0.36, curb + 0.32, d1 - d0 - 0.36), 0x4a3a2c); g.translate((s0 + s1) / 2, y - 0.4 + (curb + 0.32) / 2, (d0 + d1) / 2); K.addRun(R, shrubMat(M), g, { uvMode: 'keep' }); }
+  { const g = tintGeo(new THREE.BoxGeometry(s1 - s0 - 0.36, curb + 0.32, d1 - d0 - 0.36), 0x4a3a2c); g.translate((s0 + s1) / 2, y - 0.4 + (curb + 0.32) / 2, (d0 + d1) / 2); addShrubRun(K, R, g); }
   shrubRow(K, R, s0 + 0.25, s1 - 0.25, (d0 + d1) / 2, () => y + curb - 0.15, { r: Math.min(0.6, (d1 - d0) / 2 - 0.1), gap: 0.9, hexes, seed });
 }
 
