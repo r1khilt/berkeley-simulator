@@ -17,6 +17,7 @@ import { installModes } from './player/modes/index.js';
 import { UI, buildMapCanvas } from './ui/ui.js';
 import { Audio } from './audio.js';
 import { PLACES } from './places.js';
+import { installBigGame, BIG_GAME_PLACES } from './props/bigGame.js'; // Big Game easter egg (permanent)
 import { buildStreetscape } from './world/streetscape.js';
 import { buildSkyline, buildBridges } from './world/far.js';
 import { buildSigns } from './world/signs.js';
@@ -177,13 +178,15 @@ async function boot() {
   const audio = new Audio(); audio.setVolume(settings.volume); BS.audio = audio;
   player.onStep = (k) => audio.step(k, player.speed);
   // ---- map + places
-  const places = PLACES.map((p) => ({ ...p }));
+  const places = [...PLACES, ...(qs.get('nobg') ? [] : BIG_GAME_PLACES)].map((p) => ({ ...p })); // + Big Game easter egg places
   for (const l of manifest.landmarks) {
     const fp = (l.footprints || [])[0];
     places.unshift({ id: l.id, name: l.name, sub: l.subtitle, blurb: l.blurb, p: [l.anchor.x, l.anchor.z], r: Math.max(18, fp ? Math.min(70, Math.sqrt(Math.abs(area(fp))) * 0.9) : 20), landmark: true });
   }
   const found = new Set(store.get('found', []));
   for (const p of places) p.found = found.has(p.id);
+  // Big Game easter egg (src/props/bigGame.js): The Play at Memorial Stadium, the Stanford Tree, the Axe. ?nobg=1 disables it.
+  let bigGame = null; if (!qs.get('nobg')) try { bigGame = installBigGame({ scene, lm, physics, heightAt, setupMaterials, audio, ui, places, quality: settings.quality }); BS.bigGame = bigGame; } catch (e) { console.warn('big game egg failed', e); }
   phase('misc'); const map = buildMapCanvas({ sdf, nx: gt.nx, nz: gt.nz, step: gt.step, x0: c.x0, z0: c.z0, buildings: bjson, trees, water: vectors.water, landmarkFootprints: lmFootprints, replaced: standinIds });
   map.places = places; ui.setMap(map); BS.places = places; phase('map');
   ui.count(found.size, places.length);
@@ -281,6 +284,7 @@ async function boot() {
     bridges.update(U.uNight.value);
     { const hr = pacificHour(date); const busy = hr < 6 ? 0.08 : hr < 8 ? 0.3 : hr < 18 ? 1.0 : hr < 22 ? 0.6 : 0.25; peds.update(dt, (state === 'play' ? player.pos : camera.position), busy); }
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
+    if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
     // HUD (throttled)
     if (state === 'play' && frameN % 3 === 0) hud(date);
     if (state === 'play') { ui.compass(((-player.camYaw * 180 / Math.PI) % 360 + 360) % 360); ui.minimap(player.pos.x, player.pos.z, player.camYaw, settings.north); ui.prompt(player.activeInteraction ? player.activeInteraction.label : null); }
@@ -304,7 +308,7 @@ async function boot() {
     for (const p of places) {
       const d = Math.hypot(p.p[0] - player.pos.x, p.p[1] - player.pos.z);
       p.d = d;
-      if (!p.found && d < p.r) { p.found = true; found.add(p.id); store.set('found', [...found]); ui.toast({ kind: 'Discovered', name: p.name, sub: p.sub, blurb: p.blurb }); audio.chime(); ui.count(found.size, places.length); }
+      if (!p.found && (p.test ? p.test(d) : d < p.r)) { p.found = true; found.add(p.id); store.set('found', [...found]); if (p.ach && bigGame) bigGame.achievement(p); else { ui.toast({ kind: 'Discovered', name: p.name, sub: p.sub, blurb: p.blurb }); audio.chime(); } ui.count(found.size, places.length); }
     }
     // location label
     let best = null, bs = 1; for (const p of places) { const s = p.d / p.r; if (s < bs) { bs = s; best = p; } }
