@@ -81,13 +81,14 @@ export async function build(ctx) {
     K.fill(R, ops[1], { frame: B.frameDark, mull: 2, rev: 0.35, tran: [4.0] });
     // lettered frieze
     K.rbox(R, S, 0, 5.25, 0, L, 5.3, 0.04);
-    letterPanel(K, R, '• INTERNATIONAL • HOUSE •', c, 5.32, 11.5, 0.75, 0.05, { color: '#d9ccb0', shadow: '#7d7262' });
+    letterPanel(K, R, 'INTERNATIONAL  HOUSE', c, 5.3, 12.5, 0.85, 0.05, { color: '#8a8070', shadow: '#d8d0bf', spacing: 0.3 });
     // projecting glass vestibule
     const vu0 = u0 - 2.0, vv0 = v0 + c - 1.9, vv1 = v0 + c + 1.9;
     K.box(M.glass, vu0 + 0.05, yF, vv0 + 0.05, u0, yF + 2.75, vv1 - 0.05);
-    for (const v of [vv0, vv0 + 1.27, vv1 - 1.27, vv1]) K.box(B.frameDark, vu0, yF, v - 0.05, vu0 + 0.1, yF + 2.8, v + 0.05);
-    K.box(B.frameDark, vu0 - 0.05, yF + 2.75, vv0 - 0.05, u0, yF + 3.05, vv1 + 0.05);
-    K.box(B.frameDark, vu0, yF + 2.1, vv0, vu0 + 0.08, yF + 2.18, vv1);
+    const VF = new THREE.MeshStandardMaterial({ color: 0x5a5f5c, roughness: 0.45, metalness: 0.5 }); // grey metal vestibule frame
+    for (const v of [vv0, vv0 + 1.27, vv1 - 1.27, vv1]) K.box(VF, vu0, yF, v - 0.05, vu0 + 0.1, yF + 2.8, v + 0.05);
+    K.box(VF, vu0 - 0.05, yF + 2.75, vv0 - 0.05, u0, yF + 2.95, vv1 + 0.05);
+    K.box(VF, vu0, yF + 2.1, vv0, vu0 + 0.08, yF + 2.18, vv1);
     // shed tile roof with exposed rafter tails
     shedRoof(K, TM, u0 - 0.7, v0, u1 + 0.1, v1, 6.55, 7.45, 'u1', { rafters: 0.6, rafterMat: M.woodDark, thick: 0.25 });
     // lanterns either side of the vestibule

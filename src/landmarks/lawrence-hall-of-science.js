@@ -18,9 +18,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
-  const CON = concreteMat(0xa59d80, 'board', { rough: 0.95 });   // monolithic board-formed concrete, khaki/olive grey
-  const CONd = concreteMat(0x8f8870, 'smooth');    // slab edges, shadowed planes
-  const PAVE = concreteMat(0xc6c2b8, 'smooth', { rough: 0.95, normal: 0.4 }); // light weathered plaza paving
+  const CON = concreteMat(0xc2b48e, 'board', { rough: 0.9 });   // monolithic board-formed concrete, warm buff
+  const CONd = concreteMat(0x9c9277, 'smooth');    // slab edges, shadowed planes
+  const PAVE = concreteMat(0xb4b3ad, 'smooth', { rough: 0.95, normal: 0.15 }); // light grey plaza concrete
   const FR = M.darkBronze, GL = M.windowNight;
   const PZ = 12.0;                                  // plaza / exhibit-hall floor level
   const colliders = [], walkables = [], interactions = [];
@@ -112,7 +112,13 @@ export async function build(ctx) {
   ];
   for (const base of wings) {
     K.prism(CONd, offsetRing(base, 0.5), PZ - 0.2, PZ + 0.45); // ledge where the hall meets the podium roof
-    mass(base, 7.4, PZ, 17.8, 22.0); // blind exhibit-hall walls, low concrete hip over each hall
+    // folded-plate exhibit hall: steep battered concrete faces rising straight off the plaza, a lower-pitched upper fold,
+    // then a small vertical-sided crown box on the plateau (LiDAR: edge ~19 m, crown ~21.8–22.5 m)
+    const r1 = offsetRing(base, -3.0), r2 = offsetRing(base, -6.2);
+    frustum(K, CON, base, r1, PZ, 19.2, { cap: false, uvMode: "roof" });
+    frustum(K, CON, r1, r2, 19.2, 21.6, { cap: true, uvMode: 'roof' });
+    // crisp fold ribs down the hips (detail)
+    for (let i = 0; i < base.length; i++) { const a = base[i], b = r1[i]; const L = Math.hypot(b[0] - a[0], 19.2 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 19.2, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 19.2) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
     colliders.push(K.colPoly(base, PZ - 1, 21.8));
   }
   // south stair/service blocks (flat roofs at the spine height)

@@ -16,13 +16,13 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -8.4); const M = ctx.M;
-  const ST = coopMat('stucco', '#ede4cc'), BR = M.brick, TL = coopMat('paint', '#2f5a4c'), FAS = coopMat('paint', '#1f4a3a'), RF = coopMat('roof', '#5e5850');
-  const cas = { w: 0.6, h: 1.8, sill: 0.7, pattern: [3, 4, 3], gap: 0.1, mull: 0, tran: 0.72, muntins: 2, rev: 0.16, casing: 0.12, frame: TL };
+  const ST = coopMat('stucco', '#ede4cc'), BR = M.brick, TL = coopMat('paint', '#336b58'), FAS = coopMat('paint', '#2f5e52'), RF = coopMat('roof', '#5a5550'), SOF = coopMat('paint', '#e8e2cc');
+  const cas = { w: 0.6, h: 1.7, sill: 0.75, pattern: [3, 2], gap: 0.1, mull: 0, tran: 0.72, muntins: 2, rev: 0.2, casing: 0.12, frame: TL };
   // tall brick ground storey (French doors/windows), then two full stucco storeys of grouped casement ribbons + attic
-  const wins = [{ ...cas, pattern: [2, 2], h: 2.3, sill: 0.4, w: 0.7 }, { ...cas }, { ...cas, pattern: [4, 3, 4] }, { ...cas, h: 1.2, pattern: [3] }];
+  const wins = [{ ...cas, pattern: [2], h: 2.3, sill: 0.35, w: 0.7 }, { ...cas }, { ...cas, pattern: [2, 3] }, { ...cas, h: 1.2, pattern: [2] }];
   const floors = [1.0, 4.6, 7.8, 10.6, 12.9];
-  const hip = (sl, ov = 1.0) => ({ type: 'hip', slope: sl, overhang: ov, mat: RF, fascia: FAS, soffitMat: FAS, fasciaH: 0.3, tails: true, tailMat: FAS, tailSp: 0.7 });
-  const main = K.block({ u0: -9.45, u1: 18.53, v0: -7.64, v1: 6.06, floors, wall: ST, wallMats: [BR], trim: TL, wins, bay: 3.6, roof: hip(0.36, 0.95), belts: [4.6], beltMat: TL });
+  const hip = (sl, ov = 1.0) => ({ type: 'hip', slope: sl, overhang: ov, mat: RF, fascia: FAS, soffitMat: SOF, fasciaH: 0.28, tails: true, tailMat: FAS, tailSp: 0.7 });
+  const main = K.block({ u0: -9.45, u1: 18.53, v0: -7.64, v1: 6.06, floors, wall: ST, wallMats: [BR], trim: TL, wins, bay: 5.0, roof: hip(0.34, 1.0), belts: [4.6], beltMat: TL });
   const west = K.block({ u0: -18.13, u1: -9.45, v0: -7.64, v1: 7.24, floors: [1.0, 4.6, 7.8], wall: ST, wallMats: [BR], trim: TL, wins, bay: 3.2, roof: hip(0.32, 0.9) });
   const bay = K.block({ u0: -9.45, u1: 11.24, v0: 6.06, v1: 8.27, floors: [1.0, 4.4, 7.5], wall: ST, wallMats: [BR, BR], trim: TL, wins: [wins[0], { ...cas, pattern: [2, 1, 2, 1, 2], w: 0.7, h: 2.1, sill: 0.15 }], bay: 3.4,
     roof: { type: 'flat', parapet: 0, overhang: 0.25, eaveMat: FAS, eaveH: 0.3 }, faces: { S: { doors: [{ s: 10.3, w: 1.6, h: 2.6, door: coopMat('paint', '#5b3b28'), frame: TL }] } } });
@@ -40,13 +40,14 @@ export async function build(ctx) {
     for (let s = s0; s <= s1 + 0.01; s += 1.2) K.rbox(R, DK, s - 0.1, y0, 0, s + 0.1, y1, 0.07);
     for (const y of [y0 + 0.1, 10.55, y1 - 0.1]) K.rbox(R, DK, s0 - 0.1, y - 0.1, 0, s1 + 0.1, y + 0.1, 0.07); }
   // green pent skirt between the brick storey and the stucco above (front and the west bay)
-  for (const R of [main.runS, west.runS]) { K.rbox(R, FAS, -0.2, 4.55, 0, R.L + 0.2, 4.8, 0.65); K.rbox(R, FAS, -0.2, 4.4, 0.45, R.L + 0.2, 4.55, 0.65); }
+  for (const R of [main.runS, west.runS]) { K.rbox(R, FAS, -0.2, 4.55, 0, R.L + 0.2, 4.85, 0.5); for (let x = 0.3; x < R.L; x += 0.6) K.rbox(R, FAS, x - 0.07, 4.25, 0, x + 0.07, 4.55, 0.42, { detail: true }); }
   // full-width wrought-iron balcony on deep brackets across the projecting west bay, French door behind it
   { const R = west.runS; const y = 4.85;
-    K.rbox(R, FAS, 0.2, y - 0.2, 0, R.L - 0.2, y, 0.95);
-    for (let s = 0.6; s < R.L - 0.3; s += (R.L - 1.2) / 4) K.rbox(R, FAS, s - 0.09, y - 0.85, 0, s + 0.09, y - 0.2, 0.85);
-    K._rail(R, 0.3, R.L - 0.3, 0.9, y, M.iron, 1.0);
-    K.walkables.push(K.walkRun(R, 0.2, R.L - 0.2, 0, 0.95, () => y)); }
+    for (const [a0, a1] of [[0.5, R.L / 2 - 0.6], [R.L / 2 + 0.6, R.L - 0.5]]) { // two discrete balconies on deep brackets
+      K.rbox(R, FAS, a0, y - 0.16, 0, a1, y, 0.85);
+      for (const sb of [a0 + 0.3, (a0 + a1) / 2, a1 - 0.3]) K.rbox(R, FAS, sb - 0.08, y - 0.8, 0, sb + 0.08, y - 0.16, 0.75);
+      K._rail(R, a0 + 0.05, a1 - 0.05, 0.8, y, M.iron, 1.0);
+      K.walkables.push(K.walkRun(R, a0, a1, 0, 0.85, () => y)); } }
   K.chimney(4.0, -3.0, 0.9, 0.8, 16.9, BR);
   return K.done('davis-house');
 }
