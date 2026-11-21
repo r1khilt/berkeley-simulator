@@ -1,24 +1,41 @@
-// Conference Center at the UC Botanical Garden (Strawberry Canyon), beside Julia Morgan Hall: a one-storey timber hall in
-// a Craftsman-sympathetic style, redwood shingle under a deep-eaved gable, with big glazed doors to a deck.
-// No reliable photo was available; massing from the 2021 LiDAR (frame 37°).
-import { hallBuild, chimney } from './lib/b08c-halls.js';
+// Conference Center at the UC Botanical Garden (Strawberry Canyon), near the Tropical House and Julia Morgan Hall: a
+// one-storey timber meeting hall in the garden's rustic redwood idiom (no reliable photo was found, so the treatment follows
+// the neighbouring Julia Morgan Hall): dark-stained redwood shingle walls on a stone base, a light-grey shingled gable roof
+// with deep eaves and exposed rafter tails, banks of tall glazed doors opening onto a timber deck. Massing from the 2021 LiDAR
+// (eaves ~3.6 m, ridge ~6.0 m), frame 37°.
+import * as THREE from 'three';
+import { Kit } from './lib/classic-kit.js';
+import { rmats, gothRange } from './lib/reastb-kit.js';
 
 export const info = {
   id: 'conference-center',
   name: "Conference Center",
   subtitle: 'UC Botanical Garden',
-  blurb: "A garden meeting hall in the UC Botanical Garden in Strawberry Canyon, next to Julia Morgan Hall.",
+  blurb: "A garden meeting hall in the UC Botanical Garden in Strawberry Canyon, near Julia Morgan Hall.",
   replaces: ['w/153308474', 'way/153308474'],
 };
 
 export async function build(ctx) {
-  const M = ctx.M;
-  const blocks = [
-    { u0: -4.6, u1: 4.6, v0: -9.6, v1: 9.6, g: 0.0, eave: 3.6, ridge: 6.0, axis: 'v', roof: 'gable', bay: 2.6, win: { w: 1.9, h: 2.2, mull: 2, tran: 0.82 } },
-  ];
-  const { object3d, colliders } = hallBuild(ctx, 37, 'craftsman', blocks, (K) => {
-    const g = K.gMin(4.6, -6, 7.5, 6); K.box(M.woodDark, 4.6, g - 0.8, -6.0, 7.4, g + 0.4, 6.0);
-  });
+  const M = ctx.M; const R = rmats(M);
+  const K = new Kit(ctx, THREE.MathUtils.degToRad(37));
+  const colliders = [], walkables = [];
+  const b = { u0: -4.6, u1: 4.6, v0: -9.6, v1: 9.6, eave: 3.6, ridge: 6.0, axis: 'v' };
+  // walls: tall glazed door groups on the long (deck) side, smaller casement groups elsewhere
+  gothRange(K, { mat: R.ccSiding, trim: R.jmTrim, sash: R.jmSash, plinth: M.graniteDark, hood: false, string: false, cornice: false, noTransom: true,
+    panes: 2, mullW: 0.1, lightW: 0.55, winH: 2.1, topH: 2.1, fh: 3.0, depth: 0.28, ...b, ridge: 0, bay: 3.2,
+    lights: (i, k, f) => (f === 'E' ? 4 : 3) });
+  // gable roof with deep eaves, exposed rafter tails, dark fascia
+  K.gable(R.jmRoof, b.u0, b.v0, b.u1, b.v1, b.eave, b.ridge - b.eave, 'v', { overhang: 0.9, wallMat: R.ccSiding });
+  K.box(R.jmTrim, -0.18, b.ridge - 0.05, b.v0 - 0.9, 0.18, b.ridge + 0.12, b.v1 + 0.9); // ridge cap
+  for (const u of [b.u0 - 0.9, b.u1 + 0.9]) for (let v = b.v0 - 0.6; v <= b.v1 + 0.6; v += 0.8) K.box(R.timber, Math.min(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.62, v - 0.06, Math.max(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.48, v + 0.06, { detail: true });
+  // timber deck on the east side (where the garden falls away) with a simple rail; top just above the hall floor
+  { const v0 = -0.5, v1 = 7.0; const g = K.gMin(b.u1, v0, b.u1 + 3.0, v1); const yD = 0.8;
+    K.box(R.timber, b.u1, g - 0.6, v0, b.u1 + 3.0, yD, v1);
+    walkables.push(K.walkPoly([[b.u1, v0], [b.u1 + 3.0, v0], [b.u1 + 3.0, v1], [b.u1, v1]], yD));
+    for (let v = v0; v <= v1 + 0.01; v += (v1 - v0) / 5) K.box(R.timber, b.u1 + 2.85, yD, v - 0.05, b.u1 + 2.95, yD + 1.0, v + 0.05, { detail: true });
+    K.box(R.timber, b.u1 + 2.82, yD + 0.95, v0, b.u1 + 2.98, yD + 1.05, v1); }
+  colliders.push(K.colPoly([[b.u0, b.v0], [b.u1, b.v0], [b.u1, b.v1], [b.u0, b.v1]], -2, b.ridge + 0.5));
+  const object3d = K.finish();
   object3d.name = 'conference-center';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders, walkables };
 }

@@ -120,8 +120,10 @@ export function fhBalconyBay(K, F, R, s, w, g, eave, { d = 1.3, floors = null } 
 }
 
 // Build a whole Foothill building from blocks; extras(K, F, wings) may add towers/bays. Returns {object3d, colliders}
-export function foothillBuild(ctx, angDeg, blocks, extras) {
-  const K = new Kit(ctx, THREE.MathUtils.degToRad(angDeg)); const F = fmats(ctx.M);
+// opts (optional, refine-east-b): {mats: {cedar, roof, ...} overrides, stagger (plan offset of alternate segments, default 0.35),
+// rise (height offset of alternate segments, default 0.9), bay (window bay, default 3.6)}. Defaults keep the original output.
+export function foothillBuild(ctx, angDeg, blocks, extras, opts = {}) {
+  const K = new Kit(ctx, THREE.MathUtils.degToRad(angDeg)); const F = opts.mats ? { ...fmats(ctx.M), ...opts.mats } : fmats(ctx.M);
   const colliders = []; const wings = [];
   let longest = null, lmax = 0;
   for (const b of blocks) { const L = b.axis === 'u' ? b.u1 - b.u0 : b.v1 - b.v0; if (b.roof !== 'flat' && L > lmax) { lmax = L; longest = b; } }
@@ -129,12 +131,12 @@ export function foothillBuild(ctx, angDeg, blocks, extras) {
     const L = b.axis === 'u' ? b.u1 - b.u0 : b.v1 - b.v0; const n = b.split === false ? 1 : Math.max(1, Math.round(L / 12.5));
     for (let i = 0; i < n; i++) {
       const a0 = (b.axis === 'u' ? b.u0 : b.v0) + L * i / n, a1 = (b.axis === 'u' ? b.u0 : b.v0) + L * (i + 1) / n;
-      const odd = n > 1 && i % 2 === 1; const e = odd ? 0.35 : 0; const dy = odd ? 0.9 : 0;
+      const odd = n > 1 && i % 2 === 1; const e = odd ? (opts.stagger ?? 0.35) : 0; const dy = odd ? (opts.rise ?? 0.9) : 0;
       const seg = b.axis === 'u' ? { ...b, u0: a0, u1: a1, v0: b.v0 - e, v1: b.v1 + e } : { ...b, v0: a0, v1: a1, u0: b.u0 - e, u1: b.u1 + e };
       seg.eave = b.eave + dy; seg.ridge = b.ridge + dy; seg.vent = b === longest && i === Math.floor(n / 2);
       seg.faces = { ...(b.faces || {}) };
       if (n > 1 && !odd) { if (b.axis === 'u') { if (i > 0) seg.faces.W = false; if (i < n - 1) seg.faces.E = false; } else { if (i > 0) seg.faces.N = false; if (i < n - 1) seg.faces.S = false; } }
-      wings.push(fhWing(K, seg, F));
+      wings.push(fhWing(K, seg, F, opts.bay ? { bay: opts.bay } : {}));
     }
     colliders.push(K.colPoly([[b.u0, b.v0], [b.u1, b.v0], [b.u1, b.v1], [b.u0, b.v1]], -2, b.ridge + 1.5));
   }
