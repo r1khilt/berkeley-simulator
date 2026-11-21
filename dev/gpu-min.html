@@ -1,0 +1,27 @@
+<!doctype html><html><body style="margin:0"><canvas id="c" width="320" height="180"></canvas>
+<script type="module">
+// [gfx-webgpu] minimal WebGPU smoke test for headless runs
+import * as THREE from 'three/webgpu';
+const out = (window.OUT = { steps: [] });
+try {
+  const canvas = document.getElementById('c');
+  const r = new THREE.WebGPURenderer({ canvas, antialias: true, reversedDepthBuffer: true });
+  await r.init(); out.steps.push('init ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+  r.setSize(320, 180, false);
+  const s = new THREE.Scene(); s.background = new THREE.Color(0x336699);
+  const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.2, 160000); cam.position.set(2, 2, 3); cam.lookAt(0, 0, 0);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ color: 0xff8800 })); s.add(m);
+  const L = new THREE.DirectionalLight(0xffffff, 3); L.position.set(3, 5, 2); s.add(L, new THREE.AmbientLight(0xffffff, 0.3));
+  r.render(s, cam); out.steps.push('render');
+  out.url = canvas.toDataURL('image/png').length;
+  const g = document.createElement('canvas'); g.width = 4; g.height = 4; const x = g.getContext('2d'); x.drawImage(canvas, 0, 0, 4, 4); out.px = Array.from(x.getImageData(0, 0, 4, 4).data).slice(0, 16);
+  await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+  { const x2 = g.getContext('2d'); x2.clearRect(0, 0, 4, 4); x2.drawImage(canvas, 0, 0, 4, 4); out.pxRaf = Array.from(x2.getImageData(0, 0, 4, 4).data).slice(0, 8); }
+  r.render(s, cam); await r.backend.device.queue.onSubmittedWorkDone();
+  { const x3 = g.getContext('2d'); x3.clearRect(0, 0, 4, 4); x3.drawImage(canvas, 0, 0, 4, 4); out.pxDone = Array.from(x3.getImageData(0, 0, 4, 4).data).slice(0, 8); }
+  // explicit readback through a render target
+  const rt = new THREE.RenderTarget(64, 36); r.setRenderTarget(rt); r.render(s, cam); r.setRenderTarget(null);
+  const buf = await r.readRenderTargetPixelsAsync(rt, 0, 0, 4, 4); out.pxRT = Array.from(buf).slice(0, 8);
+  out.ok = true;
+} catch (e) { out.err = String(e.stack || e); }
+</script></body></html>
