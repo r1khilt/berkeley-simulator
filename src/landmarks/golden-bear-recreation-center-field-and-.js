@@ -40,7 +40,7 @@ export async function build(ctx) {
   const T = new Kit(ctx, deg(67.5 - 90)); parts.push(T);
   { const cs = [[-115.4, 64.0], [-101.9, 58.5]].map(([x, z]) => T.uv(x, z)); const lv = Math.max(...cs.map(([u, v]) => T.g(u, v)));
     const ua = Math.min(cs[0][0], cs[1][0]) - 5.5 - 3.8, ub = Math.max(cs[0][0], cs[1][0]) + 5.5 + 3.8, vm = (cs[0][1] + cs[1][1]) / 2;
-    tennisBlock(T, S, M, F, { u0: ua, v0: vm - 18.3, u1: ub, v1: vm + 18.3, courts: cs.map(([u, v]) => [u, v, Math.PI / 2]), level: lv, inCol: '#3a6aa8', outCol: '#4a7f55', windMat: S.windGreen, colliders }); }
+    tennisBlock(T, S, M, F, { u0: ua, v0: vm - 18.3, u1: ub, v1: vm + 18.3, courts: cs.map(([u, v]) => [u, v, Math.PI / 2]), level: lv, inCol: '#5e7a62', outCol: '#8a9a8c', windMat: S.windGreen, colliders }); }
   // ---- sand volleyball ----
   const V = new Kit(ctx, deg(62.5)); parts.push(V);
   for (const [x, z] of [[25.2, 119.3], [-0.6, 123.0]]) { const [u, v] = V.uv(x, z); const g = V.gMax(u - 9, v - 5, u + 9, v + 5, 4);
