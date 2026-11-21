@@ -148,7 +148,7 @@ export class SkySystem {
     const warm = 1 - smooth(2, 28, alt), dayI = smooth(-2, 12, alt);
     const cover = this.cloudCover ?? 0.3, wf = this.fogMul(), ovc = smooth(0.45, 0.95, cover);
     // aerosol load: clear Bay Area air ~ AOD 0.06-0.1 (haze ~ 6-10x Hillaire's clean default); overcast and fog thicken it
-    const haze = (this.hazeBase ?? 5.0) * (1 + 0.8 * ovc) * (wf > 1 ? 1 + (wf - 1) * 1.6 : 1);
+    const haze = (this.hazeBase ?? 4.0) * (1 + 0.8 * ovc) * (wf > 1 ? 1 + (wf - 1) * 1.6 : 1);
     this.atmo.setHaze(haze);
     const skyChanged = this.atmo.update(this.sunDir, Math.max(0, this.camera.position.y));
     const T = this.atmo.sunTrans, lumT = 0.2126 * T.r + 0.7152 * T.g + 0.0722 * T.b;
@@ -192,7 +192,7 @@ export class SkySystem {
     this.moon.position.copy(moonDir).multiplyScalar(100000).add(this.camera.position);
     this.moon.material.opacity = night; this.moon.visible = moonUp && night > 0.05;
     this.stars.position.copy(this.camera.position); this.glow.position.copy(this.camera.position); this.dome.position.copy(this.camera.position);
-    this.glowU.uNight.value = smooth(-14, -4, -alt); this.glowU.uTwi.value = 0.35 * smooth(-14, -6, alt) * (1 - smooth(-1, 6, alt)); this.glowU.uSun.value.copy(this.sunDir);
+    this.glowU.uNight.value = smooth(-14, -4, -alt); this.glowU.uTwi.value = smooth(-14, -6, alt) * (1 - smooth(-1, 6, alt)); this.glowU.uSun.value.copy(this.sunDir);
     this.sky.position.copy(this.camera.position);
     this.clouds.position.x = this.camera.position.x; this.clouds.position.z = this.camera.position.z;
     this.cloudUniforms.uSun.value.copy(this.sunDir);
@@ -200,20 +200,21 @@ export class SkySystem {
     this.cloudUniforms.uAmb.value.copy(low).multiplyScalar(1.1);
     // exposure: photographic auto-exposure on the horizontal illuminance (partial compensation keeps dusk moody),
     // blending into the hand-tuned night exposure the lamp/window materials were balanced for
-    const physExp = Math.min(5, Math.max(0.35, (this.expK ?? 1.05) * Math.pow(4.4 / Math.max(Eg, 1e-3), 0.78)));
-    const nightExp = 0.82 + 1.7;
+    const physExp = Math.min(10, Math.max(0.35, (this.expK ?? 1.12) * Math.pow(4.4 / Math.max(Eg, 1e-4), 0.78)));
+    const nightExp = (0.82 + 1.7) * (this.nightExpMul ?? 1.15);   // the old night exposure, lifted for the AgX toe
     this.physExposure = physExp;
-    this.renderer.toneMappingExposure = (physExp + (nightExp - physExp) * smooth(0.2, 0.85, night)) * (this.exposureMul || 1);
+    const wN = smooth(0.12, 0.62, night);
+    this.renderer.toneMappingExposure = Math.exp(Math.log(physExp) * (1 - wN) + Math.log(nightExp) * wN) * (this.exposureMul || 1);
     // environment (PMREM) refresh when the sky changed noticeably
     const envKey = `${Math.round(alt * 2)}|${Math.round(sp.azimuth * 60)}|${Math.round(cover * 20)}|${Math.round(haze * 4)}|${Math.round(night * 20)}`;
-    this.envAge += dt || 0;
-    if (envKey !== this.envKey && (this.envAge > 0.5 || !this.envRT)) {
-      this.envKey = envKey; this.envAge = 0;
+    const nowMs = performance.now();   // wall-clock throttle (PMREM costs a few ms); also correct for scripted single-frame renders
+    if (envKey !== this.envKey && (nowMs - (this.envT || 0) > 400 || !this.envRT)) {
+      this.envKey = envKey; this.envT = nowMs;
       if (this.envRT) this.envRT.dispose();
       this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 1000);
       this.scene.environment = this.envRT.texture;
     }
-    this.scene.environmentIntensity = this.envIntensity ?? 0.8;   // ~20% average large-scale sky occlusion (buildings, trees) that screen-space AO cannot see
+    this.scene.environmentIntensity = this.envIntensity ?? 0.7;   // ~40% average large-scale sky occlusion: ground in a building's shadow sees only part of the sky (buildings, trees) that screen-space AO cannot see
     this.hemi.intensity = 0.0;
     return { alt, night, warm, dayI };
   }

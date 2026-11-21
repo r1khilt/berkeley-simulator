@@ -84,7 +84,7 @@ void main(){
 const FS_AOBLUR = /* glsl */`varying vec2 vUv; uniform sampler2D tAO; uniform vec2 uRes;
 void main(){ vec2 c = texture2D(tAO, vUv).rg; if (c.g > 5.9e4) { gl_FragColor = vec4(1.0, c.g, 0.0, 1.0); return; } float sum = 0.0, wsum = 0.0;
   for (int y = -2; y <= 1; y++) for (int x = -2; x <= 1; x++) { vec2 s = texture2D(tAO, vUv + (vec2(x, y) + 0.5) / uRes).rg;
-    float w = exp(-min(abs(s.g - c.g) / (0.02 * c.g + 0.05), 40.0)); sum += s.r * w; wsum += w; }
+    float w = exp(-min(abs(s.g - c.g) / (0.06 * c.g + 0.1), 40.0)); sum += s.r * w; wsum += w; }
   float r = sum / max(wsum, 1e-6); gl_FragColor = vec4(isnan(r) ? 1.0 : r, c.g, 0.0, 1.0); }`;
 const FS_DOWN = /* glsl */`varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uFirst; uniform float uExposure;
 vec3 s(vec2 o){ vec3 c = texture2D(tSrc, vUv + o * uTexel).rgb; if (uFirst > 0.5) { c = any(isnan(c)) ? vec3(0.0) : clamp(c * uExposure, 0.0, 24.0); } return c; }
@@ -123,6 +123,7 @@ float aoUp(vec2 uv, float dist){ // depth-aware 2x2 upsample of the half-res AO
 }
 vec3 aerial(vec3 col, vec3 dir, float distM){
   float d = distM * 0.001, mu = dir.y, h0 = uCamAltKm;
+  d = d - 0.6 * (1.0 - exp(-d / 0.6));   // soft onset: near field stays crisp (quadratic below ~600 m), far field unchanged
   float xr = d * mu / 8.0, xm = d * mu / 1.2;
   float fr = abs(xr) > 1e-3 ? (1.0 - exp(-xr)) / xr : 1.0 - 0.5 * xr;
   float fm = abs(xm) > 1e-3 ? (1.0 - exp(-xm)) / xm : 1.0 - 0.5 * xm;
@@ -139,7 +140,8 @@ void main(){
   float d = texture2D(tDepth, vUv).r;
   if (!bsIsSky(d)) {
     float z = bsViewZ(d); vec3 p = bsViewPos(vUv, z);
-    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z); float amb = src.a > 0.985 ? uUnknownAmb : src.a; col *= 1.0 - clamp(amb * 1.15, 0.0, 1.0) * (1.0 - ao) * uAOStrength; }
+    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z); float amb = src.a > 0.495 ? uUnknownAmb : src.a / 0.49; amb = 0.25 + 0.75 * amb;   // mostly ambient-only, plus a little contact darkening of direct light
+      col *= 1.0 - clamp(amb * 1.1, 0.0, 1.0) * (1.0 - ao) * uAOStrength; }
     if (uUseAP > 0.5) { vec3 wd = normalize((uViewInv * vec4(p, 0.0)).xyz); col = aerial(col, wd, length(p)); }
   }
   if (uUseBloom > 0.5) col = mix(col * uExposure, texture2D(tBloom, vUv).rgb, uBloom); else col *= uExposure;
@@ -177,7 +179,7 @@ export class PostPipeline {
     const common = { tDepth: { value: dt }, uProj: { value: camera.projectionMatrix }, uProjInv: { value: camera.projectionMatrixInverse }, uFar: { value: camera.far } };
     if (this.cfg.ao) {
       this.aoRT = half(); this.aoRT2 = half(); this.aoRT.texture.minFilter = this.aoRT.texture.magFilter = THREE.NearestFilter; this.aoRT2.texture.minFilter = this.aoRT2.texture.magFilter = THREE.NearestFilter;
-      this.aoPass = pass(FS_AO(this.reversed, this.logd, this.cfg.aoSlices, this.cfg.aoSteps), Object.assign({ uRes: { value: new THREE.Vector2(this.w, this.h) }, uRadius: { value: 1.6 } }, common));
+      this.aoPass = pass(FS_AO(this.reversed, this.logd, this.cfg.aoSlices, this.cfg.aoSteps), Object.assign({ uRes: { value: new THREE.Vector2(this.w, this.h) }, uRadius: { value: 2.0 } }, common));
       this.aoBlur = pass(FS_AOBLUR, { tAO: { value: this.aoRT.texture }, uRes: { value: new THREE.Vector2(this.w >> 1, this.h >> 1) } });
       AOU.uCAOMin.value = 0.72;   // let GTAO do the contact darkening; keep a softer height-based term for big-scale sky occlusion
     }
@@ -192,12 +194,12 @@ export class PostPipeline {
     this.U = Object.assign({
       tColor: { value: this.sceneRT.texture }, tAO: { value: this.cfg.ao ? this.aoRT2.texture : null }, tBloom: { value: this.cfg.bloom ? this.bloomRTs[0].texture : null },
       uViewInv: { value: camera.matrixWorld }, uRes: { value: new THREE.Vector2(this.w, this.h) }, uAORes: { value: new THREE.Vector2(this.w >> 1, this.h >> 1) },
-      uExposure: { value: 1 }, uBloom: { value: 0.012 }, uAOStrength: { value: 1.3 }, uAPMul: { value: 0.85 }, uVignette: { value: 0.16 }, uGrain: { value: this.cfg.grain }, uTime: { value: 0 },
+      uExposure: { value: 1 }, uBloom: { value: 0.012 }, uAOStrength: { value: 1.4 }, uAPMul: { value: 0.85 }, uVignette: { value: 0.16 }, uGrain: { value: this.cfg.grain }, uTime: { value: 0 },
       uUseAO: { value: this.cfg.ao ? 1 : 0 }, uUseBloom: { value: this.cfg.bloom ? 1 : 0 }, uUseAP: { value: A ? 1 : 0 }, uUnknownAmb: { value: 0.65 },
       uNightFog: { value: new THREE.Color(0, 0, 0) }, uCamAltKm: { value: 0.1 },
     }, common, A || { uSkyLUT: { value: null }, uTrans: { value: null }, uSunDirW: { value: new THREE.Vector3() }, uCamR: { value: 6360.1 }, uSunTOA: { value: 1 }, uSkyBoost: { value: 1 }, uRayScat: { value: new THREE.Vector3() }, uMieScat: { value: 0 }, uMieExt: { value: 0 }, uOzone: { value: new THREE.Vector3() }, uMieG: { value: 0.8 } });
     for (const k of Object.keys(LOOK)) this.U['uLook_' + k] = { value: LOOK[k] };
-    this.final = pass(FS_FINAL(this.reversed, this.logd), this.U);
+    this.final = pass(FS_FINAL(this.reversed, this.logd), this.U); this.bloomDay = this.U.uBloom.value;
     if (this.cfg.smaa) { this.ldrRT = new THREE.WebGLRenderTarget(this.w, this.h, { type: THREE.UnsignedByteType, depthBuffer: false }); this.smaa = new SMAAPass(); this.smaa.renderToScreen = true; this.smaa.setSize(this.w, this.h); }
     sky.postAP = !!A;   // material fog off: aerial perspective happens here, per pixel, with the real sky radiance
     this.enabled = true;
@@ -228,6 +230,8 @@ export class PostPipeline {
     }
     const U = this.U; U.uExposure.value = exposure; U.uTime.value += dt; U.uFar.value = cam.far; U.uCamAltKm.value = Math.max(0, cam.position.y) / 1000;
     const night = this.sky.night || 0; U.uNightFog.value.setRGB(0.030, 0.030, 0.040).multiplyScalar(night * 0.6);
+    U.uLook_contrast.value = LOOK.contrast + (1.12 - LOOK.contrast) * Math.min(1, night * 1.4);   // softer curve after dark
+    U.uBloom.value = this.bloomDay + (0.06 - this.bloomDay) * Math.min(1, night * 1.2);           // lamps/windows glow at night
     if (this.smaa) { this._q(this.final, this.ldrRT); this.smaa.render(r, null, this.ldrRT); }
     else this._q(this.final, null);
     r.setRenderTarget(prevTarget); r.autoClear = prevAuto;

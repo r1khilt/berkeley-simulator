@@ -136,7 +136,7 @@ export class Atmosphere {
       uRayScat: { value: new THREE.Vector3(...RAY) }, uMieScat: { value: MIE_S }, uMieExt: { value: MIE_E }, uOzone: { value: new THREE.Vector3(...OZO) }, uMieG: { value: 0.8 },
       uTrans: { value: this.transRT.texture }, uMS: { value: this.msRT.texture }, uSkyLUT: { value: this.skyRT.texture },
       uCamR: { value: RG + 0.1 }, uSunAlt: { value: 0.5 }, uGroundAlbedo: { value: this.groundAlbedo },
-      uSunDirW: { value: new THREE.Vector3(0, 1, 0) }, uSunTOA: { value: SUN_TOA }, uSkyBoost: { value: 1.55 },
+      uSunDirW: { value: new THREE.Vector3(0, 1, 0) }, uSunTOA: { value: SUN_TOA }, uSkyBoost: { value: 1.2 },
     };
     this.passT = quadPass(FS_TRANS, this.U); this.passMS = quadPass(FS_MS, this.U); this.passSky = quadPass(FS_SKY, this.U);
     // GPU reduction -> 4x1 float target read back when the sky changes (irradiance, horizon, zenith, low sky)
@@ -205,15 +205,17 @@ ${ATMO_GLSL}
 }
 // Environment dome for PMREM: sky radiance above the horizon, sunlit ground below (no sun disk: the directional light owns it)
 export function makeEnvDome(atmo) {
-  const u = Object.assign({ uSkyMul: { value: 1 }, uGround: { value: new THREE.Color(0.1, 0.1, 0.09) }, uExtra: { value: new THREE.Color(0, 0, 0) }, uNightZen: { value: new THREE.Color() }, uNightHor: { value: new THREE.Color() }, uNightGnd: { value: new THREE.Color() }, uNightK: { value: 0 } }, atmo.U);
+  const u = Object.assign({ uEnvSat: { value: 0.65 }, uSkyMul: { value: 1 }, uGround: { value: new THREE.Color(0.1, 0.1, 0.09) }, uExtra: { value: new THREE.Color(0, 0, 0) }, uNightZen: { value: new THREE.Color() }, uNightHor: { value: new THREE.Color() }, uNightGnd: { value: new THREE.Color() }, uNightK: { value: 0 } }, atmo.U);
   const mat = new THREE.ShaderMaterial({
     uniforms: u, side: THREE.BackSide, depthWrite: false,
     vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: /* glsl */`varying vec3 vD; uniform sampler2D uSkyLUT; uniform vec3 uSunDirW, uGround, uExtra, uNightZen, uNightHor, uNightGnd; uniform float uCamR, uSunTOA, uNightK, uSkyMul;
+    fragmentShader: /* glsl */`varying vec3 vD; uniform sampler2D uSkyLUT; uniform vec3 uSunDirW, uGround, uExtra, uNightZen, uNightHor, uNightGnd; uniform float uCamR, uSunTOA, uNightK, uSkyMul, uEnvSat;
 ${ATMO_GLSL}
       void main(){ vec3 d = normalize(vD);
         vec3 sky = aSkyLUT(uSkyLUT, vec3(d.x, max(d.y, 0.002), d.z), uSunDirW, uCamR) * uSunTOA * uSkyMul;
         vec3 hz = aSkyLUT(uSkyLUT, normalize(vec3(d.x, 0.002, d.z)), uSunDirW, uCamR) * uSunTOA * uSkyMul;
+        // white-balanced skylight: the eye/camera adapts to blue shade, so ambient keeps only part of the sky's chroma
+        sky = mix(vec3(dot(sky, vec3(0.2126, 0.7152, 0.0722))), sky, uEnvSat); hz = mix(vec3(dot(hz, vec3(0.2126, 0.7152, 0.0722))), hz, uEnvSat);
         vec3 c = d.y > 0.0 ? sky : mix(hz, uGround, smoothstep(0.0, 0.12, -d.y));
         vec3 nc = d.y > 0.0 ? mix(uNightHor, uNightZen, pow(d.y, 0.6)) : mix(uNightHor*0.6+uNightGnd*0.4, uNightGnd, smoothstep(0.0, 0.25, -d.y));
         gl_FragColor = vec4(c + nc * uNightK + uExtra, 1.0); }`,
