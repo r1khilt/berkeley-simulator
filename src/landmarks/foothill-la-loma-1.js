@@ -1,6 +1,6 @@
 // Foothill La Loma 1 (William Turnbull Jr. & Associates, 1990–91): the U-shaped shingled block on La Loma Avenue at Hearst,
-// with its tall corner tower. Massing from the 2021 LiDAR (frame -9°); Bay Region shingle style per the shared Foothill kit.
-import { foothillBuild, fhBalconyBay, fhBoxBay } from './lib/b08c-foothill.js';
+// with its tall corner tower. Massing from the 2021 LiDAR (frame -9°); Bay Region shingle style per lib/rn-a-foothill.js (refine-north: shingle, grouped windows, cross-gables, entries).
+import { faBuild, faGableBay, faBoxBay } from './lib/rn-a-foothill.js';
 
 export const info = {
   id: 'foothill-la-loma-1',
@@ -20,17 +20,16 @@ export async function build(ctx) {
     { u0: 16.8, u1: 25.0, v0: -11.6, v1: 10.3, g: 8.5, eave: 14.6, ridge: 18.7, axis: 'v', faces: { S: false } },
     { u0: -13.0, u1: -5.6, v0: -16.4, v1: -13.8, g: 2.5, eave: 13.8, ridge: 16.0, axis: 'u', roof: 'flat' },
   ];
-  const { object3d, colliders } = foothillBuild(ctx, -9, blocks, (K, F, wings, cols) => {
-    // balcony bays on the courtyard faces
-    const RN = K.run([11.0, -16.4], [-17.0, -16.4]); // north wing, south face (faces the court)
-    fhBalconyBay(K, F, RN.constructor ? K.run([-17.0, -16.4], [11.0, -16.4]) : RN, 14.0, 2.8, 3.3, 16.0);
-    fhBalconyBay(K, F, K.run([14.6, 12.0], [-5.0, 12.0]), 9.8, 2.8, 3.2, 16.2);
-    // street (west) face on La Loma Avenue: balcony stack under a steep gable + two-storey box bays
+  const { object3d, colliders, walkables } = faBuild(ctx, -9, blocks, (K, F) => {
+    // court faces: cross-gabled bays
+    faGableBay(K, F, K.run([-17.0, -16.4], [11.0, -16.4]), 14.0, 4.2, 3.3, 15.0, { d: 1.0 });
+    faGableBay(K, F, K.run([14.6, 12.0], [-5.0, 12.0]), 9.8, 4.2, 3.2, 15.2, { d: 1.0 });
+    // street (west) face on La Loma Avenue: two cross-gabled bays and a two-storey box bay between them
     const RW = K.run([-22.4, -25.5], [-22.4, 13.6]);
-    fhBalconyBay(K, F, RW, 35.5, 5.0, 0.2, 13.4, { d: 1.9 });
-    fhBoxBay(K, F, RW, 9.0, 3.4, 0.4 + 3.85, 2);
-    fhBoxBay(K, F, RW, 33.5, 3.4, 0.4 + 3.85, 2);
-  });
+    faGableBay(K, F, RW, 7.5, 4.6, 0.2, 12.9, { d: 1.1 });
+    faGableBay(K, F, RW, 31.5, 5.0, 0.2, 12.9, { d: 1.1 });
+    faBoxBay(K, F, RW, 19.5, 3.4, 0.2 + 3.95, 2);
+  }, { entries: 3 });
   object3d.name = 'foothill-la-loma-1';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders, walkables };
 }
