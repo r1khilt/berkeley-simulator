@@ -35,16 +35,18 @@ export function grimesMats(M) {
   if (_mats) return _mats;
   const std = (o) => new THREE.MeshStandardMaterial(o);
   _mats = {
-    panel: std({ color: 0xffffff, map: panelTexture([206, 197, 181], 0.8), roughness: 0.9, name: 'grimes-precast' }),
+    panel: std({ color: 0xffffff, map: panelTexture([207, 196, 176], 0.68), roughness: 0.9, name: 'grimes-precast' }),
+    whitePanel: std({ color: 0xffffff, map: panelTexture([236, 234, 228], 0.93), roughness: 0.7, metalness: 0.05, name: 'grimes-white-cladding' }),
     steel: std({ color: 0xf1f1ee, roughness: 0.45, metalness: 0.15, name: 'grimes-white-steel' }),
     louvre: std({ color: 0xe9ecec, roughness: 0.5, metalness: 0.25, name: 'grimes-louvre' }),
     metalPanel: std({ color: 0xffffff, map: panelTexture([240, 240, 236], 0.9), roughness: 0.5, metalness: 0.1, name: 'grimes-white-panel' }),
     soffit: std({ color: 0xc9d0d4, roughness: 0.6, metalness: 0.2, name: 'grimes-soffit' }),
-    rod: std({ color: 0xdfe2e2, roughness: 0.3, metalness: 0.6, name: 'grimes-sma-rod' }),
-    storeGlass: nightGlow(std({ color: 0x6d8fae, roughness: 0.04, metalness: 0.4, envMapIntensity: 1.5, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
+    rod: std({ color: 0xf2f3f1, roughness: 0.35, metalness: 0.25, name: 'grimes-sma-rod' }),
+    sleeve: std({ color: 0xd4d7d8, roughness: 0.3, metalness: 0.45, name: 'grimes-sma-sleeve' }),
+    storeGlass: nightGlow(std({ color: 0x4f5f60, roughness: 0.05, metalness: 0.3, envMapIntensity: 1.1, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
     frame: std({ color: 0xe4e6e6, roughness: 0.4, metalness: 0.4, name: 'grimes-mullion' }),
     darkFrame: std({ color: 0x3a3d40, roughness: 0.45, metalness: 0.5, name: 'grimes-dark-frame' }),
-    glass: std({ color: 0x7ea6cf, roughness: 0.03, metalness: 0.45, transparent: true, opacity: 0.56, envMapIntensity: 1.6, depthWrite: false, name: 'grimes-glass' }),
+    glass: std({ color: 0x93aaa7, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.4, envMapIntensity: 1.0, depthWrite: false, name: 'grimes-glass' }),
     deck: std({ color: 0xffffff, map: floorTexture(), roughness: 0.85, name: 'grimes-deck' }),
     slab: std({ color: 0xdcdad4, roughness: 0.9, name: 'grimes-slab' }),
     ceiling: nightGlow(std({ color: 0xb98a5a, roughness: 0.8, emissive: 0xffd9a0, emissiveIntensity: 0.9, name: 'grimes-wood-ceiling' }), 1.0),
