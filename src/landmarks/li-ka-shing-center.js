@@ -11,9 +11,9 @@ export const info = {
 };
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-5.5)); const M = ctx.M;
-  // refine-central: champagne metal panel and glass skin (near-continuous glazing between slim piers), bronze louvre
+  // refine-central: buff precast panels around near-continuous glazing between slim piers, aluminium louvre
   // sunshades over the south/west glazing, a full-height glazed lobby with canopy and name, rooftop plant behind screens.
-  const P = solid(0x6c7176, 0.45, 0.55), PD = solid(0x4a4e52, 0.6, 0.4), FR = solid(0x2b3035, 0.35, 0.6), LV = solid(0x9a9c9a, 0.35, 0.75), CAN = solid(0x5e6266, 0.5, 0.5);
+  const P = tint(M.concrete, 0xf0e2c2), PD = tint(M.concrete, 0xc9bb9c), FR = solid(0x2b3035, 0.35, 0.6), LV = solid(0x9a9c9a, 0.35, 0.75), CAN = solid(0x5e6266, 0.5, 0.5);
   const allRuns = [];
   const lv = (top) => { const a = [0.8, 5.6]; while (a[a.length - 1] + 4.3 < top - 1.2) a.push(a[a.length - 1] + 4.3); return a; };
   const ribbon = (k) => ({ w: 2.75, h: 3.3, sill: 0.45, mull: 1, tran: 0.82 });
