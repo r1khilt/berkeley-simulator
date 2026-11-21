@@ -6,6 +6,7 @@
 // Massing follows the 2021 LiDAR (frame rotated -9° to the campus grid): wings 14–18 m, tower roof ~39.5 m, service block ~49 m.
 import * as THREE from 'three';
 import { Kit, deg, mats, openWall, lamp, boardMat } from './lib/b05b-kit.js';
+import { paleBoardMat } from './lib/reast-kit.js';
 
 export const info = {
   id: 'bauer-wurster-hall',
@@ -17,8 +18,8 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, deg(-9)); const M = ctx.M; const X = mats(M);
-  const C = boardMat(0xffffff), CD = boardMat(0xbdbdb8); const ROOF = new THREE.MeshStandardMaterial({ color: 0xb5b3ab, roughness: 0.95, map: M.concrete.map });
-  const GL = new THREE.MeshStandardMaterial({ color: 0x3a4248, roughness: 0.12, metalness: 0.35 });
+  const C = paleBoardMat(0xffffff), CD = paleBoardMat(0xc9c2b4); /* refine-east: pale warm board-formed concrete */ const ROOF = new THREE.MeshStandardMaterial({ color: 0xb5b3ab, roughness: 0.95, map: M.concrete.map });
+  const GL = M.windowNight; // refine-east: shared window material (interior shader upgrade)
   const FR = X.frameDark;
   const colliders = [], walkables = [];
   const FL = 3.8;
@@ -31,7 +32,7 @@ export async function build(ctx) {
     const ops = [];
     for (let f = 0; f < nF; f++) {
       const fy = y0 + f * FL; if (arcade && f === 0) continue;
-      for (let i = 0; i < nb; i++) { const c = a0 + bw * (i + 0.5); ops.push({ s0: c - bw / 2 + 0.3, s1: c + bw / 2 - 0.3, y0: fy + 0.9, y1: fy + 3.1, noFill: true }); }
+      for (let i = 0; i < nb; i++) { const c = a0 + bw * (i + 0.5); ops.push({ s0: c - bw / 2 + 0.28, s1: c + bw / 2 - 0.28, y0: fy + 0.95, y1: fy + 3.2, noFill: true }); }
     }
     K.wall(R, C, s0, s1, arcade ? y0 + FL : gs - 1.2, top + 0.9, ops, 0.5);
     for (const o of ops) {
@@ -40,10 +41,11 @@ export async function build(ctx) {
       K.rbox(R, FR, o.s0, o.y0 + 1.1, -0.45, o.s1, o.y0 + 1.16, -0.4, { detail: true });
     }
     // continuous sun shelves at every floor line + vertical fins at ~1.5 m pitch (deep egg-crate)
-    for (let f = (arcade ? 1 : 0); f <= nF; f++) { const fy = y0 + f * FL; if (fy > top - 0.3) break; K.rbox(R, C, s0 + 0.1, fy + 0.62, 0, s1 - 0.1, fy + 0.88, 1.1); K.rbox(R, CD, s0 + 0.1, fy + 0.5, 0.95, s1 - 0.1, fy + 0.62, 1.1, { detail: true }); }
-    const nfin = Math.max(2, Math.round((L - 1.2) / 1.55));
-    for (let i = 0; i <= nfin; i++) { const s = a0 + (L - 1.2) * i / nfin; const big = i % Math.max(1, Math.round(nfin / nb)) === 0;
-      K.rbox(R, C, s - (big ? 0.25 : 0.08), arcade ? y0 + FL : gs - 1.2, 0, s + (big ? 0.25 : 0.08), Math.min(top - 0.1, y0 + nF * FL + 0.88), big ? 1.1 : 1.0); }
+    for (let f = (arcade ? 1 : 0); f <= nF; f++) { const fy = y0 + f * FL; if (fy > top - 0.3) break; K.rbox(R, C, s0 + 0.1, fy + 0.42, 0, s1 - 0.1, fy + 0.92, 1.0); K.rbox(R, C, s0 + 0.1, fy + 0.18, 0.84, s1 - 0.1, fy + 0.42, 1.0); }
+    for (let i = 0; i <= nb; i++) { const s = a0 + bw * i;
+      K.rbox(R, C, s - 0.24, arcade ? y0 + FL : gs - 1.2, 0, s + 0.24, Math.min(top - 0.1, y0 + nF * FL + 0.92), 1.25);
+      for (let f = (arcade ? 1 : 0); f <= nF; f++) { const fy = y0 + f * FL; if (fy > top - 0.3) break; K.rbox(R, C, s - 0.3, fy + 0.3, 1.0, s + 0.3, fy + 0.95, 1.45); } }
+    for (const o of ops) { const w = o.s1 - o.s0; for (const t of [0.5]) { const sm = o.s0 + w * t; K.rbox(R, FR, sm - 0.04, o.y0, -0.46, sm + 0.04, o.y1, -0.4, { detail: true }); } }
     // ground-floor arcade: recessed glass wall behind square piers
     if (arcade) {
       K.rbox(R, GL, s0 + 0.3, y0, -2.6, s1 - 0.3, y0 + FL - 0.4, -2.55);
@@ -64,7 +66,7 @@ export async function build(ctx) {
     const gm = K.gMin(u0, v0, u1, v1);
     K.box(CD, u0 + 0.45, gm - 1.2, v0 + 0.45, u1 - 0.45, top - 0.05, v1 - 0.45);
     K.box(ROOF, u0 + 0.3, top - 0.3, v0 + 0.3, u1 - 0.3, top, v1 - 0.3);
-    for (let k = 0; k < Math.floor((u1 - u0) * (v1 - v0) / 110); k++) { const uu = u0 + 3 + ((k * 7.3) % (u1 - u0 - 6)), vv = v0 + 3 + ((k * 4.1) % (v1 - v0 - 6)); K.box(M.whitePaint, uu, top, vv, uu + 1.3, top + 0.9, vv + 1.3); }
+    if ((u1 - u0) * (v1 - v0) > 900) { const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2; K.box(CD, cu - 4, top, cv - 3, cu + 4, top + 3.2, cv + 3); }
     colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], gm - 1.2, top + 1));
   }
   // north studio block (3 storeys over the slope), west and south wings, small south-east block
@@ -80,22 +82,10 @@ export async function build(ctx) {
   {
     const yBase = 15.1; // above the north block roof on the north; the south face comes down to the courtyard
     const faces = [[[tu1, tv1], [tu0, tv1].map((x, i) => i ? x : tu0)], [[tu0, tv0], [tu1, tv0]]];
-    // long faces: dense grid of narrow windows between projecting piers, floor spandrels, stacked sun-shelves
-    for (const [a, b, y0f] of [[[tu0, tv1], [tu1, tv1], null], [[tu1, tv0], [tu0, tv0], yBase]]) {
-      const R = K.run(a, b); let gs = Infinity; for (let k = 0; k <= 6; k++) { const p = R.at(R.L * k / 6, 1.0); gs = Math.min(gs, ctx.groundAt(p[0], p[1])); }
-      const y0 = y0f ?? gs; const nF = Math.floor((tTop - y0 - 0.5) / 3.6); const nCol = Math.round(R.L / 1.6); const cw = R.L / nCol;
-      const ops = [];
-      for (let f = (y0f ? 0 : 1); f < nF; f++) { const fy = y0 + f * 3.6; for (let i = 0; i < nCol; i++) { const c = cw * (i + 0.5); ops.push({ s0: c - 0.5, s1: c + 0.5, y0: fy + 0.9, y1: fy + 2.95, noFill: true }); } }
-      K.wall(R, C, 0, R.L, y0f ? y0f : gs - 1.2, tTop + 1.2, ops, 0.6);
-      for (const o of ops) { K.rbox(R, GL, o.s0, o.y0, -0.55, o.s1, o.y1, -0.52); }
-      for (let i = 0; i <= nCol; i += 4) { const s = cw * i; K.rbox(R, C, s - 0.3, y0f ? y0f : gs, 0, s + 0.3, tTop + 0.3, 0.3); }
-      for (let f = (y0f ? 0 : 1); f <= nF; f++) { const fy = y0 + f * 3.6; K.rbox(R, C, 0, fy + 0.6, 0, R.L, fy + 0.85, 0.2); }
-      if (!y0f) { // courtyard arcade at the foot of the tower
-        K.rbox(R, GL, 0.4, gs, -2.4, R.L - 0.4, gs + 3.2, -2.35); for (let i = 0; i <= nCol; i++) K.rbox(R, C, cw * i - 0.35, gs - 0.5, -2.4, cw * i + 0.35, gs + 3.6, 0.55);
-        K.rbox(R, C, 0, gs + 3.2, -2.4, R.L, gs + 3.6, 0.55); K.rbox(R, M.paving, 0, gs - 0.3, -2.4, R.L, gs + 0.02, 0);
-      }
-      K.rbox(R, C, -0.1, tTop + 0.3, -0.45, R.L + 0.1, tTop + 1.3, 0.6);
-    }
+    // long faces (refine-east): the same deep egg-crate as the studio wings, wide recessed window bays under heavy
+    // concrete hoods at every floor, carried on fins at the bay pitch; courtyard arcade at the foot of the south face
+    eggFace(K.run([tu1, tv0], [tu0, tv0]), 0, tu1 - tu0, tTop, { startY: yBase, bay: 3.6, corbels: false, pylons: false });
+    { const r = eggFace(K.run([tu0, tv1], [tu1, tv1]), 0, tu1 - tu0, tTop, { arcade: true, bay: 3.6, corbels: false, pylons: true }); void r; }
     // east end: blank board-formed wall with scattered small windows, stacked recessed balcony slots in the middle
     {
       const R = K.run([tu1, tv1], [tu1, tv0]); const gs = K.g(tu1 + 1, (tv0 + tv1) / 2); const mid = R.L / 2;
@@ -110,7 +100,7 @@ export async function build(ctx) {
     colliders.push(K.colPoly([[tu0, tv0], [tu1, tv0], [tu1, tv1], [tu0, tv1]], -2, tTop + 2));
     // east stair core with high parapet
     K.box(C, 27.5, tTop, tv0 + 0.2, 33.5, 43.0, tv0 + 5.0);
-    for (let k = 0; k < 8; k++) K.box(M.whitePaint, 8 + k * 2.4, tTop + 0.3, -20 + (k % 2) * 3, 9.6 + k * 2.4, tTop + 1.5, -18.5 + (k % 2) * 3);
+    K.box(CD, 9, tTop + 0.3, -21, 24, tTop + 2.4, -15.5); // mechanical penthouse (concrete)
     // thin steel flue
     K.cyl(M.iron, 12, tTop + 0.3, -20, 0.18, 0.18, 3.6, 10);
   }

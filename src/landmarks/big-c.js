@@ -16,7 +16,7 @@ export const info = {
   replaces: [],
 };
 
-const H = 22.0, WD = 16.0, S = 3.3, CO = 3.2, CI = 1.1, THICK = 0.2;
+const H = 18.5, WD = 14.5, S = 3.1, CO = 2.9, CI = 1.0, THICK = 0.25, SHIFT = -3.0; // SHIFT: centre sits a few metres downhill of the OSM node, in the clearing below the tree line
 
 export async function build(ctx) {
   const { M, groundAt } = ctx;
@@ -26,7 +26,7 @@ export async function build(ctx) {
   const rx = -uz, rz = ux; // to the right for a viewer looking uphill (the C opens this way)
   const kPlan = Math.cos(Math.atan(Math.hypot(gx, gz))); // slope length -> plan length
   const K = new Kit(ctx, 0);
-  const b0 = -H / 2;
+  const b0 = -H / 2 + SHIFT;
   const P = (a, b) => { const bp = (b0 + b) * kPlan; return [a * rx + bp * ux, a * rz + bp * uz]; };
   const inv = (x, z) => [x * rx + z * rz, (x * ux + z * uz) / kPlan - b0];
   // letter outline in letter space (a across, b up the slope)
@@ -40,8 +40,8 @@ export async function build(ctx) {
   const inside = (a, b) => { let c = false; for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) { const p = outline[i], q = outline[j]; if ((p[1] > b) !== (q[1] > b) && a < (q[0] - p[0]) * (b - p[1]) / (q[1] - p[1]) + p[0]) c = !c; } return c; };
   const ring = outline.map(([a, b]) => P(a, b));
   // gold paint over concrete: textured, slightly worn
-  const gold = new THREE.MeshStandardMaterial({ color: 0xf6b41f, roughness: 0.82, map: M.concrete.map || null });
-  const edge = new THREE.MeshStandardMaterial({ color: 0xc99a2e, roughness: 0.9, map: M.concrete.map || null, side: THREE.DoubleSide });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xffcf26, roughness: 0.62, map: M.concrete.map || null });
+  const edge = new THREE.MeshStandardMaterial({ color: 0xd6a51c, roughness: 0.8, map: M.concrete.map || null, side: THREE.DoubleSide });
   drapePoly(K, gold, ring, { maxEdge: 0.9, off: THICK });
   // slab edges: vertical bands from below grade to the painted top, following the slope
   {
@@ -59,7 +59,7 @@ export async function build(ctx) {
   }
   // scuffed, sun-faded patches where people sit (slightly paler decals on the lower bowl and arms)
   {
-    const pale = new THREE.MeshStandardMaterial({ color: 0xf3c95a, roughness: 0.9, map: M.concrete.map || null, polygonOffset: true, polygonOffsetFactor: -2 });
+    const pale = new THREE.MeshStandardMaterial({ color: 0xf9dc6a, roughness: 0.75, map: M.concrete.map || null, polygonOffset: true, polygonOffsetFactor: -2 });
     for (const [a0, b0_, a1, b1] of [[L + 0.4, 4.5, L + S - 0.5, 9], [L + 0.4, 12.5, L + S - 0.4, 17], [0.5, 0.5, 4.5, S - 0.6]]) {
       drapePoly(K, pale, [P(a0, b0_), P(a1, b0_), P(a1, b1), P(a0, b1)], { maxEdge: 0.9, off: THICK + 0.012, detail: true });
     }

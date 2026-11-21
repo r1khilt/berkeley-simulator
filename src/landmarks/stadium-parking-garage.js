@@ -19,7 +19,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new GarageKit(ctx, 49.5, 410); const M = ctx.M, G = K.G;
-  const wall = plainMat(0xbcb8b0, { roughness: 0.93 }), ivy = plainMat(0x3c5a2e, { roughness: 1 }), turf = plainMat(0x14a85a, { roughness: 0.95 });
+  const wall = plainMat(0xbcb8b0, { roughness: 0.93 }), ivy = plainMat(0x3c5a2e, { roughness: 1 }), turf = plainMat(0x3f7d3a, { roughness: 0.95 }); // refine-east: natural artificial-turf green (was a saturated teal)
   const TOP = 7.4, LEV = [0.3, 3.85, TOP];
   const u0 = -59.4, u1 = 59.4, v0 = -29.1, v1 = 29.3;
   const P = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
