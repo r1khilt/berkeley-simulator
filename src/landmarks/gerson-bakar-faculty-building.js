@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { Kit, rect, rectRuns, banded, brackets, sign, railing, curtain } from './lib/b06a-kit.js';
 import { haasMats, arcade, discLamp } from './lib/reastc-haas.js';
+import { boardMat } from './lib/b05b-kit.js';
 
 export const info = {
   id: 'gerson-bakar-faculty-building',
@@ -22,7 +23,10 @@ export async function build(ctx) {
   const K = new Kit(ctx, ANG); const M = ctx.M;
   // shared Haas palette (reastc-haas) so the faculty building matches Cheit Hall and the Student Services Building
   const X = haasMats(M);
-  const STONE = X.cast, TAUPE = X.siding, CREAM = X.stucco;
+  // the faculty building's own finish (Commons photo): warm taupe board-formed concrete with cream precast trim,
+  // grey-taupe siding on the top storey, teal frames, copper downspouts
+  const WALL = boardMat(0xfff0d2); WALL.name = 'bakar-boardform';
+  const STONE = WALL, TAUPE = X.siding, CREAM = WALL;
   const ROOF = X.roof, GREEN = X.teal, CHAR = X.teal, HGL = M.windowNight;
   const BRK = X.cast, TANTRIM = X.fascia, CAST = X.cast, PIPE = X.fascia;
   void CHAR;
