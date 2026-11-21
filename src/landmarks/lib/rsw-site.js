@@ -34,15 +34,15 @@ export const charcoalMat = (M) => siteMat(M, 'charcoal', { color: 0x34373a, roug
 
 // canvas sign texture, cached by text+style
 const texCache = new Map();
-export function signTex(text, { w = 1024, h = 160, bg = '#2f3336', fg = '#f2efe6', font = 'bold', size = 0.56, track = 0.08, align = 'center', border = null } = {}) {
-  const key = [text, w, h, bg, fg, font, size, track, align, border].join('|'); if (texCache.has(key)) return texCache.get(key);
+export function signTex(text, { w = 1024, h = 160, bg = '#2f3336', fg = '#f2efe6', font = 'bold', size = 0.56, track = 0.08, align = 'center', border = null, family = 'Helvetica, Arial, sans-serif' } = {}) {
+  const key = [text, w, h, bg, fg, font, size, track, align, border, family].join('|'); if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); } else g.clearRect(0, 0, w, h);
   if (border) { g.strokeStyle = border; g.lineWidth = h * 0.05; g.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1); }
   let fs = Math.floor(h * size); g.fillStyle = fg; g.textBaseline = 'middle';
   const sp = (t) => t.split('').join(String.fromCharCode(8202).repeat(Math.round(track * 10)));
   const txt = track > 0 ? sp(text) : text;
-  g.font = `${font} ${fs}px Helvetica, Arial, sans-serif`; while (g.measureText(txt).width > w * 0.9 && fs > 10) { fs -= 2; g.font = `${font} ${fs}px Helvetica, Arial, sans-serif`; }
+  g.font = `${font} ${fs}px ${family}`; while (g.measureText(txt).width > w * 0.9 && fs > 10) { fs -= 2; g.font = `${font} ${fs}px ${family}`; }
   g.textAlign = align; g.fillText(txt, align === 'left' ? w * 0.05 : align === 'right' ? w * 0.95 : w / 2, h * 0.54);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t;
 }

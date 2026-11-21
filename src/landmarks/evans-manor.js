@@ -5,6 +5,7 @@
 // Massing from the 2021 LiDAR: roof ≈12.5 m, penthouses to ≈16 m.
 import * as THREE from 'three';
 import { Kit, pal, wing, facade, rail, roof } from './lib/b08a-kit.js';
+import { signMat, runSign, shrubRow, fdc, bikeRack, charcoalMat } from './lib/rsw-site.js';
 
 export const info = {
   id: 'evans-manor',
@@ -61,6 +62,25 @@ export async function build(ctx) {
         [west ? 'W' : 'E']: (R) => { const nb = Math.max(1, Math.round(R.L / 3.0)); const out = []; const bw = R.L / nb; for (let i = 0; i < nb; i++) { const c = bw * (i + 0.5); fl.forEach((y) => out.push({ s0: c - 0.75, s1: c + 0.75, y0: y + 0.85, y1: y + 2.4, mull: 1, tran: 0.5 })); } return out; } } });
     K.box(P.trimWhite, Math.min(a0, a1) - 0.5, TOP + 0.1, b0 - 0.5, Math.max(a0, a1) + 0.5, TOP + 0.35, b1 + 0.5);
     colliders.push(K.colPoly([[a0, b0], [a1, b0], [a1, b1], [a0, b1]], -2, TOP + 1));
+  }
+  // refine-south-west: Dwight Way entrance per photos — "Evans Manor" maroon serif letters over reddish-brown glazed double
+  // doors in the recess, pipe handrails at the steps, wall lanterns, iron grilles on the ground-floor windows, FDC, planting
+  { const R = runs.S; const s0 = 5.9, s1 = 8.4, D = 2.0, sc = (s0 + s1) / 2; const dk = charcoalMat(M);
+    const doorF = new THREE.MeshStandardMaterial({ color: 0x7b4b3a, roughness: 0.6 }); doorF.name = 'evansDoor';
+    K.rbox(R, doorF, sc - 0.95, G, -D + 0.02, sc + 0.95, G + 2.55, -D + 0.09);
+    for (const sg of [-1, 1]) K.rbox(R, M.windowNight, sc + sg * 0.47 - 0.33, G + 0.35, -D + 0.09, sc + sg * 0.47 + 0.33, G + 2.2, -D + 0.1, { uvMode: 'keep' });
+    K.rbox(R, M.iron, sc - 0.12, G + 1.0, -D + 0.1, sc - 0.08, G + 1.4, -D + 0.16, { detail: true }); K.rbox(R, M.iron, sc + 0.08, G + 1.0, -D + 0.1, sc + 0.12, G + 1.4, -D + 0.16, { detail: true });
+    runSign(K, R, signMat(M, 'Evans Manor', { bg: null, fg: '#6e2b2b', font: 'bold', size: 0.62, track: 0.02, family: 'Georgia, "Times New Roman", serif' }), sc, G + 2.62, 2.3, 0.4, -D + 0.04);
+    for (const s of [s0 + 0.05, s1 - 0.05]) K.rbox(R, M.lampGlow, s - 0.09, G + 2.3, -0.32, s + 0.09, G + 2.6, -0.2, { detail: true });
+    const g = K.g(...R.at(sc, 1.5));
+    for (const s of [s0 + 0.4, s1 - 0.4]) { K.rbox(R, dk, s - 0.02, G + 0.9, 0.0, s + 0.02, G + 0.94, 0.9, { detail: true }); K.rbox(R, dk, s - 0.02, g, 0.85, s + 0.02, G + 0.94, 0.89, { detail: true }); }
+    // grilles on the street-front ground-floor windows
+    for (const [a, b] of [[1.0, 2.9], [3.7, 4.4], [9.3, 10.0], [10.9, 15.3]]) {
+      for (let x = a + 0.06; x < b - 0.02; x += 0.13) K.rbox(R, dk, x - 0.012, G + 0.8, 0.04, x + 0.012, G + 2.45, 0.065, { detail: true });
+      for (const y of [G + 1.2, G + 2.05]) K.rbox(R, dk, a - 0.03, y - 0.015, 0.035, b + 0.03, y + 0.015, 0.07, { detail: true });
+    }
+    fdc(K, R, 16.2, g);
+    shrubRow(K, R, 0.3, 5.5, 0.7, (ss, dd) => K.g(...R.at(ss, dd)), { r: 0.5, gap: 0.9, seed: 5 }); shrubRow(K, R, 8.9, R.L - 0.3, 0.7, (ss, dd) => K.g(...R.at(ss, dd)), { r: 0.5, gap: 0.95, seed: 9 });
   }
   // rooftop penthouses (stairs / machinery) from the LiDAR
   for (const [a0, a1, b0, b1, h] of [[-6.9, 7.4, -36.3, -32.6, 3.4], [-6.9, 7.4, -22.6, -18.2, 2.9], [1.5, 7.4, -4.6, -1.0, 2.0]]) {

@@ -117,7 +117,7 @@ export function blocks(ctx, S, style = {}) {
     const mFas = charcoalMat(M); K.siteMats = { galv: mFrame, dark: mFas }; const walk = [];
     for (const gr of groundRuns) {
       const { R, len } = gr; const gS = (ss, dd) => K.g(...R.at(ss, dd));
-      if (gr.isEnt) {
+      if (gr.isEnt && site.entrance !== false) {
         const sc = gr.sc, cw = site.canopyW ?? 2.6, cy = F0 + Math.min(sh, 3.1) - 0.05, cd = site.canopyD ?? 2.6;
         // glass double doors with sidelights in an aluminium frame (in front of any storefront glazing)
         K.rbox(R, mWin, sc - 1.5, F0, -0.2, sc + 1.5, cy - 0.15, -0.16);
@@ -138,7 +138,7 @@ export function blocks(ctx, S, style = {}) {
           bins(K, R, sc - cw - 0.2 - 1.6, 0.8, gS(sc - cw - 1.8, 0.8));
           for (const sg of [-1, 1]) { const [lu, lv] = R.at(sc + sg * (cw + 0.8), cd + 1.4); lampPost(K, lu, lv, K.g(lu, lv), 4.2); }
         }
-      } else if (site.plant !== false && len > 4) {
+      } else if (site.plant !== false && len > 4 && !(gr.isEnt && site.entrance !== false)) {
         // foundation planting on part of the other ground runs (near-grade only)
         const gm = gS(len / 2, 0.8); if (Math.abs(gm - F0) < 0.8 && (gr.d + Math.round(len)) % 3 !== 0) shrubRow(K, R, 0.6, len - 0.6, 0.75, gS, { r: 0.5, gap: 1.0, seed: Math.round(len * 7) + gr.d, hexes: [0x4f6b3a, 0x5d7a40, 0x46613a, 0x6a7d48] });
       }
