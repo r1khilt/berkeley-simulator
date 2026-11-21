@@ -285,3 +285,13 @@ export function flatTileMat(key, { tw = 0.33, rh = 0.25, base = 0x8a4a33, vary =
     return [Math.min(255, B[0] * k), Math.min(255, B[1] * k), Math.min(255, B[2] * k), shadow ? 0.1 : 0.4 + fv * 0.4, rough];
   }, { span, rough, normal: 4 });
 }
+// cut-stone / cast-stone ashlar in running bond: blocks bw x ch, alternate courses offset half a block
+export function ashlarMat(key, { bw = 1.2, ch = 0.6, span = 2.4, base = 0xd9d0bd, joint = 0xb3ab98, jw = 0.008, vary = 0.025, grain = 0.015, rough = 0.85 } = {}) {
+  const B = _rgb(base), J = _rgb(joint); const nc = Math.round(span / bw), nr = Math.round(span / ch);
+  return bakeMat(key, (u, v) => {
+    const rv = v * nr; const row = Math.floor(rv); const fv = rv - row; const cu = u * nc + (row % 2) * 0.5; const col = Math.floor(cu); const fu = cu - col;
+    if (fu < jw * nc / span || fv < jw * nr / span) return [...J, 0.2, Math.min(1, rough + 0.1)];
+    const k = 1 + (hash2(col, row, 13) - 0.5) * 2 * vary + (fbm(u * 20, v * 20, 20, 3, 7) - 0.5) * grain * 2;
+    return [Math.min(255, B[0] * k), Math.min(255, B[1] * k), Math.min(255, B[2] * k), 0.55, rough];
+  }, { span, rough, normal: 3 });
+}
