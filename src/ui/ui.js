@@ -42,6 +42,8 @@ export class UI {
     this.fadeEl = $('div', 'fade'); document.body.appendChild(this.fadeEl);
     this._buildTitle(); this._buildHud();
     addEventListener('keydown', (e) => this._onKey(e));
+    // a sheet or the map needs the cursor: if a late pointer-lock request lands while one is open, release it again
+    document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement && (this.panelEl || this.bigmap)) document.exitPointerLock(); });
   }
   on(name, fn) { this.cb[name] = fn; }
   applySettings(s) { if (s.units) this.units = s.units; this.setTheme(s.theme || 'auto'); document.documentElement.classList.toggle('lowfx', s.quality === 'low' || this.isTouch); }
@@ -227,7 +229,7 @@ export class UI {
     c.translate(W / 2, W / 2); if (!north) c.rotate(headingRad); c.scale(S, S);
     const R = (W / S) * 0.72; drawRegion(c, m.canvas, (px - R - m.x0) * m.ppm, (pz - R - m.z0) * m.ppm, 2 * R * m.ppm, 2 * R * m.ppm, -R, -R, 2 * R, 2 * R);
     c.restore();
-    if (this.theme === 'dark') { c.fillStyle = 'rgba(14,17,24,.34)'; c.fillRect(0, 0, W, W); }
+    if (this.theme === 'dark') { c.fillStyle = 'rgba(14,17,24,.5)'; c.fillRect(0, 0, W, W); }
     c.save(); c.translate(W / 2, W / 2);
     const cs = Math.cos(headingRad), sn = Math.sin(headingRad), lim = W / 2 - 8;
     for (const p of m.places || []) {
@@ -381,7 +383,7 @@ export class UI {
   closeMap() { if (!this.bigmap) return; this.bigmap.remove(); this.bigmap = null; removeEventListener('resize', this._mapResize); removeEventListener('keydown', this._mapKey); this.cb.mapClosed?.(); }
   // ---------- sheets & popovers
   panel(html, onBind, opts = {}) {
-    this.closePanel();
+    this.closePanel(true); // replacing a sheet is not "closing" it: don't let the game re-capture the mouse
     const p = $('div', `panel${opts.popover ? ' popover' : ''}${opts.cls ? ' ' + opts.cls : ''}`); p.innerHTML = `<div class="sheet material" role="dialog">${html}</div>`;
     document.body.appendChild(p); this.panelEl = p; this.hint(null);
     document.documentElement.classList.toggle('has-modal', !opts.popover);
@@ -394,7 +396,7 @@ export class UI {
     requestAnimationFrame(() => p.classList.add('in'));
     return p;
   }
-  closePanel() { if (this.panelEl) { const p = this.panelEl; this.panelEl = null; this._timeRefresh = null; p.remove(); document.documentElement.classList.remove('has-modal'); this.cb.panelClosed?.(); } }
+  closePanel(replacing = false) { if (this.panelEl) { const p = this.panelEl; this.panelEl = null; this._timeRefresh = null; p.remove(); document.documentElement.classList.remove('has-modal'); if (!replacing) this.cb.panelClosed?.(); } }
   _onKey(e) {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     if (this.panelEl) { e.preventDefault(); this.closePanel(); } else if (this.bigmap) { e.preventDefault(); if (this._mapSel && this._mapSel()) this._mapUnsel(); else this.closeMap(); }
