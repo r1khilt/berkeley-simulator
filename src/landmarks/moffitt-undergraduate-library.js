@@ -38,9 +38,9 @@ export async function build(ctx) {
   const C = tint(M.concrete, 0xe1dfda, 'mfConc');          // cast-in-place concrete, weathered warm grey (~#a9a69f)
   const CT = tint(M.concrete, 0xddd6cd, 'mfTower');        // the stair towers read a touch warmer
   const CD = tint(M.concrete, 0xaaa8a3, 'mfConcDark');     // soffits, recesses, weathered parapets
-  const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0);
+  const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
   const FR = std(0x3a322b, 'mfBronze', { rough: 0.45, metal: 0.7 });   // dark bronze anodised frames
-  const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0); // shaded podium glazing still catches the sky
+  const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 0.45 } }), 1.0); // shaded podium glazing still catches the sky
   const PG = std(0x3a3633, 'mfPergola', { rough: 0.55, metal: 0.5 });  // dark steel pergola frame
   const GRN = std(0x3d4f2c, 'mfPlant', { rough: 0.95 });
   const WOOD = M.wood;
@@ -91,8 +91,11 @@ export async function build(ctx) {
     const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const [d, y] of pts.slice(1)) sh.lineTo(d, y); sh.lineTo(pts[0][0], pts[0][1]);
     const g = new THREE.ExtrudeGeometry(sh, { depth: s1 - s0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s1, 0, 0); K.addRun(R, mat, g);
   };
+  const GLo = std(0x1f2325, 'mfGlassUnlit', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1 } }); // same by day; dark at night
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const glassStorey = (R, s0, s1, y0, y1, o = {}) => {
-    curtain(K, R, s0, s1, y0, y1, [], { glass: o.glass || GL, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
+    if (o.glass) curtain(K, R, s0, s1, y0, y1, [], { glass: o.glass, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
+    else { const nb = Math.max(1, Math.round((s1 - s0) / 6)); for (let i = 0; i < nb; i++) curtain(K, R, s0 + (s1 - s0) * i / nb, s0 + (s1 - s0) * (i + 1) / nb, y0, y1, [], { glass: rnd() < 0.72 ? GL : GLo, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 }); } // some rooms lit at night
     const n = Math.max(1, Math.round((s1 - s0) / 6)); for (let i = 1; i < n; i++) { const s = s0 + (s1 - s0) * i / n; K.rbox(R, FR, s - 0.07, y0, -0.08, s + 0.07, y1, 0.06); }
     K.rbox(R, FR, s0, y0, -0.1, s1, y0 + 0.12, 0.05); K.rbox(R, CD, s0, y1, -0.3, s1, y1 + 0.45, -0.02); // sill + head/slab edge
   };
@@ -206,7 +209,7 @@ export async function build(ctx) {
     }
     K.rbox(R, M.glassLight, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
     K.rbox(R, C, dA - 0.3, 7.3, -0.25, dB + 0.3, F4 - 0.32, 0.08);     // recessed fascia (~1.2 m) over the doors
-    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#7a6448', metal: 0.25, rough: 0.5, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
+    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#57432c', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
     // continuous concrete sidewalk in front of the doors (flush threshold)
     const SW = tint(M.concrete, 0xfaf7f1, 'mfWalk');
     const ga = Math.max(F3, K.gMax(2.5, GS, 16, GS + 9, 8)) + 0.02;
