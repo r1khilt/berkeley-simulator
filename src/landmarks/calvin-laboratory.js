@@ -34,7 +34,7 @@ export async function build(ctx) {
   const N = 28;                       // bays around the drum (~4.1 m each)
   const rW = rr + 0.1;                // upper drum face
   const rG = rW - 0.6;                // ground-floor wall (set back under the canopy)
-  const yC0 = 4.45, yC1 = 4.75;       // canopy slab underside / top (thin cantilevered ring)
+  const yC0 = 4.1, yC1 = 4.4;         // canopy slab underside / top (thin cantilevered ring)
   const eave = 13.6;                  // top of the drum wall (cornice above)
   const rCan = rG + 3.1, rPier = rG + 2.6;
   const yRing = 16.6, rIn = 9.8;      // light-well ring (kept low so the roof stays hidden behind the eave from the ground)
@@ -52,15 +52,14 @@ export async function build(ctx) {
     // runs go clockwise in (x,z) seen from above (z south) => building on the left, normal outward
     const a = P(rW, k + 1), b = P(rW, k); const R = K.run(a, b); const L = R.L; const sm = L / 2;
     // ---- upper drum: plain render, one tall white-framed window per bay per floor (upper row shorter) ----
-    const w2 = { s0: sm - 0.58, s1: sm + 0.58, y0: 5.6, y1: 8.05, mull: 0, muntins: 3, sillMat: CW, fw: 0.05 };
-    const w3 = { s0: sm - 0.58, s1: sm + 0.58, y0: 9.55, y1: 11.4, mull: 0, muntins: 2, sillMat: CW, fw: 0.05 };
+    const w2 = { s0: sm - 0.65, s1: sm + 0.65, y0: 5.3, y1: 7.95, mull: 0, muntins: 3, sillMat: CW, fw: 0.05 };
+    const w3 = { s0: sm - 0.65, s1: sm + 0.65, y0: 9.3, y1: 11.35, mull: 0, muntins: 2, sillMat: CW, fw: 0.05 };
     K.wall(R, C, 0, L, yC1, eave, [w2, w3], 0.34);
     for (const o of [w2, w3]) K.fill(R, o, { rev: 0.25, frame: SASH, mull: 0 });
     // thick flat pier on every bay line, ending in one scrolled console bracket under the soffit
-    K.rbox(R, CW, -0.3, yC1, -0.05, 0.3, eave - 0.05, 0.4);
-    K.rbox(R, CW, -0.2, eave - 0.55, 0.4, 0.2, eave - 0.05, 0.95);
-    K.rbox(R, CW, -0.2, eave - 0.9, 0.4, 0.2, eave - 0.55, 0.6);
-    { const g = new THREE.CylinderGeometry(0.2, 0.2, 0.4, 12); g.rotateZ(Math.PI / 2); g.translate(0, eave - 0.92, 0.62); K.addRun(R, CW, g); }
+    K.rbox(R, CW, -0.18, yC1, -0.05, 0.18, eave - 0.05, 0.3);                     // slender flat fin, uniform section
+    K.rbox(R, CW, -0.16, eave - 0.45, 0.3, 0.16, eave - 0.05, 0.75);               // scrolled corbel under the soffit
+    { const g = new THREE.CylinderGeometry(0.17, 0.17, 0.32, 12); g.rotateZ(Math.PI / 2); g.translate(0, eave - 0.5, 0.55); K.addRun(R, CW, g); }
     // ---- ground floor: solid render with tall punched windows / entrance doors, recessed under the canopy ----
     const ag = P(rG, k + 1), bg = P(rG, k); const RG = K.run(ag, bg); const Lg = RG.L; const sg = Lg / 2;
     if (doors.has(k)) {
