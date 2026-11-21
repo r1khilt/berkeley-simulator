@@ -545,7 +545,7 @@ export function buildingUse({ name = '', tag = '', style = -1, h = 10, x = 0, z 
 const _irMats = new Map();
 export function interiorGlassMaterial(src) {
   let m = _irMats.get(src.uuid); if (m) return m;
-  m = new THREE.MeshStandardMaterial({ color: src.color ? src.color.clone() : new THREE.Color(0x1b242d), roughness: Math.min(src.roughness ?? 0.1, 0.25), metalness: src.metalness ?? 0.2, envMapIntensity: src.envMapIntensity ?? 1.0, side: src.side });
+  m = new THREE.MeshStandardMaterial({ color: src.color ? src.color.clone() : new THREE.Color(0x1b242d), roughness: Math.min(src.roughness ?? 0.1, 0.25), metalness: src.metalness ?? 0.2, envMapIntensity: (src.envMapIntensity ?? 1.0) * 0.4, side: src.side }); // integration: the physical-sky env (gfx-post) is bright; keep glass from blowing out
   // the room supplies the light behind the glass, so the base is a darker version of the source tint
   m.color.multiplyScalar(0.55);
   m.name = (src.name || 'glass') + ':interior'; m.userData.interiorGlass = true;
@@ -610,10 +610,10 @@ vec3 irGlass(float px) {
      vec3 rdv = normalize(vIrP - vIrC); float ry = -rdv.y;   // reflected ray rises when we look down at the glass
      vec3 sky = mix(uSkyHor * 0.35, mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, ry)), smoothstep(-0.12, 0.08, ry));
      float Fr = mix(0.1, 0.3, smoothstep(0.015, 0.12, irPxL)) + 0.9 * F;   // distant windows read mostly as reflection
-     totalEmissiveRadiance = irE * (1.0 - Fr) * vec3(0.86, 0.9, 0.9) + sky * Fr * 0.75;
+     totalEmissiveRadiance = irE * (1.0 - Fr) * vec3(0.86, 0.9, 0.9) + min(sky, vec3(1.0)) * Fr * 0.3;
    } }`);
   };
-  m.customProgramCacheKey = () => 'irglass-v1-' + IR.level;
+  m.customProgramCacheKey = () => 'irglass-v2-' + IR.level;
   _irMats.set(src.uuid, m);
   return m;
 }
