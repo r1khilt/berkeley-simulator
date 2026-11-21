@@ -78,6 +78,7 @@ async function boot() {
   const sdfI8 = new Int8Array(sdfRes.buffer, sdfRes.byteOffset, N * 4), sdf = new Uint8Array(N * 4);
   if (gt.enc === 'rowdelta64') { for (let ch = 0; ch < 4; ch++) { const o = ch * N; for (let i = 0; i < gt.nz; i++) { let acc = 0; const r = i * gt.nx; for (let j = 0; j < gt.nx; j++) { acc += sdfI8[o + r + j]; sdf[(r + j) * 4 + ch] = Math.min(255, Math.round(acc * 4.0476)); } } } }
   else { const plane = new Float32Array(N); for (let ch = 0; ch < 4; ch++) { decodePlanar(sdfI8.subarray(ch * N, (ch + 1) * N), gt.nx, gt.nz, plane, 1); for (let k = 0; k < N; k++) sdf[k * 4 + ch] = plane[k]; } }
+  BS.groundMask = { sdf, nx: gt.nx, nz: gt.nz, step: gt.step, x0: c.x0, z0: c.z0 }; // [mv-ride] road/sidewalk masks for ride plugins (kerb feel)
   const ax = metaCore.aux, NA = ax.nx * ax.nz; const auxI8 = new Int8Array(auxRes.buffer, auxRes.byteOffset, NA * 2), aux = new Uint8Array(NA * 2);
   { const plane = new Float32Array(NA); for (let ch = 0; ch < 2; ch++) { decodePlanar(auxI8.subarray(ch * NA, (ch + 1) * NA), ax.nx, ax.nz, plane, 1); for (let k = 0; k < NA; k++) aux[k * 2 + ch] = Math.min(255, plane[k] * 4.05); } }
   const mm = metaFar.mid, ff = metaFar.far;

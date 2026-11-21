@@ -503,10 +503,14 @@ export class UI {
       p.querySelector('[data-k=backpack]').addEventListener('change', (e) => onChange('backpack', e.target.checked));
     });
   }
+  // [mv-ride] minimal hook: movement plugins add touch buttons (no-op on desktop until touch controls exist)
+  addTouchButton(label, fn) { (this._extraTouch = this._extraTouch || []).push([label, fn]); if (this.touchEl) this._touchBtn(label, fn); }
+  _touchBtn(label, fn) { const b = document.createElement('button'); b.textContent = label; b.className = 'tb'; b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(b); }); this.touchEl.querySelector('.tbtns').appendChild(b); }
   // ---------- touch controls: joystick (left), jump / run / map (right); modes via the HUD mode bar; tap the prompt to interact
   touchControls(player, actions) {
     const t = $('div', 'touch', `<div class="joy"><b></b></div><div class="tbtns"><button data-a="jump" class="tb" aria-label="Jump">${icon('arrowUp')}</button><button data-a="run" class="tb" aria-label="Run">${icon('chevronsUp')}</button><button data-a="map" class="tb" aria-label="Map">${icon('map')}</button></div>`);
     document.body.appendChild(t); this.touchEl = t;
+    for (const [l, fn] of this._extraTouch || []) this._touchBtn(l, fn); // [mv-ride] plugin buttons queued before touch UI existed
     const joy = t.querySelector('.joy'), knob = joy.querySelector('b'); let jid = null; const R = 48;
     const move = (e) => { if (e.pointerId !== jid) return; const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy); if (l > R) { dx *= R / l; dy *= R / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; player.touch.mx = dx / R; player.touch.my = dy / R; };
     joy.addEventListener('pointerdown', (e) => { jid = e.pointerId; joy.setPointerCapture(jid); joy.classList.add('on'); move(e); });
