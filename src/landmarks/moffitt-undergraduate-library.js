@@ -46,7 +46,7 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const F3 = 4.4, F4 = 8.8, F5 = 13.2, SOF = 16.35, RT = 17.55, TP = 19.6, DECK_E = 8.7, DECK_N = 4.6;
   const GW = -17.2, GN = -17.3, GS = 17.3, GE = 31.5; // glass lines of the main block (deep in shadow behind the balconies)
-  const BP4 = 2.5, BP5 = 3.0, BP = 2.75, RP = 3.85;                           // balcony / roof projection beyond the glass
+  const BP4 = 2.1, BP5 = 2.6, BP = 2.35, RP = 3.85;                           // balcony / roof projection beyond the glass
   const TW = [[-17, -5], [16, 28]];                    // tower spans along u
   const TNv = -23.6, TSv = 22.8;                       // tower outer faces (north / south)
   const PU = -30.5, PS = 25.5, PN = -24.5;             // west podium edges; south walkway edge
@@ -73,8 +73,9 @@ export async function build(ctx) {
     const bn = Math.max(1, Math.round((b - a) / 5.5));
     for (let i = 0; i < bn; i++) { // separate top blocks on short square posts, open gaps between
       const p = a + (b - a) * i / bn + (i ? 0.13 : 0), q = a + (b - a) * (i + 1) / bn - (i < bn - 1 ? 0.13 : 0);
-      for (const f of [0.18, 0.5, 0.82]) { const s = p + (q - p) * f; K.rbox(R, C, s - 0.15, yF + 0.55, BP - 0.32, s + 0.15, yF + 0.8, BP - 0.04, { detail: true }); }
-      K.rbox(R, C, p, yF + 0.8, BP - 0.4, q, yF + 1.3, BP + 0.03);
+      const up = yF > F4 + 1, yT = up ? yF + 0.98 : yF + 0.8;          // the top tier's balustrade is lighter and more open
+      for (const f of (up ? [0.1, 0.3, 0.5, 0.7, 0.9] : [0.18, 0.5, 0.82])) { const s = p + (q - p) * f; K.rbox(R, C, s - 0.13, yF + 0.55, BP - 0.3, s + 0.13, yT, BP - 0.05, { detail: true }); }
+      K.rbox(R, C, p, yT, BP - 0.38, q, up ? yT + 0.36 : yF + 1.3, BP + 0.03);
     }
     const ent = R === RS && yF < F4 + 1 && s0 > 5;                  // plain square beam ends over the entrance
     beams(R, s0, s1, yF - 0.32, BP - 0.36, ent ? 0.5 : 0.62, ent ? 0.5 : 0.45, 6, 0.4);
