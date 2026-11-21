@@ -144,16 +144,16 @@ function bakeAshlar(ga, gn, S, outS) {
   const jw = 0.006 * N / 2; // joint half-width in px (~6 mm)
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const um = x / N * 2, vm = (N - 1 - y) / N * 2; // metres in the tile (v up; canvas row 0 = top)
-    const CH = 2 / 3; const row = Math.floor(vm / CH), off = (row % 2) * 0.5; const ub = um + off, col = Math.floor(ub);
+    const CH = 1.0, BL = 2.0; const row = Math.floor(vm / CH), off = (row % 2) * 0.5; const ub = um / BL + off, col = Math.floor(ub); // large ashlar: 2.0 x 1.0 m
     const fu = ub - col, fv = vm / CH - row;
-    const dx = Math.min(fu, 1 - fu) * 1.0, dy = Math.min(fv, 1 - fv) * CH; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
+    const dx = Math.min(fu, 1 - fu) * BL, dy = Math.min(fv, 1 - fv) * CH; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
     // per-block texture offset so neighbouring blocks never show the same grain
     const ox = Math.floor(h(col, row) * S), oy = Math.floor(h(row, col + 7) * S);
     const sx = (Math.floor(x * S * 4 / N) + ox) % S, sy = (Math.floor(y * S * 4 / N) + oy) % S; /* granite set = 0.45 m -> ~0.5 m grain period */ const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
     const tone = 1.0;
     const j = Math.max(0, Math.min(1, (jw + 1.2 - d) / 2.4)); // 1 in the joint
     const bev = Math.max(0, Math.min(1, (d - jw) / (jw * 2.5)));
-    const k = (1 - j) * tone * (0.95 + 0.05 * bev) + j * 0.8;
+    const k = (1 - j) * tone * (0.96 + 0.04 * bev) + j * 0.9; // tight, nearly invisible joints
     a[i] = ga[si] * k; a[i + 1] = ga[si + 1] * k; a[i + 2] = ga[si + 2] * (k * 0.99); a[i + 3] = 255;
     // normal: granite detail, plus bevel slopes facing out of the joint
     let nx = (gn[si] / 127.5 - 1) * 0.8, ny = (gn[si + 1] / 127.5 - 1) * 0.8;
@@ -221,7 +221,7 @@ export function pbrWeather(mat) {
    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.64, 0.6, 0.54) + vec3(0.01, 0.008, 0.006), grW * 0.6);
    diffuseColor.rgb *= 0.95 + 0.1 * texture(uNoiseW, vWPW.xz * 0.011 + vWPW.y * 0.004).r;
    #ifdef PBR_ASHLAR
-   { vec2 bu = vMapUv * vec2(2.0, 3.0); float rw = floor(bu.y); vec2 cell = vec2(floor(bu.x + mod(rw, 2.0) * 0.5), rw);
+   { vec2 bu = vMapUv * vec2(1.0, 2.0); float rw = floor(bu.y); vec2 cell = vec2(floor(bu.x + mod(rw, 2.0) * 0.5), rw);
      vec3 p3 = fract(vec3(cell.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); float hb = fract((p3.x + p3.y) * p3.z);
      diffuseColor.rgb *= 0.965 + 0.06 * hb; }
    #endif
