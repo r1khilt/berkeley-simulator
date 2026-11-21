@@ -14,6 +14,7 @@
 // tops and returns no holes, for engines without the terrainHoles hook.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
+import { shrubMat, tintGeo, blobGeo } from './lib/rsw-site.js';
 
 const UNDERGROUND_WALKABLE = true;
 
@@ -53,8 +54,8 @@ export async function build(ctx) {
   const colliders = [], walkables = [], holes = [];
   // ---------- local materials ----------
   const alu = new THREE.MeshStandardMaterial({ color: 0xb4b8ba, roughness: 0.38, metalness: 0.75 }); alu.name = 'bartAlu';
-  const steelW = new THREE.MeshStandardMaterial({ color: 0xe2e4e3, roughness: 0.45, metalness: 0.25 }); steelW.name = 'bartWhiteSteel';
-  const shellGlass = new THREE.MeshStandardMaterial({ color: 0xdde3e6, roughness: 0.22, metalness: 0.05, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.3 }); shellGlass.name = 'bartGlass';
+  const steelW = new THREE.MeshStandardMaterial({ color: 0xc9cdcf, roughness: 0.38, metalness: 0.35 }); steelW.name = 'bartSilverSteel'; // refine-south-west: silver ribs per photos
+  const shellGlass = new THREE.MeshStandardMaterial({ color: 0xd2dee0, roughness: 0.04, metalness: 0.15, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.3 }); shellGlass.name = 'bartGlass';
   const hoodGlass = new THREE.MeshStandardMaterial({ color: 0xcfe0e2, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.4 }); hoodGlass.name = 'bartHoodGlass';
   const sideGlass = new THREE.MeshStandardMaterial({ color: 0xb9cccc, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.58, envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false }); sideGlass.name = 'bartSideGlass';
   const parapet = M.concrete.clone(); parapet.color.set(0xd0cdc6); parapet.name = 'bartParapet';
@@ -79,6 +80,23 @@ export async function build(ctx) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
   const bandMat = new THREE.MeshStandardMaterial({ map: bandTex, roughness: 0.45, metalness: 0.2 }); bandMat.name = 'bartBand';
   const portalMat = new THREE.MeshBasicMaterial({ colorWrite: false }); portalMat.name = 'bartPortal';
+  // refine-south-west: plaza pavers (0.1 x 0.33 m running bond along Shattuck, four greys), charcoal café furniture,
+  // dark portal sign band with the station name in white
+  const paverTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 1024; const g = c.getContext('2d'); const tones = ['#a7a7a2', '#bdbcb6', '#93948f', '#d0cfc8', '#b0b0aa'];
+    let sd = 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; }; const cw = 1024 / 20, rh = 1024 / 6;
+    g.fillStyle = '#82837e'; g.fillRect(0, 0, 1024, 1024);
+    for (let i = 0; i < 20; i++) { const off = (i % 2) * rh / 2; for (let j = -1; j < 7; j++) { const r = rnd(); g.fillStyle = r < 0.4 ? tones[0] : r < 0.7 ? tones[1] : r < 0.9 ? tones[2] : tones[3]; g.fillRect(i * cw + 2, j * rh + off + 2, cw - 4, rh - 4);
+      g.fillStyle = 'rgba(255,255,255,' + (rnd() * 0.06).toFixed(3) + ')'; g.fillRect(i * cw + 2, j * rh + off + 2, cw - 4, rh - 4); } }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t; })();
+  const paver = new THREE.MeshStandardMaterial({ map: paverTex, roughness: 0.86, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); paver.name = 'bartPavers';
+  const cafeM = new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.5, metalness: 0.4 }); cafeM.name = 'bartCafe';
+  const woodTop = M.wood;
+  const portalSign = (() => { const c = document.createElement('canvas'); c.width = 1536; c.height = 160; const g = c.getContext('2d');
+    g.fillStyle = '#383b3e'; g.fillRect(0, 0, 1536, 160);
+    g.fillStyle = '#0099d8'; g.fillRect(40, 22, 116, 116); g.fillStyle = '#ffffff'; g.font = 'bold 96px Helvetica, Arial, sans-serif'; g.textBaseline = 'alphabetic'; g.fillText('b', 52, 118); g.fillText('a', 100, 118);
+    g.font = 'bold 92px Helvetica, Arial, sans-serif'; g.fillStyle = '#ffffff'; g.textBaseline = 'middle'; g.fillText('Downtown Berkeley', 196, 84);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
+  const portalSignMat = new THREE.MeshStandardMaterial({ map: portalSign, roughness: 0.45, metalness: 0.2 }); portalSignMat.name = 'bartPortalSign';
   const yellowM = new THREE.MeshStandardMaterial({ color: 0xf2b90f, roughness: 0.6, emissive: 0x3a2a00 }); yellowM.name = 'bartEdge';
   const darkWall = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.8 }); darkWall.name = 'bartTunnel';
   const trainM = new THREE.MeshStandardMaterial({ color: 0xd9dadb, roughness: 0.35, metalness: 0.7, emissive: 0x202020 }); trainM.name = 'bartTrain';
@@ -223,7 +241,7 @@ export async function build(ctx) {
     K.add(shellGlass, triGeo(pos)); }
   const beamAlong = (kit, mat, pts, w, h, opts) => { for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1]; const dxv = b[0] - a[0], dyv = b[1] - a[1], dzv = b[2] - a[2]; const L = Math.hypot(dxv, dyv, dzv); if (L < 1e-3) continue;
     const g = new THREE.BoxGeometry(w, h, L + 0.03); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(dxv / L, dyv / L, dzv / L)); g.applyQuaternion(q); g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - h / 2, (a[2] + b[2]) / 2); kit.add(mat, g, opts); } };
-  for (let k = 0; k <= 8; k++) { const z = ZN + (ZS - ZN - 0.05) * k / 8; const xa = xW(z), xb = xE(z); const pts = []; for (let i = 0; i <= 16; i++) { const x = xa + (xb - xa) * i / 16; pts.push([x, hS(x) - 0.03, z]); } beamAlong(K, steelW, pts, 0.14, 0.24); }
+  for (let k = 0; k <= 10; k++) { const z = ZN + (ZS - ZN - 0.05) * k / 10; const xa = xW(z), xb = xE(z); const pts = []; for (let i = 0; i <= 16; i++) { const x = xa + (xb - xa) * i / 16; pts.push([x, hS(x) - 0.03, z]); } beamAlong(K, steelW, pts, 0.09, 0.3); }
   { const se = []; for (let i = 0; i <= 12; i++) { const z = 11.5 + (ZS - 11.5) * i / 12; const x = xE(z); se.push([x, hS(x) - 0.02, z]); } beamAlong(K, steelW, se, 0.2, 0.26);
     beamAlong(K, steelW, WEST.map(([z, x]) => [x, hS(x) - 0.02, z]), 0.22, 0.32);
     const ne = []; for (let i = 0; i <= 16; i++) { const x = -1.2 + (XE + 1.2) * i / 16; ne.push([x, hS(x) - 0.02, ZN]); } beamAlong(K, steelW, ne, 0.2, 0.26); }
@@ -238,6 +256,19 @@ export async function build(ctx) {
       beamAlong(K, steelW, [[xa, gM + 0.15, ZN], [xm, hS(xm) - 0.3, ZN]], 0.06, 0.06); beamAlong(K, steelW, [[xb, gM + 0.15, ZN], [xm, hS(xm) - 0.3, ZN]], 0.06, 0.06); }
     K.box(parapet, -1.3, gM - 0.4, ZN - 0.18, XE + 0.3, gM + 0.12, ZN + 0.18);
     colliders.push({ type: 'poly', pts: [[-1.3, ZN - 0.18], [XE + 0.3, ZN - 0.18], [XE + 0.3, ZN + 0.18], [-1.3, ZN + 0.18]], y0: gM - 1, y1: gM + 5 });
+  }
+  // refine-south-west: boarding-side portal (photos: two raked box legs carrying a deep header with the dark station-name band)
+  { const zA = 4.75, zB = 12.6; const yTop = hS(-1) - 0.32, yBot = yTop - 0.85;
+    const seg = WEST.filter(([z]) => z >= zA - 0.01 && z <= zB + 0.01); const pts = [[xW(zA), zA], ...seg.map(([z, x]) => [x, z]), [xW(zB), zB]];
+    for (let i = 0; i < pts.length - 1; i++) { const [xa, za] = pts[i], [xb, zb] = pts[i + 1]; const L = Math.hypot(xb - xa, zb - za); if (L < 0.05) continue;
+      const g = new THREE.BoxGeometry(0.34, yTop - yBot, L + 0.04); g.rotateY(Math.atan2(xb - xa, zb - za)); g.translate((xa + xb) / 2 + 0.05, (yTop + yBot) / 2, (za + zb) / 2); K.add(steelW, g); }
+    // station-name band mounted flush on the header face: two panels, one per header segment either side of the bow
+    { const segs = [[6.05, 8.0], [8.0, 10.45]];
+      segs.forEach(([za, zb], k) => { const xa = xW(za) + 0.05 - 0.19, xb = xW(zb) + 0.05 - 0.19; const L = Math.hypot(xb - xa, zb - za);
+        const pg = new THREE.PlaneGeometry(L, 0.56); const uv = pg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, k * 0.5 + uv.getX(i) * 0.5);
+        pg.rotateY(-Math.PI / 2 + Math.atan2(xb - xa, zb - za)); pg.translate((xa + xb) / 2, yBot + 0.43, (za + zb) / 2); K.add(portalSignMat, pg, { uvMode: 'keep' }); }); }
+    for (const [z, lean] of [[zA + 0.12, -1], [zB - 0.12, 1]]) { const x = xW(z) + 0.1; const top = [x - 0.05, yBot, z + lean * 0.35], bot = [x + 0.15, gM - 0.3, z];
+      beamAlong(K, steelW, [top, bot], 0.26, 0.26); colliders.push({ type: 'cyl', x: x + 0.1, z, r: 0.22, y0: gM - 1, y1: gM + 5 }); }
   }
   // footing curb on the Shattuck side, slender columns at the high (plaza) edge
   K.box(parapet, XE - 0.15, gM - 0.4, ZN, XE + 0.35, hS(XE) + 0.05, 11.7);
@@ -269,6 +300,15 @@ export async function build(ctx) {
     for (let k = 0; k < 26; k++) { const f = k / 26; const x = xs + (xe - xs) * f; KU.box(M.iron, x, gM - DEPTH * f - 0.12, z0 + 0.25, x + 0.05, gM - DEPTH * f + 0.02, z1 - 0.25); }
     KU.box(M.iron, OX0 + 0.3, gM - 0.12, z0 + 0.25, xs, gM - 0.02, z1 - 0.25); KU.box(M.iron, xe, yC - 0.12, z0 + 0.25, xe + 1.2, yC - 0.02, z1 - 0.25);
     for (const zb of [z0 + 0.12, z1 - 0.12]) { mk(shellGlass, zb - 0.01, zb + 0.01, 0.55, 0.9); mk(M.blackPaint, zb - 0.05, zb + 0.05, 1.02, 0.08); }
+  }
+  // refine-south-west: escalator heads at street level (glass balustrades with black handrails and steel skirts curving
+  // over at the newel), so the escalators read through the portal like the photos
+  for (const [z0, z1] of [[5.25, 6.85], [9.75, 11.35]]) for (const zb of [z0 + 0.1, z1 - 0.1]) {
+    const xa = OX0 + 0.15, xb = OX0 + 1.9; // flat landing run, then the panel follows the incline down
+    K.box(hoodGlass, xa + 0.35, gM + 0.12, zb - 0.012, xb, gM + 0.98, zb + 0.012);
+    K.box(M.blackPaint, xa + 0.35, gM + 0.98, zb - 0.045, xb, gM + 1.06, zb + 0.045);
+    K.box(alu, xa + 0.2, gM, zb - 0.06, xb, gM + 0.14, zb + 0.06);
+    { const g = new THREE.CylinderGeometry(0.42, 0.42, 0.09, 18, 1, false, 0, Math.PI); g.rotateX(Math.PI / 2); g.rotateZ(Math.PI / 2); g.translate(xa + 0.6, gM + 0.6, zb); K.add(M.blackPaint, g, { uvMode: 'keep' }); }
   }
   // light-well walls (opening sides), the beam under Shattuck, solid under the stairs
   KU.box(parapet, OX0 - 0.3, yCe, OZ0 - 0.3, XE, gM - 0.03, OZ0);
@@ -365,22 +405,28 @@ export async function build(ctx) {
       const rects = []; const ox0 = Math.max(x, OX0), ox1 = Math.min(x + 1, XE), oz0 = Math.max(z, OZ0), oz1 = Math.min(z + 1, OZ1);
       if (ox0 >= ox1 || oz0 >= oz1) rects.push([x, z, x + 1, z + 1]);
       else { if (ox0 > x) rects.push([x, z, ox0, z + 1]); if (ox1 < x + 1) rects.push([ox1, z, x + 1, z + 1]); if (oz0 > z) rects.push([ox0, z, ox1, oz0]); if (oz1 < z + 1) rects.push([ox0, oz1, ox1, z + 1]); }
-      for (const [ax, az, bx, bz] of rects) { const a = [ax, groundAt(ax, az) + 0.03, az], b = [bx, groundAt(bx, az) + 0.03, az], c = [bx, groundAt(bx, bz) + 0.03, bz], d = [ax, groundAt(ax, bz) + 0.03, bz];
+      for (const [ax, az, bx, bz] of rects) { const a = [ax, groundAt(ax, az) + 0.07, az], b = [bx, groundAt(bx, az) + 0.07, az], c = [bx, groundAt(bx, bz) + 0.07, bz], d = [ax, groundAt(ax, bz) + 0.07, bz];
         pos.push(...a, ...d, ...c, ...a, ...c, ...b); }
     }
-    K.add(apron, triGeo(pos)); }
+    K.add(paver, triGeo(pos)); }
   for (const [x0, z0, x1, z1] of [[9.4, 17.5, 11.2, 24.5], [9.4, 26.5, 11.2, 33.5], [-5.6, 18.0, -3.8, 25.0], [-0.5, -5.0, 6.5, -3.4]]) {
     const g = groundAt((x0 + x1) / 2, (z0 + z1) / 2);
-    K.box(parapet, x0, g - 0.3, z0, x1, g + 0.15, z1);
-    K.box(M.soil, x0 + 0.1, g + 0.05, z0 + 0.1, x1 - 0.1, g + 0.13, z1 - 0.1);
-    for (const [a, b] of [[[x0 - 0.2, z0 - 0.2], [x1 + 0.2, z0 - 0.2]], [[x1 + 0.2, z0 - 0.2], [x1 + 0.2, z1 + 0.2]], [[x1 + 0.2, z1 + 0.2], [x0 - 0.2, z1 + 0.2]], [[x0 - 0.2, z1 + 0.2], [x0 - 0.2, z0 - 0.2]]]) { K.box(alu, Math.min(a[0], b[0]) - 0.02, g + 0.46, Math.min(a[1], b[1]) - 0.02, Math.max(a[0], b[0]) + 0.02, g + 0.5, Math.max(a[1], b[1]) + 0.02); const L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let k = 0; k <= L; k += 1.2) { const px = a[0] + (b[0] - a[0]) * k / L, pz = a[1] + (b[1] - a[1]) * k / L; K.box(alu, px - 0.02, g, pz - 0.02, px + 0.02, g + 0.5, pz + 0.02); } }
-    const n = Math.round((Math.max(x1 - x0, z1 - z0)) * 1.6);
-    for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, r = (k * 0.618) % 1; const long = (z1 - z0) > (x1 - x0); const px = long ? x0 + 0.35 + r * (x1 - x0 - 0.7) : x0 + 0.3 + f * (x1 - x0 - 0.6), pz = long ? z0 + 0.3 + f * (z1 - z0 - 0.6) : z0 + 0.35 + r * (z1 - z0 - 0.7); K.cyl(plant, px, g + 0.12, pz, 0.36, 0.22, 0.35 + (k % 3) * 0.1, 7); }
-    colliders.push({ type: 'poly', pts: [[x0 - 0.2, z0 - 0.2], [x1 + 0.2, z0 - 0.2], [x1 + 0.2, z1 + 0.2], [x0 - 0.2, z1 + 0.2]], y0: g - 1, y1: g + 0.6 });
+    // refine-south-west: low concrete planter walls (0.45 m) with a slatted wood bench top along the long sides, planted with
+    // grasses and low shrubs (photos), replacing the hoop-rail enclosures
+    const long = (z1 - z0) > (x1 - x0);
+    K.box(parapet, x0 - 0.2, g - 0.4, z0 - 0.2, x1 + 0.2, g + 0.45, z0); K.box(parapet, x0 - 0.2, g - 0.4, z1, x1 + 0.2, g + 0.45, z1 + 0.2);
+    K.box(parapet, x0 - 0.2, g - 0.4, z0, x0, g + 0.45, z1); K.box(parapet, x1, g - 0.4, z0, x1 + 0.2, g + 0.45, z1);
+    K.box(M.soil, x0, g + 0.1, z0, x1, g + 0.36, z1);
+    for (let k = 0; k < 5; k++) { if (long) K.box(woodTop, x1 + 0.02 + k * 0.1, g + 0.45, z0 + 0.3, x1 + 0.1 + k * 0.1, g + 0.5, z1 - 0.3); else K.box(woodTop, x0 + 0.3, g + 0.45, z0 - 0.62 + k * 0.1, x1 - 0.3, g + 0.5, z0 - 0.54 + k * 0.1); }
+    if (long) { K.box(parapet, x1 + 0.2, g - 0.4, z0 + 0.3, x1 + 0.55, g + 0.45, z1 - 0.3); } else { K.box(parapet, x0 + 0.3, g - 0.4, z0 - 0.55, x1 - 0.3, g + 0.45, z0 - 0.2); }
+    { const n = Math.round(Math.max(x1 - x0, z1 - z0) * 1.3); const hx = [0x6f7d45, 0x55703c, 0x8a8a52, 0x4c6436];
+      for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, r = (k * 0.618) % 1; const px = long ? x0 + 0.35 + r * (x1 - x0 - 0.7) : x0 + 0.3 + f * (x1 - x0 - 0.6), pz = long ? z0 + 0.3 + f * (z1 - z0 - 0.6) : z0 + 0.35 + r * (z1 - z0 - 0.7);
+        const rr = 0.32 + (k % 3) * 0.08; const gb = tintGeo(blobGeo(rr, k * 31 + 5), hx[k % hx.length]); gb.scale(1, k % 2 ? 1.25 : 0.85, 1); gb.translate(px, g + 0.36 + rr * 0.4, pz); K.add(shrubMat(M), gb, { uvMode: 'keep', detail: true }); } }
+    { const ex = long ? [x0 - 0.2, z0 - 0.2, x1 + 0.55, z1 + 0.2] : [x0 - 0.2, z0 - 0.55, x1 + 0.2, z1 + 0.2]; colliders.push({ type: 'poly', pts: [[ex[0], ex[1]], [ex[2], ex[1]], [ex[2], ex[3]], [ex[0], ex[3]]], y0: g - 1, y1: g + 0.5 }); }
   }
   for (const [x, z] of [[-2.0, 21.0], [0.4, 23.6], [-2.6, 26.2], [1.2, 28.4], [4.0, 21.8]]) { const g = groundAt(x, z);
-    K.cyl(red, x, g + 0.71, z, 0.33, 0.33, 0.03, 14); K.cyl(M.iron, x, g, z, 0.04, 0.04, 0.72, 6); K.cyl(M.iron, x, g, z, 0.25, 0.25, 0.02, 10);
-    for (const a of [0.4, 2.5, 4.6]) { const cx = x + Math.cos(a) * 0.62, cz = z + Math.sin(a) * 0.62; K.box(red, cx - 0.21, g + 0.44, cz - 0.21, cx + 0.21, g + 0.47, cz + 0.21); K.obox(red, cx + Math.cos(a) * 0.2, g + 0.68, cz + Math.sin(a) * 0.2, 0.42, 0.42, 0.03, -a + Math.PI / 2); for (const [ox, oz] of [[-0.17, -0.17], [0.17, -0.17], [0.17, 0.17], [-0.17, 0.17]]) K.box(red, cx + ox - 0.012, g, cz + oz - 0.012, cx + ox + 0.012, g + 0.45, cz + oz + 0.012); }
+    K.cyl(cafeM, x, g + 0.71, z, 0.33, 0.33, 0.03, 14); K.cyl(M.iron, x, g, z, 0.04, 0.04, 0.72, 6); K.cyl(M.iron, x, g, z, 0.25, 0.25, 0.02, 10);
+    for (const a of [0.4, 2.5, 4.6]) { const cx = x + Math.cos(a) * 0.62, cz = z + Math.sin(a) * 0.62; K.box(cafeM, cx - 0.21, g + 0.44, cz - 0.21, cx + 0.21, g + 0.47, cz + 0.21); K.obox(cafeM, cx + Math.cos(a) * 0.2, g + 0.68, cz + Math.sin(a) * 0.2, 0.42, 0.42, 0.03, -a + Math.PI / 2); for (const [ox, oz] of [[-0.17, -0.17], [0.17, -0.17], [0.17, 0.17], [-0.17, 0.17]]) K.box(cafeM, cx + ox - 0.012, g, cz + oz - 0.012, cx + ox + 0.012, g + 0.45, cz + oz + 0.012); }
     colliders.push({ type: 'cyl', x, z, r: 0.95, y0: g - 1, y1: g + 0.8 }); }
   { // perforated bronze globe on a tilted axis, low round plinth
     const x = 3.6, z = 1.2, g = groundAt(x, z);
@@ -392,7 +438,8 @@ export async function build(ctx) {
     colliders.push({ type: 'cyl', x, z, r: 1.3, y0: g - 1, y1: g + 3.5 });
   }
   for (const [x, z] of [[-6.0, 0.2], [8.2, -1.0], [12.6, 17.0], [12.8, 30.5]]) { const g = groundAt(x, z); K.box(alu, x - 0.125, g, z - 0.125, x + 0.125, g + 8.0, z + 0.125);
-    for (const [ax, az, hy] of [[1, 0, 7.4], [-0.5, 0.86, 6.8], [-0.5, -0.86, 7.1]]) { K.box(alu, x + Math.min(0, ax * 0.9) - 0.04, g + hy, z + Math.min(0, az * 0.9) - 0.04, x + Math.max(0, ax * 0.9) + 0.04, g + hy + 0.08, z + Math.max(0, az * 0.9) + 0.04); K.box(M.lampGlow, x + ax * 0.9 - 0.16, g + hy - 0.12, z + az * 0.9 - 0.12, x + ax * 0.9 + 0.16, g + hy, z + az * 0.9 + 0.12); }
+    K.box(alu, x - 0.95, g + 7.3, z - 0.04, x + 0.95, g + 7.38, z + 0.04);
+    for (const ax of [-0.9, 0.9]) { K.box(alu, x + ax - 0.03, g + 7.38, z - 0.03, x + ax + 0.03, g + 7.5, z + 0.03); const sg = new THREE.SphereGeometry(0.26, 14, 10); sg.translate(x + ax, g + 7.74, z); K.add(M.lampGlow, sg, { uvMode: 'keep' }); K.cyl(alu, x + ax, g + 7.98, z, 0.06, 0.12, 0.08, 10); }
     colliders.push({ type: 'cyl', x, z, r: 0.18, y0: g - 1, y1: g + 8 }); }
   { // tall BART pylon on the plaza corner (Center St side)
     const x = 11.6, z = 1.6, g = groundAt(x, z);
