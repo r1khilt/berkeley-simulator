@@ -18,7 +18,7 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.7);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
   const CON = new THREE.MeshStandardMaterial({ color: 0xcdbfb2, roughness: 0.92, map: B.precast.map, normalMap: B.precast.normalMap, roughnessMap: B.precast.roughnessMap }); // warm taupe board-formed
-  const WING = new THREE.MeshStandardMaterial({ color: 0xb09a8a, roughness: 0.9, map: B.brickBuff.map, normalMap: B.brickBuff.normalMap }); const BASEC = new THREE.MeshStandardMaterial({ color: 0xcfc6bd, roughness: 0.9 });
+  const WING = new THREE.MeshStandardMaterial({ color: 0xbfae9f, roughness: 0.92, map: B.precast.map, normalMap: B.precast.normalMap, roughnessMap: B.precast.roughnessMap }); /* same rendered slab, a shade darker */ const BASEC = new THREE.MeshStandardMaterial({ color: 0xcfc6bd, roughness: 0.9 });
   const GL = M.windowNight, FR = new THREE.MeshStandardMaterial({ color: 0x5e6e66, roughness: 0.5, metalness: 0.4 });
   const SPAN = new THREE.MeshStandardMaterial({ color: 0x8fa88a, roughness: 0.6, metalness: 0.1 });
   const colliders = [];
@@ -33,7 +33,7 @@ export async function build(ctx) {
     const g0 = Math.min(gAt(K, R, 0, 0.6), gAt(K, R, R.L, 0.6)); K.rbox(R, BASEC, -0.03, g0 - 0.5, -0.05, R.L + 0.03, Math.max(g0 + 0.9, 0.9), 0.06); }
   // taller west service strip and south end block (~20 m), with fewer, smaller windows
   for (const r of [rect(u0, v0, -4.2, v1), rect(-4.2, 17.0, u1, v1)]) {
-    massBlock(K, { poly: r, levels: [-1.5, 0.3, 6.2, 12.2, 19.8], top: 19.8, wall: WING, style: 'ribbon', depth: 0.35, rev: 0.25, glass: GL, frame: FR, win: { sill: 1.6, h: 3.0, mw: 1.5, edge: 0.6 }, roof: B.roofMembrane, parapet: 0.5, pmat: CON, coping: FR, floorBand: { mat: CON, h: 0.4, p: 0.12 } });
+    massBlock(K, { poly: r, levels: [-1.5, 0.3, 6.2, 12.2, 19.8], top: 19.8, wall: WING, style: 'punched', depth: 0.4, rev: 0.28, glass: GL, frame: FR, win: { w: 2.4, h: 1.9, sill: 1.6, bay: 7.0, mull: 2, tran: 0.5 }, roof: B.roofMembrane, parapet: 0.3, pmat: WING, coping: FR });
   }
   { const R = runs.find((r) => r.n[0] > 0.9); if (R) { const s = R.L * 0.5, gy = Math.max(gAt(K, R, s, 1.5), -1);
     K.rbox(R, M.concreteDark, s - 2.2, gy, -0.6, s + 2.2, gy + 3.3, -0.05); storefront(K, R, s - 2.0, s + 2.0, gy + 0.03, gy + 3.0, { glass: GL, frame: FR, rev: 0.6, transom: gy + 2.4 });
