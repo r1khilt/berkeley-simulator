@@ -63,6 +63,20 @@ export function normSpecs(o, seen = new Set()) {
   const out = {}; for (const [k, v] of Object.entries(o)) out[k] = typeof v === 'function' ? v : normSpecs(v, seen); return out;
 }
 
+function ctorus(list, c, R, r, m4) {
+  const g = new THREE.TorusGeometry(R, r, 4, 14).toNonIndexed(); g.applyMatrix4(m4);
+  const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); list.push(g); return g;
+}
+// a bicycle standing on the ground at (u,gy,v) in the building frame, frame plane along direction ang (radians in the u-v plane)
+function bike(list, u, gy, v, ang, hex) {
+  const c = col(hex), tyre = col('#1a1a1a'); const m = new THREE.Matrix4(); const rot = new THREE.Matrix4().makeRotationY(-ang);
+  for (const dx of [-0.52, 0.52]) { m.makeTranslation(dx, 0.34, 0); ctorus(list, tyre, 0.32, 0.03, new THREE.Matrix4().makeTranslation(u, gy, v).multiply(rot).multiply(m)); }
+  const tube = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0); const g = new THREE.CylinderGeometry(0.018, 0.018, L, 5).toNonIndexed(); g.rotateZ(Math.atan2(y1 - y0, x1 - x0) - Math.PI / 2); g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0); g.applyMatrix4(new THREE.Matrix4().makeRotationY(-ang)); g.translate(u, gy, v); const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); list.push(g); };
+  tube(-0.52, 0.34, -0.05, 0.36); tube(-0.05, 0.36, 0.38, 0.78); tube(-0.05, 0.36, -0.12, 0.84); tube(-0.12, 0.84, 0.36, 0.8); tube(0.38, 0.78, 0.52, 0.34); tube(-0.52, 0.34, -0.12, 0.84);
+  tube(0.36, 0.8, 0.33, 1.0); tube(0.22, 1.0, 0.46, 1.0); tube(-0.18, 0.88, -0.06, 0.88);
+}
+
 export function rseHouse(ctx, S0, F = {}) {
   const S = F.rawColors ? S0 : normSpecs(S0);
   const S2 = Object.assign({}, S, {
@@ -196,6 +210,25 @@ export function finishPass(api, S, F) {
       const g = new THREE.PlaneGeometry(w, h); g.translate(s, y, 0.02); g.applyMatrix4(R.m); K.add(pm, g, { uvMode: 'keep' });
     }
   }
+  // ---------------- porch life: a couch on deep porches, a ceiling lamp, bikes by the entry ----------------
+  try {
+    const pal = ['#5b4a3a', '#3d4a5c', '#6b3b33', '#7a7468', '#4b5a3a']; let pk = (S.ang ? Math.abs(Math.round(S.ang * 7)) : 3);
+    for (const p of porches) {
+      const b = blocks[p.block]; if (!b) continue; const R = faceRun(b, p.face); const dp = p.depth ?? 2.4; const deck = p.deck ?? b.f0 - 0.05; const top = p.top ?? (deck + 2.9);
+      if (F.couch !== false && dp >= 1.5 && p.s1 - p.s0 >= 3.2) {
+        const cc = col(pal[(pk++) % pal.length]); const s0 = p.s0 + 0.45, s1 = Math.min(p.s1 - 0.5, s0 + 1.9);
+        const P0 = R.at(s0, 0.3), P1 = R.at(s1, 1.05); const uu = [P0[0], P1[0]].sort((a, c) => a - c), vv = [P0[1], P1[1]].sort((a, c) => a - c);
+        cbox(props, cc, uu[0], deck, vv[0], uu[1], deck + 0.45, vv[1]); // seat
+        const B0 = R.at(s0, 0.3), B1 = R.at(s1, 0.5); const bu = [B0[0], B1[0]].sort((a, c) => a - c), bv = [B0[1], B1[1]].sort((a, c) => a - c); cbox(props, cc.clone().multiplyScalar(0.85), bu[0], deck + 0.45, bv[0], bu[1], deck + 0.9, bv[1]); // back
+        for (const s of [s0, s1 - 0.18]) { const A0 = R.at(s, 0.3), A1 = R.at(s + 0.18, 1.05); cbox(props, cc.clone().multiplyScalar(0.9), Math.min(A0[0], A1[0]), deck + 0.45, Math.min(A0[1], A1[1]), Math.max(A0[0], A1[0]), deck + 0.68, Math.max(A0[1], A1[1])); }
+      }
+      if (F.sconces !== false) { const c0 = R.at((p.s0 + p.s1) / 2, dp * 0.5); K.box(M.lampGlow, c0[0] - 0.12, top - 0.62, c0[1] - 0.12, c0[0] + 0.12, top - 0.47, c0[1] + 0.12, { detail: true }); }
+    }
+    if (main && F.bikes !== false) {
+      const R = main.R; const n = 1 + (Math.abs(Math.round((S.ang || 1) * 10)) % 2);
+      for (let k = 0; k < n; k++) { const s = main.s + (main.porch ? (main.porch.s1 - main.porch.s0) / 2 + 0.9 : 1.7) + k * 0.55; const q = R.at(s, (main.porch ? (main.porch.depth ?? 2.4) : 0.3) + 0.9 + k * 0.1); if (inBlocks(blocks, q[0], q[1], 0.3)) continue; const gy = K.g(q[0], q[1]); bike(props, q[0], gy, q[1], Math.atan2(R.n[1], R.n[0]) + 0.12 * k, ['#2b4f7a', '#8a2b2b', '#2f2f2f', '#5f6b4a'][(pk + k) % 4]); }
+    }
+  } catch (e) { console.warn('rse porch life', e); }
   // ---------------- front walk to the street ----------------
   const walkM = F.walkMat ? api.mat(F.walkMat) : M.concrete;
   const ctxWays = (ctx.packet && ctx.packet.context) || [];

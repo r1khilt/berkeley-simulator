@@ -24,11 +24,11 @@ function scriptMat(text) {
 }
 
 export async function build(ctx) {
-  const wall = ['stucco', '#c4b8ae'], trim = ['stucco', '#cdc3ba'], white = ['paint', '#f3f2ee'];
+  const wall = ['stucco', '#cfc5bb'], trim = ['stucco', '#d8cfc6'], white = ['paint', '#f3f2ee'];
   const r = rseHouse(ctx, {
     ang: -8.6, front: { block: 1, face: 'N', above: 0.35 }, storeyH: 3.5, ov: 0.5, belt: true, frieze: false,
     wall, trim, frame: white, roof: ['roof', '#6a6460'], base: ['stucco', '#b8a69c'], door: ['wood', '#6e4226'],
-    win: { w: 1.0, h: 1.45, bay: 2.9, sill: 0.9, tran: 0, muntins: 2, casing: 0, st: [{}, {}, { w: 1.05, pair: true, tran: 0.7, h: 1.5 }] },
+    win: { w: 1.0, h: 1.45, bay: 2.9, sill: 0.9, tran: 0, muntins: 2, casing: 0, st: [{}, {}, { w: 1.1, h: 1.5, sill: 1.5 }] },
     blocks: [
       { u0: -17.1, u1: -9.85, v0: -14.0, v1: 2.6, eave: 11.7, storeys: 3, roof: { type: 'flat', parapet: 0.45, capMat: trim } },
       { u0: -9.85, u1: 4.25, v0: -9.9, v1: 2.6, eave: 11.7, storeys: 3, noWin: { N: [[5.7, 8.4]] }, roof: { type: 'flat', parapet: 0.45, capMat: trim } },
@@ -42,17 +42,17 @@ export async function build(ctx) {
       // sidelights beside the door
       for (const s of [10.75 - 0.95, 10.75 + 0.95]) { K.rbox(R, glass, s - 0.17, F0 + 0.2, -0.05, s + 0.17, F0 + 2.3, -0.02); K.rbox(R, mat(white), s - 0.24, F0 + 0.1, 0, s + 0.24, F0 + 0.2, 0.06); for (const ss of [s - 0.24, s + 0.17]) K.rbox(R, mat(white), ss, F0 + 0.1, 0, ss + 0.07, F0 + 2.36, 0.05); }
       // flat-headed stair window between the floor lines (split-level landing): 4 x 3 white grid with a transom band
-      { const s = 7.05, w = 2.4, y0 = F0 + 1.95, y1 = F0 + 5.55, wm = mat(white);
-        K.rbox(R, glass, s - w / 2, y0, -0.12, s + w / 2, y1, -0.1);
-        for (const ss of [s - w / 2 - 0.07, s + w / 2]) K.rbox(R, wm, ss, y0 - 0.07, -0.12, ss + 0.07, y1 + 0.07, 0.0);
-        K.rbox(R, wm, s - w / 2 - 0.07, y1, -0.12, s + w / 2 + 0.07, y1 + 0.07, 0.0); K.rbox(R, wm, s - w / 2 - 0.1, y0 - 0.1, -0.12, s + w / 2 + 0.1, y0, 0.07);
-        for (let k = 1; k < 4; k++) K.rbox(R, wm, s - w / 2 + w * k / 4 - 0.025, y0, -0.1, s - w / 2 + w * k / 4 + 0.025, y1, -0.07, { detail: true });
-        for (const yy of [y0 + (y1 - y0) * 0.27, y0 + (y1 - y0) * 0.54, y1 - 0.55]) K.rbox(R, wm, s - w / 2, yy - 0.025, -0.1, s + w / 2, yy + 0.025, -0.07, { detail: true });
+      { const s = 7.05, w = 2.1, y0 = F0 + 2.85, y1 = F0 + 6.45, wm = mat(white);
+        K.rbox(R, glass, s - w / 2, y0, 0.01, s + w / 2, y1, 0.03);
+        for (const ss of [s - w / 2 - 0.08, s + w / 2]) K.rbox(R, wm, ss, y0 - 0.08, 0, ss + 0.08, y1 + 0.08, 0.1);
+        K.rbox(R, wm, s - w / 2 - 0.08, y1, 0, s + w / 2 + 0.08, y1 + 0.08, 0.1); K.rbox(R, wm, s - w / 2 - 0.12, y0 - 0.12, 0, s + w / 2 + 0.12, y0, 0.16);
+        for (let k = 1; k < 3; k++) K.rbox(R, wm, s - w / 2 + w * k / 3 - 0.025, y0, 0.02, s - w / 2 + w * k / 3 + 0.025, y1, 0.06, { detail: true });
+        for (let k = 1; k < 4; k++) { const yy = y0 + (y1 - y0) * k / 4; K.rbox(R, wm, s - w / 2, yy - 0.025, 0.02, s + w / 2, yy + 0.025, 0.06, { detail: true }); }
         // ordinary window pair above it on the top floor
-        const y2 = F0 + 2 * H + 0.9; K.rbox(R, glass, s - 1.2, y2, -0.12, s + 1.2, y2 + 0.95, -0.1); K.rbox(R, wm, s - 1.27, y2 - 0.07, -0.12, s + 1.27, y2, 0.06); K.rbox(R, wm, s - 1.27, y2 + 0.95, -0.12, s + 1.27, y2 + 1.02, 0.0); for (const ss of [s - 1.27, s - 0.035, s + 1.2]) K.rbox(R, wm, ss, y2, -0.12, ss + 0.07, y2 + 0.95, 0.0);
+        const y2 = F0 + 2 * H + 1.45; K.rbox(R, glass, s - 1.1, y2, 0.01, s + 1.1, y2 + 1.4, 0.03); K.rbox(R, wm, s - 1.18, y2 - 0.1, 0, s + 1.18, y2, 0.14); K.rbox(R, wm, s - 1.18, y2 + 1.4, 0, s + 1.18, y2 + 1.48, 0.1); for (const ss of [s - 1.18, s - 0.04, s + 1.1]) K.rbox(R, wm, ss, y2, 0, ss + 0.08, y2 + 1.4, 0.1);
         // gold script centred under the stair window, lit by two small black lamps
-        const g = new THREE.PlaneGeometry(3.3, 0.82); g.translate(s, F0 + 1.3, 0.04); g.applyMatrix4(R.m); K.add(scriptMat('Gamma Phi Beta'), g, { uvMode: 'keep' });
-        for (const ss of [s - 1.2, s + 1.2]) { K.rbox(R, api.M.blackPaint, ss - 0.05, F0 + 1.82, 0, ss + 0.05, F0 + 1.95, 0.22, { detail: true }); } }
+        const g = new THREE.PlaneGeometry(2.8, 0.7); g.translate(s, F0 + 2.35, 0.04); g.applyMatrix4(R.m); K.add(scriptMat('Gamma Phi Beta'), g, { uvMode: 'keep' });
+        for (const ss of [s - 0.9, s + 0.9]) { K.rbox(R, api.M.blackPaint, ss - 0.06, F0 + 2.72, 0, ss + 0.06, F0 + 2.84, 0.2, { detail: true }); } }
       // slim flat canopy over the door, sidelights already framed; wall lamps outside the sidelights
       K.rbox(R, mat(white), 10.75 - 1.35, F0 + 2.5, 0, 10.75 + 1.35, F0 + 2.57, 1.15); K.rbox(R, mat(white), 10.75 - 1.35, F0 + 2.42, 1.1, 10.75 + 1.35, F0 + 2.57, 1.15);
       for (const ss of [10.75 - 1.45, 10.75 + 1.45]) { K.rbox(R, api.M.blackPaint, ss - 0.07, F0 + 1.65, 0, ss + 0.07, F0 + 1.95, 0.16, { detail: true }); K.rbox(R, api.M.lampGlow, ss - 0.05, F0 + 1.68, 0.16, ss + 0.05, F0 + 1.92, 0.2, { detail: true }); }

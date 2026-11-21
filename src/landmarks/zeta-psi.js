@@ -15,19 +15,19 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const brick = ['brick', '#c46a50'], panel = ['paint', '#94553f'], cream = ['paint', '#d8cfbf'], frameC = ['paint', '#5b4636'];
+  const brick = ['brick', '#c46a50'], panel = ['paint', '#b0624a'], cream = ['paint', '#e8e0cc'], frameC = ['paint', '#e6dfcf'], fasc = ['paint', '#5a4a3a']; // refine-south-east: lighter salmon panels, cream frames, dark fascia
   const F = 3.1, H = 2.95, YU = F + H, YE = 9.0;
   const r = rseHouse(ctx, {
     ang: -8.904, floor: F, storeyH: H, ov: 0.6, split: H,
-    wall: panel, wall0: brick, trim: cream, frame: frameC, roof: ['roof', '#5a4e46'], base: ['brick', '#a85a44'], door: ['paint', '#2e2a28'],
+    wall: panel, wall0: brick, trim: cream, frame: frameC, roof: ['roof', '#6e6458'], base: ['brick', '#a85a44'], door: ['paint', '#2e2a28'],
     win: { w: 2.0, h: 1.1, bay: 4.6, sill: 1.2, tran: 0, casing: 0, mull: 1, st: [{ w: 1.0, h: 1.5, sill: 0.9, mull: 1 }] },
     belt: false,
     blocks: [
       { u0: -16.2, u1: 13.04, v0: -21.5, v1: -6.9, eave: YE, storeys: 2,
         win: { N: { nb: 8, st: [{ w: 3.1, h: 2.45, sill: 0.1, mull: 3, tran: 0.84, skip: [0, 1, 2, 3, 6, 7] }, { none: true }] } },
-        roof: { type: 'flat', parapet: 0.0, ov: 0.35, eaveMat: cream } },
-      { u0: -1.0, u1: 13.04, v0: -6.9, v1: 22.3, eave: YE, storeys: 2, roof: { type: 'flat', parapet: 0.0, ov: 0.6, eaveMat: cream } },
-      { u0: -16.1, u1: -1.0, v0: 8.8, v1: 22.2, eave: 6.6, floor: 1.0, storeys: 2, split: 2.8, roof: { type: 'flat', parapet: 0.0, ov: 0.5, eaveMat: cream } },
+        roof: { type: 'hip', ridge: YE + 1.6, ov: 0.6 } },
+      { u0: -1.0, u1: 13.04, v0: -6.9, v1: 22.3, eave: YE, storeys: 2, roof: { type: 'hip', ridge: YE + 1.5, ov: 0.6 } },
+      { u0: -16.1, u1: -1.0, v0: 8.8, v1: 22.2, eave: 6.6, floor: 1.0, storeys: 2, split: 2.8, roof: { type: 'hip', ridge: 8.0, ov: 0.6 } },
     ],
     doors: [{ block: 0, face: 'N', s: 2.6, w: 1.7, h: 2.3 }],
     chimneys: [{ u: -12.0, v: -10.0, w: 1.0, d: 0.65, top: 10.4, mat: brick }],
@@ -38,9 +38,9 @@ export async function build(ctx) {
       for (let k = 0; k < 6; k++) { const c = L * (k + 0.5) / 6; ops.push({ s0: c - 1.15, s1: c + 1.15, y0: YE - 0.35 - 1.15, y1: YE - 0.35 }); }
       K.wall(R2, mat(panel), 0, L, YU, YE, ops, 0.3);
       for (const o of ops) { K.fill(R2, { ...o, sill: false }, { rev: 0.22, mull: 1, frame: mat(frameC), glass }); K.rbox(R2, mat(['paint', '#7e4636']), o.s0, YU + 0.15, 0.0, o.s1, o.y0 - 0.08, 0.03); }
-      for (let k = 0; k <= 6; k++) { const s = Math.min(L - 0.08, Math.max(0.08, L * k / 6)); K.rbox(R2, mat(['paint', '#7a4433']), s - 0.08, YU, 0, s + 0.08, YE, 0.15); }
-      K.rbox(R, mat(cream), 0, YU - 0.3, 0, L, YU + 0.02, CO + 0.05);
-      K.rbox(R, mat(['roof', '#6a6460']), -0.3, YE - 0.06, 0, L + 0.3, YE + 0.06, CO + 0.1); K.rbox(R, mat(cream), -0.3, YE - 0.22, CO + 0.02, L + 0.3, YE + 0.1, CO + 0.12);
+      for (let k = 0; k <= 6; k++) { const s = Math.min(L - 0.05, Math.max(0.05, L * k / 6)); K.rbox(R2, mat(['paint', '#9c5240']), s - 0.05, YU, 0, s + 0.05, YE, 0.05); }
+      K.rbox(R, mat(cream), 0, YU - 0.2, 0, L, YU + 0.02, CO + 0.1);
+      K.rbox(R, mat(['roof', '#6e6458']), -0.3, YE - 0.06, 0, L + 0.3, YE + 0.06, CO + 0.6); K.rbox(R, mat(fasc), -0.3, YE - 0.2, CO + 0.55, L + 0.3, YE + 0.06, CO + 0.62);
       for (const s of [0.0, L - 0.3]) K.rbox(R, mat(panel), s, YU, 0, s + 0.3, YE, CO);
       // recessed entry: brick piers either side of the door, under the cantilever
       for (const s of [1.25, 3.95]) K.rbox(R, mat(brick), s - 0.25, F - 0.6, 0.05, s + 0.25, YU - 0.3, CO - 0.05);

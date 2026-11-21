@@ -13,7 +13,7 @@ export const info = {
 export async function build(ctx) {
   const r = rseHouse(ctx, {
     ang: -9.041, front: { block: 0, face: 'N', above: 0.8 }, storeyH: 3.2, ov: 0.6,
-    wall: ['stucco', '#efe7d6'], trim: ['paint', '#2f4f6f'], frame: ['paint', '#f6f3ea'], roof: ['tile', '#c47c5a'], base: ['stucco', '#d2c8b2'], shutters: ['paint', '#2f4f6f'],
+    wall: ['stucco', '#efe7d6'], trim: ['paint', '#2b3b4f'], frame: ['paint', '#f6f3ea'], roof: ['tile', '#c47c5a'], base: ['stucco', '#d2c8b2'], shutters: ['paint', '#2b3b4f'],
     win: { w: 0.9, h: 1.6, bay: 2.8, sill: 0.85, tran: 0.5, casing: 0.08 },
     blocks: [
       { u0: -9.5, u1: 3.05, v0: -16.75, v1: 13.62, eave: 11.0, roof: { type: 'hip', ridge: 12.9 } },

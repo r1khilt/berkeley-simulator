@@ -20,7 +20,7 @@ export async function build(ctx) {
   const F = 4.2;
   const r = rseHouse(ctx, {
     ang: -10.43, floor: F, storeyH: 3.8, ov: 0.75,
-    wall, trim: white, frame: white, roof, base: ['stucco', '#60666b'], door: ['paint', '#26282a'],
+    wall, trim: white, frame: white, roof, base: ['stucco', '#60666b'], door: ['paint', '#26282a'], shutters: ['paint', '#1f2224'], // refine-south-east: dark shutters per HALS CA-2 photo
     win: { w: 1.05, h: 1.9, bay: 3.2, sill: 0.8, tran: 0.55, casing: 0.15, muntins: 2 }, belts: false,
     blocks: [
       { u0: 0.89, u1: 14.86, v0: -6.82, v1: 15.27, eave: 11.8, storeys: 2,
