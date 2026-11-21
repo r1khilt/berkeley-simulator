@@ -384,9 +384,9 @@ void facade(vec3 wallC){
     float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
     float cl = textureLod(uNoise, Rf.xz / max(0.3, Rf.y + 0.45) * 0.03 + seed, 2.0).r;
     vec3 skyR = mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, Rf.y)) * (0.9 + 0.35 * smoothstep(0.55, 0.75, cl));
-    float ang = atan(Rf.x, Rf.z); float skyline = 0.04 + 0.22 * texture(uNoise, vec2(ang * 0.8, seed)).g;
+    float ang = atan(Rf.x, Rf.z); float skyline = 0.05 + 0.14 * textureLod(uNoise, vec2(ang * 0.5, seed), 2.5).g;   // smooth: reads as a soft reflection over the interiors
     vec3 streetR = mix(uSkyHor * 0.08, uSkyHor * 0.22, smoothstep(-0.4, 0.0, Rf.y)) * (0.75 + 0.5 * textureLod(uNoise, vec2(ang * 0.6, seed), 1.0).r);
-    vec3 refl = Rf.y > skyline ? skyR : streetR;
+    vec3 refl = mix(streetR, skyR, smoothstep(skyline - 0.06, skyline + 0.06, Rf.y));
     float wobble = (texture(uNoise, vec2(bi * 0.37 + seed, fi * 0.21)).b - 0.5) * 0.15;
     refl *= 1.0 + wobble;
     float kRefl = mix(mix(0.1, 0.9, F), mix(0.25, 0.95, F), lodW);

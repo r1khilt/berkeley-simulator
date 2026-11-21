@@ -94,9 +94,15 @@ vec3 irWallTint(float s) {
   else if (r.y > 0.6) c = mix(c, vec3(0.80, 0.55, 0.50), 0.35);
   return c;
 }
-vec3 irPalette(float h) { // saturated accent colours: blankets, books, posters, products, seats
+vec3 irPalette(float h) { // accent colours: posters, products
   vec3 c = 0.5 + 0.5 * cos(6.28318 * (h + vec3(0.0, 0.33, 0.67)));
-  return mix(vec3(0.5), c, 0.7) * (0.55 + 0.45 * fract(h * 13.7));
+  return mix(vec3(0.5), c, 0.62) * (0.55 + 0.45 * fract(h * 13.7));
+}
+vec3 irMuted(float h) { // fabrics, blankets, book spines: navy, burgundy, forest, mustard, grey, tan, teal, plum
+  float k = floor(fract(h) * 8.0);
+  vec3 c = k < 1.0 ? vec3(0.13, 0.17, 0.3) : k < 2.0 ? vec3(0.38, 0.11, 0.12) : k < 3.0 ? vec3(0.16, 0.27, 0.17) : k < 4.0 ? vec3(0.6, 0.45, 0.16)
+         : k < 5.0 ? vec3(0.42, 0.42, 0.43) : k < 6.0 ? vec3(0.55, 0.45, 0.35) : k < 7.0 ? vec3(0.12, 0.33, 0.36) : vec3(0.3, 0.18, 0.3);
+  return c * (0.85 + 0.3 * fract(h * 17.3));
 }
 // ---------- ray state ----------
 vec3 irRO, irRD, irIRD, irPS, irNrm, irBLo, irBHi; float irT, irAO, irPx, irCamD; int irMat; bool irOnFloor;
@@ -125,113 +131,119 @@ void irLayout(int t, vec3 R, float seed, float lit, float yF) {
   float W = R.x, H = R.y, D = R.z;
   vec4 a = irH4(seed + 0.37), b = irH4(seed + 5.11);
   bool flip = a.x > 0.5;
+  bool who = lit > 0.5 && a.w < 0.3;   // someone is in (lit rooms only)
   if (t == IR_OFFICE) {
-    if (b.w < 0.2 && W > 3.2) { // meeting room: long table, chairs, screen on the back wall
-      irTest(vec3(0.7, 0.71, 1.5), vec3(W - 0.7, 0.76, D - 1.4), IM_WOOD);
-      irTest(vec3(W * 0.5 - 0.35, 0.0, 2.0), vec3(W * 0.5 + 0.35, 0.71, D - 1.9), IM_DARK);
-      irTest(vec3(0.95, 0.44, 1.75), vec3(W - 0.95, 1.0, 1.32), IM_SEATS);
-      irTest(vec3(0.95, 0.44, D - 1.15), vec3(W - 0.95, 1.0, D - 0.95), IM_SEATS);
-      if (lit > 0.5 && a.w < 0.4) irPerson(vec3(W * 0.3 + a.y * W * 0.4, 0.0, 1.45), 1.0, a.z);
+    if (b.w < 0.2 && W > 3.2) { // meeting room: long table, chairs both sides, screen on the back wall
+      irTest(vec3(0.8, 0.71, 1.4), vec3(W - 0.8, 0.76, D - 1.3), IM_WOOD);
+      irTest(vec3(W * 0.5 - 0.3, 0.0, 2.0), vec3(W * 0.5 + 0.3, 0.71, D - 1.9), IM_DARK);
+      irTest(vec3(1.0, 0.45, 1.05), vec3(W - 1.0, 1.02, 1.12), IM_SEATS);
+      irTest(vec3(1.0, 0.45, D - 1.0), vec3(W - 1.0, 1.02, D - 0.93), IM_SEATS);
+      if (who) irPerson(vec3(W * 0.3 + a.y * W * 0.4, 0.0, D - 0.75), 1.0, a.z);
       return;
     }
-    float dw = min(W - 0.7, 1.35 + 0.45 * a.y), dx = mix(0.35, W - 0.35 - dw, a.z);
-    if (b.x < 0.6) { // desk against the back wall, person/chair facing it
-      irTest(vec3(dx, 0.71, D - 0.78), vec3(dx + dw, 0.75, D - 0.02), IM_WOOD);
+    float dw = min(W - 0.8, 1.4 + 0.4 * a.y), dx = mix(0.4, W - 0.4 - dw, a.z);
+    float mx = dx + dw * (0.38 + 0.24 * b.y);
+    if (b.x < 0.55) { // desk against the back wall; chair (and person) facing it
+      irTest(vec3(dx, 0.71, D - 0.75), vec3(dx + dw, 0.75, D - 0.02), IM_WOOD);
       float px0 = flip ? dx + 0.04 : dx + dw - 0.46;
       irTest(vec3(px0, 0.0, D - 0.72), vec3(px0 + 0.42, 0.71, D - 0.08), IM_METAL);
-      float mx = dx + dw * (0.35 + 0.3 * b.y);
-      irTest(vec3(mx - 0.28, 0.81, D - 0.44), vec3(mx + 0.28, 1.15, D - 0.4), IM_SCREEN);
-      float cz = D - 1.2 - 0.2 * b.z;
-      irTest(vec3(mx - 0.26, 0.42, cz - 0.24), vec3(mx + 0.26, 0.5, cz + 0.24), IM_FABRIC);
-      irTest(vec3(mx - 0.24, 0.52, cz - 0.3), vec3(mx + 0.24, 1.1, cz - 0.24), IM_FABRIC);
-      if (lit > 0.5 && a.w < 0.22) irPerson(vec3(mx, 0.0, cz), 1.0, a.z);
-    } else { // desk facing the window, monitor back to us
-      float dz = 1.0 + 0.6 * b.y;
+      irTest(vec3(mx - 0.29, 0.83, D - 0.42), vec3(mx + 0.29, 1.17, D - 0.39), IM_SCREEN);
+      float cz = D - 1.15 - 0.15 * b.z;
+      irTest(vec3(mx - 0.25, 0.44, cz - 0.23), vec3(mx + 0.25, 0.5, cz + 0.23), IM_FABRIC);
+      irTest(vec3(mx - 0.23, 0.52, cz - 0.3), vec3(mx + 0.23, 1.12, cz - 0.24), IM_FABRIC);
+      if (who) irPerson(vec3(mx, 0.0, cz), 1.0, a.z);
+      float sx = flip ? W - 0.38 : 0.0;   // tall bookcase on a side wall
+      irTest(vec3(sx, 0.0, D - 2.2), vec3(sx + 0.38, 2.0 + 0.15 * a.y, D - 1.15), IM_BOOKS);
+    } else {          // desk facing the window; tall shelving along the back wall
+      float dz = 0.5 + 0.5 * b.y;
       irTest(vec3(dx, 0.71, dz), vec3(dx + dw, 0.75, dz + 0.75), IM_WOOD);
-      irTest(vec3(dx + 0.03, 0.0, dz + 0.05), vec3(dx + dw - 0.03, 0.71, dz + 0.1), IM_WOOD);
-      float mx = dx + dw * 0.5;
-      irTest(vec3(mx - 0.28, 0.81, dz + 0.42), vec3(mx + 0.28, 1.15, dz + 0.47), IM_DARK);
-      float cz = dz + 1.25;
-      irTest(vec3(mx - 0.24, 0.52, cz + 0.24), vec3(mx + 0.24, 1.12, cz + 0.3), IM_FABRIC);
-      if (lit > 0.5 && a.w < 0.25) irPerson(vec3(mx, 0.0, cz), 1.0, a.z);
+      irTest(vec3(dx + 0.03, 0.12, dz + 0.04), vec3(dx + dw - 0.03, 0.71, dz + 0.08), IM_WOOD);
+      irTest(vec3(mx - 0.29, 0.83, dz + 0.45), vec3(mx + 0.29, 1.17, dz + 0.49), IM_DARK);
+      float cz = dz + 1.2;
+      irTest(vec3(mx - 0.25, 0.44, cz - 0.23), vec3(mx + 0.25, 0.5, cz + 0.23), IM_FABRIC);
+      irTest(vec3(mx - 0.23, 0.52, cz + 0.24), vec3(mx + 0.23, 1.12, cz + 0.3), IM_FABRIC);
+      if (who) irPerson(vec3(mx, 0.0, cz), 1.0, a.z);
+      irTest(vec3(W * 0.12, 0.0, D - 0.4), vec3(W * 0.12 + min(1.8, W * 0.55), 2.05, D - 0.02), IM_BOOKS);
     }
-    float sx = flip ? W - 0.36 : 0.0; // bookcase on a side wall
-    irTest(vec3(sx, 0.0, D - 1.0 - 1.1 * b.w), vec3(sx + 0.36, 1.85 + 0.3 * a.y, D - 0.15 - 1.1 * b.w), IM_BOOKS);
-    if (a.w > 0.6) { float px = flip ? 0.25 : W - 0.6; irTest(vec3(px, 0.0, 0.7), vec3(px + 0.35, 0.95 + 0.5 * b.z, 1.05), IM_PLANT); }
+    if (a.w > 0.55) { float px = flip ? 0.2 : W - 0.62; irTest(vec3(px, 0.0, 0.25), vec3(px + 0.42, 1.15 + 0.45 * b.z, 0.67), IM_PLANT); }
   } else if (t == IR_CLASS) {
     for (int i = 0; i < 3; i++) {
-      float z = 1.4 + float(i) * 1.25;
-      irTest(vec3(0.6, 0.71, z), vec3(W - 0.6, 0.76, z + 0.5), IM_WOOD);
-      irTest(vec3(0.7, 0.44, z - 0.5), vec3(W - 0.7, 0.92, z - 0.42), IM_SEATS);
+      float z = 1.3 + float(i) * 1.3;
+      irTest(vec3(0.7, 0.71, z), vec3(W - 0.7, 0.76, z + 0.5), IM_WOOD);
+      irTest(vec3(0.8, 0.44, z - 0.5), vec3(W - 0.8, 0.92, z - 0.43), IM_SEATS);
     }
-    irTest(vec3(W * 0.5 - 0.7, 0.0, D - 1.6), vec3(W * 0.5 + 0.7, 0.76, D - 1.0), IM_WOOD);
-    if (lit > 0.5 && a.w < 0.35) irPerson(vec3(W * (0.3 + 0.4 * a.y), 0.0, D - 0.75), 0.0, a.z);
+    irTest(vec3(W * 0.5 - 0.22, H - 0.42, D * 0.42), vec3(W * 0.5 + 0.22, H - 0.26, D * 0.42 + 0.36), IM_WHITE);   // ceiling projector
+    irTest(vec3(W * 0.5 - 0.02, H - 0.26, D * 0.42 + 0.16), vec3(W * 0.5 + 0.02, H, D * 0.42 + 0.2), IM_DARK);
+    irTest(vec3(W * 0.62, 0.0, D - 1.7), vec3(W * 0.62 + 1.3, 0.76, D - 1.1), IM_WOOD);
+    if (who) irPerson(vec3(W * (0.25 + 0.3 * a.y), 0.0, D - 0.8), 0.0, a.z);
   } else if (t == IR_LECTURE) { // tiered rows stepping down toward a stage and screen at the back
     for (int i = 0; i < 5; i++) {
       float z0 = 0.4 + float(i) * 0.95, y = -0.3 * float(i);
       irTest(vec3(0.0, yF, z0), vec3(W, y, z0 + 0.95), IM_FLOOR);
       irTest(vec3(0.5, y, z0 + 0.5), vec3(W - 0.5, y + 0.82, z0 + 0.58), IM_SEATS);
     }
-    irTest(vec3(W * 0.62, yF, D - 2.3), vec3(W * 0.62 + 0.6, yF + 1.1, D - 1.8), IM_WOOD);
   } else if (t == IR_LAB) {
     irTest(vec3(0.9, 0.0, 1.9), vec3(W - 0.9, 0.92, 2.9), IM_BENCH);              // island bench
-    irTest(vec3(1.1, 0.92, 2.35), vec3(W - 1.1, 1.75, 2.45), IM_METAL);             // reagent shelf spine
-    irTest(vec3(1.1, 1.38, 2.2), vec3(W - 1.1, 1.42, 2.6), IM_GOODS);              // shelf with bottles
+    irTest(vec3(1.1, 0.92, 2.36), vec3(W - 1.1, 1.8, 2.44), IM_METAL);              // reagent shelf spine
+    irTest(vec3(1.1, 1.36, 2.15), vec3(W - 1.1, 1.4, 2.65), IM_GOODS);              // shelf with bottles
     float fx = flip ? 0.3 : W - 1.8;
-    irTest(vec3(fx, 0.0, D - 0.85), vec3(fx + 1.5, 2.35, D), IM_HOOD);           // fume hood
+    irTest(vec3(fx, 0.0, D - 0.85), vec3(fx + 1.5, 2.35, D), IM_HOOD);            // fume hood
     float sx = flip ? W - 0.75 : 0.0;
-    irTest(vec3(sx, 0.0, 1.0), vec3(sx + 0.75, 0.92, D - 1.1), IM_BENCH);            // wall bench
-    irTest(vec3(W * 0.3, 0.92, 2.0), vec3(W * 0.3 + 0.5, 1.28, 2.32), IM_WHITE);     // instrument
-    if (lit > 0.5 && a.w < 0.3) irPerson(vec3(W * (0.35 + 0.3 * a.y), 0.0, 1.55), 0.0, a.z);
+    irTest(vec3(sx, 0.0, 1.0), vec3(sx + 0.75, 0.92, D - 1.1), IM_BENCH);           // wall bench + cabinets above
+    irTest(vec3(flip ? W - 0.38 : 0.0, 1.5, 1.0), vec3(flip ? W : 0.38, 2.3, D - 1.1), IM_GOODS);
+    irTest(vec3(0.0, H - 0.4, D * 0.35), vec3(W, H - 0.05, D * 0.35 + 0.45), IM_METAL);  // duct
+    if (who) irPerson(vec3(W * (0.35 + 0.3 * a.y), 0.0, 1.5), 0.0, a.z);
   } else if (t == IR_DORM) {
-    float bx = flip ? W - 0.98 : 0.02; bool loft = b.x < 0.3;
-    float by = loft ? 1.25 : 0.0;
-    irTest(vec3(bx, by, D - 2.05), vec3(bx + 0.96, by + 0.5, D - 0.02), IM_BED);
-    irTest(vec3(bx + 0.12, by + 0.5, D - 0.6), vec3(bx + 0.84, by + 0.64, D - 0.1), IM_WHITE);
-    if (loft) irTest(vec3(bx, 0.0, D - 2.0), vec3(bx + 0.96, by, D - 1.92), IM_WOOD);
-    float dx = flip ? 0.25 : W - 1.3;           // desk + laptop against the other wall, near the back
-    irTest(vec3(dx, 0.72, D - 1.95), vec3(dx + 1.05, 0.76, D - 1.35), IM_WOOD);
-    irTest(vec3(dx + 0.3, 0.76, D - 1.62), vec3(dx + 0.68, 1.0, D - 1.6), IM_SCREEN);
-    irTest(vec3(dx + 0.25, 0.42, D - 1.15), vec3(dx + 0.75, 0.95, D - 1.08), IM_FABRIC);
-    float wx = flip ? 0.05 : W - 0.75;         // dresser / wardrobe by the window
-    irTest(vec3(wx, 0.0, 0.5), vec3(wx + 0.7, 0.85 + 1.1 * step(0.5, b.y), 1.1), IM_WOOD);
-    if (lit > 0.5 && a.w < 0.2) irPerson(vec3(dx + 0.5, 0.0, D - 0.95), 1.0, a.z);
+    float bx = flip ? W - 0.98 : 0.02; bool loft = b.x < 0.55;
+    float by = loft ? 1.3 : 0.25;
+    irTest(vec3(bx, by, D - 2.05), vec3(bx + 0.96, by + 0.26, D - 0.02), IM_BED);
+    irTest(vec3(bx + 0.14, by + 0.26, D - 0.62), vec3(bx + 0.82, by + 0.4, D - 0.12), IM_WHITE);
+    irTest(vec3(bx, 0.0, D - 2.07), vec3(bx + 0.96, by, D - 1.99), IM_WOOD);      // bed end / loft ladder end
+    float dx = flip ? 0.25 : W - 1.3;
+    if (loft) dx = bx + 0.02;                                                  // desk tucked under the loft
+    irTest(vec3(dx, 0.72, D - 1.6), vec3(dx + 0.94, 0.76, D - 0.4), IM_WOOD);
+    irTest(vec3(dx + 0.3, 0.76, D - 1.25), vec3(dx + 0.66, 0.98, D - 1.23), IM_SCREEN);
+    irTest(vec3(flip ? 0.05 : W - 0.75, 0.0, 0.45), vec3(flip ? 0.75 : W - 0.05, 0.9 + 1.0 * step(0.5, b.y), 1.05), IM_WOOD);  // dresser / wardrobe
+    if (who) irPerson(vec3(dx + 0.5, 0.0, D - 1.75), 1.0, a.z);
+    else irTest(vec3(dx + 0.24, 0.44, D - 2.0), vec3(dx + 0.72, 0.95, D - 1.93), IM_FABRIC);   // chair back
   } else if (t == IR_LIVING) {
-    float sz = D - 1.0;                          // sofa against the back wall, coffee table, TV by the window wall
+    float sz = D - 0.95;                        // sofa against the back wall, coffee table, bookcase, lamp
     irTest(vec3(W * 0.2, 0.0, sz), vec3(W * 0.8, 0.45, D - 0.05), IM_FABRIC);
-    irTest(vec3(W * 0.2, 0.45, D - 0.25), vec3(W * 0.8, 0.9, D - 0.05), IM_FABRIC);
-    irTest(vec3(W * 0.35, 0.0, sz - 1.0), vec3(W * 0.65, 0.42, sz - 0.45), IM_WOOD);
+    irTest(vec3(W * 0.2, 0.45, D - 0.27), vec3(W * 0.8, 0.92, D - 0.05), IM_FABRIC);
+    irTest(vec3(W * 0.36, 0.0, sz - 1.05), vec3(W * 0.64, 0.42, sz - 0.5), IM_WOOD);
     float sx = flip ? W - 0.4 : 0.0;
-    irTest(vec3(sx, 0.0, 1.0), vec3(sx + 0.4, 1.9, 2.2), IM_BOOKS);
-    float lx = flip ? 0.25 : W - 0.45;           // floor lamp
-    irTest(vec3(lx, 0.0, D - 0.6), vec3(lx + 0.06, 1.45, D - 0.54), IM_DARK);
-    irTest(vec3(lx - 0.14, 1.45, D - 0.71), vec3(lx + 0.2, 1.72, D - 0.43), IM_LAMP);
-    if (lit > 0.5 && a.w < 0.25) irPerson(vec3(W * (0.35 + 0.3 * a.y), 0.0, sz + 0.4), 1.0, a.z);
+    irTest(vec3(sx, 0.0, 1.0), vec3(sx + 0.4, 1.95, 2.3), IM_BOOKS);
+    float lx = flip ? 0.25 : W - 0.45;
+    irTest(vec3(lx, 0.0, D - 0.6), vec3(lx + 0.05, 1.45, D - 0.55), IM_DARK);
+    irTest(vec3(lx - 0.15, 1.45, D - 0.72), vec3(lx + 0.2, 1.72, D - 0.42), IM_LAMP);
+    if (who) irPerson(vec3(W * (0.35 + 0.3 * a.y), 0.0, sz + 0.4), 1.0, a.z);
   } else if (t == IR_LIBRARY) {
-    if (b.x < 0.5) { // stacks parallel to the glass: spines face us
-      irTest(vec3(0.5, 0.71, 0.9), vec3(W - 0.5, 0.76, 1.9), IM_WOOD);             // reading table
-      irTest(vec3(W * 0.5 - 0.12, 0.76, 1.3), vec3(W * 0.5 + 0.12, 1.05, 1.5), IM_LAMP);
+    if (b.x < 0.5) { // reading table by the window, stacks parallel to the glass (spines face out)
+      irTest(vec3(0.5, 0.71, 0.9), vec3(W - 0.5, 0.76, 1.9), IM_WOOD);
+      irTest(vec3(W * 0.5 - 0.12, 0.76, 1.3), vec3(W * 0.5 + 0.12, 1.02, 1.5), IM_LAMP);
       irTest(vec3(0.4, 0.0, 3.0), vec3(W - 0.4, 2.15, 3.55), IM_BOOKS);
       irTest(vec3(0.4, 0.0, 4.9), vec3(W - 0.4, 2.15, 5.45), IM_BOOKS);
-      if (lit > 0.5 && a.w < 0.35) irPerson(vec3(W * (0.25 + 0.5 * a.y), 0.0, 2.2), 1.0, a.z);
-    } else {          // stacks perpendicular: look down the aisles
-      for (int i = 0; i < 3; i++) { float x = W * (0.12 + 0.36 * float(i)) + 0.3 * a.z; irTest(vec3(x, 0.0, 1.6), vec3(x + 0.55, 2.2, D - 0.6), IM_BOOKS); }
+      if (who) irPerson(vec3(W * (0.25 + 0.5 * a.y), 0.0, 2.2), 1.0, a.z);
+    } else {          // stacks perpendicular to the glass: aisles
+      for (int i = 0; i < 3; i++) { float x = W * (0.1 + 0.33 * float(i)) + 0.3 * a.z; irTest(vec3(x, 0.0, 1.5), vec3(x + 0.55, 2.2, D - 0.6), IM_BOOKS); }
+      if (who) irPerson(vec3(W * (0.1 + 0.33 * floor(a.y * 2.99)) + 0.3 * a.z + 0.95, 0.0, 2.5 + 2.0 * a.y), 0.0, a.z);
     }
   } else if (t == IR_CAFE) {
     irTest(vec3(W * 0.25, 0.0, D - 2.3), vec3(W - 0.3, 1.02, D - 1.6), IM_COUNTER);
-    irTest(vec3(W * 0.3, 0.0, D - 0.45), vec3(W - 0.3, 2.0, D), IM_GOODS);       // back bar shelves
+    irTest(vec3(W * 0.3, 0.0, D - 0.45), vec3(W - 0.3, 2.1, D), IM_GOODS);          // back bar shelves
     for (int i = 0; i < 2; i++) {
-      float x = W * (0.2 + 0.45 * float(i)) + 0.3 * a.y, z = 1.1 + 0.9 * float(i) * b.z;
+      float x = W * (0.2 + 0.45 * float(i)) + 0.3 * a.y, z = 1.0 + (0.6 + 0.6 * float(i)) * b.z;
       irTest(vec3(x - 0.36, 0.72, z - 0.36), vec3(x + 0.36, 0.76, z + 0.36), IM_WOOD);
       irTest(vec3(x - 0.05, 0.0, z - 0.05), vec3(x + 0.05, 0.72, z + 0.05), IM_DARK);
-      irTest(vec3(x - 0.18, H - 1.0, z - 0.18), vec3(x + 0.18, H - 0.75, z + 0.18), IM_LAMP);   // pendant
+      irTest(vec3(x - 0.17, H - 1.05, z - 0.17), vec3(x + 0.17, H - 0.8, z + 0.17), IM_LAMP);   // pendant
     }
-    if (a.w < 0.6) irPerson(vec3(W * (0.25 + 0.5 * a.y), 0.0, 1.9), a.w < 0.3 ? 1.0 : 0.0, a.z);
+    if (a.w < 0.7) irPerson(vec3(W * (0.25 + 0.5 * a.y), 0.0, 1.9 + b.w), a.w < 0.35 ? 1.0 : 0.0, a.z);
+    irPerson(vec3(W * (0.45 + 0.3 * b.y), 0.0, D - 1.25), 0.0, b.z);              // barista
   } else { // retail
-    for (int i = 0; i < 2; i++) { float x = W * (0.22 + 0.42 * float(i)); irTest(vec3(x, 0.0, 2.0), vec3(x + 0.7, 1.55, D - 1.5), IM_GOODS); }
-    irTest(vec3(0.0, 0.0, D - 0.5), vec3(W, 2.1, D), IM_GOODS);
-    irTest(vec3(W * 0.7, 0.0, 1.0), vec3(W * 0.7 + 1.2, 0.95, 1.6), IM_COUNTER);
-    if (a.w < 0.5) irPerson(vec3(W * (0.3 + 0.4 * a.y), 0.0, 1.7), 0.0, a.z);
+    for (int i = 0; i < 2; i++) { float x = W * (0.2 + 0.4 * float(i)) + 0.2 * a.z; irTest(vec3(x, 0.0, 2.0), vec3(x + 0.7, 1.55, D - 1.5), IM_GOODS); }
+    irTest(vec3(0.0, 0.0, D - 0.5), vec3(W, 2.2, D), IM_GOODS);
+    irTest(vec3(W * 0.68, 0.0, 0.9), vec3(W * 0.68 + 1.2, 0.95, 1.5), IM_COUNTER);
+    if (a.w < 0.6) irPerson(vec3(W * (0.3 + 0.4 * a.y), 0.0, 1.7), 0.0, a.z);
   }
 }
 // ---------- materials ----------
@@ -239,7 +251,7 @@ float irBand(float x, float w, float fw) { return smoothstep(-fw, fw, x) * (1.0 
 vec3 irBooks(vec2 q, float s, float fw) { // q: (along shelf, up) metres
   float sh = floor(q.y / 0.36); float fy = fract(q.y / 0.36) * 0.36;
   float bk = floor(q.x / 0.045 + irH(vec2(sh, s)) * 3.0); float hb = irH(vec2(bk, sh + s * 3.1));
-  vec3 c = irPalette(hb) * 0.75;
+  vec3 c = mix(irMuted(hb), vec3(0.85, 0.82, 0.74), step(0.82, fract(hb * 5.3)) * 0.7);
   float top = 0.22 + 0.1 * irH(vec2(bk + 9.1, sh));
   float isBook = step(0.03, fy) * (1.0 - step(top, fy)) * step(0.08, irH(vec2(bk * 1.7, sh + 2.0)));
   vec3 board = vec3(0.45, 0.33, 0.22);
@@ -251,7 +263,7 @@ vec3 irBooks(vec2 q, float s, float fw) { // q: (along shelf, up) metres
 vec3 irGoods(vec2 q, float s, float fw) {
   float sh = floor(q.y / 0.42); float fy = fract(q.y / 0.42) * 0.42;
   float it = floor(q.x / 0.16); float h = irH(vec2(it, sh + s));
-  vec3 c = irPalette(h);
+  vec3 c = mix(irPalette(h), irMuted(h * 3.1), 0.4);
   float on = step(0.04, fy) * (1.0 - step(0.2 + 0.15 * h, fy)) * step(0.15, fract(q.x / 0.16));
   vec3 o = mix(vec3(0.85, 0.85, 0.83), c, on);
   return mix(o, vec3(0.6, 0.55, 0.5), smoothstep(0.02, 0.05, fw));
@@ -287,14 +299,23 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
           em += vec3(0.75, 0.8, 0.95) * inB * scr * lit * 0.7;
         }
       }
+      if ((t == IR_CLASS || t == IR_LAB || t == IR_OFFICE) && c4.w < 0.5) { // wall clock
+        vec2 cc = vec2(W * (0.25 + 0.5 * c4.z), min(H - 0.45, 2.35)); float d = length(vec2(q.x, p.y) - cc);
+        alb = mix(alb, vec3(0.92), 1.0 - smoothstep(0.13 - fw, 0.13 + fw, d)); alb = mix(alb, vec3(0.08), irBand(d - 0.13, 0.025, fw));
+      }
       if (t == IR_DORM || t == IR_LIVING) { // posters / art
         for (int i = 0; i < 2; i++) {
           vec4 r = irH4(seed + 3.3 * float(i) + 1.7);
-          float px = W * (0.12 + 0.5 * float(i) + 0.2 * r.x), pw = 0.45 + 0.35 * r.y, ph = pw * (1.25 + 0.2 * r.z), py = 1.3 + 0.3 * r.w;
+          float px = W * (0.08 + 0.5 * float(i) + 0.2 * r.x), pw = 0.45 + 0.35 * r.y, ph = pw * (1.25 + 0.2 * r.z), py = 1.45 + 0.35 * r.w;
           float inP = irBand(q.x - px, pw, fw) * irBand(p.y - py, ph, fw);
           vec2 pq = vec2((q.x - px) / pw, (p.y - py) / ph);
           vec3 pc = mix(irPalette(r.x + r.w), irPalette(r.y * 3.1), step(0.5, fract(pq.y * (1.0 + floor(r.z * 3.0)) + pq.x * (r.w - 0.5))));
           alb = mix(alb, pc, inP);
+        }
+        if (t == IR_DORM && b.z < 0.6) { // fairy lights along the top of the wall
+          float sy = H - 0.25 - 0.06 * sin(q.x * 3.0 + a.y * 6.0); vec2 dq = vec2(fract(q.x / 0.22) - 0.5, (p.y - sy) / 0.22);
+          float dot_ = (1.0 - smoothstep(0.08, 0.2, length(dq))) * (1.0 - smoothstep(0.02, 0.05, fw));
+          em += vec3(1.0, 0.62, 0.3) * dot_ * max(lit, uNight * 0.7) * 1.6;
         }
       }
       if (t == IR_CAFE) { // menu board above the counter
@@ -350,15 +371,16 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
       em += sc * scr * on * 0.85; alb = mix(alb, vec3(0.02), scr);
     }
   } else if (m == IM_FABRIC) {
-    alb = t == IR_LIVING || t == IR_DORM ? irPalette(c4.z + 0.5) * 0.7 : mix(vec3(0.12, 0.13, 0.15), mix(vec3(0.15, 0.22, 0.38), vec3(0.32, 0.12, 0.1), step(0.5, c4.w)), step(0.55, c4.z));
+    alb = t == IR_LIVING || t == IR_DORM ? irMuted(c4.z + 0.5) : mix(vec3(0.1, 0.105, 0.115), irMuted(c4.w) * 0.8, step(0.6, c4.z));
   } else if (m == IM_BOOKS) {
     bool face = (hi.y - lo.y > 1.0) && (abs(n.z) > 0.5 ? (hi.x - lo.x > 0.5) : (hi.z - lo.z > 0.5));
     alb = face ? irBooks(fq, seed + floor(lo.x * 3.0 + lo.z * 7.0), fw) : vec3(0.45, 0.35, 0.25);
     if (t == IR_LIBRARY && !face && abs(n.z) > 0.5) alb = mix(vec3(0.5, 0.42, 0.32), vec3(0.85, 0.82, 0.72), irBand(fq.y - 1.6, 0.15, fw) * irBand(fq.x - 0.12, 0.3, fw));
   } else if (m == IM_METAL) { alb = vec3(0.62, 0.63, 0.64); if (abs(n.z) > 0.5) alb *= 0.85 + 0.15 * step(0.03, abs(fract(fq.y / 0.24) - 0.5) * 0.24); }
   else if (m == IM_BED) {
-    alb = irPalette(c4.x) * 0.85;
-    if (abs(n.y) > 0.5) alb = mix(alb, vec3(0.9), step(fq.y, 0.45) * 0.0);
+    alb = irMuted(c4.x) * 1.1;
+    if (n.y < 0.5) alb *= 0.75;                                         // blanket drapes darker on the sides
+    if (n.y > 0.5) alb = mix(alb, vec3(0.88, 0.87, 0.84), step(hi.z - lo.z - 0.55, fq.y) * 0.85);   // sheet fold by the pillow
   } else if (m == IM_WHITE) { alb = vec3(0.88, 0.88, 0.86); }
   else if (m == IM_BENCH) { alb = abs(n.y) > 0.5 ? vec3(0.08, 0.08, 0.085) : mix(vec3(0.82, 0.83, 0.8), vec3(0.6), step(0.88, p.y) + step(abs(fract((n.x != 0.0 ? p.z : p.x) / 0.6) - 0.5), 0.02) * 0.5); }
   else if (m == IM_HOOD) {
@@ -368,7 +390,7 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
       alb = mix(alb, vec3(0.1, 0.12, 0.13), sash); em += vec3(0.85, 0.92, 1.0) * sash * lit * 0.55;
       alb *= 1.0 - 0.3 * irBand(fq.y - 0.88, 0.05, fw);
     }
-  } else if (m == IM_PERSON) { alb = mix(vec3(0.05, 0.05, 0.06), irPalette(c4.w) * 0.3, step(p.y - lo.y, 0.6) * 0.0 + 0.5) ; }
+  } else if (m == IM_PERSON) { alb = hi.y - lo.y < 0.3 ? vec3(0.32, 0.22, 0.17) * (0.6 + 0.8 * c4.y) : irMuted(c4.w * 3.7) * 0.55; }
   else if (m == IM_PLANT) { alb = p.y - lo.y < 0.35 ? vec3(0.45, 0.3, 0.22) : vec3(0.12, 0.3, 0.1) * (0.8 + 0.4 * irH(floor(p.xy * 12.0))); }
   else if (m == IM_GOODS) { alb = abs(n.y) > 0.5 ? vec3(0.7) : irGoods(fq, seed + floor(lo.x), fw); }
   else if (m == IM_LAMP) { alb = vec3(0.9); em += lampC * (lit * 1.8 + (t == IR_LIBRARY ? 0.0 : 0.0)) * (t == IR_LIBRARY ? vec3(0.4, 1.0, 0.55) * 0.9 : vec3(1.0)); }
@@ -380,27 +402,27 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
   // ---- lighting
   vec3 L = vec3(W * 0.5, H - 0.1, D * 0.55) - p; float d2 = dot(L, L);
   float diff = max(dot(n, L * inversesqrt(max(d2, 1e-3))), 0.0);
-  float lamp = m == IM_CEIL ? 0.5 : 0.32 + 0.9 * diff * (7.0 / (7.0 + d2));
-  float day = (1.0 - uNight) * (0.55 + 0.45 * max(-n.z, 0.0) + 0.25 * max(n.y, 0.0)) * exp(-p.z * 0.2);
+  float lamp = m == IM_CEIL ? 0.42 : 0.26 + 0.75 * diff * (7.0 / (7.0 + d2));
+  float day = (1.0 - uNight) * (0.5 + 0.5 * max(-n.z, 0.0) + 0.3 * max(n.y, 0.0) - 0.15 * max(-n.y, 0.0)) * (0.35 + 0.65 * exp(-p.z * 0.28));
   if (m == IM_WALL || m == IM_FLOOR || m == IM_CEIL) { // shell AO in the corners
     vec3 qd = min(p - vec3(0.0, yF, 0.0), vec3(W, H, D) - p);
     float e = abs(n.x) > 0.5 ? min(qd.y, qd.z) : (abs(n.y) > 0.5 ? min(qd.x, qd.z) : min(qd.x, qd.y));
     ao = 0.6 + 0.4 * smoothstep(0.0, 0.8, e);
   } else ao = 0.72 + 0.28 * smoothstep(0.0, 0.6, p.y - yF) + 0.1 * max(n.y, 0.0);
   ao *= irAO;
-  return alb * (lit * lamp * lampC * 0.95 + day * vec3(0.32, 0.33, 0.35) + vec3(0.006)) * ao + em;
+  return alb * (lit * lamp * lampC * 0.8 + day * vec3(0.4, 0.41, 0.43) + vec3(0.006)) * ao + em;
 }
 // approximate average room radiance (for tiny/far windows)
 vec3 irAverage(int t, float seed, float lit, vec3 lampC) {
-  vec3 base = irWallTint(seed) * 0.7;
-  return base * (lit * lampC * 0.75 + (1.0 - uNight) * 0.18 + 0.006) + lampC * lit * (t == IR_DORM || t == IR_LIVING ? 0.08 : 0.25);
+  vec3 base = irWallTint(seed) * 0.62;
+  return base * (lit * lampC * 0.55 + (1.0 - uNight) * 0.2 + 0.006) + lampC * lit * (t == IR_DORM || t == IR_LIVING ? 0.06 : 0.18);
 }
 // blinds / roller shades / curtains hanging just behind the glass. win = (x0, y0, x1, y1) in room space.
 vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
   vec4 r = irH4(wseed + 19.7);
   bool resid = (t == IR_DORM || t == IR_LIVING);
   float pc = resid ? 0.5 : (t == IR_OFFICE ? 0.04 : 0.0);
-  float pb = resid ? 0.3 : (t == IR_CAFE || t == IR_RETAIL ? 0.08 : (t == IR_LIBRARY ? 0.25 : 0.5));
+  float pb = resid ? 0.28 : (t == IR_CAFE || t == IR_RETAIL ? 0.08 : (t == IR_LIBRARY ? 0.2 : 0.36));
   float ww = win.z - win.x, wh = win.w - win.y;
   if (r.x < pc) { // curtains drawn in from both sides
     float z = 0.14; float tt = (z - irRO.z) * irIRD.z; vec2 q = irRO.xy + irRD.xy * tt;
@@ -409,23 +431,24 @@ vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
     float fwc = irPx * 1.2;
     float c = max(1.0 - smoothstep(win.x + cl - fwc, win.x + cl + fwc, q.x), smoothstep(win.z - cr - fwc, win.z - cr + fwc, q.x));
     c *= step(win.y - 0.3, q.y) * step(q.y, win.w + 0.4);
-    vec3 cc = mix(vec3(0.8, 0.74, 0.62), irPalette(r.w * 7.3) * 0.8, step(0.55, fract(r.w * 13.0)));
+    vec3 cc = mix(vec3(0.78, 0.72, 0.6), irMuted(r.w * 7.3) * 1.2, step(0.5, fract(r.w * 13.0)));
     float fold = mix(0.78 + 0.22 * sin(q.x * 22.0 + r.y * 9.0), 0.86, smoothstep(0.02, 0.06, irPx));
     vec3 col = cc * fold * ((1.0 - uNight) * 0.16 + lampC * lit * 0.5 + 0.005);
     return vec4(col, c);
   }
   if (r.x < pc + pb) { // venetian blind or roller shade from the top down to a random height
     float z = 0.05; float tt = (z - irRO.z) * irIRD.z; vec2 q = irRO.xy + irRD.xy * tt;
-    float bottom = win.w - (0.12 + 0.88 * r.y * r.y) * wh;
-    if (r.y > 0.93) bottom = win.y - 0.2;
+    float bottom = win.w - (0.1 + 0.75 * r.y * r.y) * wh;
+    if (r.y > 0.96) bottom = win.y - 0.2;
     float c = step(bottom, q.y) * step(win.x - 0.1, q.x) * step(q.x, win.z + 0.1);
-    bool ven = r.z < 0.62;
-    vec3 bc = ven ? mix(vec3(0.84, 0.83, 0.8), vec3(0.6, 0.62, 0.64), step(0.7, r.w)) : mix(vec3(0.86, 0.83, 0.75), vec3(0.3, 0.31, 0.33), step(0.65, r.w));
+    bool ven = r.z < 0.6;
+    vec3 bc = ven ? mix(vec3(0.8, 0.79, 0.76), vec3(0.58, 0.6, 0.62), step(0.7, r.w)) : mix(vec3(0.74, 0.71, 0.64), vec3(0.32, 0.33, 0.35), step(0.6, r.w));
     float sl = 1.0;
-    if (ven) { float f = fract(q.y / 0.05); sl = mix(0.55 + 0.45 * smoothstep(0.1, 0.3, f) * (1.0 - smoothstep(0.75, 0.95, f)), 0.8, smoothstep(0.01, 0.03, irPx)); }
-    float rail = 1.0 - step(bottom + 0.04, q.y);
-    vec3 col = bc * sl * ((1.0 - uNight) * 0.2 + lampC * lit * (ven ? 0.22 : 0.42) + 0.005) * (1.0 - 0.4 * rail);
-    return vec4(col, c * (ven ? 0.9 : 1.0));
+    if (ven) { float f = fract(q.y / 0.07); sl = mix(0.5 + 0.5 * smoothstep(0.05, 0.25, f) * (1.0 - smoothstep(0.8, 0.97, f)), 0.78, smoothstep(0.008, 0.02, irPx)); }
+    else sl = 0.92 + 0.08 * smoothstep(bottom, win.w, q.y);
+    float rail = 1.0 - step(bottom + 0.045, q.y);
+    vec3 col = bc * sl * ((1.0 - uNight) * 0.15 + lampC * lit * (ven ? 0.18 : 0.3) + 0.004) * (1.0 - 0.45 * rail);
+    return vec4(col, c * (ven ? 0.95 : 1.0));
   }
   return vec4(0.0);
 }
@@ -448,6 +471,15 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
   irMat = irNrm.y > 0.5 ? IM_FLOOR : (irNrm.y < -0.5 ? IM_CEIL : IM_WALL);
   irPS = ro + rd * irT; irOnFloor = irMat == IM_FLOOR; irBLo = lo; irBHi = R;
   irLayout(t, R, seed, lit, yF);
+  if (win.y > 0.45 && t != IR_LECTURE && t != IR_CAFE && t != IR_RETAIL) { // interior sill + things people leave on it
+    vec4 k = irH4(wseed + 3.7);
+    irTest(vec3(win.x - 0.08, win.y - 0.04, 0.0), vec3(win.z + 0.08, win.y, 0.26), IM_WHITE);
+    if (k.x < 0.22) { float x = mix(win.x + 0.1, win.z - 0.35, k.y);
+      irTest(vec3(x, win.y, 0.05), vec3(x + 0.18, win.y + 0.15, 0.22), IM_COUNTER);
+      irTest(vec3(x - 0.06, win.y + 0.15, 0.03), vec3(x + 0.24, win.y + 0.38 + 0.2 * k.z, 0.25), IM_PLANT); }
+    if (k.w < 0.2) { float x = mix(win.x + 0.08, win.z - 0.4, fract(k.y + 0.5));
+      irTest(vec3(x, win.y, 0.04), vec3(x + 0.32, win.y + 0.1 + 0.12 * k.z, 0.24), IM_GOODS); }
+  }
   vec3 col = irShade(t, R, yF, seed, lit, lampC);
   return mix(col, cov.rgb, cov.a);
 }
@@ -630,7 +662,8 @@ export function prepareWindowGeometry(geo, { use = USE.academic, bseed = 0, grou
       const a = list[i], b = list[j];
       if (a.nx * b.nx + a.nz * b.nz < 0.995 || Math.abs(a.d1 - b.d1) > 0.08) continue;
       const gs = Math.max(a.s0, b.s0) - Math.min(a.s1, b.s1), gy = Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1);
-      if ((gs < 0.2 && gy < -0.3) || (gy < 0.2 && gs < -0.3) || (gs < 0 && gy < 0)) { const ra = f2(i), rb = f2(j); if (ra !== rb) P2[rb] = ra; }
+      const ribbon = Math.abs(a.y0 - b.y0) < 0.12 && Math.abs(a.y1 - b.y1) < 0.12 && (a.y1 - a.y0) > 1.6;   // curtain-wall / ribbon panes
+      if ((gs < (ribbon ? 0.45 : 0.2) && gy < -0.3) || (gy < 0.2 && gs < -0.3) || (gs < 0 && gy < 0)) { const ra = f2(i), rb = f2(j); if (ra !== rb) P2[rb] = ra; }
     }
   }
   const win = new Map();
