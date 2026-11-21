@@ -5,7 +5,8 @@
 // dentils and modillions, bronze anthemion cresting, tiled gable roof with pedimented east/west ends broken
 // by great arched windows, and a portal approached by semicircular steps.
 import * as THREE from 'three';
-import { Kit } from './lib/beaux-kit.js';
+import { Kit, clipBelow } from './lib/beaux-kit.js';
+import { buildDoeInterior, updateDoeInterior } from './lib/doe-interior.js';
 
 export const info = {
   id: 'doe-library',
@@ -33,12 +34,14 @@ export async function build(ctx) {
   const verd = new THREE.MeshStandardMaterial({ color: 0x5f9686, roughness: 0.55, metalness: 0.25 }); verd.name = 'doeVerdigris';
 
   // ===================== NORTH WING =====================
-  const gN = k.groundMin([[NW.u0, NW.v0], [NW.u1, NW.v0], [-17, NW.v0]]); // terrace ~2.2
+  const gN = k.groundMin([[NW.u0, NW.v0], [NW.u1, NW.v0], [-17, NW.v0]]); // lowest ground along the north front
+  const gP = k.ground(-17.06, NW.v0 - 0.6);                                   // terrace in front of the north portal (~2.35)
+  const F1 = Math.max(gN + 0.85, gP + 0.32);                                  // interior: entrance floor (vestibule, lobby, Morrison)
   const yFound = -1.5;
   const yBase = 6.7, ySill = 7.25, yColTop = 16.5, yArch = 17.2, yFrieze = 18.05, yCorn = 19.3, yRidge = 24.9;
   const D = 0.95;
-  // core volume (hidden behind façades) closes the box
-  k.box(stone, NW.u0 + 0.6, NW.u1 - 0.6, yFound, yCorn, NW.v0 + 0.6, NW.v1, {});
+  // (the north wing is hollow: its rooms are built by lib/doe-interior.js)
+  let nrrWins = [], morWinN = [];
   {
     const F = k.side('N', NW.v0);
     const s0 = F.s(NW.u1), s1 = F.s(NW.u0); // s runs west->east reversed; s0 < s1
@@ -59,7 +62,7 @@ export async function build(ctx) {
     const baseOps = [];
     for (const [a, b] of bays) {
       const c = (a + b) / 2;
-      if (Math.abs(c - cs) < 0.5) baseOps.push({ s0: cs - 1.55, s1: cs + 1.55, y0: gN + 0.85, y1: 6.25 });
+      if (Math.abs(c - cs) < 0.5) baseOps.push({ s0: cs - 1.55, s1: cs + 1.55, y0: F1, y1: 6.25 });
       else baseOps.push({ s0: c - 1.1, s1: c + 1.1, y0: 3.3, y1: 5.9 });
     }
     F.wall(rust, s0, s1, yFound, yBase, 0.8, baseOps);
@@ -72,15 +75,18 @@ export async function build(ctx) {
     F.moulding(stone, s0, s1, yBase - 0.35, [[0.2, 0.12], [0.25, 0.3], [0.12, 0.42]]);
     F.box(stone, s0 - 0.1, s1 + 0.1, yBase + 0.22, ySill, -0.3, 1.35);
     // upper wall with the eleven arched reading-room windows
-    const winOps = bays.map(([a, b]) => { const c = (a + b) / 2, w = Math.abs(c - cs) < 0.5 ? 3.0 : Math.min(3.4, b - a - 1.75); return { s0: c - w / 2, s1: c + w / 2, y0: 8.15, y1: 15.4, arch: false }; });
+    const winOps = bays.map(([a, b]) => { const c = (a + b) / 2, w = Math.abs(c - cs) < 0.5 ? 3.0 : Math.min(3.4, b - a - 1.75); return { s0: c - w / 2, s1: c + w / 2, y0: 9.7, y1: 15.4, arch: false }; });
+    nrrWins = winOps.map((o) => [-o.s1, -o.s0]); morWinN = baseOps.filter((o) => o.y1 < 6.1).map((o) => [-o.s1, -o.s0]);
     F.wall(stone, s0, s1, ySill, yArch, 0.9, winOps);
     for (const op of winOps) {
-      F.window(op.s0, op.s1, op.y0, op.y1, { mullions: 3, transoms: [10.1, 12.1, 14.0], depth: 0.55, frameMat: M.darkBronze });
+      F.window(op.s0, op.s1, op.y0, op.y1, { mullions: 3, transoms: [11.1, 12.55, 14.0], depth: 0.55, frameMat: M.darkBronze });
       F.box(stone, op.s0 - 0.22, op.s0, op.y0, op.y1, 0, 0.1); F.box(stone, op.s1, op.s1 + 0.22, op.y0, op.y1, 0, 0.1);   // architrave
       F.box(stone, op.s0 - 0.22, op.s1 + 0.22, op.y1, op.y1 + 0.32, 0, 0.12);                                            // flat head
       F.box(stone, op.s0 - 0.4, op.s1 + 0.4, op.y1 + 0.32, op.y1 + 0.48, 0, 0.3);                                         // cornice
       F.box(stone, op.s0 - 0.15, op.s1 + 0.15, op.y0 - 0.25, op.y0, 0, 0.16);  // sill
-      F.box(stone, op.s0 + 0.15, op.s1 - 0.15, ySill + 0.1, op.y0 - 0.35, 0, 0.06, { detail: true }); // spandrel panel
+      F.box(stone, op.s0 + 0.15, op.s1 - 0.15, ySill + 0.1, op.y0 - 0.85, 0, 0.06, { detail: true }); // spandrel panel
+      F.box(stone, op.s0 - 0.12, op.s1 + 0.12, op.y0 - 0.72, op.y0 - 0.3, 0, 0.1);                     // fret band under the sill
+      F.repeat(stone, op.s0, op.s1, 0.28, 0.1, op.y0 - 0.64, op.y0 - 0.38, 0.1, 0.15);
     }
     // garland panels between paired columns
     for (let i = 0; i < cols.length - 1; i++) if (cols[i + 1] - cols[i] < 2.5) {
@@ -113,28 +119,33 @@ export async function build(ctx) {
       for (const sx of [-1, 1]) { F.geom(stone, new THREE.CylinderGeometry(0.34, 0.34, 0.12, 16).rotateX(Math.PI / 2).scale(1.3, 1, 1).translate(cs + sx * (iw / 2 + 0.9), (yArch + yFrieze) / 2, 1.3), { detail: true }); }
     }
     // portal: architrave, inscribed lintel, broad flat hood on S-consoles, bronze doors, bust of Minerva
-    const p0 = cs - 1.55, p1 = cs + 1.55, pt = gN + 0.85;
+    const p0 = cs - 1.55, p1 = cs + 1.55, pt = F1;
     F.box(stone, p0 - 0.45, p0, pt, 6.25, 0, 0.22); F.box(stone, p1, p1 + 0.45, pt, 6.25, 0, 0.22);
     F.box(stone, p0 - 0.45, p1 + 0.45, 6.25, 7.0, 0, 0.26);
     F.box(bronze, p0 + 0.3, p1 - 0.3, 6.45, 6.8, 0.26, 0.28, { detail: true }); // inscription band
     F.box(verd, p0 - 0.75, p1 + 0.75, 7.0, 7.32, 0, 0.95);                    // hood (patinated bronze)
     for (const sx of [p0 - 0.6, p1 + 0.6]) { const cg = new THREE.Shape(); cg.moveTo(0, 0); cg.quadraticCurveTo(0.55, 0.1, 0.65, 0.75); cg.lineTo(0, 0.75); cg.lineTo(0, 0); const g = new THREE.ExtrudeGeometry(cg, { depth: 0.3, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(sx + 0.15, 6.25, 0.2); F.geom(stone, g); }
-    F.window(p0, p1, pt, 6.25, { mullions: 3, transoms: [pt + 2.6], depth: 0.6, glassMat: M.windowNight, frameMat: M.bronze });
+    F.window(p0, p1, pt + 3.0, 6.25, { mullions: 3, depth: 0.6, glassMat: M.windowNight, frameMat: M.bronze });   // transom light
+    F.box(M.bronze, p0, p1, pt + 2.88, pt + 3.02, -0.68, -0.5);
+    for (const [sa, sb] of [[p0 + 0.03, p0 + 0.11], [p1 - 0.11, p1 - 0.03]]) {   // bronze door leaves standing open inward
+      F.box(M.bronze, sa, sb, pt + 0.01, pt + 2.86, -2.05, -0.62);
+      for (const yy of [pt + 0.9, pt + 1.9]) F.box(M.darkBronze, sa - 0.015, sb + 0.015, yy, yy + 0.06, -1.95, -0.72, { detail: true });
+    }
     F.geom(M.bronze, new THREE.SphereGeometry(0.32, 12, 10).scale(1, 1.25, 0.9).translate(cs, 7.75, 0.45), { detail: true });
     F.box(stone, cs - 0.4, cs + 0.4, 7.32, 7.45, 0.2, 0.7, { detail: true });
     // two Ionic columns flanking the central window
     for (const sx of [-1, 1]) F.column(stone, cs + sx * 1.85, 7.9, 13.9, 0.45, { tc: 0.0, fluted: false, style: 'ionic' });
     // semicircular steps from the Glade path up to the portal (broken flight: landing at the centre)
-    const nSteps = Math.max(2, Math.round((pt - gN) / 0.16));
+    const gS = Math.min(gP - 0.02, pt - 0.3), nSteps = Math.max(2, Math.round((pt - gS) / 0.16));
     for (let i = 0; i < nSteps; i++) {
-      const r = 5.2 - i * 0.45, y0s = gN + (i * (pt - gN)) / nSteps, y1s = gN + ((i + 1) * (pt - gN)) / nSteps;
+      const r = 5.2 - i * 0.45, y0s = gS + (i * (pt - gS)) / nSteps, y1s = gS + ((i + 1) * (pt - gS)) / nSteps;
       const g = new THREE.CylinderGeometry(r, r, y1s - yFound + 0.0, 40, 1, false, Math.PI / 2, Math.PI);
       g.translate(cs, (y1s + yFound) / 2, 0); F.geom(dark, g);
     }
     const [ex, ez] = k.xz(-17.06, NW.v0);
     walkables.push({ type: 'fn', bounds: [ex - 6, ez - 6, ex + 6, ez + 6], heightAt: (x, z) => {
       const [u, v] = k.uv(x, z); const r = Math.hypot(u + 17.06, v - NW.v0); if (v > NW.v0 + 0.02 || r > 5.2) return null;
-      const i = Math.min(nSteps - 1, Math.floor((5.2 - r) / 0.45)); return gN + ((i + 1) * (pt - gN)) / nSteps; } });
+      const i = Math.min(nSteps - 1, Math.floor((5.2 - r) / 0.45)); return gS + ((i + 1) * (pt - gS)) / nSteps; } });
   }
   // pedimented east and west ends of the reading room
   for (const [name, at] of [['W', NW.u0], ['E', NW.u1]]) {
@@ -172,7 +183,8 @@ export async function build(ctx) {
     F.box(stone, win.s0 + 0.1, win.s1 - 0.1, ySill - 0.18, ySill, 0, 0.85);
   }
   // tiled gable roof over the reading room (ridge along u)
-  k.gableRoof(M.redTile, NW.u0 - 0.8, NW.u1 + 0.8, NW.v0 - 0.05, NW.v1 + 0.3, yCorn, yRidge, 'u', { soffit: stone });
+  k.gableRoof(M.redTile, NW.u0 - 0.8, NW.u1 + 0.8, NW.v0 - 0.05, NW.v1 + 0.3, yCorn, yRidge, 'u', { soffit: false });
+  k.box(stone, NW.u0 - 0.8, NW.u0, yCorn - 0.05, yCorn, NW.v0 - 0.05, NW.v1 + 0.3); k.box(stone, NW.u1, NW.u1 + 0.8, yCorn - 0.05, yCorn, NW.v0 - 0.05, NW.v1 + 0.3);
   k.box(M.copper, NW.u0 - 0.8, NW.u1 + 0.8, yRidge - 0.05, yRidge + 0.22, (NW.v0 + NW.v1) / 2 - 0.25, (NW.v0 + NW.v1) / 2 + 0.25, { detail: true });
   {   // three low copper-framed glazed skylights on the north slope (lying on the slope, ~0.35 m proud)
     const vE = NW.v0 - 0.05, vR = (NW.v0 - 0.05 + NW.v1 + 0.3) / 2, th = Math.atan2(yRidge - yCorn, vR - vE);
@@ -187,11 +199,15 @@ export async function build(ctx) {
       k.add(verd, new THREE.BoxGeometry(ub - ua + 0.36, 0.3, 0.2).translate((ua + ub) / 2, yAt(vb) + 0.3, vb + 0.1));
     }
   }
-  colliders.push({ type: 'poly', pts: k.polyLocal([[NW.u0, NW.v0], [NW.u1, NW.v0], [NW.u1, NW.v1], [NW.u0, NW.v1]]), y0: -3, y1: yRidge });
+  { const pa = -17.06 - 1.55, pb = -17.06 + 1.55;   // north wing shell, open at the north portal
+    for (const pts of [[[NW.u0, NW.v1], [NW.u0, NW.v0], [pa, NW.v0]], [[pb, NW.v0], [NW.u1, NW.v0], [NW.u1, NW.v1]]]) colliders.push({ type: 'poly', pts: k.polyLocal(pts), y0: -3, y1: yRidge });
+    colliders.push({ type: 'poly', pts: k.polyLocal([[pa, NW.v0], [pb, NW.v0]]), y0: 6.2, y1: yRidge }); }
 
   // ===================== SOUTH BLOCK (1914–17) =====================
   const yCornS = 17.5, yDeck = 20.6;
-  k.box(stone, SB.u0 + 0.6, SB.u1 - 0.6, yFound, yCornS, SB.v0 - 0.5, SB.v1 - 0.6);
+  const SH = { u0: -22.0, u1: -12.1, v1: -14.25, y1: 17.0 };   // stair-hall void (its finishes come from the interior)
+  k.box(stone, SB.u0 + 0.6, SH.u0, yFound, yCornS, SB.v0, SB.v1 - 0.6); k.box(stone, SH.u1, SB.u1 - 0.6, yFound, yCornS, SB.v0, SB.v1 - 0.6);
+  k.box(stone, SH.u0, SH.u1, yFound, yCornS, SH.v1, SB.v1 - 0.6); k.box(stone, SH.u0, SH.u1, SH.y1, yCornS, SB.v0, SH.v1);
   const range = (F, s0, s1, opts = {}) => {
     const n = Math.max(1, Math.round((s1 - s0) / 4.6)), bw = (s1 - s0) / n;
     const ops1 = [], ops2 = [], ops3 = [];
@@ -215,7 +231,7 @@ export async function build(ctx) {
   range(k.side('W', SB.u0), SB.v0 + 0.0, SB.v1, { archUpper: true });
   range(k.side('S', SB.v1), SB.u0, SB.u1);
   { const F = k.side('E', SB.u1); range(F, F.s(1.85), F.s(-12.4)); }
-  k.hipRoof(M.redTile, SB.u0 - 0.6, SB.u1 + 0.6, SB.v0 - 10, SB.v1 + 0.6, yCornS, 0.54, yDeck, { soffit: stone });
+  k.hipRoof(M.redTile, SB.u0 - 0.6, SB.u1 + 0.6, SB.v0 - 10, SB.v1 + 0.6, yCornS, 0.54, yDeck, { soffit: stone, clip: clipBelow('v', -26.0), soffitClip: clipBelow('v', SB.v0) }); // clipped clear of the reading-room vault
   // central Loan Hall block with hipped roof and pyramidal skylight
   const CB = { u0: -33.8, u1: -0.4, v0: -9.5, v1: 24.5 };
   k.box(stone, CB.u0, CB.u1, yDeck - 0.5, 23.4, CB.v0, CB.v1);
@@ -236,7 +252,7 @@ export async function build(ctx) {
   // raised stair-hall roof between the reading room and the Loan Hall
   k.box(stone, -21.5, -12.0, yDeck - 0.5, 22.7, -21.6, -14.5);
   k.box(M.glass, -20.5, -13.0, 22.7, 22.95, -20.8, -15.2);
-  colliders.push({ type: 'poly', pts: k.polyLocal([[SB.u0, SB.v0], [SB.u1, SB.v0], [SB.u1, SB.v1], [SB.u0, SB.v1]]), y0: -3, y1: 27 });
+  colliders.push({ type: 'poly', pts: k.polyLocal([[SH.u0 + 0.4, SB.v0], [SB.u0, SB.v0], [SB.u0, SB.v1], [SB.u1, SB.v1], [SB.u1, SB.v0], [SH.u1 - 0.4, SB.v0]]), y0: -3, y1: 27 });
 
   // ===================== LINK (Doe–Bancroft) =====================
   for (const [u0, u1, v0, v1, h] of [[16.0, 21.2, -19.4, 24.0, 13.3], [16.0, 25.0, 24.0, 35.1, 7.5], [SB.u1 - 0.2, 16.0, -17.8, -12.4, 18.0], [SB.u1 - 0.2, 16.0, 1.85, 35.1, 18.0], [21.0, BA.u0 + 0.3, -14.5, 17.5, 18.7]]) {
@@ -287,9 +303,36 @@ export async function build(ctx) {
   const [bx, bz] = k.xz(BA.u1 + 1.2, 5.2);
   walkables.push({ type: 'poly', pts: k.polyLocal([[BA.u1, 0.8], [BA.u1 + 1.9, 0.8], [BA.u1 + 1.9, 9.6], [BA.u1, 9.6]]), y: gBe + 0.75 });
 
+  // ===================== INTERIORS =====================
+  const ig = buildDoeInterior({ F1, F2: ySill, cs: -17.06, wins: nrrWins, morWinN, morWinW: [[-32.05 - 2.6, -32.05 - 1.0], [-32.05 + 1.0, -32.05 + 2.6]], endWin: { vc: -32.05, hw: 3.0, y0: 8.2, ys: 17.6 } });
+  for (const c of ig.colliders) colliders.push({ type: 'poly', pts: k.polyLocal(c.pts), y0: c.y0, y1: c.y1 });
+  for (const w of ig.walkables) {
+    if (w.type === 'poly') { walkables.push({ type: 'poly', pts: k.polyLocal(w.pts), y: w.y }); continue; }
+    const [a, b, c, d] = w.rect, cr = [k.xz(a, b), k.xz(c, b), k.xz(c, d), k.xz(a, d)];
+    walkables.push({ type: 'fn', bounds: [Math.min(...cr.map((p) => p[0])), Math.min(...cr.map((p) => p[1])), Math.max(...cr.map((p) => p[0])), Math.max(...cr.map((p) => p[1]))],
+      heightAt: (x, z) => { const [u, v] = k.uv(x, z); return u < a || u > c || v < b || v > d ? null : w.f(u, v); } });
+  }
+  const object3d = k.finish();
+  for (const m of object3d.children) if (m.isMesh && m.material === M.windowNight) m.castShadow = false; // let daylight through the glass
+  ig.group.rotation.y = k.phi; object3d.add(ig.group);
+  ig.group.traverse((o) => { if (o.isMesh) o.frustumCulled = false; }); // compile once while loading, then cull
+  const L = (u, y, v) => { const [x, z] = k.xz(u, v); return [x, y, z]; };
+  const inf = ig.info, st = { hands: ig.hands, frames: 0 }, A = ctx.anchor;
   return {
-    object3d: k.finish(), colliders, walkables,
-    interactions: [{ id: 'doe-north-portal', pos: [ex0(k), 3.2, ez0(k)], radius: 4, label: 'The University Library: North Reading Room' }],
+    object3d, colliders, walkables,
+    interactions: [
+      { id: 'doe-north-portal', pos: [ex0(k), 3.2, ez0(k)], radius: 4, label: 'Enter the North Reading Room', teleport: L(inf.cs, inf.F2 + 0.02, inf.nrr.vS - 1.6) },
+      { id: 'doe-stair-up', pos: L(inf.cs, inf.F1 + 1, -23.2), radius: 2.2, label: 'Climb the stairs to the North Reading Room', teleport: L(inf.cs, inf.F2 + 0.02, inf.nrr.vS - 1.6) },
+      { id: 'doe-nrr-down', pos: L(inf.cs, inf.F2 + 1, inf.nrr.vS - 1.0), radius: 1.6, label: 'Go down to the north entrance', teleport: L(inf.cs, inf.F1 + 0.02, -39.0) },
+    ],
+    update(dt, env) {
+      st.frames++;
+      const cp = env.camera.position, [u, v] = k.uv(cp.x - A.x, cp.z - A.z), ly = cp.y - A.y;
+      const near = u > -62 && u < 64 && v > -74 && v < 42 && ly < 45;
+      if (st.frames === 4) ig.group.traverse((o) => { if (o.isMesh) o.frustumCulled = true; });
+      ig.group.visible = st.frames < 4 || near;
+      if (ig.group.visible) updateDoeInterior(st, env);
+    },
   };
 }
 function ex0(k) { return k.xz(-17.06, -44.5)[0]; }
