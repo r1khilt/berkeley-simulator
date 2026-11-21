@@ -29,7 +29,7 @@ export async function build(ctx) {
   const gAvg = (K.g(u0, 0) + K.g(u1, 0)) / 2; const gMin = K.gMin(u0, v0, u1, v1, 8); const yB = gMin - 1.2;
   const F0 = Math.max(0.0, gAvg) + 0.45; // ground-floor level (a low plinth above grade)
   const floors = [F0, F0 + 4.1, F0 + 8.0, F0 + 11.9];
-  const rows = [{ y0: F0 + 0.55, h: 3.25 }, { y0: floors[1] + 0.6, h: 3.0 }, { y0: floors[2] + 0.6, h: 3.0 }, { y0: floors[3] + 0.55, h: 2.6 }];
+  const rows = [{ y0: F0 + 0.55, h: 3.25 }, { y0: floors[1] + 0.6, h: 3.0 }, { y0: floors[2] + 0.6, h: 3.0 }, { y0: floors[3] + 0.55, h: Math.min(2.6, eave - 0.8 - (floors[3] + 0.55)) }];
   const BAY = 3.6, WW = 1.35;
   // entrances on the west front where the paths arrive (v = -18.5 main, 8.6), and on the east front (v = 23.2)
   const ents = { W: [{ v: -18.5, main: true }, { v: 8.6 }], E: [{ v: 23.2 }] };
