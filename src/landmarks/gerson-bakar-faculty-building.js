@@ -6,7 +6,9 @@
 // wing (ridge ~25.5 m) with a raised lantern at the crossing, a lower three-storey south-west block, and two lower
 // gabled wings stepping up the slope toward Piedmont Avenue.
 import * as THREE from 'three';
-import { Kit, tint, tintMul, rect, rectRuns, banded, brackets, sign, railing, panelMat, curtain } from './lib/b06a-kit.js';
+import { Kit, rect, rectRuns, banded, brackets, sign, railing, curtain } from './lib/b06a-kit.js';
+import { haasMats, arcade, discLamp } from './lib/reastc-haas.js';
+import { boardMat } from './lib/b05b-kit.js';
 
 export const info = {
   id: 'gerson-bakar-faculty-building',
@@ -19,9 +21,16 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-4.8);
   const K = new Kit(ctx, ANG); const M = ctx.M;
-  const STONE = panelMat('haas-cast6', { base: '#ada595', joint: '#938b7c', cols: 2, rows: 4, vary: 0.02, noise: 0.05, jw: 3, span: 2.4, roughness: 0.9 }), TAUPE = panelMat('haas-taupe4', { base: '#6f665b', joint: '#5f574d', cols: 1, rows: 8, vary: 0.02, noise: 0.03, jw: 2, span: 2.4, roughness: 0.85 }), CREAM = panelMat('haas-cast7', { base: '#b7af9f', joint: '#9d9585', cols: 2, rows: 4, vary: 0.02, noise: 0.05, jw: 3, span: 2.4, roughness: 0.9 });
-  const ROOF = tint(M, 'shingle', '#c4c7c2'), GREEN = tint(M, 'whitePaint', '#4e7d76'), CHAR = tint(M, 'whitePaint', '#6f6e6a'), HGL = tint(M, 'glass', '#2f4a4a', { metalness: 0.4, roughness: 0.05 });
-  const BRK = tint(M, 'woodDark', '#4a3f36'), TANTRIM = tint(M, 'whitePaint', '#a89880'), CAST = tintMul(M, 'stuccoWhite', 0.78, 0.74, 0.66), PIPE = tint(M, 'bronze', '#4f3e33');
+  // shared Haas palette (reastc-haas) so the faculty building matches Cheit Hall and the Student Services Building
+  const X = haasMats(M);
+  // the faculty building's own finish (Commons photo): warm taupe board-formed concrete with cream precast trim,
+  // grey-taupe siding on the top storey, teal frames, copper downspouts
+  const WALL = boardMat(0xe6dbc7); WALL.name = 'bakar-boardform';
+  { const big = (t) => { const c = t.clone(); c.repeat.set(0.7, 0.7); c.needsUpdate = true; return c; }; WALL.map = big(WALL.map); WALL.normalMap = big(WALL.normalMap); WALL.normalScale.set(0.55, 0.55); } // ~0.22 m formwork boards
+  const STONE = WALL, TAUPE = X.siding, CREAM = WALL;
+  const ROOF = X.roof, GREEN = X.teal, CHAR = X.teal, HGL = M.windowNight;
+  const BRK = X.cast, TANTRIM = X.fascia, CAST = X.cast, PIPE = X.fascia;
+  void CHAR;
   const colliders = [], walkables = [];
   const roofOv = 1.3;
 
@@ -58,7 +67,7 @@ export async function build(ctx) {
   // north-south wing (five storeys on the downhill side; runs the full length of the west side)
   wing({ u0: -25.3, v0: -36.0, u1: -4.3, v1: 13.8, eave: 19.3, slope: 0.46, faces: 'NWES' });
   // east-west wing (ridge ~25.5)
-  wing({ u0: -4.3, v0: -6.0, u1: 30.6, v1: 14.4, eave: 19.0, slope: 0.46, faces: 'NSE' });
+  wing({ u0: -4.3, v0: -6.0, u1: 30.6, v1: 14.4, eave: 19.0, slope: 0.58, faces: 'NSE' });
   // lower three-storey strip along the south (flat roof with cast-stone coping, ~11.6 m)
   wing({ u0: -27.6, v0: 13.8, u1: -7.6, v1: 19.1, eave: 11.3, slope: 0.42, faces: 'SWE', top: 3.0, base: 4.6 });
   // gabled bar (ridge north-south) and east wing (ridge east-west) stepping up toward Piedmont Avenue
@@ -90,6 +99,15 @@ export async function build(ctx) {
     K.rbox(R, CAST, s0 - 0.35, gl + 6.7, 0, s0 + 0.35, gl + 7.8, 0.7);
   }
 
+  // raised louvred lantern over the crossing of the two main wings (LiDAR ~28 m)
+  { const lu = -7.6, lv = 3.4, hw = 2.6; K.box(CREAM, lu - hw, 23.0, lv - hw, lu + hw, 26.4, lv + hw);
+    for (const [a, b] of [[[lu - hw, lv + hw], [lu + hw, lv + hw]], [[lu + hw, lv + hw], [lu + hw, lv - hw]], [[lu + hw, lv - hw], [lu - hw, lv - hw]], [[lu - hw, lv - hw], [lu - hw, lv + hw]]]) {
+      const R = K.run(a, b); K.rbox(R, M.concreteDark, 0.5, 23.6, -0.3, R.L - 0.5, 26.0, -0.02); for (let k = 0; k < 6; k++) K.rbox(R, GREEN, 0.5, 23.8 + k * 0.36, 0, R.L - 0.5, 23.9 + k * 0.36, 0.12, { detail: true }); }
+    K.box(CAST, lu - hw - 0.25, 26.4, lv - hw - 0.25, lu + hw + 0.25, 26.65, lv + hw + 0.25); K.hip(ROOF, lu - hw - 0.5, lv - hw - 0.5, lu + hw + 0.5, lv + hw + 0.5, 26.65, 0.6); }
+  // covered arcades with pergolas along the courtyard faces (south face of the east-west wing, west face of the gabled bar)
+  { const R = K.run([-4.3, 14.4], [12.6, 14.4]); const gl = Math.max(K.g(-2, 15.5), K.g(3, 15.5)); for (const [a, b] of [[0.4, 5.7], [11.3, 16.5]]) arcade(K, R, a, b, gl, 3.8, { X, pitch: 3.6, yBase: K.gMin(-4.3, 14.4, 12.6, 17.0) - 1.0 });
+    const R2 = K.run([12.6, 14.4], [12.6, 29.8]); const gl2 = Math.max(K.g(11.0, 18), K.g(11.0, 26)); arcade(K, R2, 2.8, R2.L - 0.6, gl2, 3.8, { X, pitch: 4.0, yBase: K.gMin(10.0, 14.4, 12.6, 29.8) - 1.0 }); }
+  for (const [u, v] of [[2.0, 22.0], [-6.0, 24.0]]) discLamp(K, u, K.g(u, v), v, 6.0, X);
   const object3d = K.finish();
   object3d.name = 'gerson-bakar-faculty-building';
   return { object3d, colliders, walkables };
