@@ -128,7 +128,7 @@ async function boot() {
     const pts = []; for (const fp of lmFootprints) { let x = 0, z = 0; fp.forEach((p) => { x += p[0]; z += p[1]; }); x /= fp.length; z /= fp.length; let r = 0; fp.forEach((p) => { r = Math.max(r, Math.hypot(p[0] - x, p[1] - z)); }); if (r < 60) pts.push([x, z, r * 0.8]); }
     treeSys.hideInPolys([...lmFootprints, ...manifest.landmarks.flatMap((l) => l.clear || [])].filter((fp) => fp.length >= 3)); // new-buildings: `clear` polygons = sites rebuilt since the 2021 LiDAR
     scene.add(treeSys.group);
-    for (let i = 0; i < trees.n; i++) { const h = trees.h[i] / 100; if (h > 4.5 && trees.sp[i] !== 13) physics.addCircle(trees.x[i] / 10, trees.z[i] / 10, Math.min(0.9, 0.18 + h * 0.012), trees.y[i] / 100 - 2, trees.y[i] / 100 + 3, 'tree'); }
+    for (let i = 0; i < trees.n; i++) { const h = trees.h[i] / 100; if (treeSys.hidden.has(i)) continue; /* new-buildings: no invisible trunks inside landmarks / clear zones */ if (h > 4.5 && trees.sp[i] !== 13) physics.addCircle(trees.x[i] / 10, trees.z[i] / 10, Math.min(0.9, 0.18 + h * 0.012), trees.y[i] / 100 - 2, trees.y[i] / 100 + 3, 'tree'); }
   } catch (e) { console.warn('trees unavailable', e); }
   BS.trees = treeSys; phase('treeSys');
   { // leaf-litter map from deciduous trees (2 m texels)

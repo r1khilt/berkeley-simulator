@@ -27,56 +27,75 @@ export const info = {
   subtitle: 'John Carl Warnecke · 1970 · renovated 2026',
   blurb: 'The undergraduate library beside Memorial Glade, linked underground to the Main Stacks. Its top two floors became a 24-hour study space in 2016, and its lower three floors reopened in August 2026 as the Carol T. Christ Center for Connected Learning, with an expanded Free Speech Movement Café at the south entrance.',
   replaces: ['w/24025027', 'way/24025027', 'w/1098756727'],
-  // site work outside the OSM outline (east plaza deck with Press, north deck, SW stair): hide stand-ins + 2021 LiDAR trees here
-  clear: [rectXZ(30.5, -17.5, 50.6, 12.5), rectXZ(30.5, 12.5, 38.5, 20.5), rectXZ(50.6, -7.5, 56.5, 7.5), rectXZ(-22, -31, 26, -23.9), rectXZ(-41, 20, -30.5, 25.6)],
+  // site work outside the OSM outline (east plaza deck with Press, its stairs, north deck): hide stand-ins + 2021 LiDAR trees here
+  clear: [rectXZ(30.5, -17.5, 50.6, 12.5), rectXZ(30.5, 12.5, 38.5, 20.5), rectXZ(50.6, -7.5, 56.5, 7.5), rectXZ(-22, -31, 26, -23.9)],
 };
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
-  const C = tint(M.concrete, 0xc4bfb4, 'mfConc');          // board-smooth cast concrete, cool beige-grey
-  const CT = tint(M.concrete, 0xc8c0b5, 'mfTower');        // the stair towers read a touch warmer
-  const CD = tint(M.concrete, 0x8e8a83, 'mfConcDark');     // recessed / inner concrete
-  const GL = nightGlow(std(0x2c3438, 'mfGlass', { rough: 0.05, metal: 0.35, extra: { envMapIntensity: 2.0, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0);
+  const C = tint(M.concrete, 0xe1dfda, 'mfConc');          // cast-in-place concrete, weathered warm grey (~#a9a69f)
+  const CT = tint(M.concrete, 0xddd6cd, 'mfTower');        // the stair towers read a touch warmer
+  const CD = tint(M.concrete, 0xaaa8a3, 'mfConcDark');     // soffits, recesses, weathered parapets
+  const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
   const FR = std(0x3a322b, 'mfBronze', { rough: 0.45, metal: 0.7 });   // dark bronze anodised frames
-  const PG = std(0x8d4b37, 'mfPergola', { rough: 0.7, metal: 0.2 });   // red slatted pergola
-  const GRN = std(0x4f6b39, 'mfPlant', { rough: 0.95 });
+  const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 0.45 } }), 1.0); // shaded podium glazing still catches the sky
+  const PG = std(0x3a3633, 'mfPergola', { rough: 0.55, metal: 0.5 });  // dark steel pergola frame
+  const GRN = std(0x3d4f2c, 'mfPlant', { rough: 0.95 });
   const WOOD = M.wood;
   const colliders = [], walkables = [];
-  const F3 = 4.4, F4 = 8.8, F5 = 13.2, SOF = 16.35, RT = 17.55, TP = 18.9, DECK_E = 8.7, DECK_N = 4.6;
-  const GW = -18.5, GN = -18.6, GS = 18.6, GE = 31.5; // glass lines of the main block
-  const BP = 2.1, RP = 2.55;                           // balcony / roof projection beyond the glass
+  const F3 = 4.4, F4 = 8.8, F5 = 13.2, SOF = 16.35, RT = 17.55, TP = 19.6, DECK_E = 8.7, DECK_N = 4.6;
+  const GW = -17.2, GN = -17.3, GS = 17.3, GE = 31.5; // glass lines of the main block (deep in shadow behind the balconies)
+  const BP4 = 2.1, BP5 = 2.6, BP = 2.35, RP = 3.85;                           // balcony / roof projection beyond the glass
   const TW = [[-17, -5], [16, 28]];                    // tower spans along u
   const TNv = -23.6, TSv = 22.8;                       // tower outer faces (north / south)
   const PU = -30.5, PS = 25.5, PN = -24.5;             // west podium edges; south walkway edge
   const rectCol = (u0, v0, u1, v1, y0, y1) => K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], y0, y1);
 
   // ---------- helpers ----------
-  const beams = (R, s0, s1, ySof, dEdge, h0, h1, pitch = 6) => { // tapered downstand beams under a cantilever
+  const beams = (R, s0, s1, ySof, dEdge, h0, h1, pitch = 3.6, w = 0.45) => { // tapered downstand beams under a cantilever
     const n = Math.max(1, Math.round((s1 - s0) / pitch));
     for (let i = 0; i <= n; i++) {
-      const s = Math.min(s1 - 0.2, Math.max(s0 + 0.2, s0 + (s1 - s0) * i / n));
+      const s = Math.min(s1 - w / 2, Math.max(s0 + w / 2, s0 + (s1 - s0) * i / n));
       const sh = new THREE.Shape(); sh.moveTo(-0.3, ySof); sh.lineTo(-0.3, ySof - h0); sh.lineTo(dEdge, ySof - h1); sh.lineTo(dEdge, ySof); sh.lineTo(-0.3, ySof);
-      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.4, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s + 0.2, 0, 0);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s + w / 2, 0, 0);
       K.addRun(R, C, g);
     }
   };
   // signature balcony: cantilevered slab, flat spandrel band, block spacers, floating rail in ~6 m segments, soffit beams.
   // e0/e1 extend band + rail past the run ends (corner wraps); slabExt extends the slab too.
   const balcony = (R, s0, s1, yF, { e0 = 0, e1 = 0, slabExt = false } = {}) => {
-    const a = s0 - e0, b = s1 + e1;
+    const a = s0 - e0, b = s1 + e1; const BP = yF > F4 + 1 ? BP5 : BP4;
     K.rbox(R, C, slabExt ? a : s0, yF - 0.32, -0.3, slabExt ? b : s1, yF, BP - 0.27);
-    K.rbox(R, C, a, yF - 0.52, BP - 0.28, b, yF + 0.6, BP);
-    const n = Math.max(1, Math.round((b - a) / 3));
-    for (let i = 0; i <= n; i++) { const s = Math.min(b - 0.14, Math.max(a + 0.14, a + (b - a) * i / n)); K.rbox(R, C, s - 0.13, yF + 0.6, BP - 0.26, s + 0.13, yF + 0.86, BP - 0.04, { detail: true }); }
-    const sn = Math.max(1, Math.round((b - a) / 6));
-    for (let i = 0; i < sn; i++) { const p = a + (b - a) * i / sn, q = a + (b - a) * (i + 1) / sn; K.rbox(R, C, p + (i ? 0.05 : 0), yF + 0.86, BP - 0.31, q - (i < sn - 1 ? 0.05 : 0), yF + 1.2, BP + 0.02); }
-    for (let i = 1; i < sn; i++) { const p = a + (b - a) * i / sn; K.rbox(R, CD, p - 0.025, yF - 0.52, BP - 0.01, p + 0.025, yF + 0.6, BP + 0.008, { detail: true }); }
-    beams(R, s0, s1, yF - 0.32, BP - 0.3, 0.62, 0.26);
+    const sn = Math.max(1, Math.round((b - a) / 6.5));
+    for (let i = 0; i < sn; i++) { const p = a + (b - a) * i / sn, q = a + (b - a) * (i + 1) / sn; K.rbox(R, C, p + (i ? 0.02 : 0), yF - 0.62, BP - 0.34, q - (i < sn - 1 ? 0.02 : 0), yF + 0.55, BP); }
+    K.rbox(R, CD, a, yF - 0.6, BP - 0.38, b, yF + 0.53, BP - 0.33); // back of the panel joints
+    const bn = Math.max(1, Math.round((b - a) / 5.5));
+    for (let i = 0; i < bn; i++) { // separate top blocks on short square posts, open gaps between
+      const p = a + (b - a) * i / bn + (i ? 0.13 : 0), q = a + (b - a) * (i + 1) / bn - (i < bn - 1 ? 0.13 : 0);
+      const up = yF > F4 + 1, yT = up ? yF + 0.98 : yF + 0.8;          // the top tier's balustrade is lighter and more open
+      for (const f of (up ? [0.1, 0.3, 0.5, 0.7, 0.9] : [0.18, 0.5, 0.82])) { const s = p + (q - p) * f; K.rbox(R, C, s - 0.13, yF + 0.55, BP - 0.3, s + 0.13, yT, BP - 0.05, { detail: true }); }
+      K.rbox(R, C, p, yT, BP - 0.38, q, up ? yT + 0.36 : yF + 1.3, BP + 0.03);
+    }
+    const ent = R === RS && yF < F4 + 1 && s0 > 5;                  // plain square beam ends over the entrance
+    beams(R, s0, s1, yF - 0.32, BP - 0.36, ent ? 0.5 : 0.62, ent ? 0.5 : 0.45, 6, 0.4);
+    if (R === RW) globes(R, s0, s1, yF - 0.32, 6, BP);
   };
+  const globeGeo = new THREE.SphereGeometry(0.17, 10, 6);
+  const globes = (R, s0, s1, ySof, pitch, proj = BP) => { // white globe pendants under the west soffits, one per beam bay
+    const n = Math.max(1, Math.round((s1 - s0) / pitch));
+    for (let i = 0; i < n; i++) { const s = s0 + (s1 - s0) * (i + 0.5) / n; const g = globeGeo.clone(); g.translate(s, ySof - 0.42, proj * 0.45); K.addRun(R, M.lampGlow, g, { detail: true }); K.rbox(R, M.iron, s - 0.01, ySof - 0.27, proj * 0.45 - 0.01, s + 0.01, ySof, proj * 0.45 + 0.01, { detail: true }); }
+  };
+  const profileRun = (R, mat, s0, s1, pts) => { // extrude a (d, y) profile along a run
+    const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const [d, y] of pts.slice(1)) sh.lineTo(d, y); sh.lineTo(pts[0][0], pts[0][1]);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: s1 - s0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s1, 0, 0); K.addRun(R, mat, g);
+  };
+  const GLo = std(0x1f2325, 'mfGlassUnlit', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1 } }); // same by day; dark at night
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const glassStorey = (R, s0, s1, y0, y1, o = {}) => {
-    curtain(K, R, s0, s1, y0, y1, [], { glass: GL, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
+    if (o.glass) curtain(K, R, s0, s1, y0, y1, [], { glass: o.glass, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
+    else { const nb = Math.max(1, Math.round((s1 - s0) / 6)); for (let i = 0; i < nb; i++) curtain(K, R, s0 + (s1 - s0) * i / nb, s0 + (s1 - s0) * (i + 1) / nb, y0, y1, [], { glass: rnd() < 0.72 ? GL : GLo, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 }); } // some rooms lit at night
     const n = Math.max(1, Math.round((s1 - s0) / 6)); for (let i = 1; i < n; i++) { const s = s0 + (s1 - s0) * i / n; K.rbox(R, FR, s - 0.07, y0, -0.08, s + 0.07, y1, 0.06); }
     K.rbox(R, FR, s0, y0, -0.1, s1, y0 + 0.12, 0.05); K.rbox(R, CD, s0, y1, -0.3, s1, y1 + 0.45, -0.02); // sill + head/slab edge
   };
@@ -101,7 +120,7 @@ export async function build(ctx) {
   const sS = (u) => u - GW, sN = (u) => GE - u, sE = (v) => GS - v;
   // west face: three glazed storeys above the podium terrace, balconies on F4 and F5 wrapping both corners
   glassStorey(RW, 0, RW.L, F3, F4 - 0.4); glassStorey(RW, 0, RW.L, F4, F5 - 0.4); glassStorey(RW, 0, RW.L, F5, SOF);
-  for (const y of [F4, F5]) balcony(RW, 0, RW.L, y, { e0: BP, e1: BP, slabExt: true });
+  for (const y of [F4, F5]) { const P = y > F4 + 1 ? BP5 : BP4; balcony(RW, 0, RW.L, y, { e0: P, e1: P, slabExt: true }); }
   // north and south faces: balconied bays between the towers and stubs at the west corners; flush east-style ends
   const balBays = (R, sf) => [[sf(TW[0][1]), sf(TW[1][0])], R === RS ? [0, sf(TW[0][0])] : [sf(TW[0][0]), R.L]].map((p) => p.slice().sort((x, y) => x - y));
   for (const [R, sf] of [[RS, sS], [RN, sN]]) {
@@ -109,7 +128,7 @@ export async function build(ctx) {
       const stubS = R === RS && s0 <= 0.01, stubN = R === RN && s1 >= R.L - 0.01;
       if (!(R === RS && s0 > 5 && s0 < 20)) glassStorey(R, s0, s1, F3, F4 - 0.4); // south middle bay at F3 = entrance (below)
       glassStorey(R, s0, s1, F4, F5 - 0.4); glassStorey(R, s0, s1, F5, SOF);
-      for (const y of [F4, F5]) balcony(R, s0, s1, y, { e0: stubS ? BP - 0.28 : 0, e1: stubN ? BP - 0.28 : 0 });
+      for (const y of [F4, F5]) { const P = y > F4 + 1 ? BP5 : BP4; balcony(R, s0, s1, y, { e0: stubS ? P - 0.34 : 0, e1: stubN ? P - 0.34 : 0 }); }
     }
     // flush end bay toward the east face (u 28..31.5)
     const [e0, e1] = [sf(TW[1][1]), sf(GE)].sort((x, y) => x - y);
@@ -119,28 +138,28 @@ export async function build(ctx) {
   // east face: flush — glass storey (F4, with doors), solid spandrel, glass band (F5); floor 3 shows only down the lightwell
   {
     const dS0 = sE(9), dS1 = sE(5);
-    glassStorey(RE, 0, dS0, F4, 12.6); glassStorey(RE, dS1, RE.L, F4, 12.6);
+    glassStorey(RE, 0, dS0, F4, 12.6, { glass: GLP }); glassStorey(RE, dS1, RE.L, F4, 12.6, { glass: GLP });
     for (let i = 0; i < 4; i++) { const a = dS0 + (dS1 - dS0) * i / 4, b = a + (dS1 - dS0) / 4; K.rbox(RE, GL, a, F4, -0.12, b, F4 + 2.6, -0.06); K.rbox(RE, FR, a, F4, -0.06, a + 0.09, F4 + 2.6, 0.04); K.rbox(RE, FR, (a + b) / 2 - 0.2, F4 + 1.0, -0.02, (a + b) / 2 + 0.2, F4 + 1.05, 0.06, { detail: true }); }
     K.rbox(RE, FR, dS1 - 0.09, F4, -0.06, dS1, F4 + 2.6, 0.04); K.rbox(RE, FR, dS0, F4 + 2.6, -0.1, dS1, F4 + 2.75, 0.05); K.rbox(RE, GL, dS0, F4 + 2.75, -0.12, dS1, 12.6, -0.06);
     K.rbox(RE, FR, dS0 - 1.2, 11.7, 0, dS1 + 1.2, 11.9, 2.4);         // slim steel canopy on thin columns
     for (const s of [dS0 - 0.9, dS1 + 0.9]) K.rbox(RE, FR, s - 0.07, F4, 2.15, s + 0.07, 11.7, 2.29);
     K.rbox(RE, C, 0, 12.6, -0.2, RE.L, 13.9, 0.12);                 // continuous solid spandrel
-    glassStorey(RE, 0, RE.L, 13.9, SOF);
+    glassStorey(RE, 0, RE.L, 13.9, SOF, { glass: GLP });
     glassStorey(RE, 0, RE.L, F3, F4 - 0.3);
   }
   // ---------- roof slab (deep fascia, overhangs most on W/N/S), beams beneath, membrane, penthouse ----------
   const roofPoly = [[GW - RP, GN - RP], [GE + 0.8, GN - RP], [GE + 0.8, GS + RP], [GW - RP, GS + RP]];
-  K.prism(C, roofPoly, SOF, RT - 0.12);
-  K.prism(M.concreteDark, [[GW - RP + 0.35, GN - RP + 0.35], [GE + 0.45, GN - RP + 0.35], [GE + 0.45, GS + RP - 0.35], [GW - RP + 0.35, GS + RP - 0.35]], RT - 0.12, RT - 0.02);
+  K.prism(C, roofPoly, SOF, RT - 0.45);
+  K.prism(M.concreteDark, [[GW - RP + 0.35, GN - RP + 0.35], [GE + 0.45, GN - RP + 0.35], [GE + 0.45, GS + RP - 0.35], [GW - RP + 0.35, GS + RP - 0.35]], RT - 0.45, RT - 0.05);
   {
     const ring = [[GW - RP, GN - RP], [GW - RP, GS + RP], [GE + 0.8, GS + RP], [GE + 0.8, GN - RP]];
-    for (let i = 0; i < 4; i++) { const R = K.run(ring[i], ring[(i + 1) % 4]); K.rbox(R, C, -0.04, RT - 0.12, -0.36, R.L + 0.04, RT + 0.1, 0.04); K.rbox(R, CD, 0, SOF + 0.28, 0.0, R.L, SOF + 0.33, 0.012, { detail: true }); }
-    beams(RW, -RP + 0.4, RW.L + RP - 0.4, SOF, RP - 0.1, 0.72, 0.32);
-    for (const [R, sf] of [[RS, sS], [RN, sN]]) for (const [s0, s1] of balBays(R, sf)) beams(R, s0, s1, SOF, RP - 0.1, 0.72, 0.32);
+    for (let i = 0; i < 4; i++) { const R = K.run(ring[i], ring[(i + 1) % 4]); profileRun(R, C, 0, R.L, [[-0.9, RT - 0.47], [0, RT - 0.47], [-0.26, RT + 0.05], [-0.9, RT + 0.05]]); K.rbox(R, CD, 0, SOF + 0.2, 0.0, R.L, SOF + 0.25, 0.012, { detail: true }); }
+    beams(RW, 0, RW.L, SOF, RP - 0.12, 0.95, 0.6, 6, 0.45); globes(RW, 0, RW.L, SOF, 6, RP);
+    for (const [R, sf] of [[RS, sS], [RN, sN]]) for (const [s0, s1] of balBays(R, sf)) beams(R, s0, s1, SOF, RP - 0.12, 0.95, 0.6, 6, 0.45);
   }
-  penthouse(K, [[4, -8], [16, -8], [16, 6], [4, 6]], RT - 0.05, 3.45, { mat: CD, louvreMat: FR });
+  penthouse(K, [[4, -8], [16, -8], [16, 6], [4, 6]], RT - 0.05, 3.45, { mat: C, louvreMat: CD });
   K.box(C, 3.8, RT + 3.4, -8.2, 16.2, RT + 3.6, 6.2);
-  K.box(CD, 18, RT - 0.05, -6.5, 22, 19.2, -3);
+  K.box(C, 18, RT - 0.05, -6.5, 22, 19.2, -3);
   for (const [u, v] of [[-8, -12], [-2, 10], [24, 12], [26, -9], [-12, 2]]) K.box(CD, u - 0.6, RT - 0.05, v - 0.6, u + 0.6, RT + 0.7, v + 0.6, { detail: true });
   colliders.push(rectCol(GW, GN, GE, GS, -5, RT + 3.5));
 
@@ -152,64 +171,80 @@ export async function build(ctx) {
     const R = south ? K.run([u0, vo], [u1, vo]) : K.run([u1, vo], [u0, vo]);
     const yb = Math.min(gAt(R, 2, 1), gAt(R, R.L - 2, 1), south ? F3 : DECK_N);
     const ops = [];
-    for (const yF of [F3, F4, F5]) { const c = R.L * (south ? 0.68 : 0.32); ops.push({ s0: c - 0.45, s1: c + 0.45, y0: yF + 0.75, y1: yF + 3.35 }); }
+    const pat = south ? (u0 > 0 ? [[], [], []] : [[], [0.3, 0.72], [0.3, 0.55]]) : [[0.3, 0.74], [0.22, 0.58], [0.36, 0.74]]; // loose, staggered; the SE tower beside the entrance is blank
+    [F3, F4, F5].forEach((yF, k) => { for (const f of pat[k]) { const c = R.L * f; ops.push({ s0: c - 0.65, s1: c + 0.65, y0: yF + 0.8, y1: yF + 3.0 }); } });
     K.wall(R, CT, 0, R.L, yb - 1.5, TP, ops, 0.55);
     for (const o of ops) K.fill(R, o, { rev: 0.42, mull: 0, glass: GL, frame: FR });
     K.rbox(R, CT, -0.05, TP - 0.02, -0.6, R.L + 0.05, TP + 0.08, 0.05);
+    for (const y of [F3, F4, F5, RT - 0.4]) if (y > yb) K.rbox(R, CD, 0.02, y - 0.03, -0.01, R.L - 0.02, y + 0.03, 0.006, { detail: true }); // pour joints
     colliders.push(rectCol(u0, v0, u1, v1, -3, TP));
   }
 
-  // ---------- south entrance (floor 3): storefront, bronze lettering, ribbed pier, FSM Café ----------
+  // ---------- south entrance (floor 3): three door pairs in a dark storefront under a lettered fascia (2026) ----------
   {
-    const R = RS; const e0 = sS(TW[0][1]), e1 = sS(TW[1][0]);       // bay between the south towers
-    const dA = sS(-2.6), dB = sS(5.2);                                 // three door bays
-    K.rbox(R, C, e0, F3, -0.35, sS(-3.6), F4 - 0.3, 0.25);             // plain pier beside the tower
-    { const p0 = sS(-3.6), p1 = sS(-2.6); K.rbox(R, C, p0, F3, -0.3, p1, F4 - 0.3, 0.1); for (let s = p0 + 0.12; s < p1 - 0.05; s += 0.25) K.rbox(R, C, s - 0.05, F3 + 0.05, 0.1, s + 0.05, F4 - 0.35, 0.2, { detail: true }); }
-    for (let i = 0; i < 3; i++) {
-      const a = dA + (dB - dA) * i / 3, b = dA + (dB - dA) * (i + 1) / 3, m = (a + b) / 2;
-      K.rbox(R, GL, a, F3, -0.14, b, 7.2, -0.08);
-      for (const s of [a, m, b]) K.rbox(R, FR, s - (s === m ? 0.04 : 0.08), F3, -0.08, s + (s === m ? 0.04 : 0.08), 7.2, 0.05);
-      for (const s of [m - 0.25, m + 0.25]) K.rbox(R, FR, s - 0.02, F3 + 0.9, -0.03, s + 0.02, F3 + 2.1, 0.09, { detail: true });
-      K.rbox(R, FR, a, F3 + 2.62, -0.08, b, F3 + 2.72, 0.05);
+    const R = RS; const e0 = sS(TW[0][1]), e1 = sS(TW[1][0]);       // bay between the south towers (u -5..16)
+    const dA = sS(-3.7), dB = sS(10.3);                                // storefront u -3.7..10.3
+    K.rbox(R, C, e0, F3 - 0.5, -0.3, dA, F4 - 0.3, 0.1);               // plain flanking pier (left)
+    K.rbox(R, C, dB, F3 - 0.5, -0.3, e1, F4 - 0.3, 0.1);               // solid wall to the right (ribbed near the doors)
+    for (let s = dB + 0.25; s < dB + 2.2; s += 0.24) K.rbox(R, C, s - 0.05, F3 + 0.1, 0.1, s + 0.05, 7.25, 0.18, { detail: true });
+    const DW = 1.9, PW = (dB - dA - 3 * DW - 1.1) / 4;                // door pairs, black panels, sidelight
+    const lobby = nightGlow(std(0xe8e2d6, 'mfLobbyLight', { rough: 0.6, extra: { emissive: 0xfff2dc, emissiveIntensity: 1.3 } }), 0.6);
+    K.rbox(R, M.paving, dA, F3 - 0.05, -9, dB, F3 + 0.01, -0.3);       // lobby floor seen through the doors
+    K.rbox(R, CD, dA, 7.4, -9, dB, 7.5, -0.3);                         // lobby ceiling
+    for (let k = 0; k < 4; k++) K.rbox(R, lobby, dA + 0.5, 7.36, -1.2 - k * 2, dB - 0.5, 7.4, -1.0 - k * 2); // linear ceiling lights
+    K.rbox(R, CD, dA, F3, -9.1, dB, 7.5, -9);                          // back wall
+    let s = dA;
+    for (let i = 0; i < 4; i++) {
+      K.rbox(R, FR, s, F3, -0.32, s + PW, 7.3, -0.18); s += PW;         // solid black panel
+      if (i < 3) { // a pair of glazed leaves in black frames
+        const a = s, b = s + DW, m = (a + b) / 2;
+        K.rbox(R, M.glassLight, a, F3 + 0.02, -0.3, b, 7.0, -0.26, { detail: true });
+        for (const q of [a, m, b]) K.rbox(R, FR, q - 0.05, F3, -0.33, q + 0.05, 7.0, -0.19);
+        for (const q of [a + 0.04, b - 0.04]) K.rbox(R, FR, q - 0.03, F3, -0.33, q + 0.03, 7.0, -0.19); 
+        K.rbox(R, FR, a, F3, -0.33, b, F3 + 0.12, -0.19);
+        for (const q of [m - 0.22, m + 0.22]) K.rbox(R, M.iron, q - 0.02, F3 + 0.9, -0.2, q + 0.02, F3 + 2.1, -0.12, { detail: true });
+        K.rbox(R, FR, a, 7.0, -0.33, b, 7.3, -0.18);                    // dark transom band with closers
+        s = b;
+      }
     }
-    K.rbox(R, FR, dA, 7.2, -0.12, dB, 7.3, 0.06);
-    K.rbox(R, C, dA - 0.9, 7.3, -0.2, dB + 0.9, F4 - 0.32, 0.16);       // sign fascia band
-    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.86, 0.34, { color: '#3f2e1f', metal: 0.55, rough: 0.45, d: 0.175, font: 'Georgia, "Times New Roman", serif', weight: '600' });
-    // FSM Café: full-height glazing, café tables in front
-    const c0 = dB + 0.6, c1 = e1;
-    K.rbox(R, C, dB, F3, -0.3, c0, F4 - 0.3, 0.12);
-    const CG = nightGlow(std(0x5b5446, 'mfCafeGlass', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.2, emissive: 0xffc27a, emissiveIntensity: 1.4 } }), 1.0);
-    curtain(K, R, c0, c1, F3 + 0.05, F4 - 0.4, [F3 + 2.9], { glass: CG, mull: 1.0, mullMat: FR, mullD: 0.06, band: 0.08, bandMat: FR, bandD: 0.06, recess: 0.06 });
-    K.rbox(R, FR, c0, F3 + 0.05, -0.1, c1, F3 + 0.17, 0.05);
-    for (let k = 0; k < 4; k++) { const s = c0 + 1.2 + k * ((c1 - c0 - 2.4) / 3); for (const d of [1.7, 3.6]) { const ss = s + (d > 2 ? 0.8 : 0); const p = R.at(ss, d); const gy = Math.max(F3, K.g(p[0], p[1])); K.cyl(M.iron, p[0], gy, p[1], 0.05, 0.05, 0.72, 6, { detail: true }); K.cyl(WOOD, p[0], gy + 0.72, p[1], 0.38, 0.38, 0.04, 14, { detail: true }); for (const o of [-0.6, 0.6]) { const q = R.at(ss + o, d); K.box(M.iron, q[0] - 0.2, gy, q[1] - 0.2, q[0] + 0.2, gy + 0.45, q[1] + 0.2, { detail: true }); } } }
+    K.rbox(R, M.glassLight, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
+    K.rbox(R, C, dA - 0.3, 7.3, -0.25, dB + 0.3, F4 - 0.32, 0.08);     // recessed fascia (~1.2 m) over the doors
+    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#57432c', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
+    // continuous concrete sidewalk in front of the doors (flush threshold)
+    const SW = tint(M.concrete, 0xfaf7f1, 'mfWalk');
+    const ga = Math.max(F3, K.gMax(2.5, GS, 16, GS + 9, 8)) + 0.02;
+    K.box(SW, 2.5, ga - 0.4, GS, 16, ga, GS + 9);
+    for (let k = 1; k < 6; k++) K.box(CD, 2.5, ga, GS + k * 1.5 - 0.01, 16, ga + 0.004, GS + k * 1.5 + 0.01, { detail: true });
+    walkables.push(K.walkPoly([[2.5, GS], [16, GS], [16, GS + 9], [2.5, GS + 9]], ga));
   }
 
   // ---------- podium terrace (floor-3 level) on the west, walkway along the south, deck along the north ----------
   {
     // west podium: floors 1–2 recessed behind square piers, deep terrace slab, solid upstand + rail
-    K.box(CD, PU + 3.0, -5, PN, GW + 0.4, F3 - 1.1, PS - 3.0);
+    K.box(CD, PU + 3.0, -5, PN, GW + 0.4, F3 - 1.8, PS - 3.0);
     const RPw = K.run([PU + 3.0, PN], [PU + 3.0, PS - 3.0]);
-    curtain(K, RPw, 0, RPw.L, -4.4, F3 - 1.15, [0], { glass: GL, mull: 1.5, mullMat: FR, band: 0.4, bandMat: CD, bandD: 0.05, recess: 0.0 });
-    K.box(C, PU, F3 - 1.1, PN, GW, F3, PS);
-    for (let v = PN + 3; v <= PS - 2.5; v += 6) { K.box(C, PU + 0.2, -5, v - 0.35, PU + 0.9, F3 - 1.1, v + 0.35); K.box(C, PU + 0.2, F3 - 1.75, v - 0.25, PU + 3.0, F3 - 1.1, v + 0.25); colliders.push(K.colCyl(PU + 0.55, v, 0.5, -5, F3)); }
-    for (const u of [PU + 3.5, PU + 9.5]) K.box(C, u - 0.35, -5, PS - 0.9, u + 0.35, F3 - 1.1, PS - 0.2);
+    curtain(K, RPw, 0, RPw.L, -4.4, F3 - 1.85, [0], { glass: GLP, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
+    K.box(C, PU, F3 - 1.8, PN, GW, F3 - 0.03, PS); K.box(M.paving, PU + 0.4, F3 - 0.03, PN, GW, F3, PS - 0.01);
+    for (let v = PN + 4.0; v <= PS - 2.5; v += 7.5) { K.box(C, PU + 1.9, -5, v - 0.4, PU + 2.7, F3 - 1.8, v + 0.4); K.box(C, PU + 0.25, F3 - 2.25, v - 0.32, PU + 1.9, F3 - 1.8, v + 0.32); K.box(C, PU + 0.9, F3 - 2.7, v - 0.32, PU + 1.9, F3 - 2.25, v + 0.32); colliders.push(K.colCyl(PU + 2.3, v, 0.5, -5, F3)); }
+    for (const u of [PU + 4.5, PU + 11.0]) K.box(C, u - 0.35, -5, PS - 2.7, u + 0.35, F3 - 1.8, PS - 2.0);
     const RPe = K.run([PU, PN], [PU, PS]); // podium edge (west-facing), open at the SW stair
-    parapetRail(RPe, 0, RPe.L - 5.6, F3);
+    K.rbox(RPe, CD, 0, F3 - 0.02, -0.4, RPe.L, F3 + 1.3, 0); K.rbox(RPe, C, -0.03, F3 + 1.3, -0.45, RPe.L + 0.03, F3 + 1.42, 0.05);
     // podium south face (floors 1–2 recessed behind piers)
     const RPs = K.run([PU + 3.0, PS - 3.0], [GW + 0.4, PS - 3.0]);
-    curtain(K, RPs, 0, RPs.L, -2, F3 - 1.15, [0], { glass: GL, mull: 1.5, mullMat: FR, band: 0.4, bandMat: CD, bandD: 0.05, recess: 0.0 });
+    curtain(K, RPs, 0, RPs.L, -2, F3 - 1.85, [0], { glass: GLP, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
     // south walkway (east of the podium) to the entrance: solid slab, parapet where the lawn falls away
-    K.box(C, GW, -5, GS, 2.5, F3, PS);
+    K.box(C, GW, -5, GS, 2.5, F3 - 0.03, PS); K.box(CD, GW, F3 - 0.03, GS, 2.5, F3, PS);
     const RWk = K.run([PU, PS], [2.5, PS]);
     let sEnd = RWk.L; for (let s = 0; s <= RWk.L; s += 0.5) if (gAt(RWk, s, 1.2) > F3 - 0.7) { sEnd = s; break; }
     parapetRail(RWk, 0, Math.max(4, sEnd), F3);
     // planters on the terrace
-    for (const [u0, v0, u1, v1] of [[-29.6, -21.5, -25.6, -16.5], [-29.6, 11.5, -25.6, 16.5], [-24.5, -23.6, -19.8, -21.4]]) { K.box(C, u0, F3, v0, u1, F3 + 0.7, v1); K.box(GRN, u0 + 0.15, F3 + 0.7, v0 + 0.15, u1 - 0.15, F3 + 0.95, v1 - 0.15, { detail: true }); colliders.push(rectCol(u0, v0, u1, v1, F3 - 0.5, F3 + 0.7)); }
+    for (const [u0, v0, u1, v1] of [[-29.6, -21.5, -25.6, -16.5], [-29.6, 11.5, -25.6, 16.5], [-24.5, -23.6, -19.8, -21.4]]) { K.box(C, u0, F3, v0, u1, F3 + 0.7, v1); K.box(M.soil, u0 + 0.15, F3 + 0.66, v0 + 0.15, u1 - 0.15, F3 + 0.7, v1 - 0.15, { detail: true }); for (let k = 0; k < 4; k++) { const g = new THREE.IcosahedronGeometry(0.75 + 0.2 * (k % 2), 1); g.scale(1, 0.7, 1); g.translate(u0 + 0.9 + (k % 2) * (u1 - u0 - 1.8), F3 + 0.95, v0 + 1 + Math.floor(k / 2) * (v1 - v0 - 2)); K.add(GRN, g, { detail: true }); } colliders.push(rectCol(u0, v0, u1, v1, F3 - 0.5, F3 + 0.7)); }
     // red slatted pergola over the middle of the terrace
     { const u0 = -29.4, u1 = -21.6, v0 = -7.5, v1 = 7.5, y1 = 7.9;
-      for (const u of [u0 + 0.3, u1 - 0.3]) for (let k = 0; k < 4; k++) { const v = v0 + 0.3 + k * (v1 - v0 - 0.6) / 3; K.box(PG, u - 0.15, F3, v - 0.15, u + 0.15, y1 - 0.5, v + 0.15); colliders.push(K.colCyl(u, v, 0.25, F3, y1)); }
-      for (const u of [u0 + 0.3, u1 - 0.3]) K.box(PG, u - 0.18, y1 - 0.5, v0, u + 0.18, y1 - 0.2, v1);
-      for (let v = v0 + 0.25; v <= v1; v += 0.9) K.box(PG, u0 - 0.3, y1 - 0.2, v - 0.05, u1 + 0.3, y1, v + 0.05, { detail: true }); }
+      for (const u of [u0 + 0.3, u1 - 0.3]) for (let k = 0; k < 4; k++) { const v = v0 + 0.3 + k * (v1 - v0 - 0.6) / 3; K.box(PG, u - 0.1, F3, v - 0.1, u + 0.1, y1 - 0.45, v + 0.1); colliders.push(K.colCyl(u, v, 0.25, F3, y1)); }
+      for (const u of [u0 + 0.3, u1 - 0.3]) K.box(PG, u - 0.12, y1 - 0.45, v0, u + 0.12, y1 - 0.2, v1);
+      for (let k = 0; k <= 6; k++) { const v = v0 + (v1 - v0) * k / 6; K.box(PG, u0 - 0.3, y1 - 0.2, v - 0.06, u1 + 0.3, y1, v + 0.06); }
+      K.box(M.glassLight, u0 - 0.3, y1 + 0.0, v0, u1 + 0.3, y1 + 0.03, v1, { detail: true }); }
     // north deck over the loading dock: slab, north face with dock doors, parapets
     const NE0 = -22, NE1 = 26, NV = -30.5;
     K.box(C, NE0, -5, NV, NE1, DECK_N, GN);
@@ -224,8 +259,6 @@ export async function build(ctx) {
     colliders.push(rectCol(GW, GS, 2.5, PS, -5, F3 - 0.05));
     colliders.push(rectCol(NE0, NV, NE1, GN, -5, DECK_N - 0.05));
     // stair from the walkway down to the west lawn
-    { const v0 = PS - 5.2, v1 = PS - 0.4, gLo = Math.min(K.g(PU - 11, v0), K.g(PU - 11, v1)); const n = Math.max(4, Math.round((F3 - gLo) / 0.16));
-      walkables.push(K.stairs(C, PU - n * 0.33, v0, PU, v1, gLo, F3, '+u', n)); }
   }
 
   // ---------- east plaza deck at the floor-4 level, lightwell with stair, steps to the south plaza and Memorial Glade ----------
@@ -234,9 +267,10 @@ export async function build(ctx) {
     const slabs = [[u0, v0, u1, W0], [u0, W1, u1, v1], [L1, W0, u1, W1]];
     for (const [a, b, c, d] of slabs) { K.box(C, a, 2.5, b, c, yF - 0.04, d); K.box(M.paving, a, yF - 0.04, b, c, yF, d); walkables.push(K.walkPoly([[a, b], [c, b], [c, d], [a, d]], yF)); colliders.push(rectCol(a, b, c, d, -2, yF - 0.05)); }
     // lightwell against the façade: walls, floor at floor 3, stair along its south side, railings
-    K.box(M.paving, L0, F3 - 0.3, W0, L1, F3 + 0.02, W1); walkables.push(K.walkPoly([[L0, W0], [L1, W0], [L1, W1 - 1.9], [L0, W1 - 1.9]], F3 + 0.02));
+    const LW = Math.max(F3, K.gMax(L0, W0, L1, W1, 8)) + 0.04;          // well floor sits just above the bare-earth terrain
+    K.box(M.paving, L0, LW - 0.35, W0, L1, LW, W1); walkables.push(K.walkPoly([[L0, W0], [L1, W0], [L1, W1 - 1.9], [L0, W1 - 1.9]], LW));
     for (const [a, b] of [[[L0, W0], [L1, W0]], [[L1, W0], [L1, W1]], [[L1, W1], [L0, W1]]]) { const R = K.run(a, b); K.rbox(R, CD, 0, F3 - 0.3, 0, R.L, yF - 0.05, 0.25); }
-    walkables.push(K.stairs(C, L0 + 0.6, W1 - 1.9, L1, W1 - 0.25, F3 + 0.02, yF, '+u', Math.round((yF - F3) / 0.165)));
+    walkables.push(K.stairs(C, L0 + 0.6, W1 - 1.9, L1, W1 - 0.25, LW, yF, '+u', Math.round((yF - LW) / 0.165)));
     for (const [a, b] of [[[L0, W0], [L1, W0]], [[L1, W0], [L1, W1 - 2.0]], [[L1 - 0.1, W1], [L0, W1]]]) { const R = K.run(a, b); K.rbox(R, C, 0, yF - 0.02, -0.25, R.L, yF + 0.18, 0.05); rail(R, 0.1, R.L - 0.1, yF + 0.18, -0.12, 0.9); }
     // deck edges: concrete fascia + railing where the ground falls away
     const RSd = K.run([u0 + 7, v1], [u1, v1]); K.rbox(RSd, C, 0, 2.5, -0.3, RSd.L, yF + 0.15, 0.02); rail(RSd, 0, RSd.L, yF + 0.15, -0.15);
