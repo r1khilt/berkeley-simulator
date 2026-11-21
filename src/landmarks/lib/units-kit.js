@@ -66,7 +66,7 @@ export function tower(ctx, P) {
   const mBrace = T.brace != null ? paintTint(M, T.brace) : mWall; // seismic frame colour (Unit 2 braces are a contrasting terracotta)
   const mGround = concreteTint(M, T.ground ?? 0xa9a59b); // recessed ground storey: plain board-formed concrete
   const mBase = mGround;
-  const mFas = charcoalMat(M); const mPave = M.concrete;
+  const mFas = charcoalMat(M); const mPave = concreteTint(M, 0x9f998e); // warmer, darker apron paving (light concrete in tower shadow read as sky-blue in-game)
   K.siteMats = { galv: mFrame, dark: mFas };
   const NAME = (P.name || String(P.seed || '').replace(/-/g, ' ')).toUpperCase();
   const mRoof = M.concreteDark, mRing = paintTint(M, T.ring ?? T.wall ?? 0xe4dcc4);
