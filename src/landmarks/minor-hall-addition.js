@@ -2,6 +2,7 @@
 // block has deep recessed window loggias behind horizontal bands of warm timber-clad spandrels, rising over a broad one-storey
 // clinic podium with planted roof edges. Massing from LiDAR: north block ~18.5 m, podium ~5.3 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, runsOf, rect, flatRoof, entrance, colFromXZ, tint, plain, glassTint, orient } from './lib/b04-kit.js';
 
 export const info = {
@@ -38,6 +39,7 @@ export async function build(ctx) {
   K.box(C, -8, 18.5, 5, 6, 20.6, 13);
   entrance(K, K.run([20.2, 25.6], [-4.5, 25.3]), 12.0, Math.max(0, K.g(8, 26.5)), { w: 4.0, h: 3.0, rec: 0.2, glass: GL, canopy: 2.2, canopyMat: C });
   colliders.push(colFromXZ(fp.outer, -2, 5.6)); colliders.push(colFromXZ(K.polyXZ(nb), 5, 21));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'minor-hall-addition';
   return { object3d, colliders, walkables };
 }

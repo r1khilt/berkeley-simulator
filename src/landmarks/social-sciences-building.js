@@ -4,6 +4,7 @@
 // floor behind pilotis, and a set-back rooftop penthouse. Two low one-storey wings reach north toward Dwinelle.
 // Massing from the 2021 LiDAR (slab roof ~33 m above grade, penthouse ~36 m).
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit } from './lib/classic-kit.js';
 import { concreteMat, glazing, block } from './lib/b06c-kit.js';
 
@@ -86,6 +87,7 @@ export async function build(ctx) {
   { const gm = K.g(0, v1 + 2); K.box(C, -6, gm + 3.2, v1 - 0.5, 6, gm + 3.6, v1 + 4.0); for (const u of [-5.6, 5.6]) K.box(C, u - 0.15, gm - 0.5, v1 + 3.5, u + 0.15, gm + 3.2, v1 + 3.8);
     const [ex, ez] = K.xz(0, v1 + 2.5); interactions.push({ id: 'ssb-entrance', pos: [ex, gm + 1, ez], radius: 3, label: 'Social Sciences Building (Barrows Hall)' }); }
 
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish();
   object3d.name = 'social-sciences-building';
   return { object3d, colliders, walkables, interactions };

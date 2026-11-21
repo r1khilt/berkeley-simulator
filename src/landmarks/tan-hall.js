@@ -2,6 +2,7 @@
 // grid of punched windows, a lighter band over the base, a projecting cornice, a faceted corner tower and rooftop plant.
 // Massing from LiDAR: parapet ~29.5 m with plant rising to ~35 m in the middle.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, flatRoof, rect, runsOf, entrance, penthouse, colFromXZ, tint, glassTint, plain } from './lib/b04-kit.js';
 import { corniceProfile } from './lib/classic-kit.js';
 
@@ -40,6 +41,7 @@ export async function build(ctx) {
   entrance(K, K.run([u0, v1], [u1, v1]), 15.0, Math.max(0, K.g(0, v1 + 2)), { w: 4.0, h: 3.2, rec: 1.5, glass: tint(M, 'glass', 0x1c2226), frame: FR, surround: false });
   for (const s of [-3, 3]) { const R = K.run([u0, v1], [u1, v1]); K.rbox(R, Sb, 15 + s * 2.2 - 1.2, Math.max(0, K.g(0, v1 + 2)) - 0.5, 1.2, 15 + s * 2.2 + 1.2, Math.max(0, K.g(0, v1 + 2)) + 0.6, 2.6); } // planter walls
   colliders.push(colFromXZ(ctx.footprints[0].outer, -2, 35));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'tan-hall';
   return { object3d, colliders, walkables };
 }

@@ -5,6 +5,7 @@
 // granite stair. Steep red Mission-tile hip roof truncated to a flat deck, with a row of small dormers.
 // Massing from LiDAR: eaves ~17 m, deck ~20.5 m, 18.4 x 54 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, colFromXZ, tint, plain, glassTint, cols } from './lib/b04-kit.js';
 import { ionicColumn } from './lib/classic-kit.js';
 import { howard } from './lib/b04-howard.js';
@@ -113,6 +114,7 @@ export async function build(ctx) {
   K.box(plain(M, 0x8a8f92, { rough: 0.5, metal: 0.4 }), -2.5, 20.5, -9.0, 1.5, 23.0, -5.0); K.hip(plain(M, 0x8a8f92, { rough: 0.5, metal: 0.4 }), -2.7, -9.2, 1.7, -4.8, 23.0, 0.5);
   for (const [u, v] of [[2.0, -16], [-3.0, 3], [3.5, 12], [-1.0, 20]]) { K.cyl(M.concreteDark, u, 20.5, v, 0.3, 0.3, 1.6, 10); K.cyl(M.iron, u, 22.1, v, 0.36, 0.36, 0.2, 10); }
   colliders.push(colFromXZ(ctx.footprints[0].outer, -3, 22));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'gilman-hall';
   return { object3d, colliders, walkables };
 }

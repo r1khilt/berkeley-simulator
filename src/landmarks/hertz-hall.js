@@ -16,8 +16,8 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, deg(-9)); const M = ctx.M; const X = mats(M);
-  const W = new THREE.MeshStandardMaterial({ color: 0xcfc2b3, roughness: 0.92, map: M.stucco.map, normalMap: M.stucco.normalMap });
-  const BAT = new THREE.MeshStandardMaterial({ color: 0xd2c5b2, roughness: 0.9, map: M.stucco.map });
+  const W = new THREE.MeshStandardMaterial({ color: 0xfcf5e6, roughness: 0.92, map: M.stuccoWhite.map, normalMap: M.stuccoWhite.normalMap }); // refine-central: smooth painted concrete (was tan textured stucco)
+  const BAT = new THREE.MeshStandardMaterial({ color: 0xf2e9d8, roughness: 0.9, map: M.stuccoWhite.map });
   const ROOF = new THREE.MeshStandardMaterial({ color: 0x5e4b3c, roughness: 0.6, metalness: 0.3 });
   const SOFF = new THREE.MeshStandardMaterial({ color: 0x8a7560, roughness: 0.85 });
   const MUL = new THREE.MeshStandardMaterial({ color: 0xe3dccd, roughness: 0.5 });

@@ -6,6 +6,7 @@
 // Massing from LiDAR: front range eaves ~19 m / ridge ~22 m, north range ~19 m, court block ~13.6 m, connector ~20 m,
 // east wing eaves ~19.6 m / ridge ~25 m with flat-roofed ends.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, punchedBlock, rect, colFromXZ, tint, plain, cols, punched, glassTint } from './lib/b04-kit.js';
 import { ionicColumn, corniceProfile } from './lib/classic-kit.js';
 
@@ -215,6 +216,7 @@ export async function build(ctx) {
     ent(runs.S, 16.4 - 4.8); ent(runs.E, 46.1 - 31.6); ent(runs.E, 46.1 - 0.1); ent(runs.W, 32.0 + 13.0);
   }
   colliders.push(colFromXZ(ctx.footprints[0].outer, -3, 26));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'physics-north-and-physics-south';
   return { object3d, colliders, walkables };
 }

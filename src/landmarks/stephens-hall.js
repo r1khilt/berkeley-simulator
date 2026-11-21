@@ -5,6 +5,8 @@
 // on ground that falls ~6 m from the north-west toward Strawberry Creek.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
+import { sign, wallLamp, downspout, baseShrubs } from './lib/rc-finish.js';
+import { tint } from './lib/b02-kit.js';
 
 export const info = {
   id: 'stephens-hall',
@@ -16,16 +18,19 @@ export const info = {
 
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.657);
-  const K = new Kit(ctx, ANG); const M = ctx.M; const S = M.stucco, SD = M.concreteDark;
+  // refine-central: smooth pale buff painted concrete (not textured cream stucco), plain coped parapets (no battlements),
+  // wide flat-headed multi-light steel casements in pairs/triples with grey-green frames, the STEPHENS HALL inscription and
+  // lanterns at the breezeway, downspouts and planting.
+  const K = new Kit(ctx, ANG); const M = ctx.M; const S = tint(M.stuccoWhite, 0xece2b8), SD = M.concreteDark;
   K.curveSeg = 3; // flat Tudor arches need few segments (keeps the many grouped windows within budget)
   const colliders = [], walkables = [];
-  const frame = M.woodDark;
+  const frame = tint(M.whitePaint, 0x7f8c8a);
 
   // crenellated parapet along a run at deck height yD, top yP
   const parapet = (R, yD, yP, s0 = 0, s1 = R.L) => {
     K.rbox(R, S, s0, yD - 0.5, -0.35, s1, yP - 0.55, 0.0);
     K.mould(R, S, s0, s1, [[0, yD - 0.55], [0.18, yD - 0.5], [0.18, yD - 0.3], [0, yD - 0.25]], { ret0: false, ret1: false });
-    if (yP > 22) { // battlements only on the tower and the hall; the wings get a plain coped parapet
+    if (false) { // (refine-central) the real parapets are plain and coped; battlements removed
       const n = Math.max(1, Math.round((s1 - s0) / 1.6));
       for (let i = 0; i < n; i++) { const a = s0 + (s1 - s0) * (i + 0.2) / n, b = a + (s1 - s0) / n * 0.6; K.rbox(R, S, a, yP - 0.45, -0.35, b, yP, 0.02); }
       K.rbox(R, S, s0, yP - 0.52, -0.38, s1, yP - 0.45, 0.06);
@@ -44,20 +49,20 @@ export async function build(ctx) {
         const c = bw * (i + 0.5);
         const p = R.at(c, 1.0); const gl = K.g(p[0], p[1]);
         if (st.y0 < gl + 0.6) continue; // below grade here
-        const n = st.lights ?? 2, lw = st.lw ?? 0.62, gap = 0.16; const tot = n * lw + (n - 1) * gap;
-        for (let k = 0; k < n; k++) { const s0 = c - tot / 2 + k * (lw + gap); ops.push({ s0, s1: s0 + lw, y0: st.y0, y1: st.y1, arch: 'gothic', rise: lw * 0.35, sill: k === 0 ? undefined : false, st }); }
+        const n = Math.min(2, st.lights ?? 2), gap = 0.22, lw = Math.min(1.25, (bw - 1.1 - (n - 1) * gap) / n); const tot = n * lw + (n - 1) * gap;
+        for (let k = 0; k < n; k++) { const s0 = c - tot / 2 + k * (lw + gap); ops.push({ s0, s1: s0 + lw, y0: st.y0, y1: st.y1, sill: k === 0 ? undefined : false, muntins: Math.max(2, Math.round((st.y1 - st.y0) / 0.6)), st }); }
       }
     }
     for (const d of doors) ops.push({ ...d, door: true });
     K.wall(R, S, 0, R.L, y0, yD - 0.5, ops, 0.45);
     for (const o of ops) {
       if (o.door) K.fill(R, o, { kind: 'door', rev: 0.4, door: M.woodDark, frame });
-      else K.fill(R, o, { mull: 0, rev: 0.35, frame, tran: o.y1 - o.y0 > 1.9 ? [o.y0 + (o.y1 - o.y0) * 0.62] : [], sill: false });
+      else K.fill(R, o, { mull: 1, rev: 0.35, frame, tran: o.y1 - o.y0 > 1.9 ? [o.y0 + (o.y1 - o.y0) * 0.62] : [], sill: false });
     }
     // hood moulds over window groups + continuous sills
     for (const st of stories) for (let i = 0; i < nb; i++) {
       if (skipBays.includes(i)) continue; const c = bw * (i + 0.5); const p = R.at(c, 1.0); if (st.y0 < K.g(p[0], p[1]) + 0.6) continue;
-      const n = st.lights ?? 2, lw = st.lw ?? 0.62, tot = n * lw + (n - 1) * 0.16;
+      const n = Math.min(2, st.lights ?? 2), lw = Math.min(1.25, (bw - 1.1 - (n - 1) * 0.22) / n), tot = n * lw + (n - 1) * 0.22;
       K.rbox(R, S, c - tot / 2 - 0.25, st.y1 + 0.08, 0, c + tot / 2 + 0.25, st.y1 + 0.26, 0.16);
       for (const k of [-1, 1]) K.rbox(R, S, c + k * (tot / 2 + 0.17) - 0.08, st.y1 - 0.45, 0, c + k * (tot / 2 + 0.17) + 0.08, st.y1 + 0.26, 0.16);
       K.rbox(R, S, c - tot / 2 - 0.12, st.y0 - 0.14, 0, c + tot / 2 + 0.12, st.y0, 0.14);
@@ -171,6 +176,7 @@ export async function build(ctx) {
     K.rbox(R, S, ps0 - 0.5, gl - 1, 0, ps0, gl + 5.2, 0.25); K.rbox(R, S, ps1, gl - 1, 0, ps1 + 0.5, gl + 5.2, 0.25);
     K.rbox(R, S, ps0 - 0.6, gl + 6.75, 0, ps1 + 0.6, gl + 7.1, 0.3);
     parapet(R, 23.5, 24.4);
+    if (pass) { sign(K, R, (ps0 + ps1) / 2, gl + 7.25, Math.max(4.2, ps1 - ps0 + 1.6), 0.5, 'STEPHENS HALL', { bg: '#e2d8b0', fg: '#6b6248', d: 0.24, backMat: S }); for (const ss of [ps0 - 0.95, ps1 + 0.95]) wallLamp(K, R, ss, gl + 3.0); }
     return R;
   };
   hFace([hU0, hV1], [hU1, hV1], gS, true);   // south (W→E)

@@ -2,6 +2,7 @@
 // Hildebrand halls: running-bond brick walls with a brick-on-edge coping, a raised clerestory spine and stepped parapet, and a
 // deep plain doorway. Massing from LiDAR: roof ~6.2 m, raised spine ~8.3 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, rect, runsOf, colFromXZ, tint, glassTint, plain } from './lib/b04-kit.js';
 
 export const info = {
@@ -43,6 +44,7 @@ export async function build(ctx) {
   K.prism(plain(M, 0x8d8b86, { rough: 0.95 }), poly.map(([u, v]) => [u * 0.96, v * 0.97]).reverse(), 5.9, 5.95);
   for (const [u, v] of [[-7, -10], [-7, 0], [6, -12], [6, 2], [-6, 12]]) { K.box(plain(M, 0xbfc2c2, { rough: 0.5, metal: 0.3 }), u - 0.8, 5.95, v - 0.8, u + 0.8, 6.9, v + 0.8); K.cyl(M.iron, u, 6.9, v, 0.35, 0.35, 0.6, 10); }
   colliders.push(colFromXZ(ctx.footprints[0].outer, -2, 8.3));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'giauque-hall';
   return { object3d, colliders, walkables };
 }

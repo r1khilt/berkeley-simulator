@@ -2,6 +2,7 @@
 // tile hip roof and copper eaves; on its south side a semicircular two-storey drum under a conical tile roof with a copper
 // lantern, entered through a round-arched, rusticated doorway. Massing from LiDAR: eaves ~12.6 m, ridge ~19 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, tint, solid, stoneBlock, hipPoly, rect, dentils, orient } from './lib/b02-kit.js';
 import { arcBand } from './lib/classic-kit.js';
 
@@ -57,6 +58,7 @@ export async function build(ctx) {
   K.lathe(CU, [[r + 1.05, 0], [r + 1.05, 0.3], [r + 0.2, 0.3]], cx, DE - 0.2, cz, 36);
   K.lathe(CU, [[0.9, 0], [0.9, 1.0], [1.1, 1.05], [1.1, 1.25], [0.3, 1.9], [0.06, 2.4], [0.001, 2.45]], cx, DE + 4.6, cz, 12);
   colliders.push({ type: 'poly', pts: K.polyXZ(arc), y0: -2, y1: 17 });
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'wellman-hall';
   return { object3d, colliders, walkables };
 }

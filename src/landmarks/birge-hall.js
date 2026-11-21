@@ -2,6 +2,7 @@
 // White concrete box: tall narrow windows between slim white fins with fine slab lines, a continuous balcony with a white
 // railing over the recessed, glazed ground storey, flat roof. Massing from LiDAR: parapet ~25-26 m, mechanical attic to ~27 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, flatRoof, rect, runsOf, entrance, colFromXZ, glassTint, tint } from './lib/b04-kit.js';
 
 export const info = {
@@ -46,6 +47,7 @@ export async function build(ctx) {
     entrance(K, R, R.L / 2, Math.max(0, K.g(...R.at(R.L / 2, 2))), { w: 4.2, h: 3.0, rec: 0.2, surround: false, glass: GL, frame: M.whitePaint });
   }
   colliders.push(colFromXZ(K.polyXZ(rect(u0, v0, u1, v1)), -2, 27));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'birge-hall';
   return { object3d, colliders, walkables };
 }

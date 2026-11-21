@@ -4,6 +4,7 @@
 // by a bold bolection moulding, smooth granite above, frieze of rosette pateras and dentils, mutule cornice, tiled hip roof
 // crowned by a long raised skylight with a copper frame and acroteria. Central entrance bay with five bays to either side.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 
 export const info = {
@@ -165,6 +166,8 @@ export async function build(ctx) {
   // east and south doors at grade: small landings
   for (const [u0, v0, u1, v1] of [[uE, vMid - 1.8, uE + 1.0, vMid + 1.8], [-1.8 + (uW + uE) / 2, vS, 1.8 + (uW + uE) / 2, vS + 1.0]]) K.box(GD, u0, -1.2, v0, u1, 0.15, v1);
 
+  // refine-central: foundation hedge, lamp posts and a bike rack where the paths arrive
+  siteDress(K, ctx, [[uW, vS], [uE, vS], [uE, vN], [uW, vN]], { d: 1.1 });
   const object3d = K.finish();
   object3d.name = 'california-hall';
   return { object3d, colliders, walkables };

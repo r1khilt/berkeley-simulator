@@ -2,6 +2,7 @@
 // ribbon glazing between solid spandrel bands, cantilevered over a dark recessed ground-floor colonnade on a paved plaza,
 // with a raised central roof block and a red-orange penthouse. Massing from LiDAR: roof ~19 m, central block ~22 m, plant ~25 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, flatRoof, rect, runsOf, entrance, penthouse, colFromXZ, tint, plain, glassTint } from './lib/b04-kit.js';
 
 export const info = {
@@ -39,6 +40,7 @@ export async function build(ctx) {
   entrance(K, K.run([u0 + gi, v1 - gi], [u1 - gi, v1 - gi]), 14.5, Math.max(0, K.g(0, v1)), { w: 4.0, h: 3.0, rec: 0.1, surround: false, glass: GL });
   entrance(K, K.run([u0 + gi, v0 + gi], [u0 + gi, v1 - gi]), 21.5, Math.max(0, K.g(u0, 0)), { w: 3.6, h: 3.0, rec: 0.1, surround: false, glass: GL });
   colliders.push(colFromXZ(K.polyXZ(rect(u0, v0, u1, v1)), 4.3, 25)); colliders.push(colFromXZ(K.polyXZ(rect(u0 + gi, v0 + gi, u1 - gi, v1 - gi)), -2, 4.4));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'hildebrand-hall';
   return { object3d, colliders, walkables };
 }

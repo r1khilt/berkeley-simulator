@@ -19,7 +19,7 @@ export function genParts(K, parts, defaults = {}) {
     if (p.dentils) dentils(K, poly, p.cornice?.mat || p.mat, p.top - (p.cornice?.H ?? 0.6));
     let yMax = p.top;
     if (p.roof === 'flat') { flatRoof(K, poly, p.top, { mat: p.parMat || p.mat, parapet: p.parapet ?? 0.8, deck: p.deck, coping: p.coping }); yMax += (p.parapet ?? 0.8); }
-    else if (p.roof === 'hip') { const P = hipPoly(K, p.hipPoly || poly, p.eave ?? p.top, p.slope ?? 0.42, { ov: p.ov ?? 0.7, soffit: p.soffit, yTop: p.yTop ?? Infinity, gables: p.gables || [] }); yMax += 8; }
+    else if (p.roof === 'hip') { const P = hipPoly(K, p.hipPoly || poly, p.eave ?? p.top, p.slope ?? 0.42, { ov: p.ov ?? 0.7, soffit: p.soffit, yTop: p.yTop ?? Infinity, gables: p.gables || [], mat: p.roofMat }); yMax += 8; }
     if (p.extra) p.extra(runs, p);
     if (p.collide !== false) colliders.push(K.colPoly(poly, g0, yMax));
   }

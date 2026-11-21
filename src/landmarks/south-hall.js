@@ -4,6 +4,7 @@
 // the wings have separate roof forms (LiDAR: wing mansards ~18–19 m, central ~21 m). Entrance porch on the east with segmental
 // arches and a balustrade with urn finials; stairs descend to the right and the left.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, corniceProfile, balustrade, urn, arcBand, mansard } from './lib/classic-kit.js';
 
 export const info = {
@@ -17,7 +18,9 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.055);
   const K = new Kit(ctx, ANG); const M = ctx.M;
-  const BR = M.brick, ST = M.graniteDark, TR = M.whitePaint, SL = M.slate;
+  const BR = M.brick, ST = M.graniteDark, SL = M.slate;
+  // refine-central: the dressings read as warm sandstone-grey in photos, not bright white paint
+  const TR = M.whitePaint.clone(); TR.color.set(0xc9bfae); TR.roughness = 0.75;
   // plan (calibrated to LiDAR): east wall, west walls (wings / projecting central block), north & south walls
   const uE = 9.0, uWw = -7.1, uWc = -8.1, vN = -22.55, vS = 23.75, vC0 = -11.95, vC1 = 13.05;
   const BASE = 3.9;            // main floor (top of the rusticated base)
@@ -183,6 +186,7 @@ export async function build(ctx) {
     walkables.push(K.stairs(ST, uWc - 1.4, -0.4, uWc, 2.6, gw, gw + 0.45, '+u', 3));
   }
 
+  siteDress(K, ctx, [[uWw, vS], [uE, vS], [uE, vN], [uWw, vN]], { d: 1.0 });
   const object3d = K.finish();
   object3d.name = 'south-hall';
   return { object3d, colliders, walkables };

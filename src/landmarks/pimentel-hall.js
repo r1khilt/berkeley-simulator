@@ -2,6 +2,7 @@
 // A windowless drum of red brick with a concrete coping, ivy spilling over the rim, a deep plain doorway slot and a flat roof.
 // Massing from LiDAR: roof ~6 m above the low side of the site.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, plain, colFromXZ, orient } from './lib/b04-kit.js';
 
 export const info = {
@@ -51,6 +52,7 @@ export async function build(ctx) {
   }
   colliders.push(colFromXZ(ctx.footprints[0].outer, -3, top + 0.5));
   walkables.push({ type: 'poly', pts: poly.map(([x, z]) => [+x.toFixed(2), +z.toFixed(2)]), y: top + 0.2 });
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'pimentel-hall';
   return { object3d, colliders, walkables };
 }
