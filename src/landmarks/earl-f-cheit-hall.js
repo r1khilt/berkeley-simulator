@@ -83,10 +83,10 @@ export async function build(ctx) {
   block(-8.4, 12.0, 7.8, 21.9, EAVE, 0.6, { S: 1, E: 1, N: 1, W: 1 }, [], { doors: { E: [7.0] } });
   block(-12.6, -8.5, -16.7, -3.2, 15.0, 0.62, { S: 1, E: 0, N: 1, W: 1 });
   block(-11.1, -8.4, 14.9, 21.6, 15.0, 0.62, { S: 1, E: 0, N: 1, W: 1 });
-  { const vC = -10.5, hw = 3.0, pr = 2.0, ch = 1.0, u1 = 9.0; const top = EAVE + 1.0;
+  { const vC = -10.5, hw = 3.4, pr = 2.2, ch = 1.6, u1 = 9.0; const top = EAVE + 1.0;
     const P = [[u1, vC + hw], [u1 + pr - ch, vC + hw], [u1 + pr, vC + hw - ch], [u1 + pr, vC - hw + ch], [u1 + pr - ch, vC - hw], [u1, vC - hw]];
     for (let i = 0; i < P.length - 1; i++) { const R = K.run(P[i], P[i + 1]); const L = R.L; let gs = Infinity; for (let k = 0; k <= 2; k++) { const p = R.at(L * k / 2, 0.5); gs = Math.min(gs, K.g(p[0], p[1])); }
-      const ops = L > 2.5 ? [{ s0: L / 2 - 0.95, s1: L / 2 - 0.1, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }, { s0: L / 2 + 0.1, s1: L / 2 + 0.95, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }] : [{ s0: 0.2, s1: L - 0.2, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }];
+      const ops = L > 2.5 ? [{ s0: L / 2 - 1.5, s1: L / 2 - 0.12, y0: gs + 1.0, y1: top - 1.2, muntins: 8, mull: 1, frame: TEAL, sill: false }, { s0: L / 2 + 0.12, s1: L / 2 + 1.5, y0: gs + 1.0, y1: top - 1.2, muntins: 8, mull: 1, frame: TEAL, sill: false }] : [{ s0: 0.2, s1: L - 0.2, y0: gs + 1.0, y1: top - 1.2, muntins: 8, mull: 1, frame: TEAL, sill: false }];
       openWall(K, R, STU, 0, L, gs - 1.2, top, ops, { depth: 0.4, rev: 0.25, frame: TEAL });
       K.rbox(R, CREAM, -0.05, gs - 1.2, 0, L + 0.05, gs + 0.55, 0.06); K.rbox(R, CREAM, -0.05, top - 0.5, 0, L + 0.05, top - 0.2, 0.14); }
     K.prism(M.concreteDark, P.map(([u, v]) => [u - 0.35 + (u - u1) * -0.1, v]), -1, top);
@@ -104,10 +104,9 @@ export async function build(ctx) {
       K.rbox(R, CS, -0.05, gs - 1.2, 0, R.L + 0.05, gs + 1.0, 0.12);
       K.rbox(R, CREAM, -0.05, TH - 0.8, -0.3, R.L + 0.05, TH, 0.08); K.rbox(R, X.fascia, -0.05, TH - 0.85, 0, R.L + 0.05, TH - 0.78, 0.12); }
     const c = [3.0, -22.5]; K.prism(M.concreteDark, P.map(([u, v]) => [u + (c[0] - u) * 0.08, v + (c[1] - v) * 0.08]), -1, TH);
-    const pos = []; const apex = [c[0], TH + 4.2, c[1]]; const O = P.map(([u, v]) => [u + (u - c[0]) * 0.12, TH - 0.1, v + (v - c[1]) * 0.12]); O.push(O[0]);
+    const pos = []; const apex = [c[0], TH + 2.6, c[1]]; const O = P.map(([u, v]) => [u + (u - c[0]) * 0.12, TH - 0.1, v + (v - c[1]) * 0.12]); O.push(O[0]);
     for (let i = 0; i < O.length - 1; i++) pos.push(...O[i], ...apex, ...O[i + 1]);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); K.add(ROOF, g, { uvMode: 'roof' });
-    K.cyl(X.fascia, apex[0], apex[1] - 0.1, apex[2], 0.18, 0.05, 1.2, 8, { detail: true }); // copper finial
   }
   // courtyard paving apron along the east front (granite pavers), and slender disc-head pole lights
   for (const [ua, va, ub, vb] of [[9.0, -16.7, 12.5, 7.8], [12.0, 7.8, 15.0, 21.9]]) { const gy = Math.max(K.g(ua + 0.5, (va + vb) / 2), K.g(ua + 0.5, va + 0.5), K.g(ua + 0.5, vb - 0.5)); K.box(M.paving, ua - 0.05, gy - 0.6, va, ub, gy + 0.03, vb); walkables.push(K.walkPoly([[ua, va], [ub, va], [ub, vb], [ua, vb]], gy + 0.03)); }

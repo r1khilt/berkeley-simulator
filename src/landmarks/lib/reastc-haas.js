@@ -29,11 +29,14 @@ export function haasMats(M) {
 // the band [y0, y1]. Returns null when the band misses the opening.
 export function archPart(s, w, yTop, y0, y1) {
   const r = w / 2, spring = yTop - r;
-  if (y0 >= yTop - 0.05 || y1 <= -1e9) return null;
-  if (y1 <= spring + 0.01) return { s0: s - r, s1: s + r, y0, y1: Math.min(y1, spring), noFill: true };
-  if (y0 < spring) return { s0: s - r, s1: s + r, y0, y1: yTop, arch: true, noFill: true }; // y1 must be >= yTop here
+  if (y0 >= yTop - 0.05 || y1 <= y0) return null;
+  if (y0 < spring + 0.01) {
+    if (y1 >= yTop) return { s0: s - r, s1: s + r, y0, y1: yTop, arch: true, noFill: true };
+    return { s0: s - r, s1: s + r, y0, y1, noFill: true };          // band ends below the crown: square cut (archivolt covers the corners)
+  }
   const dy = y0 - spring; const hc = Math.sqrt(Math.max(0.01, r * r - dy * dy));
-  return { s0: s - hc, s1: s + hc, y0, y1: yTop, arch: 'seg', rise: yTop - y0, noFill: true };
+  if (y1 >= yTop) return { s0: s - hc, s1: s + hc, y0, y1: yTop, arch: 'seg', rise: yTop - y0, noFill: true };
+  return { s0: s - hc, s1: s + hc, y0, y1, noFill: true };
 }
 
 // Great arched portal on run R (the wall itself must already have the arch hole, see archPart): stepped archivolt with
@@ -120,4 +123,17 @@ export function discLamp(K, u, y, v, h = 6.0, X) {
   K.cyl(X.steel, u, y - 0.3, v, 0.08, 0.06, h + 0.3, 8, { detail: true });
   K.cyl(X.steel, u, y + h, v, 0.36, 0.36, 0.1, 14, { detail: true });
   K.cyl(K.M.lampGlow, u, y + h - 0.04, v, 0.3, 0.3, 0.04, 14, { detail: true });
+}
+
+// Projecting arcade in front of an existing wall on run R (s0..s1): square stucco piers on the outer line `dep` out,
+// a cast lintel + thin roof slab back to the wall, paving, and an optional steel pergola above. g = walk level.
+export function arcade(K, R, s0, s1, g, h, { X, pitch = 4.0, dep = 2.4, pier = 0.7, pergola = true, yBase } = {}) {
+  const M = K.M; const L = s1 - s0; const n = Math.max(1, Math.round(L / pitch)); const bw = L / n; const yb = yBase ?? g - 1.0;
+  for (let i = 0; i <= n; i++) { const c = Math.min(s1 - pier / 2, Math.max(s0 + pier / 2, s0 + bw * i)); K.rbox(R, X.stucco, c - pier / 2, yb, dep - pier, c + pier / 2, g + h, dep); K.rbox(R, X.cast, c - pier / 2 - 0.06, g + h - 0.35, dep - pier - 0.06, c + pier / 2 + 0.06, g + h - 0.12, dep + 0.06); }
+  K.rbox(R, X.cast, s0, g + h, 0, s1, g + h + 0.5, dep + 0.05);
+  K.rbox(R, X.fascia, s0, g + h + 0.5, 0, s1, g + h + 0.62, dep + 0.12);
+  K.rbox(R, M.paving, s0, yb, 0, s1, g + 0.03, dep);
+  if (pergola) { const yP = g + h + 0.62; const ns = Math.max(1, Math.round(L / 0.5));
+    for (let i = 0; i <= ns; i++) { const s = s0 + L * i / ns; K.rbox(R, X.steel, s - 0.025, yP, 0.1, s + 0.025, yP + 0.1, dep + 1.2, { detail: true }); }
+    K.rbox(R, X.steel, s0, yP, dep + 1.05, s1, yP + 0.2, dep + 1.2, { detail: true }); }
 }
