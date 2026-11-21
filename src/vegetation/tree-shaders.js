@@ -179,7 +179,7 @@ export function patchLeaf(mat, uni) {
       .replace('#include <lights_physical_pars_fragment>', TRANSLUCENT)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= uLeafSpec; material.specularColorBlended *= uLeafSpec; material.specularF90 *= uLeafSpec;')
       // small unshadowed sky fill so crown interiors (in the crown's own shadow) never go black; off at night
-      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * 0.035 * (1.0 - uNight);');
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * (1.0 - uNight); // light transmitted through the canopy: shaded crown interiors stay readable green');
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
@@ -191,7 +191,7 @@ export function patchBark(mat, uni) {
   mat.onBeforeCompile = (sh) => {
     withUniforms(sh, uni, false);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\n')
+      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\nvarying float vBarkTone;\n')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = treeWind(transformed);\n')
       .replace('#include <uv_vertex>', `#include <uv_vertex>
       {
@@ -199,11 +199,14 @@ export function patchBark(mat, uni) {
         mat4 bm = treeObjM();
         float bsx = length(bm[0].xyz), bsy = length(bm[1].xyz), bsz = length(bm[2].xyz);
         vec2 k = vec2(0.5 * (bsx + bsz), pow(bsx * bsy * bsz, 1.0 / 3.0)) / uTypH;
+        // gfx-trees: per-tree pattern offset + tone so neighbouring trunks don't look like clones
+        vec2 bo = vec2(treeHash(bm[3].xz * 0.71 + 5.3), treeHash(bm[3].xz * 0.37 + 9.1));
+        vBarkTone = 0.86 + 0.28 * treeHash(bm[3].xz * 1.13 + 2.7);
         #ifdef USE_MAP
-          vMapUv *= k;
+          vMapUv = vMapUv * k + bo;
         #endif
         #ifdef USE_NORMALMAP
-          vNormalMapUv *= k;
+          vNormalMapUv = vNormalMapUv * k + bo;
         #endif
       }`)
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -213,11 +216,11 @@ export function patchBark(mat, uni) {
         vPx = 2.0 * aRad * su * projectionMatrix[1][1] * 0.5 * uViewH / max(-mvPosition.z, 0.05);
       }`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vPx;\n')
+      .replace('#include <common>', '#include <common>\nvarying float vPx;\nvarying float vBarkTone;\n')
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vPx < 0.75) discard; // sub-pixel twig')
-      .replace('#include <color_fragment>', ''); // bark ignores the foliage tint
+      .replace('#include <color_fragment>', 'diffuseColor.rgb *= vBarkTone;'); // bark ignores the foliage tint (per-tree tone only)
   };
-  mat.customProgramCacheKey = () => 'tree-bark-5';
+  mat.customProgramCacheKey = () => 'tree-bark-6';
   return mat;
 }
 
@@ -231,13 +234,15 @@ export function patchBlob(mat, uni) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + RAMP + 'varying float vLeaf;\n')
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= uLeafSpec; material.specularColorBlended *= uLeafSpec; material.specularF90 *= uLeafSpec;')
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * vLeaf * (1.0 - uNight);')
       .replace('#include <color_fragment>', /* glsl */`
   float q0 = 0.42 + ( vInst - 0.5 ) * uRamp.z; // mean of the atlas' per-leaf values
-  vec3 bc = ( leafRamp( q0 - 0.3 ) + leafRamp( q0 ) + leafRamp( q0 + 0.3 ) ) * ( 1.0 / 3.0 ) * vTint * uTrans.z;
+  vec3 bc = ( leafRamp( q0 - 0.3 ) + leafRamp( q0 ) + leafRamp( q0 + 0.3 ) ) * ( 1.1 / 3.0 ) * vTint * uTrans.z; // x1.1: far crowns were a step darker than near ones
   diffuseColor.rgb *= mix( uTwigCol, bc, vLeaf ) * vAO;
 `);
+    sh.uniforms.uNight = U.uNight; sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
-  mat.customProgramCacheKey = () => 'tree-blob-3';
+  mat.customProgramCacheKey = () => 'tree-blob-4';
   return mat;
 }
 

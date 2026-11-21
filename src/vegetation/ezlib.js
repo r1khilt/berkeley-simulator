@@ -1,5 +1,10 @@
 // Berkeley Simulator — photographic tree library built on EZ-Tree.
 //
+// STATUS (gfx-trees evaluation, Nov 2026): opt-in only, via ?trees=ez. The default is ./trees.js. In headless
+// SwiftShader the game took ~181 s to load with this library vs ~31 s with trees.js, and frames were several times
+// slower (LOD0 budget 7.8k tris/tree vs 3k, alpha-tested 4-quad impostors on ~13k far trees, runtime atlas baking).
+// To make it shippable: lod0Budget <= 3000, opaque far LOD, bake leaf atlases + impostors offline.
+//
 // Branch skeletons come from EZ-Tree (MIT License, (c) Daniel Greenheck, https://github.com/dgreenheck/ez-tree).
 // ezSkeleton() below is a port of ez-tree/src/lib/tree.js generate() that consumes ez-tree's RNG in exactly the
 // same order, so ez-tree presets reproduce. We port instead of importing Tree because tree.js imports
