@@ -28,6 +28,7 @@ import { U, materials } from './materials.js';
 import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './time.js';
 import { installGrading, contactAO, GRADE } from './world/grading.js';
 import { initPBR, PBR } from './world/pbr.js'; // gfx-materials: PBR surface textures
+import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
 installGrading();
 
 let canvas = document.getElementById('c'); // [gfx-webgpu] let: the WebGPU fallback may swap in a fresh canvas
@@ -46,8 +47,9 @@ async function boot() {
   let gpu = null;
   if (qs.get('renderer') === 'webgpu') { const r = await (await import('./gpu/webgpu.js')).createWebGPU({ canvas, qs }); if (r.renderer) gpu = r; else { canvas = r.canvas; BS.rendererFallback = r.fail; } }
   BS.gpu = gpu;
-  let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
-  if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
+  const usePost = !gpu && (settings.quality === 'high' || settings.quality === 'ultra' || qs.get('post') === '1') && qs.get('post') !== '0';   // gfx-post: MSAA lives in the HDR target then
+  let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
+  if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
   renderer.setPixelRatio(Math.min(devicePixelRatio, Q.dpr)); renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.CustomToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -307,7 +309,9 @@ async function boot() {
       const rk = `${pp.month}-${pp.day}-${pp.hour}`;
       if (((pp.hour === 7 && pp.minute === 50) || (pp.hour === 12 && pp.minute === 0 && pp.second > 40) || (pp.hour === 18 && pp.minute === 0 && pp.second > 40)) && !recitalDone.has(rk)) { recitalDone.add(rk); audio.carillon(d, pan, 50); }
     }
-    if (gpuPost) gpuPost.render(U.uNight.value); /* [gfx-webgpu] */ else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
+    if (gpuPost) gpuPost.render(U.uNight.value); /* [gfx-webgpu] */
+    else if (post) post.render(dt);   // gfx-post
+    else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
   }
   function hud(date) {
     ui.clock(clockString(date), timeSt.label);
@@ -327,9 +331,12 @@ async function boot() {
     const { x, z } = player.pos; ui.location(x > 380 && z < 300 ? 'Berkeley Hills' : z > 420 ? 'Southside' : z < -480 ? 'Northside' : x < -800 ? 'Downtown Berkeley' : 'UC Berkeley campus', 'Berkeley, California');
   }
   // post: bloom for emissives (lamps, windows, sun glints)
-  let composer = null, bloom = null, gpuPost = null;
+  let composer = null, bloom = null, gpuPost = null, post = null;
   if (gpu && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) gpuPost = await gpu.makePost({ scene, camera }); // [gfx-webgpu]
-  if (!gpu && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) {
+  // gfx-post: HDR target + GTAO + aerial perspective + AgX look (+ bloom, SMAA on ultra). ?post=0 restores the old path.
+  if (usePost) { try { post = new PostPipeline({ renderer, scene, camera, sky, quality: settings.quality === 'ultra' ? 'ultra' : settings.quality === 'medium' ? 'medium' : 'high' }); } catch (e) { console.warn('post pipeline unavailable', e); post = null; } }
+  BS.post = post;
+  if (!gpu && !post && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) {
     const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: 4 });
     composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
