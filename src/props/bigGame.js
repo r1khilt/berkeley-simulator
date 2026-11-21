@@ -113,11 +113,12 @@ function buildFigureGeos() {
     arm: merge([vbox(0.14, 0.34, 0.15, 0, -0.17, 0), vbox(0.12, 0.3, 0.13, 0, -0.48, 0, 0.95), vbox(0.12, 0.1, 0.13, 0, -0.66, 0, D)]),
     trombone: merge([vbox(0.022, 0.022, 0.9, 0.03, 1.66, 0.55, 1), vbox(0.022, 0.022, 0.9, -0.03, 1.66, 0.55, 1), vbox(0.08, 0.022, 0.022, 0, 1.66, 1.0),
       vbox(0.02, 0.02, 0.42, 0.07, 1.74, 0.3), vcone(0.11, 0.3, 0.07, 1.74, 0.62, 1, 12, Math.PI / 2), vbox(0.02, 0.1, 0.02, 0.07, 1.7, 0.1)]),
-    sousa: merge([paint(tf(new THREE.TorusGeometry(0.4, 0.045, 6, 18), 0, 1.35, 0, Math.PI / 2 - 0.35, 0, 0.5), 1), vcone(0.34, 0.45, 0.12, 2.12, 0.2, 1, 16, 0.5), vcyl(0.05, 0.05, 0.6, 0.12, 1.85, 0.0, 1, 6)]),
+    sousa: merge([paint(tf(new THREE.TorusGeometry(0.36, 0.07, 8, 20), 0, 1.32, 0.02, Math.PI / 2 - 0.4, 0, 0.55), 1), vcone(0.36, 0.45, 0.06, 2.12, 0.28, 1, 18, 1.25), vcyl(0.075, 0.075, 0.62, 0.06, 1.8, 0.04, 1, 8, 0.3), vbox(0.06, 0.06, 0.2, 0, 1.64, 0.12, 1)]),
     drum: merge([vcyl(0.24, 0.24, 0.28, 0, 1.0, 0.3, 1, 16), vcyl(0.245, 0.245, 0.04, 0, 1.13, 0.3, cardinal, 16), vcyl(0.245, 0.245, 0.04, 0, 0.87, 0.3, cardinal, 16)]),
-    horn: merge([vbox(0.04, 0.04, 0.4, 0, 1.66, 0.3, 1), vcone(0.07, 0.14, 0, 1.66, 0.55, 1, 10, Math.PI / 2), vbox(0.07, 0.05, 0.1, 0, 1.6, 0.25, 1)]),
+    horn: merge([vbox(0.05, 0.05, 0.42, 0, 1.64, 0.32, 1), vcone(0.11, 0.18, 0, 1.64, 0.6, 1, 12, Math.PI / 2), vbox(0.09, 0.09, 0.16, 0, 1.58, 0.28, 1)]),
     ball: merge([paint(tf(new THREE.SphereGeometry(0.13, 12, 8), 0, 0, 0, 0, 0, 0, 1, 1, 1.65), hex(0x7a4321)), vbox(0.02, 0.012, 0.12, 0, 0.128, 0, 0.95)]),
-    star: paint(tf(new THREE.OctahedronGeometry(0.17, 0), 0, 0, 0, 0, 0, 0, 1, 0.55, 1), hex(0xffd23f)),
+    star: (() => { const sh = new THREE.Shape(); for (let k = 0; k < 10; k++) { const a = Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 0.1 : 0.24; k ? sh.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : sh.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      return paint(new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: false }).translate(0, 0, -0.025), hex(0xffd84a)); })(),
     ring: paint(tf(new THREE.RingGeometry(1.0, 1.16, 40), 0, 0, 0, -Math.PI / 2), 1),
   };
 }
@@ -153,14 +154,15 @@ class ThePlay {
     const stRole = ['K', 'G', 'G', 'G', 'G', 'G', 'F', 'F', 'F', 'B9', 'B10'];
     stW.forEach((w, k) => this.stan.push(mk({ team: 'stan', role: stRole[k], k, x0: KICK_U + (k === 0 ? 7.5 : 4.5), z0: k === 0 ? -0.5 : w, vmax: 6.4 + r() * 0.9 })));
     const instr = ['trombone', 'trombone', 'trombone', 'trombone', 'trombone', 'sousa', 'sousa', 'sousa', 'sousa', 'drum', 'drum', 'drum', 'drum', 'drum'];
+    const COLS = [-15.75, -12.25, -8.75, -5.25, 5.25, 8.75, 12.25, 15.75];
     for (let k = 0; k < N_BAND; k++) {
-      const row = Math.floor(k / 9), col = k % 9;
-      this.band.push(mk({ team: 'band', k, x0: 56.2 + row * 1.5 + (r() - 0.5) * 0.5, z0: -14 + col * 3.5 + (r() - 0.5) * 0.9, skin: COL.skin[(r() * COL.skin.length) | 0], instr: instr[k] || 'horn',
+      const row = Math.floor(k / 8), col = row < 4 ? k % 8 : 2 + (k % 8);
+      this.band.push(mk({ team: 'band', k, x0: 57.8 + row * 1.8 + (r() - 0.5) * 0.4, z0: COLS[col] + (r() - 0.5) * 0.8, skin: COL.skin[(r() * COL.skin.length) | 0], instr: instr[k] || 'horn',
         tx: 27 + r() * 22, tz: -21 + r() * 42, delay: r() * 0.9, sp: 4.2 + r() * 1.4 }));
     }
-    // shuffle instruments; Tyrrell is the front-row trombonist nearest Cal's path (w ≈ +3.5)
+    // shuffle instruments; Gary Tyrrell is the front-row trombonist nearest Moen's path (w ≈ +5)
     for (let k = this.band.length - 1; k > 0; k--) { const j = (r() * (k + 1)) | 0; const t = this.band[k].instr; this.band[k].instr = this.band[j].instr; this.band[j].instr = t; }
-    let ty = this.band[0], bd = 1e9; for (const b of this.band) { const d = Math.hypot(b.x0 - 56.2, b.z0 - 3.5); if (d < bd) { bd = d; ty = b; } }
+    let ty = this.band[0], bd = 1e9; for (const b of this.band) { const d = Math.hypot(b.x0 - 57.8, b.z0 - 5.25); if (d < bd) { bd = d; ty = b; } }
     const swap = this.band.find((b) => b.instr === 'trombone'); if (swap && swap !== ty) { swap.instr = ty.instr; } ty.instr = 'trombone'; ty.tyrrell = true; this.tyrrell = ty;
     const cnt = {}; for (const b of this.band) cnt[b.instr] = (cnt[b.instr] || 0) + 1;
     this.mInstr = { trombone: inst(G.trombone, gold, cnt.trombone), sousa: inst(G.sousa, gold, cnt.sousa || 1), horn: inst(G.horn, gold, cnt.horn || 1), drum: inst(G.drum, drumM, cnt.drum || 1) };
@@ -174,18 +176,23 @@ class ThePlay {
       for (const s of [0, 1]) { setC(this.mLeg, 2 * i + s, COL.bandPants); setC(this.mArm, 2 * i + s, hex(0x9e1b1b)); } });
     for (const m of [this.mStar]) for (let i = 0; i < 3; i++) setC(m, i, [1, 1, 1]);
     for (const m of [this.mTorsoC, this.mTorsoS, this.mHelmet, this.mBlazer, this.mFace, this.mHat, this.mLeg, this.mArm, this.mStar]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
-    this.ballFly = null; this.trombone = null;
+    this.trombone = null; this.lowQ = quality === 'low';
     this.reset();
   }
   attach(st) { // st = the loaded memorial-stadium landmark record
     const a = st.packetAnchor, yF = (st.res && st.res.debug && Number.isFinite(st.res.debug.yF)) ? st.res.debug.yF : -1.42;
     this.root.position.set(FCW[0], a.y + yF, FCW[1]); this.root.rotation.y = -Math.atan2(AX[1], AX[0]);
-    // video-board overlays: just in front of the stadium's own screens (16.6 x 9.4 m, centred 34.1 m above the anchor)
+    // replay video boards (16.6 x 9.4 m screens, centred 34.1 m above the stadium anchor like the stadium's own)
+    this.ready = true; if (this.boardTex) return;
     this.boardTex = canvasTex(1024, 512, () => {}); this.boardCanvas = this.boardTex.image;
     const bm = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xffffff, emissiveMap: this.boardTex, emissiveIntensity: 0.95, roughness: 0.4, name: 'bg:board', polygonOffset: true, polygonOffsetFactor: -2 });
+    // memorial-stadium.js's board slabs run along the field axis (17.6 m long, front end at |u| = 106.7), so the
+    // replay screen is mounted on the slab's field end, facing the field.
+    const frameM = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6, metalness: 0.3, name: 'bg:boardFrame' });
     for (const sgn of [1, -1]) {
       const g = new THREE.PlaneGeometry(16.6, 9.4); g.rotateY(sgn > 0 ? -Math.PI / 2 : Math.PI / 2);
-      const m = new THREE.Mesh(g, bm); m.position.set(sgn * (115.5 - 0.97), 34.1 - yF, -0.6); m.name = 'bigGame:board'; this.root.add(m);
+      const m = new THREE.Mesh(g, bm); m.position.set(sgn * 106.2, 34.1 - yF, -0.6); m.name = 'bigGame:board'; this.root.add(m);
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.5, 10.4, 17.6), frameM); f.position.set(sgn * 106.47, 34.1 - yF, -0.6); f.name = 'bigGame:boardFrame'; f.castShadow = true; this.root.add(f);
     }
     this.boardKey = ''; this.drawBoard('pre');
     this.root.updateMatrixWorld(true);
@@ -215,7 +222,7 @@ class ThePlay {
       const dn = DOWN[f.name];
       if (dn && T >= dn[0] && T < dn[1]) { if (f.state !== 'down') { f.state = 'down'; f.st = T; f.fall = 1; } f.vx = f.vz = 0; }
       else if (T >= 16.4 && (i === MOEN || T > 17.2)) { if (f.state !== 'cheer') { f.state = 'cheer'; f.st = T; } }
-      else if (f.state === 'down') { f.state = 'run'; f.st = T; } else if (f.state !== 'down') f.state = 'run';
+      else if (f.state === 'down') { f.state = 'run'; f.st = T; } else f.state = T < 0.4 ? 'stand' : 'run';
     }
     const ci = this.carrierAt(T), car = cal[ci];
     const leadX = car.x + car.vx * 0.35, leadZ = car.z + car.vz * 0.35;
@@ -226,8 +233,8 @@ class ThePlay {
     const ty = this.tyrrell;
     if (this.tHit == null && T > 15 && Math.hypot(moen.x - ty.x, moen.z - ty.z) < 0.95) {
       this.tHit = T; ty.state = 'flat'; ty.st = T; ty.yaw = Math.atan2(moen.vx, moen.vz) + Math.PI; if (!silent) this.events.push('flat');
-      const fx = Math.sin(ty.yaw + Math.PI), fz = Math.cos(ty.yaw + Math.PI); // knocked the way Moen was running
-      this.trombone = { x: ty.x, y: 1.6, z: ty.z, vx: fx * 2.2 + 0.4, vy: 6.2, vz: fz * 2.2 - 0.6, rx: 0, ry: ty.yaw, rz: 0, w: 9, landed: false };
+      const fx = Math.sin(ty.yaw), fz = Math.cos(ty.yaw); // the trombone flies up and lands by his right hand
+      this.trombone = { x: ty.x, y: 1.6, z: ty.z, vx: -fz * 1.5 - fx * 0.7, vy: 5.6, vz: fx * 1.5 - fz * 0.7, rx: 0, ry: ty.yaw, rz: 0, w: 9, landed: false };
     }
     // --- Cal blockers
     for (let i = 4; i < cal.length; i++) {
@@ -253,7 +260,8 @@ class ThePlay {
         if (f.state !== 'dejected') { f.state = 'dejected'; f.st = T; }
         this.seekTo(f, f.x + f.vx * 0.2, f.z + f.vz * 0.2, 1.2, dt, 0); continue;
       }
-      if (f.eng) { if ((f.role === 'B9' && T > 6.5) || (f.role === 'B10' && T > 9.0)) { const b = f.eng; f.eng = null; b.eng = null; if (f.role === 'B9') { f.state = 'down'; f.st = T; f.fall = -1; f.up = 15.5; } else f.state = 'run'; b.state = 'run'; } else continue; }
+      if (f.role === 'B9' && T > 6.5 && !f.done) { f.done = true; if (f.eng) { f.eng.eng = null; f.eng.state = 'run'; f.eng = null; } f.state = 'down'; f.st = T; f.fall = -1; f.up = 99; continue; }
+      if (f.eng) { if (f.role === 'B10' && T > 9.0) { const b = f.eng; f.eng = null; b.eng = null; f.state = 'run'; b.state = 'run'; } else continue; }
       let tx = leadX, tz = leadZ, vmax = f.vmax * (T < 2.5 ? 0.62 : 1), R = 0, ang = f.k * 2.1;
       if (f.role === 'K') {
         if (T < 13.45) { tx = leadX + 5.5; tz = clamp(leadZ, -20, 20); vmax = 5.6; }
@@ -261,19 +269,25 @@ class ThePlay {
         if (f.dove) { if (T - f.st > 0.38) { if (f.state !== 'down') { f.state = 'down'; f.st = T; f.fall = 1; f.up = 16.6; } continue; } tx = f.dx; tz = f.dz; vmax = 7.5; }
       } else if (f.role === 'G') {
         const victim = T < 5.15 ? null : cal[GARNER];
-        R = victim ? 0.85 + 4.6 * (1 - sstep(5.2, 6.55, T)) : 5.5; if (victim) { tx = victim.x; tz = victim.z; }
-        const gi = f.k - 1; ang = gi * TAU / 5 + 0.4;
+        R = victim ? 0.95 + 4.5 * (1 - sstep(5.2, 6.55, T)) : 5.5; if (victim) { tx = victim.x; tz = victim.z; }
+        const gi = f.k - 1; ang = (gi - 2) * 0.88;
         if (T >= 7.1 && !f.done) { f.done = true; if (gi < 3) { f.state = 'down'; f.st = T + gi * 0.07; f.fall = 1; f.up = 10.6 + gi * 0.35; } else { f.state = 'party'; f.st = T; } }
         if (f.state === 'party') { if (T < 9.4) { f.vx *= 0.8; f.vz *= 0.8; continue; } f.state = 'run'; vmax = 5.2; R = 3; }
         if (f.state === 'dejected') { vmax = 4.4; R = 3.5; }
       } else if (f.role === 'F') {
-        const victim = T < 9.6 ? null : cal[FORD]; const fi = f.k - 6; ang = fi * TAU / 3 + 1.2;
+        const victim = T < 9.6 ? null : cal[FORD]; const fi = f.k - 6; ang = (fi - 1) * 0.75;
         R = victim ? 0.8 + 5.2 * (1 - sstep(10.7, 12.25, T)) : 6; if (victim) { tx = victim.x + victim.vx * 0.15; tz = victim.z + victim.vz * 0.15; }
         if (T >= 12.55 + fi * 0.06 && !f.done) { f.done = true; f.state = 'down'; f.st = T; f.fall = 1; f.up = 15.6 + fi * 0.4; continue; }
         if (f.state === 'dejected') { vmax = 4.2; R = 4; }
       } else if (f.role === 'B9' || f.role === 'B10') { if (T > 12.75 && f.role === 'B10') { vmax = 7.55; tx = moen.x; tz = moen.z; } R = f.role === 'B9' ? 3 : 0; }
-      this.seekTo(f, tx + Math.cos(ang) * R, tz + Math.sin(ang) * R, vmax, dt, 0.25);
+      const commit = (f.role === 'G' && T > 5.4 && T < 7.2) || (f.role === 'F' && T > 10.9 && T < 12.6);
+      if (commit) { // close in from wherever you are: hit him from your own side of the pile
+        const v = f.role === 'G' ? cal[GARNER] : cal[FORD], dx = f.x - v.x, dz = f.z - v.z, dd = Math.hypot(dx, dz) || 1;
+        if (dd < 4.5) { const k = sstep(4.5, 1.0, dd); tx = v.x + v.vx * 0.12; tz = v.z + v.vz * 0.12; const rx = Math.cos(ang) * R * (1 - k) + dx / dd * 0.62 * k, rz = Math.sin(ang) * R * (1 - k) + dz / dd * 0.62 * k; this.seekTo(f, tx + rx, tz + rz, vmax * 1.1, dt, 0); }
+        else this.seekTo(f, tx + Math.cos(ang) * R, tz + Math.sin(ang) * R, vmax * 1.1, dt, 0);
+      } else this.seekTo(f, tx + Math.cos(ang) * R, tz + Math.sin(ang) * R, vmax, dt, 0.25);
       if (f.state !== 'dive' && f.state !== 'dejected') f.state = 'run';
+      if (commit) { const v = f.role === 'G' ? cal[GARNER] : cal[FORD]; if (Math.hypot(v.x - f.x, v.z - f.z) < 1.7) { f.state = 'tackle'; f.look = v; } }
     }
     // --- band
     for (const b of band) {
@@ -293,15 +307,16 @@ class ThePlay {
     for (let i = 0; i < A.length; i++) {
       const a = A[i]; if (a.track || a.state === 'down' || a.state === 'flat') continue;
       for (let j = 0; j < A.length; j++) {
-        if (i === j) continue; const b = A[j]; if (b.state === 'flat') continue;
-        const dx = a.x - b.x, dz = a.z - b.z, d2 = dx * dx + dz * dz, rr = (b.state === 'down' || a.eng === b) ? 0.55 : 0.85;
+        if (i === j) continue; const b = A[j]; let bx = b.x, bz = b.z, rr = a.eng === b || a.state === 'tackle' ? 0.55 : 0.85;
+        if (b.state === 'flat' || b.state === 'down') { const back = b.state === 'flat' ? -0.9 : 0.95; bx += Math.sin(b.yaw) * back; bz += Math.cos(b.yaw) * back; rr = b.state === 'flat' ? (a.track ? 0 : 1.9) : (a.team !== b.team && T - b.st < 1.2 ? 0.5 : 1.0); }
+        const dx = a.x - bx, dz = a.z - bz, d2 = dx * dx + dz * dz;
         if (d2 < rr * rr && d2 > 1e-6) { const d = Math.sqrt(d2), push = (rr - d) * (b.track ? 1 : 0.5); a.x += dx / d * push; a.z += dz / d * push; }
       }
     }
     // trombone flight
     const tb = this.trombone;
-    if (tb && !tb.landed) { tb.vy -= 9.8 * dt; tb.x += tb.vx * dt; tb.y += tb.vy * dt; tb.z += tb.vz * dt; tb.rx += tb.w * dt; tb.rz += tb.w * 0.6 * dt; if (tb.y <= 0.06 && tb.vy < 0) { tb.y = 0.06; tb.landed = true; tb.rx = Math.PI / 2; tb.rz = 0.3; } }
-    for (const f of A) { if (f.state === 'down' || f.state === 'flat') { f.speed = 0; continue; } f.speed = Math.hypot(f.vx, f.vz); f.ph += f.speed * dt * 2.6; if (f.speed > 0.4) { const ty2 = Math.atan2(f.vx, f.vz); let dy = ty2 - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); f.yaw += dy * Math.min(1, dt * 10); } else if (f.look) { const ty2 = Math.atan2(f.look.x - f.x, f.look.z - f.z); let dy = ty2 - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); f.yaw += dy * Math.min(1, dt * 4); } }
+    if (tb && !tb.landed) { tb.vy -= 9.8 * dt; tb.x += tb.vx * dt; tb.y += tb.vy * dt; tb.z += tb.vz * dt; tb.rx += tb.w * dt; tb.rz += tb.w * 0.6 * dt; if (tb.y <= 0.1 && tb.vy < 0) { tb.y = 0.1; tb.landed = true; tb.rx = 0; tb.rz = 1.45; tb.ry += 0.6; } }
+    for (const f of A) { if (f.state === 'down' || f.state === 'flat') { f.speed = 0; continue; } f.speed = Math.hypot(f.vx, f.vz); f.ph += f.speed * dt * 2.6; if (f.state === 'tackle' && f.look) { const ty2 = Math.atan2(f.look.x - f.x, f.look.z - f.z); let dy = ty2 - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); f.yaw += dy * Math.min(1, dt * 12); } else if (f.speed > 0.4) { const ty2 = Math.atan2(f.vx, f.vz); let dy = ty2 - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); f.yaw += dy * Math.min(1, dt * 10); } else if (f.look) { const ty2 = Math.atan2(f.look.x - f.x, f.look.z - f.z); let dy = ty2 - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); f.yaw += dy * Math.min(1, dt * 4); } }
     if (T >= T_END) this.reset();
     return T0_;
   }
@@ -327,23 +342,28 @@ class ThePlay {
     if (st === 'cheer' || st === 'party') { y = Math.abs(Math.sin(T * 7 + f.jump)) * 0.32; armUp = 1; spread = 0.35 + 0.15 * Math.sin(T * 7 + f.jump); legA = 0.15; armA = 0; }
     if (st === 'flee') { armUp = 0.8; spread = 0.5 + 0.4 * Math.sin(T * 17 + f.jump); }
     if (st === 'block') { lean = 0.38; armFwd = 1; legA = 0.35; armA = 0; }
+    if (st === 'tackle') { lean = 0.62; armFwd = 1; legA = 0.45; armA = 0.15; spread = 0.25; }
+    if (st === 'stand' && f.team !== 'band') { lean = 0.16; y = -0.03; legA = 0.12; armFwd = 0.25; armA = 0; } // ready stance
     if (st === 'play') { y = 0; lean = -0.04 + 0.03 * Math.sin(T * 3.1 + f.jump); }
     if (st === 'dive') { lean = sstep(0, 0.38, T - f.st) * 1.2; armFwd = 1; }
+    if (f.name === 'moen' && T > 11.9 && T < 12.8) { armFwd = 0.75; armA *= 0.3; spread = 0.3; }
+    let kick = 0; if (f.role === 'K' && T > -0.12 && T < 0.45) { const k = Math.sin(clamp((T + 0.12) / 0.57, 0, 1) * Math.PI); lean = -0.12 * k; legA = 0; armA = 0; spread = 0.5 * k; armFwd = 0; kick = 1.35 * k; }
     if (st === 'down') { const k = sstep(0, 0.32, T - f.st); fallA = f.fall * k * Math.PI / 2; y = 0.16 * k; legA = 0; armA = 0; armFwd = f.fall > 0 ? 1 : 0; }
     if (st === 'flat') { const k = sstep(0, 0.22, T - f.st); fallA = -k * Math.PI / 2; y = 0.07 * k; squash = k; legA = 0; armA = 0; spread = 1.1 * k; f.splay = k; }
     // base: T(x,y,z) · Ry(yaw) · Rx(fall, about the feet) · T(0, lift) · Rx(lean about the hips) · S(squash)
     B.makeRotationY(f.yaw).setPosition(f.x, y, f.z);
     if (fallA) B.multiply(_m4.makeRotationX(fallA));
     if (lean) { B.multiply(_m4.makeTranslation(0, 0.95, 0)).multiply(_m4.makeRotationX(lean)).multiply(_m4.makeTranslation(0, -0.95, 0)); }
-    if (squash) B.multiply(_m4.makeScale(1 + 0.45 * squash, 1.04, 1 - 0.68 * squash));
+    if (squash) B.multiply(_m4.makeScale(1 + 0.9 * squash, 1 + 0.1 * squash, 1 - 0.83 * squash));
     const s = Math.sin(f.ph);
-    return { legA: legA * s, armA: -armA * s, armUp, spread, armFwd };
+    return { legA: legA * s, armA: -armA * s, armUp, spread, armFwd, kick };
   }
   render() {
     const B = new THREE.Matrix4(), M = new THREE.Matrix4(), R = new THREE.Matrix4();
-    const limb = (mesh, idx, B, x, y, swing, roll, up, fwd) => {
+    const limb = (mesh, idx, B, x, y, swing, roll, up, fwd, yawIn = 0) => {
       M.copy(B).multiply(_m4.makeTranslation(x, y, 0));
-      if (roll) M.multiply(R.makeRotationZ(roll));
+      if (yawIn) M.multiply(R.makeRotationY(x > 0 ? -yawIn : yawIn));
+      if (roll) M.multiply(R.makeRotationZ(up > 0.5 ? -roll : roll));
       const a = up ? -Math.PI + 0.25 + (1 - up) * 1.5 : fwd ? (-Math.PI / 2 + 0.15) * fwd : 0;
       M.multiply(R.makeRotationX(a - swing)); mesh.setMatrixAt(idx, M);
     };
@@ -352,14 +372,14 @@ class ThePlay {
       if (band) { const j = i - this.nP; this.mBlazer.setMatrixAt(j, B); this.mFace.setMatrixAt(j, B); this.mHat.setMatrixAt(j, B); }
       else { if (i < 10) this.mTorsoC.setMatrixAt(i, B); else this.mTorsoS.setMatrixAt(i - 10, B); this.mHelmet.setMatrixAt(i, B); }
       const sx = band ? 0.27 : 0.33, hx = 0.12;
-      const lr = 0.04 + (f.splay || 0) * 0.45; limb(this.mLeg, 2 * i, B, hx, 0.95, p.legA, lr, 0, 0); limb(this.mLeg, 2 * i + 1, B, -hx, 0.95, -p.legA, -lr, 0, 0);
+      const lr = 0.04 + (f.splay || 0) * 0.45; limb(this.mLeg, 2 * i, B, hx, 0.95, p.legA, lr, 0, 0); limb(this.mLeg, 2 * i + 1, B, -hx, 0.95, p.kick ? p.kick : -p.legA, -lr, 0, 0);
       const playing = band && (f.state === 'play' || f.state === 'walk');
       if (band && f.state === 'stand') { limb(this.mArm, 2 * i, B, sx, 1.5, 0, 0.1, 0, 0.45); limb(this.mArm, 2 * i + 1, B, -sx, 1.5, 0, -0.1, 0, 0.45); }
-      else if (playing) { limb(this.mArm, 2 * i, B, sx, 1.5, 0, 0.2, 0, 1); limb(this.mArm, 2 * i + 1, B, -sx, 1.5, 0, -0.2, 0, 1); }
+      else if (playing) { limb(this.mArm, 2 * i, B, sx, 1.5, -0.12, 0, 0, 1, 0.42); limb(this.mArm, 2 * i + 1, B, -sx, 1.5, -0.12, 0, 0, 1, 0.42); }
       else { limb(this.mArm, 2 * i, B, sx, 1.5, p.armA, p.spread, p.armUp, p.armFwd); limb(this.mArm, 2 * i + 1, B, -sx, 1.5, -p.armA, -p.spread, p.armUp, p.armFwd); }
       if (band) { // instrument: at the mouth while playing, waved overhead when cheering, flying if you are Gary Tyrrell
         const im = this.mInstr[f.instr];
-        if (f.tyrrell && this.trombone) { const t = this.trombone; M.compose(_v.set(t.x, t.y - 1.66, t.z), _q.setFromEuler(_e.set(t.rx, t.ry, t.rz)), _s.set(1, 1, 1)); }
+        if (f.tyrrell && this.trombone) { const t = this.trombone; M.compose(_v.set(t.x, t.y, t.z), _q.setFromEuler(_e.set(t.rx, t.ry, t.rz)), _s.set(1, 1, 1)).multiply(_m4.makeTranslation(0, -1.68, -0.5)); } // pivot on its middle
         else { M.copy(B); if (!playing && f.instr !== 'drum' && f.instr !== 'sousa') M.multiply(f.state === 'stand' ? _m4.makeTranslation(0, -0.62, -0.12) : _m4.makeTranslation(0, 0.62 + 0.08 * Math.sin(this.T * 7 + f.jump), -0.22)); }
         im.setMatrixAt(f.slot, M);
       }
@@ -367,7 +387,7 @@ class ThePlay {
     // ball
     const T = this.T; let bx = 0, by = 0, bz = 0, byaw = 0, bpitch = 0;
     let seg = 0, tPrev = T0; while (seg < BALL.length - 1 && T >= BALL[seg].t1) { tPrev = BALL[seg].t1; seg++; }
-    const b = BALL[seg], hand = (f) => { const up = f.state === 'cheer' ? 2.35 : 1.15; return [f.x + Math.sin(f.yaw) * 0.32, up, f.z + Math.cos(f.yaw) * 0.32]; };
+    const b = BALL[seg], hand = (f) => { const up = f.state === 'cheer' ? 2.26 : 1.15; return [f.x + Math.sin(f.yaw) * 0.32, up, f.z + Math.cos(f.yaw) * 0.32]; };
     if (b.type === 'tee') { bx = KICK_U; by = 0.14; bz = 0; byaw = 0; bpitch = -Math.PI / 2 + 0.3; }
     else if (b.type === 'kick') { // squib: three skips from the kick to Moen's arms at the Cal 45
       const pts = [[KICK_U, 0.14, 0], [15 * YD, 0.12, -0.3], [5 * YD, 0.1, -0.6], [-5 * YD + 0.3, 1.0, -1]], hs = [1.5, 0.95, 0.75];
@@ -379,8 +399,8 @@ class ThePlay {
     // cartoon stars over the flattened trombonist
     const ty = this.tyrrell, on = this.tHit != null && T - this.tHit > 0.35;
     for (let k = 0; k < 3; k++) {
-      const a = T * 3.4 + k * TAU / 3, hx = ty.x - Math.sin(ty.yaw) * 1.72, hz = ty.z - Math.cos(ty.yaw) * 1.72;
-      M.compose(_v.set(hx + Math.cos(a) * 0.42, on ? 0.62 + 0.08 * Math.sin(a * 2) : -50, hz + Math.sin(a) * 0.42), _q.setFromEuler(_e.set(0, a * 2, 0)), _s.set(1, 1, 1)); this.mStar.setMatrixAt(k, M);
+      const a = T * 3.4 + k * TAU / 3, hx = ty.x - Math.sin(ty.yaw) * 1.9, hz = ty.z - Math.cos(ty.yaw) * 1.9;
+      M.compose(_v.set(hx + Math.cos(a) * 0.55, on ? 0.95 + 0.12 * Math.sin(a * 2) : -50, hz + Math.sin(a) * 0.55), _q.setFromEuler(_e.set(0, a * 1.5, 0)), _s.set(1, 1, 1)); this.mStar.setMatrixAt(k, M);
     }
     // telestrator ring: under the ball carrier (or the receiver while a lateral is in the air) until the touchdown
     const ci = this.carrierAt(T), cf = this.cal[ci], showRing = T > 2.2 && (this.tTD == null || T < this.tTD + 1.0);
@@ -416,7 +436,7 @@ class ThePlay {
     };
     const big = (l1, l2, fg, bg, sub) => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = fg;
       c.font = `bold ${l2 ? 112 : 150}px Arial, Helvetica, sans-serif`; c.fillText(l1, w / 2, l2 ? 180 : 230, w - 60); if (l2) c.fillText(l2, w / 2, 320, w - 60);
-      if (sub) { c.font = 'bold 44px Arial, Helvetica, sans-serif'; c.globalAlpha = 0.9; c.fillText(sub, w / 2, 448, w - 80); c.globalAlpha = 1; } };
+      if (sub) { c.font = 'bold 52px Arial, Helvetica, sans-serif'; c.globalAlpha = 0.9; c.fillText(sub, w / 2, 448, w - 80); c.globalAlpha = 1; } };
     if (key === 'pre') score(19, 20, ['4TH QTR', '0:04']);
     else if (key.startsWith('clock')) score(19, 20, ['4TH QTR', '0:0' + key.slice(5), key === 'clock0' ? '#ff3b2f' : '#ff5a3a']);
     else if (key.startsWith('lat')) { score(19, 20, ['4TH QTR', '0:00', '#ff3b2f']); c.fillStyle = '#fdb515'; c.fillRect(0, h - 104, w, 104); c.fillStyle = '#003262'; c.font = 'bold 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.fillText('LATERAL #' + key.slice(3) + '!', w / 2, h - 50); }
@@ -437,7 +457,7 @@ class ThePlay {
     const want = this.active ? d < 560 : d < 480;
     if (want !== this.active) { this.active = want; this.root.visible = want; if (want && performance.now() - this.lastFar > 20000) this.reset(); if (!want) this.lastFar = performance.now(); }
     if (!this.active) return d;
-    const sh = d < 260; if (sh !== this._sh) { this._sh = sh; for (const m of this.root.children) if (m.isMesh && m.name !== 'bigGame:board') m.castShadow = sh; }
+    const sh = d < 260 && !this.lowQ; if (sh !== this._sh) { this._sh = sh; for (const m of this.root.children) if (m.isMesh && !m.name.startsWith('bigGame:board')) m.castShadow = sh; }
     let left = Math.min(dt, 0.1); while (left > 1e-6) { const h = Math.min(left, 1 / 30); this.step(h); left -= h; }
     this.render();
     return d;
@@ -449,29 +469,35 @@ class StanfordTree {
   constructor({ scene, setupMaterials }) {
     this.root = new THREE.Group(); this.root.name = 'bigGame:stanfordTree'; this.root.visible = false; scene.add(this.root);
     this.setupMaterials = setupMaterials; this.ready = false; this.hand = null;
-    const r = rng(1891), S = 1.2; // the costume is about 3.6 m from branch-tips to sneakers
-    const greens = [hex(0x2f6b2a), hex(0x3d7d31), hex(0x285a24), hex(0x4a8a37)], brown = hex(0x6b4a2e), white = hex(0xf4f2ec), red = hex(0xc8102e), cardinal = hex(0x8c1515);
+    const r = rng(1891), S = 2.0; // cartoon scale: about 6.5 m from branch-tips to sneakers, so it reads from the ground
+    const greens = [hex(0x2e8a2c), hex(0x41a035), hex(0x267a26), hex(0x58b340)], brown = hex(0x6b4a2e), white = hex(0xf4f2ec), red = hex(0xc8102e), cardinal = hex(0x8c1515);
     const blob = (x, y, z, rad) => { const g = new THREE.IcosahedronGeometry(rad, 1); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + (r() - 0.5) * 0.28; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } g.translate(x, y, z); return paint(g, greens[(r() * greens.length) | 0]); };
+    const tier = (y0, y1, rad, z, col) => { // a lumpy cone tier with a ragged hem
+      const g = new THREE.ConeGeometry(rad, y1 - y0, 11, 2, false); const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) { const y = p.getY(i), k = y < -(y1 - y0) * 0.45 ? 1 + (r() - 0.35) * 0.3 : 1 + (r() - 0.5) * 0.12; p.setXYZ(i, p.getX(i) * k, y + (y < -(y1 - y0) * 0.45 ? (r() - 0.5) * 0.12 : 0), p.getZ(i) * k * 0.82); }
+      g.translate(0, (y0 + y1) / 2, z); return paint(g, col); };
     const parts = [
-      blob(0, -0.78, 0.3, 0.27), blob(0, -1.05, 0.33, 0.4), blob(0.3, -1.3, 0.3, 0.4), blob(-0.3, -1.3, 0.3, 0.4), blob(0, -1.55, 0.36, 0.5),
-      blob(0.42, -1.75, 0.26, 0.42), blob(-0.42, -1.75, 0.26, 0.42), blob(0, -1.95, 0.3, 0.52), blob(0.26, -2.2, 0.28, 0.4), blob(-0.26, -2.2, 0.28, 0.4),
+      tier(-1.25, -0.42, 0.42, 0.3, greens[3]), tier(-1.75, -0.85, 0.62, 0.3, greens[1]), tier(-2.3, -1.3, 0.8, 0.3, greens[0]), tier(-2.55, -1.85, 0.9, 0.3, greens[2]),
+      blob(0, -1.5, 0.38, 0.42), blob(0, -1.95, 0.36, 0.5),
+      vsph(0.075, 0.09, 0.0, -0.01, brown, 1, 1, 1, 10), vsph(0.075, -0.09, 0.0, -0.01, brown, 1, 1, 1, 10), // fists around the minute hand
       // branch arms reaching up to the minute hand, with twiggy fingers
-      vlink([0.36, -1.15, 0.3], [0.1, -0.04, 0.02], 0.075, 0.05, brown), vlink([-0.36, -1.15, 0.3], [-0.1, -0.04, 0.02], 0.075, 0.05, brown),
+      vlink([0.4, -1.1, 0.3], [0.1, -0.04, 0.02], 0.1, 0.065, brown), vlink([-0.4, -1.1, 0.3], [-0.1, -0.04, 0.02], 0.1, 0.065, brown),
       vlink([0.1, -0.04, 0.02], [0.2, 0.1, -0.06], 0.035, 0.02, brown), vlink([0.1, -0.04, 0.02], [0.03, 0.12, -0.08], 0.035, 0.02, brown),
       vlink([-0.1, -0.04, 0.02], [-0.2, 0.1, -0.06], 0.035, 0.02, brown), vlink([-0.1, -0.04, 0.02], [-0.03, 0.12, -0.08], 0.035, 0.02, brown),
       // googly eyes and a big goofy grin
-      vsph(0.14, 0.17, -1.32, 0.74, white, 1, 1, 0.75, 14), vsph(0.14, -0.17, -1.32, 0.74, white, 1, 1, 0.75, 14),
-      paint(tf(new THREE.TorusGeometry(0.2, 0.045, 6, 16, Math.PI), 0, -1.56, 0.84, 0, 0, Math.PI), red),
+      vsph(0.175, 0.19, -1.3, 0.74, white, 1, 1, 0.7, 16), vsph(0.175, -0.19, -1.3, 0.74, white, 1, 1, 0.7, 16),
+      vbox(0.2, 0.04, 0.05, 0.2, -1.08, 0.78, hex(0x1a1a1a), 0, 0, -0.25), vbox(0.2, 0.04, 0.05, -0.2, -1.08, 0.78, hex(0x1a1a1a), 0, 0, 0.25), // worried eyebrows
+      paint(tf(new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI), 0, -1.58, 0.84, 0, 0, Math.PI), red),
       vsph(0.075, 0.03, -1.72, 0.84, hex(0xe8708a), 1, 0.7, 0.6, 10), // tongue
-      paint(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[0.09, 0.11], [0.0, 0.15], [-0.09, 0.1], [-0.06, 0.02], [0.06, -0.03], [0.1, -0.1], [0.0, -0.16], [-0.1, -0.11]].map(([x, y]) => new THREE.Vector3(x * 1.3, -2.0 + y * 1.3, 0.83 - Math.abs(x) * 0.4))), 24, 0.032, 6), cardinal),
+      paint(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[0.09, 0.11], [0.0, 0.15], [-0.09, 0.1], [-0.06, 0.02], [0.06, -0.03], [0.1, -0.1], [0.0, -0.16], [-0.1, -0.11]].map(([x, y]) => new THREE.Vector3(x * 1.3, -2.05 + y * 1.3, 0.87 - Math.abs(x) * 0.4))), 24, 0.034, 6), cardinal),
     ];
     const bodyG = merge(parts.map((g) => { g.scale(S, S, S); return g; }));
-    const legG = merge([vcyl(0.075, 0.07, 0.7, 0, -0.35, 0, brown, 8), vbox(0.15, 0.1, 0.26, 0, -0.73, 0.06, white), vbox(0.152, 0.03, 0.262, 0, -0.785, 0.06, red)]); legG.scale(S, S, S);
-    const pupG = vsph(0.062, 0, 0, 0, 0.05, 1, 1, 1, 10); pupG.scale(S, S, S);
+    const legG = merge([vcyl(0.1, 0.09, 0.7, 0, -0.35, 0, brown, 8), vbox(0.19, 0.12, 0.3, 0, -0.74, 0.06, white), vbox(0.192, 0.035, 0.302, 0, -0.8, 0.06, red)]); legG.scale(S, S, S);
+    const pupG = vsph(0.08, 0, 0, 0, 0.05, 1, 1, 1, 10); pupG.scale(S, S, S);
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true, name: 'bg:tree' });
     const smooth = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, name: 'bg:treeParts' });
     this.swing = new THREE.Group(); this.root.add(this.swing);
-    this.body = new THREE.Mesh(bodyG, mat); this.body.castShadow = true; this.swing.add(this.body);
+    this.body = new THREE.Mesh(bodyG, mat); this.body.castShadow = true; this.body.receiveShadow = true; this.swing.add(this.body);
     this.legs = new THREE.InstancedMesh(legG, smooth, 2); this.pupils = new THREE.InstancedMesh(pupG, smooth, 2);
     for (const m of [this.legs, this.pupils]) { m.frustumCulled = false; m.castShadow = true; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.swing.add(m); }
     this.S = S; this.t = 0; this.pos = new THREE.Vector3(); this.normal = new THREE.Vector3(0, 0, 1);
@@ -487,8 +513,9 @@ class StanfordTree {
     const d = Math.hypot(camPos.x - this.pos.x, camPos.z - this.pos.z);
     this.root.visible = !(d > 1400);
     if (!this.root.visible) return;
+    const sh = d < 260; if (sh !== this._sh) { this._sh = sh; this.body.castShadow = this.legs.castShadow = this.pupils.castShadow = sh; }
     const mi = _m4; this.hand.getMatrixAt(2, mi); const mw = new THREE.Matrix4().multiplyMatrices(this.hand.matrixWorld, mi); // south face
-    const tip = new THREE.Vector3(0, 2.22, 0.03).applyMatrix4(mw), n = new THREE.Vector3(0, 0, 1).transformDirection(mw); n.y = 0; n.normalize();
+    const tip = new THREE.Vector3(0, 1.93, 0.03).applyMatrix4(mw), n = new THREE.Vector3(0, 0, 1).transformDirection(mw); n.y = 0; n.normalize();
     this.normal.copy(n); this.pos.copy(tip).addScaledVector(n, 0.3);
     this.root.position.copy(this.pos); this.root.rotation.set(0, Math.atan2(n.x, n.z), 0);
     if (d > 420) return; // too far to see the wiggles
@@ -497,9 +524,9 @@ class StanfordTree {
     this.swing.rotation.set(0.05 * Math.sin(t * 1.1 + 1), 0, 0.09 * Math.sin(t * 1.6) + kick * 0.05 * Math.sin(t * 9));
     for (const s of [0, 1]) {
       const a = (s ? 1 : -1) * (0.12 + kick * 0.7) * Math.sin(t * (kick > 0.1 ? 11 : 2.3) + s * 1.3);
-      _m4.compose(_v.set((s ? 0.16 : -0.16) * S, -2.38 * S, 0.3 * S), _q.setFromEuler(_e.set(a + 0.15, 0, (s ? 0.06 : -0.06))), _s.set(1, 1, 1)); this.legs.setMatrixAt(s, _m4);
+      _m4.compose(_v.set((s ? 0.2 : -0.2) * S, -2.45 * S, 0.3 * S), _q.setFromEuler(_e.set(a + 0.15, 0, (s ? 0.08 : -0.08))), _s.set(1, 1, 1)); this.legs.setMatrixAt(s, _m4);
       const ja = t * 7 + s * 2, jr = 0.045 * S * (0.6 + 0.4 * Math.sin(t * 3.3 + s));
-      _m4.makeTranslation((s ? 0.17 : -0.17) * S + Math.cos(ja) * jr, -1.32 * S + Math.sin(ja) * jr - 0.02 * S, 0.84 * S); this.pupils.setMatrixAt(s, _m4);
+      _m4.makeTranslation((s ? 0.19 : -0.19) * S + Math.cos(ja) * jr, -1.3 * S + Math.sin(ja) * jr - 0.03 * S, 0.83 * S); this.pupils.setMatrixAt(s, _m4);
     }
     this.legs.instanceMatrix.needsUpdate = true; this.pupils.instanceMatrix.needsUpdate = true;
   }
@@ -524,12 +551,12 @@ function buildAxe(M) {
   for (const sz of [-1, 1]) for (const y of [y0 + e / 2, y1 - e / 2]) fr.push(box(W, e, e, 0, y, sz * D / 2));
   for (const sx of [-1, 1]) for (const y of [y0 + e / 2, y1 - e / 2]) fr.push(box(e, e, D, sx * W / 2, y, 0));
   // stanchions with Cal-blue velvet rope
-  const posts = [[-1.05, 1.0], [1.05, 1.0], [1.05, -0.75], [-1.05, -0.75]];
+  const posts = [[-1.1, 1.1], [1.1, 1.1], [1.1, -0.75], [-1.1, -0.75]];
   for (const [x, z] of posts) { fr.push(tf(new THREE.CylinderGeometry(0.03, 0.03, 0.92, 10), x, 0.46, z)); fr.push(tf(new THREE.CylinderGeometry(0.14, 0.16, 0.04, 16), x, 0.02, z)); fr.push(tf(new THREE.SphereGeometry(0.05, 10, 8), x, 0.95, z)); }
   add(fr, M.gold, 'axe:brass', false);
   const ropeM = new THREE.MeshStandardMaterial({ color: 0x0e2f63, roughness: 0.9, name: 'bg:velvet' });
   const ropes = [];
-  for (let k = 0; k < 3; k++) { const [ax, az] = posts[k], [bx, bz] = posts[k + 1]; const pts = []; for (let i = 0; i <= 12; i++) { const s = i / 12; pts.push(new THREE.Vector3(ax + (bx - ax) * s, 0.86 - 0.22 * Math.sin(Math.PI * s), az + (bz - az) * s)); } ropes.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.022, 6)); }
+  for (const k of [1, 2, 3]) { const [ax, az] = posts[k], [bx, bz] = posts[(k + 1) % 4]; const pts = []; for (let i = 0; i <= 12; i++) { const s = i / 12; pts.push(new THREE.Vector3(ax + (bx - ax) * s, 0.88 - 0.13 * Math.sin(Math.PI * s), az + (bz - az) * s)); } ropes.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.022, 6)); }
   add(ropes, ropeM, 'axe:rope', false);
   // the plaque: dark walnut, rows of brass score plates, the axe head mounted in the middle
   const plaqueTex = canvasTex(512, 640, (c, w, h) => {
@@ -550,14 +577,19 @@ function buildAxe(M) {
   // easel behind it
   add([box(0.05, 0.9, 0.05, 0, PH + 0.45, -0.28, 0), box(0.6, 0.05, 0.06, 0, PH + 0.03, -0.12)], M.woodDark, 'axe:easel');
   // axe head: broad blade with a curved edge, steel, on a short handle stub
-  const blade = new THREE.Shape(); blade.moveTo(-0.05, 0.06); blade.lineTo(0.12, 0.08); blade.quadraticCurveTo(0.2, 0.2, 0.3, 0.22); blade.quadraticCurveTo(0.36, 0.0, 0.3, -0.22); blade.quadraticCurveTo(0.2, -0.2, 0.12, -0.08); blade.lineTo(-0.05, -0.06); blade.lineTo(-0.08, 0); blade.closePath();
-  const bg = new THREE.ExtrudeGeometry(blade, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 1 }); bg.translate(0, 0, -0.0175);
-  const steel = new THREE.MeshStandardMaterial({ color: 0xb9bec2, roughness: 0.32, metalness: 0.9, name: 'bg:steel' });
-  const axe = new THREE.Group(); axe.position.set(0, PH + 0.12 + 0.52, -0.06); axe.rotation.set(-0.08, 0, 0.55); root.add(axe);
+  // single-bit axe head in profile: square poll, the eye, a narrowing cheek, then a flared, curved bit; tapered to a wedge
+  const blade = new THREE.Shape(); blade.moveTo(-0.07, 0.04); blade.lineTo(0.03, 0.04); blade.quadraticCurveTo(0.09, 0.035, 0.13, 0.06); blade.quadraticCurveTo(0.17, 0.09, 0.2, 0.115);
+  blade.quadraticCurveTo(0.235, 0.0, 0.2, -0.115); blade.quadraticCurveTo(0.17, -0.09, 0.13, -0.06); blade.quadraticCurveTo(0.09, -0.035, 0.03, -0.04); blade.lineTo(-0.07, -0.04); blade.closePath();
+  const bg = new THREE.ExtrudeGeometry(blade, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1, curveSegments: 10 }); bg.translate(0, 0, -0.025);
+  { const p = bg.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), k = x < 0.02 ? 1 : Math.max(0.1, 1 - (x - 0.02) / 0.2); p.setZ(i, p.getZ(i) * k); } bg.computeVertexNormals(); }
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc6cacd, roughness: 0.24, metalness: 0.95, name: 'bg:steel' });
+  const axe = new THREE.Group(); axe.position.set(0.04, PH + 0.12 + 0.5, -0.07); axe.rotation.set(-0.08, 0, -0.5); axe.scale.setScalar(1.25); root.add(axe);
   const bm = new THREE.Mesh(bg, steel); bm.castShadow = true; axe.add(bm);
-  const hg = tf(new THREE.CylinderGeometry(0.022, 0.026, 0.42, 10), -0.24, 0, 0, 0, 0, Math.PI / 2); const hm = new THREE.Mesh(hg, M.woodDark); axe.add(hm);
+  axe.add(new THREE.Mesh(merge([tf(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 8), -0.035, 0, -0.045, Math.PI / 2), tf(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 8), 0.13, 0, -0.045, Math.PI / 2), // brass pegs and straps
+    tf(new THREE.BoxGeometry(0.08, 0.02, 0.085), -0.035, -0.22, -0.012), tf(new THREE.BoxGeometry(0.02, 0.11, 0.085), 0.065, 0, -0.012)].map((g) => g.toNonIndexed())), M.gold));
+  const hg = tf(new THREE.CylinderGeometry(0.019, 0.022, 0.36, 10, 1), -0.035, -0.12, 0, 0, 0, 0); const hm = new THREE.Mesh(hg, M.woodDark); hm.castShadow = true; axe.add(hm); // handle stub through the eye
   // glass
-  const glassM = new THREE.MeshStandardMaterial({ color: 0xdfeaf0, transparent: true, opacity: 0.14, roughness: 0.04, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide, name: 'bg:glass' });
+  const glassM = new THREE.MeshStandardMaterial({ color: 0xd4e6ee, transparent: true, opacity: 0.2, roughness: 0.03, metalness: 0.35, depthWrite: false, side: THREE.DoubleSide, name: 'bg:glass' });
   const gl = merge([box(W - 0.02, GH - 0.02, 0.01, 0, (y0 + y1) / 2, D / 2), box(W - 0.02, GH - 0.02, 0.01, 0, (y0 + y1) / 2, -D / 2), box(0.01, GH - 0.02, D - 0.02, W / 2, (y0 + y1) / 2, 0), box(0.01, GH - 0.02, D - 0.02, -W / 2, (y0 + y1) / 2, 0), box(W, 0.01, D, 0, y1, 0)].map((g) => g.toNonIndexed()));
   const glass = new THREE.Mesh(gl, glassM); glass.renderOrder = 2; root.add(glass);
   // brass placard on the plinth front
@@ -572,6 +604,18 @@ function buildAxe(M) {
   });
   const tg = new THREE.PlaneGeometry(0.86, 0.43); tg.translate(0, 0.55, D / 2 + 0.004);
   root.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ map: tag, roughness: 0.35, metalness: 0.6, name: 'bg:placard' })));
+  const ban = canvasTex(256, 600, (c, w, h) => {
+    c.fillStyle = '#003262'; c.fillRect(0, 0, w, h); c.fillStyle = '#fdb515'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14);
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#fdb515'; c.font = 'bold 50px Arial, Helvetica, sans-serif'; c.fillText("GIVE", w / 2, 96); c.fillText("'EM", w / 2, 156); c.fillText('THE', w / 2, 216); c.font = 'bold 74px Arial, Helvetica, sans-serif'; c.fillText('AXE', w / 2, 296);
+    c.save(); c.translate(70, 505); c.rotate(0.45); c.scale(1.15, 1.15); c.fillStyle = '#fdb515'; c.fillRect(-7, -150, 14, 150); // handle, then poll, cheek and a flared bit
+    c.beginPath(); c.moveTo(-16, -150); c.lineTo(4, -150); c.quadraticCurveTo(20, -150, 30, -160); c.quadraticCurveTo(44, -170, 56, -178); c.quadraticCurveTo(66, -146, 56, -114); c.quadraticCurveTo(44, -122, 30, -132); c.quadraticCurveTo(20, -140, 4, -136); c.lineTo(-16, -136); c.closePath(); c.fill(); c.restore();
+    c.font = '600 22px Arial, Helvetica, sans-serif'; c.fillStyle = '#f6f2ea'; c.fillText('BIG GAME · GO BEARS', w / 2, 540);
+  });
+  const bw = 0.85, bh = 2.0, banner = new THREE.Group(); banner.position.set(1.95, 0, -0.1); banner.rotation.y = -0.25; root.add(banner);
+  const bp = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh).translate(0, 0.12 + bh / 2, 0), new THREE.MeshStandardMaterial({ map: ban, roughness: 0.8, side: THREE.DoubleSide, name: 'bg:banner' })); bp.castShadow = true; banner.add(bp);
+  const stand = merge([box(bw + 0.08, 0.1, 0.24, 0, 0.05, 0), box(0.025, bh + 0.05, 0.025, 0, 0.1 + bh / 2, -0.03), box(bw, 0.025, 0.03, 0, bh + 0.13, 0)].map((g) => g.toNonIndexed()));
+  const sm = new THREE.Mesh(stand, M.iron); sm.castShadow = true; banner.add(sm);
+  root.traverse((o) => { if (!o.isMesh) return; if (o.material !== glassM) o.receiveShadow = true; o.castShadow = /axe:plinth|bg:banner|bg:steel|bg:plaque/.test(o.name + ' ' + o.material.name) || o === bp; });
   return root;
 }
 
@@ -581,8 +625,8 @@ const ICONS = {
   tree: '<svg viewBox="0 0 32 32"><path d="M16 3l7 9h-3.5l5 7h-4l4.5 6H7l4.5-6h-4l5-7H9z" fill="#003262"/><rect x="14.5" y="25" width="3" height="4.5" rx="1" fill="#003262"/></svg>',
   axe: '<svg viewBox="0 0 32 32"><path d="M8 26.5L21.5 13" stroke="#003262" stroke-width="2.6" stroke-linecap="round"/><path d="M17.5 6.5c3.5-1.2 7.6.4 9.3 3.7-2.3.4-4.4 1.8-5.4 4l-3.9-3.9c.6-1.3.6-2.6 0-3.8z" fill="#003262"/></svg>',
 };
-const CSS = `.bg-ach{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-12px);opacity:0;display:flex;gap:14px;align-items:flex-start;width:min(480px,88vw);padding:14px 18px 14px 14px;
-background:rgba(10,18,36,.58);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(253,181,21,.5);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
+const CSS = `.bg-ach{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-12px);opacity:0;display:flex;gap:14px;align-items:flex-start;width:min(460px,86vw);padding:14px 18px 14px 14px;
+background:rgba(10,18,36,.86);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(253,181,21,.5);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
 color:#f6f2ea;transition:opacity .45s,transform .45s cubic-bezier(.2,.8,.2,1);pointer-events:none;z-index:3}
 .bg-ach.on{opacity:1;transform:translate(-50%,0)}
 .bg-ach .ic{flex:none;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#fdb515 58%,#c98a00);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(253,181,21,.16)}
@@ -652,13 +696,14 @@ export function installBigGame({ scene, lm, physics, heightAt, setupMaterials, a
     seek: (t) => play.seek(t),
     achievement(p) { // called by the HUD the first time one of our places is found
       const n = mine.filter((q) => q.found).length;
-      setTimeout(() => toast(p, n, mine.length), 120 + 900 * pending++); setTimeout(() => { pending = Math.max(0, pending - 1); }, 1500);
+      setTimeout(() => toast(p, n, mine.length), 120 + 3500 * pending++); setTimeout(() => { pending = Math.max(0, pending - 1); }, 3600);
       if (audio && audio.ctx) { audio.bell(783.99, 0.0, 0.16, 30, 0); audio.bell(1046.5, 0.14, 0.16, 30, 0); audio.bell(1318.5, 0.28, 0.16, 30, 0); }
     },
     update(dt, env) {
       camera = env.camera; camPos.copy(env.camera.position);
-      if (!play.ready) { const st = lm.byId.get('memorial-stadium'); if (st && st.state === 'ready') play.attach(st); }
-      if (tree.ready === false) { const tw = lm.byId.get('sather-tower'); if (tw && tw.state === 'ready') tree.attach(tw); }
+      const st = lm.byId.get('memorial-stadium'), tw = lm.byId.get('sather-tower');
+      if (!play.ready) { if (st && st.state === 'ready') play.attach(st); } else if (!st || st.state !== 'ready') { play.ready = play.active = false; play.root.visible = false; }
+      if (tree.ready === false) { if (tw && tw.state === 'ready') tree.attach(tw); } else if (tree.ready === true && (!tw || tw.state !== 'ready')) { tree.ready = false; tree.root.visible = false; }
       const d = play.update(dt, camPos);
       for (const e of play.events) {
         if (e === 'td' && env.player && d != null && d < 170) witnessed = true;
@@ -669,7 +714,7 @@ export function installBigGame({ scene, lm, physics, heightAt, setupMaterials, a
       }
       play.events.length = 0;
       tree.update(dt, camPos);
-      axe.visible = Math.hypot(camPos.x - AXE.x, camPos.z - AXE.z) < 450;
+      axe.visible = Math.hypot(camPos.x - AXE.x, camPos.z - AXE.z) < 260;
     },
   };
   return api;
