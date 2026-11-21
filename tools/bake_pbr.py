@@ -51,14 +51,14 @@ def save(path, arr, q):
 M = {}
 # name: (source, real tile size m, bake kwargs)
 SETS = {
-  'asphalt':  ('asphalt_02', 3.0, dict(L=0.075, sat=0.35, rough=(0.78, 1.0), detile=0.75)),
-  'sidewalk': ('asphalt_04', 4.04, dict(L=0.26, sat=0.25, tint=(1.0, 0.99, 0.96), rough=(0.80, 0.98), detile=0.8)),
+  'asphalt':  ('asphalt_02', 3.0, dict(L=0.10, sat=0.35, rough=(0.78, 1.0), detile=0.75)),
+  'sidewalk': ('asphalt_04', 4.04, dict(L=0.38, sat=0.25, tint=(1.0, 0.99, 0.96), rough=(0.80, 0.98), detile=0.8)),
   'granite':  ('acg:Granite002A', 1.0, dict(L=0.36, sat=0.35, tint=(1.0, 0.99, 0.965), rough=(0.55, 0.85), detile=0.6, nstr=0.6)),
   'brick':    ('brick_wall_006', 3.0, dict(sat=0.95, rough=(0.80, 0.98), detile=0.6, sigma_frac=0.08)),
-  'lawn':     ('leafy_grass', 2.0, dict(L=0.08, sat=0.3, tint=(0.72, 1.22, 0.48), rough=(0.85, 1.0), detile=0.7)),
+  'lawn':     ('leafy_grass', 2.0, dict(L=0.10, sat=0.3, tint=(0.72, 1.22, 0.48), rough=(0.85, 1.0), detile=0.7)),
   'drygrass': ('withered_grass', 2.0, dict(L=0.16, sat=0.9, tint=(1.06, 1.0, 0.78), rough=(0.85, 1.0), detile=0.7)),
-  'litter':   ('forest_leaves_02', 3.0, dict(L=0.075, sat=0.85, rough=(0.85, 1.0), detile=0.6)),
-  'dirt':     ('park_dirt', 3.0, dict(L=0.14, sat=0.8, rough=(0.88, 1.0), detile=0.7)),
+  'litter':   ('forest_leaves_02', 3.0, dict(L=0.085, sat=0.55, rough=(0.85, 1.0), detile=0.6)),
+  'dirt':     ('park_dirt', 3.0, dict(L=0.15, sat=0.55, rough=(0.88, 1.0), detile=0.7)),
   'stucco':   ('white_stucco', 2.0, dict(L=0.55, sat=0.6, tint=(1.0, 0.965, 0.88), rough=(0.85, 1.0), detile=0.8, nstr=1.4)),
   'boardconc':('wood_textured_concrete', 1.8, dict(L=0.27, sat=0.15, rough=(0.82, 1.0), detile=0.6)),
   'concrete': ('concrete_wall_004', 2.0, dict(L=0.30, sat=0.2, tint=(1.0, 0.99, 0.96), rough=(0.80, 0.98), detile=0.75)),

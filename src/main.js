@@ -26,7 +26,7 @@ import { Grass } from './world/grass.js';
 import { U, materials } from './materials.js';
 import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './time.js';
 import { installGrading, contactAO, GRADE } from './world/grading.js';
-import { initPBR, PBR } from './world/pbr.js'; // gfx-materials: PBR surface textures
+import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 installGrading();
 
 const canvas = document.getElementById('c');
@@ -162,7 +162,7 @@ async function boot() {
   csm.lights.forEach((l, i) => { l.shadow.normalBias = [0.07, 0.22, 0.5, 0.9][i] ?? 0.9; l.shadow.bias = [-0.0003, -0.0006, -0.001, -0.0015][i] ?? -0.0015; });
   const csmDone = new WeakSet();
   const aoCore = { v4: terrain.uniforms.uCore.value, size: terrain.uniforms.uCoreSize.value };
-  const setupMaterials = (root) => root.traverse((o) => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (!m || csmDone.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue; csmDone.add(m); if (o.parent !== terrain.group && !m.transparent && o.name !== 'bay' && !(m.customProgramCacheKey && /coreTerrain|ring|bayWater|creek/.test(m.customProgramCacheKey()))) contactAO(m, terrain.uniforms.uHeight.value, aoCore); const prev = m.onBeforeCompile; if (!useCSM) continue; const k1 = String(m.customProgramCacheKey()); csm.setupMaterial(m); const hook = m.onBeforeCompile; m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); hook.call(this, sh, r); }; m.customProgramCacheKey = () => k1 + '|csm'; m.needsUpdate = true; } });
+  const setupMaterials = (root) => root.traverse((o) => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (!m || csmDone.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue; csmDone.add(m); pbrWeather(m); /* gfx-materials: base grime on PBR masonry */ if (o.parent !== terrain.group && !m.transparent && o.name !== 'bay' && !(m.customProgramCacheKey && /coreTerrain|ring|bayWater|creek/.test(m.customProgramCacheKey()))) contactAO(m, terrain.uniforms.uHeight.value, aoCore); const prev = m.onBeforeCompile; if (!useCSM) continue; const k1 = String(m.customProgramCacheKey()); csm.setupMaterial(m); const hook = m.onBeforeCompile; m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); hook.call(this, sh, r); }; m.customProgramCacheKey = () => k1 + '|csm'; m.needsUpdate = true; } });
   BS.csm = csm;
   // ---- player
   const physicsPlayer = new Player({ scene, camera, physics, dom: canvas, look: store.get('look', {}) });

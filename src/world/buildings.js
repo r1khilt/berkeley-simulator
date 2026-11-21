@@ -5,6 +5,8 @@ let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
 import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
+import { PBR_GLSL, GH_GLSL, pbrUniforms, ghUniforms } from './pbr.js'; // gfx-materials: PBR wall/roof surfaces
+import { FACADE_PBR_GLSL, ROOF_PBR_GLSL } from './pbrFacade.js';
 
 const CH = 512;
 export const STYLE = { classical: 0, brick: 1, stucco: 2, concrete: 3, glass: 4, house: 5, apartment: 6, commercial: 7, industrial: 8, church: 9, brutal: 10, shingle: 11 };
@@ -291,6 +293,7 @@ void facade(vec3 wallC){
   vec4 nf = texture(uNoise, vec2(u, v)*1.3 + seed*3.0);
   float pxu = fwidth(u), pxv = fwidth(v);
   float detail = 1.0 - smoothstep(0.03, 0.12, max(pxu,pxv));
+  if (uPbrOn > 0.5) { wallPBR(s, wallC, u, v, seed, topH, edgeLen, floorH, bayW, winW, winH, sill, groundH, col, rough); } else { // gfx-materials: PBR wall surface, old procedural below
   col *= 0.9 + 0.16*nz.r + 0.06*(nf.b-0.5)*detail;
   if (s==1) { // brick courses
     float bv = v/0.075; float row=floor(bv); float bu = u/0.22 + mod(row,2.0)*0.5; float m = smoothstep(0.0,0.12,fract(bv))*smoothstep(0.0,0.06,fract(bu));
@@ -309,6 +312,7 @@ void facade(vec3 wallC){
     if (v > c0 && v < c1) { col *= 1.08; }
     if (v > c0 - 0.25 && v < c0) col *= 0.7;
   }
+  } // gfx-materials
   // windows
   float nb = max(1.0, floor(edgeLen / bayW + 0.5)); float bw = edgeLen / nb;
   float lodW = smoothstep(0.25, 0.6, pxu / bw * 6.0);
@@ -409,27 +413,30 @@ void facade(vec3 wallC){
 function makeWallMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor;
+    sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFac = aFac; vUvF = uv; vWPosF = (modelMatrix*vec4(transformed,1.0)).xyz; vWNF = normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + FACADE_GLSL)
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + PBR_GLSL + GH_GLSL + FACADE_GLSL.replace('vec3 fCol; float fRough;', FACADE_PBR_GLSL + 'vec3 fCol; float fRough;')) // gfx-materials
       .replace('#include <color_fragment>', '#include <color_fragment>\n facade(diffuseColor.rgb);\n diffuseColor.rgb = fCol;')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = fRough;')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = fMetal;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * step(0.5, fRough), 0.0)).xyz);'); // gfx-materials: wall relief (not on glass)
   };
-  mat.customProgramCacheKey = () => 'facade-v4';
+  mat.customProgramCacheKey = () => 'facade-v4-pbr1';
   return mat;
 }
 function makeRoofMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.9, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uNoise = { value: noiseTexture() };
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; varying vec4 vFacR; varying vec2 vUvR;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFacR = aFac; vUvR = uv;');
+    sh.uniforms.uNoise = { value: noiseTexture() }; pbrUniforms(sh.uniforms); // gfx-materials
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; varying vec4 vFacR; varying vec2 vUvR; varying vec3 vWPosR, vNR;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFacR = aFac; vUvR = uv; vWPosR = (modelMatrix*vec4(transformed,1.0)).xyz; vNR = mat3(modelMatrix)*normal;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 uniform sampler2D uNoise; varying vec4 vFacR; varying vec2 vUvR;
-float h21r(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }`)
+float h21r(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+varying vec3 vWPosR, vNR;
+` + PBR_GLSL + ROOF_PBR_GLSL) // gfx-materials
       .replace('#include <color_fragment>', `#include <color_fragment>
  { int t = int(vFacR.x+0.5); vec2 uv = vUvR; float px = max(fwidth(uv.x), fwidth(uv.y)); float det = 1.0 - smoothstep(0.02, 0.09, px);
    vec4 n = texture(uNoise, uv*0.09 + vFacR.y*5.0); vec4 n2 = texture(uNoise, uv*0.8);
@@ -446,9 +453,12 @@ float h21r(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); ret
    } else { // standing-seam metal / slate
      c *= mix(1.0, 0.9 + 0.1*smoothstep(0.0, 0.05, abs(fract(uv.x/0.45)-0.5)), det) * (0.92+0.12*n.r);
    }
-   diffuseColor.rgb = c; }`);
+   if (uPbrOn > 0.5) roofPBR(t, uv, vFacR.y, c); // gfx-materials
+   diffuseColor.rgb = c; }`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n if (fRoughR >= 0.0) roughnessFactor = fRoughR;')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrmR, 0.0)).xyz);'); // gfx-materials
   };
-  mat.customProgramCacheKey = () => 'roof-v2';
+  mat.customProgramCacheKey = () => 'roof-v2-pbr1';
   return mat;
 }
 
