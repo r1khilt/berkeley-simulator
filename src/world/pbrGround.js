@@ -116,7 +116,7 @@ void groundShadePBR(vec2 w, float dist) {
       // gum spots and drip stains (Telegraph classics)
       vec2 gc = w * 3.0; vec2 gi = floor(gc); float hg = hq12(gi + 0.7);
       if (hg > 0.965) { float gr = length(fract(gc) - 0.5 - (vec2(hq12(gi + 1.0), hq12(gi + 2.0)) - 0.5) * 0.4); p.c *= 1.0 - 0.35 * (1.0 - smoothstep(0.035, 0.06, gr)) * det; p.r = mix(p.r, 0.7, (1.0 - smoothstep(0.035, 0.06, gr)) * det); }
-      p.c *= 1.0 - 0.1 * smoothstep(0.6, 0.85, texture(uNoise, w * 0.19).r) * (0.5 + 0.5 * n1.b);
+      p.c *= 1.0 - 0.1 * smoothstep(0.6, 0.85, n0.b) * (0.5 + 0.5 * n1.b);
     }
     col += wP * p.c; rough += wP * p.r; g += wP * p.g; bump += wP;
   }
@@ -141,8 +141,8 @@ void groundShadePBR(vec2 w, float dist) {
     float crk = max(aaLine(c1, 0.0015), aaLine(c2, 0.002) * 0.7) * age * det;
     float seal = (1.0 - smoothstep(0.006, 0.011, abs(c1))) * step(0.62, n1.r) * (1.0 - fade);
     a.c *= 1.0 - 0.55 * crk; a.c = mix(a.c, vec3(0.016, 0.016, 0.017), seal * 0.9); a.r = mix(a.r, 0.38, seal);
-    // oil drips and tyre polish
-    float oil = smoothstep(0.66, 0.86, texture(uNoise, w * 0.17 + 0.5).r) * (0.4 + 0.6 * n2.g);
+    // oil drips and tyre polish (large blotches: reuse the macro noise instead of another fetch)
+    float oil = smoothstep(0.66, 0.86, n0.b) * (0.4 + 0.6 * n2.g);
     a.c *= 1.0 - 0.35 * oil; a.r = mix(a.r, 0.6, oil * 0.6);
     // gutter: darker, dirtier band along the kerb where pavement meets the road
     float gut = aaStep(dA) * (1.0 - smoothstep(0.0, 0.5, dA)) * smoothstep(-1.0, -0.2, dP);

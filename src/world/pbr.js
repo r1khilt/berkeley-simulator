@@ -216,7 +216,7 @@ export function pbrWeather(mat) {
    vWPW = (modelMatrix * wpw).xyz; }`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPW; uniform sampler2D uNoiseW; uniform float uPbrOn;\n' + GH_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
- if (uPbrOn > 0.5) {
+ if (uPbrOn > 0.5 && distance(vWPW, cameraPosition) < 120.0) {
    float hgW = vWPW.y - groundAt(vWPW.xz);
    float nW = texture(uNoiseW, vec2(vWPW.x + vWPW.z, vWPW.y * 0.2) * 0.35).r;
    float grW = (1.0 - smoothstep(0.05, 0.4 + 0.7 * nW, hgW)) * step(-1.5, hgW);
