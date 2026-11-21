@@ -7,11 +7,24 @@
 import * as THREE from 'three';
 import { U } from '../materials.js';
 
+// Detail level: 0 = average colour only, 1 = rooms + lights + blinds (no furniture), 2 = furnished. Defaults from the
+// Settings quality (low → 0, medium → 1, high/ultra → 2); ?interiors=0|1|2 overrides. BSIM can change it live (IR.uInteriors.value).
+function defaultLevel() {
+  try {
+    const qs = new URLSearchParams(location.search); if (qs.get('interiors') != null) return +qs.get('interiors');
+    let q = qs.get('q'); if (!q) { const st = JSON.parse(localStorage.getItem('bsim.settings') || '{}'); q = st.quality; }
+    if (!q) q = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches ? 'low' : 'high';
+    return q === 'low' ? 0 : q === 'medium' ? 1 : 2;
+  } catch (e) { return 2; }
+}
+export const IR = { uInteriors: { value: defaultLevel() } };
+if (typeof window !== 'undefined') window.BSIM_IR = IR;
 // building uses (packed into the façade attribute / landmark glass attribute)
 export const USE = { academic: 0, office: 1, science: 2, residential: 3, library: 4, commercial: 5, house: 6, industrial: 7, assembly: 8 };
 
-// GLSL. Requires the host to declare `uniform float uNight;` before this chunk.
+// GLSL. Requires the host to declare `uniform float uNight;` before this chunk and to bind IR.uInteriors.
 export const INTERIOR_GLSL = /* glsl */`
+uniform float uInteriors;
 #define IR_OFFICE 0
 #define IR_CLASS 1
 #define IR_LECTURE 2
@@ -79,8 +92,8 @@ float irLitOf(int t, float h) {
   return step(h, mix(p.x, p.y, smoothstep(0.05, 0.85, uNight)));
 }
 vec3 irLampColor(int t, float h) {
-  if (t == IR_DORM || t == IR_LIVING) return mix(vec3(1.0, 0.74, 0.47), vec3(1.0, 0.86, 0.68), h) * 1.05;
-  if (t == IR_CAFE) return vec3(1.0, 0.72, 0.44) * 1.1;
+  if (t == IR_DORM || t == IR_LIVING) return mix(vec3(1.0, 0.8, 0.58), vec3(1.0, 0.88, 0.72), h);
+  if (t == IR_CAFE) return vec3(1.0, 0.78, 0.55) * 1.05;
   if (t == IR_LIBRARY) return mix(vec3(1.0, 0.86, 0.66), vec3(0.95, 0.97, 1.0), step(0.6, h));
   if (t == IR_RETAIL) return vec3(1.0, 0.95, 0.88) * 1.15;
   return mix(vec3(0.92, 0.96, 1.0), vec3(1.0, 0.9, 0.75), step(0.72, h)) * (0.92 + 0.16 * fract(h * 7.0));
@@ -410,12 +423,12 @@ vec3 irShade(int t, vec3 R, float yF, float seed, float lit, vec3 lampC) {
     ao = 0.6 + 0.4 * smoothstep(0.0, 0.8, e);
   } else ao = 0.72 + 0.28 * smoothstep(0.0, 0.6, p.y - yF) + 0.1 * max(n.y, 0.0);
   ao *= irAO;
-  return alb * (lit * lamp * lampC * 0.8 + day * vec3(0.4, 0.41, 0.43) + vec3(0.006)) * ao + em;
+  return alb * (lit * lamp * lampC * 0.72 + day * vec3(0.3, 0.31, 0.33) + vec3(0.006)) * ao + em;
 }
 // approximate average room radiance (for tiny/far windows)
 vec3 irAverage(int t, float seed, float lit, vec3 lampC) {
   vec3 base = irWallTint(seed) * 0.62;
-  return base * (lit * lampC * 0.55 + (1.0 - uNight) * 0.2 + 0.006) + lampC * lit * (t == IR_DORM || t == IR_LIVING ? 0.06 : 0.18);
+  return base * (lit * lampC * 0.5 + (1.0 - uNight) * 0.15 + 0.006) + lampC * lit * (t == IR_DORM || t == IR_LIVING ? 0.05 : 0.15);
 }
 // blinds / roller shades / curtains hanging just behind the glass. win = (x0, y0, x1, y1) in room space.
 vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
@@ -470,8 +483,9 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
   else { irT = tw.z; irNrm = vec3(0.0, 0.0, -1.0); }
   irMat = irNrm.y > 0.5 ? IM_FLOOR : (irNrm.y < -0.5 ? IM_CEIL : IM_WALL);
   irPS = ro + rd * irT; irOnFloor = irMat == IM_FLOOR; irBLo = lo; irBHi = R;
-  irLayout(t, R, seed, lit, yF);
-  if (win.y > 0.45 && t != IR_LECTURE && t != IR_CAFE && t != IR_RETAIL) { // interior sill + things people leave on it
+  bool furn = uInteriors > 1.5 && (win.z - win.x) > px * 22.0;   // furniture only when the window is big enough on screen to show it
+  if (furn) irLayout(t, R, seed, lit, yF);
+  if (furn && win.y > 0.45 && t != IR_LECTURE && t != IR_CAFE && t != IR_RETAIL) { // interior sill + things people leave on it
     vec4 k = irH4(wseed + 3.7);
     irTest(vec3(win.x - 0.08, win.y - 0.04, 0.0), vec3(win.z + 0.08, win.y, 0.26), IM_WHITE);
     if (k.x < 0.22) { float x = mix(win.x + 0.1, win.z - 0.35, k.y);
@@ -530,7 +544,7 @@ export function interiorGlassMaterial(src) {
   m.color.multiplyScalar(0.55);
   m.name = (src.name || 'glass') + ':interior'; m.userData.interiorGlass = true;
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uNight = U.uNight;
+    sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; sh.uniforms.uInteriors = IR.uInteriors;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
 attribute vec4 aWinO; attribute vec4 aWinE; varying vec3 vIrP; varying vec3 vIrC; flat varying vec4 vIrI;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -547,7 +561,7 @@ attribute vec4 aWinO; attribute vec4 aWinE; varying vec3 vIrP; varying vec3 vIrC
    vIrC = vec3(dot(dc, Tw), dot(dc, Uw), -dot(dc, Nw));
    vIrI = vec4(aWinO.w, aWinE.w, Wm, Hm); }`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform float uNight; varying vec3 vIrP; varying vec3 vIrC; flat varying vec4 vIrI;
+uniform float uNight; uniform vec3 uSkyZen, uSkyHor; varying vec3 vIrP; varying vec3 vIrC; flat varying vec4 vIrI;
 ${INTERIOR_GLSL}
 vec3 irGlass(float px) {
   float Wm = vIrI.z, Hm = vIrI.w;
@@ -578,7 +592,7 @@ vec3 irGlass(float px) {
   float rh = fract(rs * 0.618 + 0.11);
   float lit = irLitOf(t, rh);
   R.z = irDepthOf(t, fract(rs * 0.31));
-  if (px * 8.0 > min(Wm, Hm)) return irAverage(t, rs, lit, irLampColor(t, fract(rs * 0.618)));
+  if (px * 8.0 > min(Wm, Hm) || uInteriors < 0.5) return irAverage(t, rs, lit, irLampColor(t, fract(rs * 0.618)));
   return irRoom(ro, rd, R, t, rs, ws, lit, win, px, camD);
 }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -586,8 +600,10 @@ vec3 irGlass(float px) {
    if (vIrI.z > 0.01) {
      vec3 irE = irGlass(irPxL);
      float cosT = clamp(normalize(vIrP - vIrC).z, 0.0, 1.0);
-     float F = 0.04 + 0.96 * pow(1.0 - cosT, 5.0);
-     totalEmissiveRadiance = irE * (1.0 - F) * 0.88;
+     float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
+     vec3 rdv = normalize(vIrP - vIrC); float ry = -rdv.y;   // reflected ray rises when we look down at the glass
+     vec3 sky = mix(uSkyHor * 0.35, mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, ry)), smoothstep(-0.12, 0.08, ry));
+     totalEmissiveRadiance = irE * (1.0 - F) * vec3(0.84, 0.88, 0.88) + sky * F * 0.7;
    } }`);
   };
   m.customProgramCacheKey = () => 'irglass-v1';
