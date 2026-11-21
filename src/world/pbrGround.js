@@ -22,15 +22,17 @@ PS gTapS(vec2 uv, float Lr, float near) {
   return s;
 }
 // anti-aliased thin line from a signed distance-like value d (units of its own gradient)
-float aaLine(float d, float wdt) { float fw = max(fwidth(d), 1e-5); return 1.0 - smoothstep(wdt, wdt + fw * 1.5, abs(d)); }
+float aaLine(float d, float wdt) { float fw = max(fwidth(d), 1e-5); float ww = max(wdt, fw * 0.75); return (1.0 - smoothstep(ww - fw * 0.5, ww + fw * 0.5, abs(d))) * (wdt / ww); }
+// joint mask from distance-to-joint jd (metres) and half-width jw: sub-pixel joints get wider but fainter instead of dashed
+float jointAA(float jd, float jw) { float fw = max(fwidth(jd), 1e-5); float ww = max(jw, fw * 0.75); return (1.0 - smoothstep(ww - fw * 0.5, ww + fw * 0.5, jd)) * (jw / ww); }
 
 void groundShadePBR(vec2 w, float dist) {
   vec4 s = texture(uSdf, (w - uGround.xy) / uGround.zw);
   vec2 ax = texture(uAux, (w - uAuxRect.xy) / uAuxRect.zw).rg;
-  float sp = floor(texture(uSpecial, (w - uGround.xy) / uGround.zw).r * 255.0 + 0.5);
   vec4 n0 = texture(uNoise, w * 0.013); vec4 n1 = texture(uNoise, w * 0.071); vec4 n2 = texture(uNoise, w * 0.37);
+  float sp = floor(texture(uSpecial, (w + (vec2(n2.r, n1.g) - 0.5) * 1.4 - uGround.xy) / uGround.zw).r * 255.0 + 0.5);
   float fade = clamp(dist / 120.0, 0.0, 1.0);
-  float near = 1.0 - smoothstep(180.0, 280.0, dist);
+  float near = 1.0 - (uPbrHQ > 0.5 ? smoothstep(180.0, 280.0, dist) : smoothstep(110.0, 170.0, dist));
   float det = 1.0 - smoothstep(25.0, 90.0, dist);         // small decals (joints, cracks, gum)
   float edgeN = (n1.g - 0.5) * 0.9 + (n2.b - 0.5) * 0.35;
   float dA = (s.r - 0.5) * 6.0, dP = (s.g - 0.5) * 6.0, dG = (s.b - 0.5) * 6.0, dD = (s.a - 0.5) * 6.0;
@@ -54,7 +56,7 @@ void groundShadePBR(vec2 w, float dist) {
   // ---- lawn: irrigated turf with dry patches and faint mowing stripes
   if (wG > 0.001) {
     PS l = gTap(w, 2.0, L_LAWN, kIso, near);
-    float dryP = smoothstep(0.55, 0.8, n0.r + (n1.b - 0.5) * 0.2) * 0.65 + smoothstep(0.55, 0.95, 1.0 - lush) * 0.5;
+    float dryP = smoothstep(0.6, 0.85, n0.r + (n1.b - 0.5) * 0.2) * 0.35 + smoothstep(0.7, 0.98, 1.0 - lush) * 0.3;
     if (dryP > 0.02) { PS d = gTap(w * 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
     l.c *= 0.84 + 0.3 * n0.g;
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
@@ -76,21 +78,21 @@ void groundShadePBR(vec2 w, float dist) {
       vec2 reg = floor(gq / 9.0);
       p = gTapS(uv + vec2(hq12(reg), hq12(reg + 3.1)), L_BRICK, near);
       p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y) * vec2(1.0, 1.5);
-      p.c *= vec3(0.86, 0.84, 0.86) * (0.85 + 0.3 * n1.r) * (0.9 + 0.2 * hq12(reg + 7.0));
+      p.c = mix(vec3(dot(p.c, vec3(0.2126, 0.7152, 0.0722))), p.c, 0.6) * vec3(1.05, 0.95, 0.95) * (0.85 + 0.3 * n1.r) * (0.9 + 0.2 * hq12(reg + 7.0));
       p.r = mix(p.r, 0.9, 0.3);
     } else if (sp > 4.5 && sp < 5.5) { // granite pavers: 0.9 m squares, each with its own crop of the stone and tone
       vec2 cq = gq / 0.9; vec2 ci = floor(cq), cf = fract(cq);
-      p = gTapS(gq / 1.0 + vec2(hq12(ci), hq12(ci + 5.3)) * 3.0, L_GRANITE, near);
+      p = gTapS(gq / 0.45 + vec2(hq12(ci), hq12(ci + 5.3)) * 3.0, L_GRANITE, near);
       p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y);
       p.c *= 0.88 + 0.2 * hq12(ci + 9.1);
       float jd = min(min(cf.x, 1.0 - cf.x), min(cf.y, 1.0 - cf.y)) * 0.9;  // metres to the joint
-      float jt = (1.0 - smoothstep(0.004, 0.004 + max(fwidth(jd) * 1.5, 0.002), jd)) * det;
+      float jt = jointAA(jd, 0.004) * det;
       jointDark = jt; p.r = mix(p.r, 0.95, jt);
       // slight edge bevel
       float bv = (1.0 - smoothstep(0.004, 0.02, jd)) * det;
       vec2 gn = vec2(cf.x < 0.5 ? -1.0 : 1.0, cf.y < 0.5 ? -1.0 : 1.0) * vec2(step(min(cf.x, 1.0 - cf.x), min(cf.y, 1.0 - cf.y)), step(min(cf.y, 1.0 - cf.y), min(cf.x, 1.0 - cf.x)));
       p.g += vec2(0.98776 * gn.x - 0.15600 * gn.y, 0.15600 * gn.x + 0.98776 * gn.y) * bv * 0.6;
-      p.c *= 1.0 - 0.45 * jt;
+      p.c *= 1.0 - 0.32 * jt;
     } else { // poured concrete sidewalk: 1.52 m scored slabs on the city grid, expansion joints every 4th line
       vec2 cq = gq / 1.52; vec2 ci = floor(cq), cf = fract(cq);
       p = gTap(gq + vec2(hq12(ci), hq12(ci + 2.7)) * 4.0, 4.04, L_SIDEWALK, kIso, near);
@@ -101,10 +103,10 @@ void groundShadePBR(vec2 w, float dist) {
       float jd = min(dj.x, dj.y);
       float exp4 = step(mod(ci.x + (cf.x > 0.5 ? 1.0 : 0.0), 4.0), 0.5) * step(dj.x, dj.y) + step(mod(ci.y + (cf.y > 0.5 ? 1.0 : 0.0), 4.0), 0.5) * step(dj.y, dj.x);
       float jwid = mix(0.004, 0.009, clamp(exp4, 0.0, 1.0));
-      float jt = (1.0 - smoothstep(jwid, jwid + max(fwidth(jd) * 1.5, 0.002), jd)) * det;
+      float jt = jointAA(jd, jwid) * det;
       float jdirt = (1.0 - smoothstep(0.0, 0.06, jd)) * 0.12 * det;  // grime collects along joints
       jointDark = jt;
-      p.c *= (1.0 - 0.5 * jt) * (1.0 - jdirt);
+      p.c *= (1.0 - 0.38 * jt) * (1.0 - jdirt);
       // groove normal (both sides of the joint slope into it)
       vec2 gn = vec2(cf.x < 0.5 ? 1.0 : -1.0, cf.y < 0.5 ? 1.0 : -1.0) * vec2(step(dj.x, dj.y), step(dj.y, dj.x));
       p.g -= vec2(0.98776 * gn.x - 0.15600 * gn.y, 0.15600 * gn.x + 0.98776 * gn.y) * (1.0 - smoothstep(jwid, jwid + 0.01, jd)) * 0.5 * det;
@@ -114,7 +116,7 @@ void groundShadePBR(vec2 w, float dist) {
       // gum spots and drip stains (Telegraph classics)
       vec2 gc = w * 3.0; vec2 gi = floor(gc); float hg = hq12(gi + 0.7);
       if (hg > 0.965) { float gr = length(fract(gc) - 0.5 - (vec2(hq12(gi + 1.0), hq12(gi + 2.0)) - 0.5) * 0.4); p.c *= 1.0 - 0.35 * (1.0 - smoothstep(0.035, 0.06, gr)) * det; p.r = mix(p.r, 0.7, (1.0 - smoothstep(0.035, 0.06, gr)) * det); }
-      p.c *= 1.0 - 0.18 * smoothstep(0.6, 0.85, texture(uNoise, w * 0.19).r) * (0.5 + 0.5 * n1.b);
+      p.c *= 1.0 - 0.1 * smoothstep(0.6, 0.85, n0.b) * (0.5 + 0.5 * n1.b);
     }
     col += wP * p.c; rough += wP * p.r; g += wP * p.g; bump += wP;
   }
@@ -122,7 +124,7 @@ void groundShadePBR(vec2 w, float dist) {
   if (wA > 0.001) {
     PS a = gTap(w, 3.0, L_ASPHALT, kIso, near);
     float age = smoothstep(0.25, 0.8, n0.r);                     // weathered grey (old) vs dark (recent overlay)
-    a.c *= mix(0.78, 1.32, age) * (0.92 + 0.16 * n1.g);
+    a.c *= mix(0.85, 1.2, age) * (0.92 + 0.16 * n1.g);
     // utility-cut patches: rectangles on the city grid, darker & smoother with a tar seam
     vec2 pc = gq / vec2(11.0, 7.0); vec2 pi = floor(pc), pf = fract(pc);
     if (hq12(pi + 17.0) > 0.7) {
@@ -134,12 +136,13 @@ void groundShadePBR(vec2 w, float dist) {
       float seam = (1.0 - smoothstep(0.02, 0.05, abs(din))) * det; a.c = mix(a.c, vec3(0.018), seam * 0.85); a.r = mix(a.r, 0.45, seam);
     }
     // crack network (two scales of noise iso-lines) in the older surface, plus black sealant "tar snakes"
-    float c1 = texture(uNoise, w * 0.09).g - 0.5, c2 = texture(uNoise, w * 0.23 + 0.37).b - 0.5;
+    vec2 wr = vec2(0.8 * w.x - 0.6 * w.y, 0.6 * w.x + 0.8 * w.y);
+    float c1 = 0.6 * (texture(uNoise, wr * 0.061).g - 0.5) + 0.4 * (texture(uNoise, w * 0.0437 + 0.21).g - 0.5), c2 = texture(uNoise, wr * 0.157 + 0.37).g - 0.5;
     float crk = max(aaLine(c1, 0.0015), aaLine(c2, 0.002) * 0.7) * age * det;
     float seal = (1.0 - smoothstep(0.006, 0.011, abs(c1))) * step(0.62, n1.r) * (1.0 - fade);
     a.c *= 1.0 - 0.55 * crk; a.c = mix(a.c, vec3(0.016, 0.016, 0.017), seal * 0.9); a.r = mix(a.r, 0.38, seal);
-    // oil drips and tyre polish
-    float oil = smoothstep(0.66, 0.86, texture(uNoise, w * 0.17 + 0.5).r) * (0.4 + 0.6 * n2.g);
+    // oil drips and tyre polish (large blotches: reuse the macro noise instead of another fetch)
+    float oil = smoothstep(0.66, 0.86, n0.b) * (0.4 + 0.6 * n2.g);
     a.c *= 1.0 - 0.35 * oil; a.r = mix(a.r, 0.6, oil * 0.6);
     // gutter: darker, dirtier band along the kerb where pavement meets the road
     float gut = aaStep(dA) * (1.0 - smoothstep(0.0, 0.5, dA)) * smoothstep(-1.0, -0.2, dP);

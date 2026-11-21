@@ -9,9 +9,9 @@ import * as THREE from 'three';
 // Layer order == array index. size = real-world metres covered by one texture repeat.
 // mean = linear albedo average of the baked set (manifest.json), used for the far-distance LOD
 export const LAYERS = [
-  ['asphalt', 3.0, [0.0755, 0.0751, 0.0722]], ['sidewalk', 4.04, [0.2665, 0.2593, 0.2481]], ['granite', 1.0, [0.3685, 0.3591, 0.3435]],
-  ['brick', 3.0, [0.3903, 0.1774, 0.0981]], ['lawn', 2.0, [0.0594, 0.0912, 0.0301]], ['drygrass', 2.0, [0.2171, 0.1509, 0.0823]],
-  ['litter', 3.0, [0.1071, 0.07, 0.0301]], ['dirt', 3.0, [0.1847, 0.134, 0.0683]], ['stucco', 2.0, [0.5817, 0.5468, 0.4886]],
+  ['asphalt', 3.0, [0.1344, 0.1298, 0.1186]], ['sidewalk', 4.04, [0.3966, 0.3784, 0.3473]], ['granite', 0.45, [0.4109, 0.3993, 0.3752]],
+  ['brick', 3.0, [0.3903, 0.1774, 0.0981]], ['lawn', 2.0, [0.0743, 0.1139, 0.0376]], ['drygrass', 2.0, [0.2171, 0.1509, 0.0823]],
+  ['litter', 3.0, [0.1086, 0.0813, 0.0521]], ['dirt', 3.0, [0.1829, 0.1455, 0.0972]], ['stucco', 1.2, [0.5817, 0.5468, 0.4886]],
   ['boardconc', 1.8, [0.2781, 0.2688, 0.2576]], ['concrete', 2.0, [0.307, 0.3003, 0.2759]], ['siding', 1.0, [0.3371, 0.2913, 0.2773]],
   ['rooftile', 4.0, [0.2539, 0.1274, 0.0681]],
 ];
@@ -19,7 +19,7 @@ export const L = Object.fromEntries(LAYERS.map(([n], i) => [n, i]));
 export const SIZE_M = Object.fromEntries(LAYERS.map(([n, m]) => [n, m]));
 
 export const PBR = {
-  uA: { value: null }, uN: { value: null }, uOn: { value: 0 },
+  uA: { value: null }, uN: { value: null }, uOn: { value: 0 }, uHQ: { value: 0 }, // uHQ: ultra-only extras (anti-tiling 2nd tap)
   // ground height lookup so any material can find "height above ground" (grime at wall bases); set by CoreTerrain
   uGH: { value: null }, uGHRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uGHSize: { value: new THREE.Vector2(1, 1) },
   ready: null, res: 0, maps: {},
@@ -30,7 +30,7 @@ export const PBR_ENABLED = qs.get('pbr') !== '0';
 // GLSL #defines for layer ids + shared helpers. Include once per shader (after <common>).
 export const PBR_GLSL = /* glsl */`
 ${LAYERS.map(([n], i) => `#define L_${n.toUpperCase()} ${i}.0`).join('\n')}
-uniform highp sampler2DArray uPbrA, uPbrN; uniform float uPbrOn;
+uniform highp sampler2DArray uPbrA, uPbrN; uniform float uPbrOn, uPbrHQ;
 const vec3 PBR_MEAN[${LAYERS.length}] = vec3[](${LAYERS.map(([, , m]) => `vec3(${m.map((v) => v.toFixed(4)).join(',')})`).join(',')});
 struct PS { vec3 c; float r; vec2 g; float h; };
 // one tap: c albedo (linear), r roughness, g surface slope along +u/+v of the uv used (image-up = -v), h height 0..1
@@ -41,6 +41,7 @@ PS pbrTap(vec2 uv, float Lr) {
 PS pbrMix(PS a, PS b, float w) { a.c = mix(a.c, b.c, w); a.r = mix(a.r, b.r, w); a.g = mix(a.g, b.g, w); a.h = mix(a.h, b.h, w); return a; }
 // isotropic surfaces: blend with a rotated + offset copy where k (low-frequency noise 0..1) says so -> no visible repeat
 PS pbrIso(vec2 p, float size, float Lr, float k) {
+  if (uPbrHQ < 0.5) return pbrTap(p / size, Lr);   // perf gate: single tap below ultra
   float w0 = smoothstep(0.32, 0.68, k);
   vec2 q = vec2(0.766 * p.x - 0.643 * p.y, 0.643 * p.x + 0.766 * p.y) / size + vec2(0.31, 0.57);
   if (w0 <= 0.0) return pbrTap(p / size, Lr);
@@ -65,25 +66,39 @@ float groundAt(vec2 w) { vec2 f = (w - uGHRect.xy) / uGHRect.z; f = clamp(f, vec
   float a = texelFetch(uGH, i, 0).r, b = texelFetch(uGH, i + ivec2(1, 0), 0).r, c = texelFetch(uGH, i + ivec2(0, 1), 0).r, d = texelFetch(uGH, i + ivec2(1, 1), 0).r;
   return mix(mix(a, b, t.x), mix(c, d, t.x), t.y); }
 `;
-export function pbrUniforms(target) { target.uPbrA = PBR.uA; target.uPbrN = PBR.uN; target.uPbrOn = PBR.uOn; return target; }
+export function pbrUniforms(target) { target.uPbrA = PBR.uA; target.uPbrN = PBR.uN; target.uPbrOn = PBR.uOn; target.uPbrHQ = PBR.uHQ; return target; }
 export function ghUniforms(target) { target.uGH = PBR.uGH; target.uGHRect = PBR.uGHRect; target.uGHSize = PBR.uGHSize; return target; }
 
-// ---- 2D maps for the shared landmark materials: Texture objects exist immediately (flat placeholder) and get
-// their real image swapped in when the set loads, so every material and every .clone() shares the upgrade.
-function flatCanvas(rgb) { const c = document.createElement('canvas'); c.width = c.height = 4; const x = c.getContext('2d'); x.fillStyle = `rgb(${rgb.join(',')})`; x.fillRect(0, 0, 4, 4); return c; }
-function mkTex(img, srgb) {
-  const t = new THREE.Texture(img); if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true; return t;
+// ---- 2D maps for the shared landmark materials. materials.js hands over its existing (procedural) Texture objects;
+// when the real set loads we swap their image source in place, so every material and every .clone() upgrades.
+// target = mean colour (sRGB 0-255) the real map is normalised to, so colours authored against the old procedural
+// textures keep working; tile = metres per uv unit the material uses (TEX_M).
+export function adoptPBR(name, tex, target, tile = 2.0, src = name) {
+  if (!PBR_ENABLED || PBR.maps[name]) return;
+  const m = { map: tex.map, normalMap: tex.normalMap, roughnessMap: tex.roughnessMap, tile, src, target };
+  PBR.maps[name] = m;
+  if (!PBR.ready) initPBR(qs.get('q') || 'high');
+  PBR.ready.then((ok) => { if (ok) fill2D(name, m); });
 }
-// name: 'granite' | 'ashlar' | ... ; placeholder colour (sRGB 0-255); tile = metres per uv unit used by the material (TEX_M)
-// src = layer to take the images from (default: same name); placeholder = target mean colour (sRGB 0-255) the real map is
-// normalised to, so colours authored against the old procedural textures keep working.
-export function pbrMaps(name, placeholder, tile = 2.0, src = name) {
-  if (PBR.maps[name]) return PBR.maps[name];
-  const m = { map: mkTex(flatCanvas(placeholder), true), normalMap: mkTex(flatCanvas([128, 128, 255]), false), roughnessMap: mkTex(flatCanvas([235, 235, 235]), false), tile, src, target: placeholder };
-  PBR.maps[name] = m; return m;
+function swapImage(tex, canvas, repeat) { if (!tex) return; tex.source = new (THREE.TextureSource || THREE.Source)(canvas); if (repeat) tex.repeat.set(repeat, repeat); tex.needsUpdate = true; }
+async function fill2D(name, m) {
+  try {
+    const S = PBR.res, S2 = PBR.res2;
+    const base = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/pbr/';
+    const [ba, bn] = await Promise.all([loadBitmap(base + m.src + '_a.webp'), loadBitmap(base + m.src + '_n.webp')]);
+    const pa = pixels(ba, S), pn = pixels(bn, S);
+    if (name === 'ashlar') {
+      const ga = canvasFrom(pa, S, 'rgb', S, m.target).getContext('2d').getImageData(0, 0, S, S).data;
+      const ash = bakeAshlar(ga, pn, S, S >= 1024 ? 1024 : 512);
+      swapImage(m.map, ash.a, 1); swapImage(m.normalMap, ash.n, 1); swapImage(m.roughnessMap, canvasFrom(pa, S, 'a', 256), m.tile / SIZE_M[m.src]);
+      return;
+    }
+    const rep = m.tile / SIZE_M[m.src];
+    swapImage(m.map, canvasFrom(pa, S, 'rgb', Math.min(S, S2), m.target), rep);
+    swapImage(m.normalMap, canvasFrom(pn, S, 'rgb', Math.min(S, S2)), rep);
+    swapImage(m.roughnessMap, canvasFrom(pa, S, 'a', Math.min(S, S2) / 2), rep);
+  } catch (e) { console.warn('PBR 2D set', name, e.message); }
 }
-function swapImage(tex, canvas, repeat) { tex.source = new THREE.Source(canvas); if (repeat) tex.repeat.set(repeat, repeat); tex.needsUpdate = true; }
 
 async function loadBitmap(url) {
   const r = await fetch(url); if (!r.ok) throw new Error('pbr: ' + url + ' ' + r.status);
@@ -130,16 +145,16 @@ function bakeAshlar(ga, gn, S, outS) {
   const jw = 0.006 * N / 2; // joint half-width in px (~6 mm)
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const um = x / N * 2, vm = (N - 1 - y) / N * 2; // metres in the tile (v up; canvas row 0 = top)
-    const row = Math.floor(vm / 0.5), off = (row % 2) * 0.5; const ub = um + off, col = Math.floor(ub);
-    const fu = ub - col, fv = vm / 0.5 - row;
-    const dx = Math.min(fu, 1 - fu) * 1.0, dy = Math.min(fv, 1 - fv) * 0.5; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
+    const CH = 1.0, BL = 2.0; const row = Math.floor(vm / CH), off = (row % 2) * 0.5; const ub = um / BL + off, col = Math.floor(ub); // large ashlar: 2.0 x 1.0 m
+    const fu = ub - col, fv = vm / CH - row;
+    const dx = Math.min(fu, 1 - fu) * BL, dy = Math.min(fv, 1 - fv) * CH; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
     // per-block texture offset so neighbouring blocks never show the same grain
     const ox = Math.floor(h(col, row) * S), oy = Math.floor(h(row, col + 7) * S);
-    const sx = (Math.floor(x * S * 2 / N) + ox) % S, sy = (Math.floor(y * S * 2 / N) + oy) % S; const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
-    const tone = 0.93 + h(col + 3, row) * 0.12;
+    const sx = (Math.floor(x * S * 4 / N) + ox) % S, sy = (Math.floor(y * S * 4 / N) + oy) % S; /* granite set = 0.45 m -> ~0.5 m grain period */ const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
+    const tone = 1.0;
     const j = Math.max(0, Math.min(1, (jw + 1.2 - d) / 2.4)); // 1 in the joint
     const bev = Math.max(0, Math.min(1, (d - jw) / (jw * 2.5)));
-    const k = (1 - j) * tone * (0.9 + 0.1 * bev) + j * 0.62;
+    const k = (1 - j) * tone * (0.96 + 0.04 * bev) + j * 0.9; // tight, nearly invisible joints
     a[i] = ga[si] * k; a[i + 1] = ga[si + 1] * k; a[i + 2] = ga[si + 2] * (k * 0.99); a[i + 3] = 255;
     // normal: granite detail, plus bevel slopes facing out of the joint
     let nx = (gn[si] / 127.5 - 1) * 0.8, ny = (gn[si + 1] / 127.5 - 1) * 0.8;
@@ -155,41 +170,66 @@ export function initPBR(quality = 'high') {
   if (PBR.ready) return PBR.ready;
   if (!PBR_ENABLED) { PBR.ready = Promise.resolve(false); return PBR.ready; }
   const S = (quality === 'low' || quality === 'medium') ? 512 : 1024; PBR.res = S;
-  const S2 = quality === 'ultra' ? 1024 : 512; // 2D landmark maps
+  PBR.uHQ.value = (quality === 'ultra' || qs.get('pbrhq') === '1') ? 1 : 0;
+  PBR.res2 = quality === 'ultra' ? 1024 : 512; // 2D landmark maps (ashlar always at the array resolution)
   const base = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/pbr/';
   const t0 = performance.now();
   PBR.ready = (async () => {
     const n = LAYERS.length;
     const bmps = await Promise.all(LAYERS.flatMap(([nm]) => [loadBitmap(base + nm + '_a.webp'), loadBitmap(base + nm + '_n.webp')]));
     const A = new Uint8Array(S * S * 4 * n), Nn = new Uint8Array(S * S * 4 * n);
-    const keep = {}; // full-res pixels for the 2D map sets
-    const want2D = new Set(['granite', 'concrete', 'stucco', 'brick', 'rooftile', 'asphalt', 'dirt', 'sidewalk']);
     for (let i = 0; i < n; i++) {
       const nm = LAYERS[i][0];
       const pa = pixels(bmps[2 * i], S), pn = pixels(bmps[2 * i + 1], S);
       A.set(pa, i * S * S * 4); Nn.set(pn, i * S * S * 4);
-      if (want2D.has(nm)) keep[nm] = { pa, pn };
       bmps[2 * i].close && bmps[2 * i].close(); bmps[2 * i + 1].close && bmps[2 * i + 1].close();
       if (i % 3 === 2) await new Promise((r) => setTimeout(r, 0));
     }
     PBR.uA.value = arrayTex(A, S, n, true); PBR.uN.value = arrayTex(Nn, S, n, false);
-    // 2D sets for the shared materials (only the ones a material asked for)
-    for (const [name, m] of Object.entries(PBR.maps)) {
-      if (name === 'ashlar' && keep.granite) {
-        const ga = canvasFrom(keep.granite.pa, S, 'rgb', S, m.target).getContext('2d').getImageData(0, 0, S, S).data;
-        const ash = bakeAshlar(ga, keep.granite.pn, S, S >= 1024 ? 1024 : 512);
-        swapImage(m.map, ash.a, 1); swapImage(m.normalMap, ash.n, 1); swapImage(m.roughnessMap, canvasFrom(keep.granite.pa, S, 'a', 256), m.tile / SIZE_M.granite);
-        continue;
-      }
-      const src = keep[m.src]; if (!src) continue;
-      const rep = m.tile / SIZE_M[m.src];
-      swapImage(m.map, canvasFrom(src.pa, S, 'rgb', Math.min(S, S2), m.target), rep);
-      swapImage(m.normalMap, canvasFrom(src.pn, S, 'rgb', Math.min(S, S2)), rep);
-      swapImage(m.roughnessMap, canvasFrom(src.pa, S, 'a', Math.min(S, S2) / 2), rep);
-    }
     PBR.uOn.value = 1;
     PBR.loadMs = Math.round(performance.now() - t0);
     return true;
   })().catch((e) => { console.warn('PBR textures unavailable, using procedural surfaces:', e.message); return false; });
   return PBR.ready;
+}
+
+// ---- weathering for the shared landmark materials that use a PBR set (granite, ashlar, concrete, stucco, brick, ...):
+// splash-zone grime at the foot of walls (true height above local ground) and large-scale tone drift.
+// Installed per material by main.js setupMaterials (works for clones; idempotent).
+import { noiseTexture } from './noiseTex.js';
+export function isPBRMat(m) { if (!PBR_ENABLED || !m || !m.map) return false; for (const k in PBR.maps) if (PBR.maps[k].map === m.map) return true; return false; }
+export function pbrWeather(mat) {
+  if (!isPBRMat(mat) || mat.userData.pbrWeather) return;
+  mat.userData.pbrWeather = 1;
+  const k0 = mat.customProgramCacheKey ? String(mat.customProgramCacheKey()) : '';
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = function (sh, r) {
+    if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r);
+    if (sh.vertexShader.includes('varying vec3 vWPW')) return;
+    ghUniforms(sh.uniforms); sh.uniforms.uNoiseW = { value: noiseTexture() }; sh.uniforms.uPbrOn = PBR.uOn;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPW;')
+      .replace('#include <fog_vertex>', `#include <fog_vertex>
+ { vec4 wpw = vec4(transformed, 1.0);
+   #ifdef USE_INSTANCING
+   wpw = instanceMatrix * wpw;
+   #endif
+   vWPW = (modelMatrix * wpw).xyz; }`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPW; uniform sampler2D uNoiseW; uniform float uPbrOn;\n' + GH_GLSL)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+ if (uPbrOn > 0.5 && distance(vWPW, cameraPosition) < 120.0) {
+   float hgW = vWPW.y - groundAt(vWPW.xz);
+   float nW = texture(uNoiseW, vec2(vWPW.x + vWPW.z, vWPW.y * 0.2) * 0.35).r;
+   float grW = (1.0 - smoothstep(0.05, 0.4 + 0.7 * nW, hgW)) * step(-1.5, hgW);
+   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.64, 0.6, 0.54) + vec3(0.01, 0.008, 0.006), grW * 0.6);
+   diffuseColor.rgb *= 0.95 + 0.1 * texture(uNoiseW, vWPW.xz * 0.011 + vWPW.y * 0.004).r;
+   #ifdef PBR_ASHLAR
+   { vec2 bu = vMapUv * vec2(1.0, 2.0); float rw = floor(bu.y); vec2 cell = vec2(floor(bu.x + mod(rw, 2.0) * 0.5), rw);
+     vec3 p3 = fract(vec3(cell.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); float hb = fract((p3.x + p3.y) * p3.z);
+     diffuseColor.rgb *= 0.965 + 0.06 * hb; }
+   #endif
+ }`);
+  };
+  if (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map) { mat.defines = Object.assign({}, mat.defines, { PBR_ASHLAR: '' }); }
+  mat.customProgramCacheKey = () => k0 + '|pbrw' + (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map ? 'a' : '');
+  mat.needsUpdate = true;
 }

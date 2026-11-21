@@ -4,6 +4,7 @@
 // Textures assume box-projected UVs in metres (see boxUV): one texture repeat == TEX_M metres.
 import * as THREE from 'three';
 import { fbm, vnoise, hash2, mulberry32 } from './lib/noise.js';
+import { adoptPBR, PBR_ENABLED } from './world/pbr.js'; // gfx-materials: real CC0 PBR sets for the masonry materials
 
 export const TEX_M = 2.0; // metres covered by one texture tile (box-projected UVs are divided by this)
 
@@ -160,6 +161,14 @@ export function textures() {
   if (_tex) return _tex;
   _tex = {};
   for (const [k, f] of Object.entries(recipes)) _tex[k] = bake(f, SIZE, k === 'tile' ? 4 : k === 'brick' || k === 'ashlar' ? 3 : 2);
+  // gfx-materials: the procedural bakes above stay as the placeholder/fallback; pbr.js swaps in real CC0 photo sets
+  // (normalised to the same mean colour so authored tints still hold). asphalt/soil get their own sets.
+  if (PBR_ENABLED) {
+    _tex.asphalt = bake(recipes.concrete, 64, 2); _tex.soil = bake(recipes.concrete, 64, 2);
+    const up = { granite: ['granite', [202, 200, 195]], ashlar: ['granite', [205, 203, 198]], concrete: ['concrete', [190, 187, 180]], stucco: ['stucco', [222, 210, 186]],
+      brick: ['brick', [142, 74, 57]], tile: ['rooftile', [162, 82, 55]], asphalt: ['asphalt', [92, 92, 94]], soil: ['dirt', [110, 94, 74]] };
+    for (const [k, [src, col]] of Object.entries(up)) adoptPBR(k, _tex[k], col, TEX_M, src);
+  }
   return _tex;
 }
 
@@ -212,7 +221,7 @@ export function materials() {
     wood: std({ color: 0xffffff, roughness: 0.85 }, T.wood),
     woodDark: std({ color: 0x7a6650, roughness: 0.85 }, T.wood),
     paving: std({ color: 0xffffff, roughness: 0.9 }, T.paving),
-    asphalt: std({ color: 0x45474a, roughness: 0.95 }, T.concrete),
+    asphalt: T.asphalt ? std({ color: 0x9a9a9c, roughness: 0.95 }, T.asphalt) : std({ color: 0x45474a, roughness: 0.95 }, T.concrete), // gfx-materials
     whitePaint: std({ color: 0xf3f1ec, roughness: 0.6 }),
     blackPaint: std({ color: 0x18191b, roughness: 0.5 }),
     turf: std({ color: 0x4c7a33, roughness: 0.95 }),
@@ -220,7 +229,7 @@ export function materials() {
     calGold: std({ color: 0xfdb515, roughness: 0.6 }),     // California Gold
     seatBlue: std({ color: 0x0b3a6e, roughness: 0.6 }),
     water: std({ color: 0x2d4e5c, roughness: 0.05, metalness: 0.1, envMapIntensity: 1.5 }),
-    soil: std({ color: 0x6b5a45, roughness: 1.0 }, T.concrete),
+    soil: T.soil ? std({ color: 0xc8beb0, roughness: 1.0 }, T.soil) : std({ color: 0x6b5a45, roughness: 1.0 }, T.concrete), // gfx-materials
   };
   return _M;
 }
