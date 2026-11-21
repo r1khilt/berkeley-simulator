@@ -19,8 +19,12 @@ export function installGrading() {
   vec3 c = NeutralToneMapping( color );
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, 1.08);
+  // gfx-trees: contrast in perceptual (gamma) space. Applied to linear values around 0.5 it clamped everything below
+  // 0.024 linear (about 43/255 on screen) to pure black, which crushed tree canopies and every shadow to #000.
+  c = pow(max(c, 0.0), vec3(1.0 / 2.2));
   c = (c - 0.5) * 1.05 + 0.5;
-  return clamp(c, 0.0, 1.0);
+  c = pow(clamp(c, 0.0, 1.0), vec3(2.2));
+  return c;
 }`);
 }
 // contact AO hook: call with the core height texture info

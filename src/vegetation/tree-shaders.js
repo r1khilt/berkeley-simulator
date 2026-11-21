@@ -179,7 +179,7 @@ export function patchLeaf(mat, uni) {
       .replace('#include <lights_physical_pars_fragment>', TRANSLUCENT)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= uLeafSpec; material.specularColorBlended *= uLeafSpec; material.specularF90 *= uLeafSpec;')
       // small unshadowed sky fill so crown interiors (in the crown's own shadow) never go black; off at night
-      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * 0.035 * (1.0 - uNight);');
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * (1.0 - uNight); // light transmitted through the canopy: shaded crown interiors stay readable green');
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
@@ -231,13 +231,15 @@ export function patchBlob(mat, uni) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + RAMP + 'varying float vLeaf;\n')
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= uLeafSpec; material.specularColorBlended *= uLeafSpec; material.specularF90 *= uLeafSpec;')
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * vLeaf * (1.0 - uNight);')
       .replace('#include <color_fragment>', /* glsl */`
   float q0 = 0.42 + ( vInst - 0.5 ) * uRamp.z; // mean of the atlas' per-leaf values
   vec3 bc = ( leafRamp( q0 - 0.3 ) + leafRamp( q0 ) + leafRamp( q0 + 0.3 ) ) * ( 1.0 / 3.0 ) * vTint * uTrans.z;
   diffuseColor.rgb *= mix( uTwigCol, bc, vLeaf ) * vAO;
 `);
+    sh.uniforms.uNight = U.uNight; sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
-  mat.customProgramCacheKey = () => 'tree-blob-3';
+  mat.customProgramCacheKey = () => 'tree-blob-4';
   return mat;
 }
 

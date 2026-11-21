@@ -53,9 +53,9 @@ const BARK = {
   plane: (u, v) => { // London plane: smooth, camouflage patches of cream / olive / grey-brown
     const n1 = pfbm(u * 4, v * 8, 4, 8, 4, 21), n2 = pfbm(u * 6, v * 12, 6, 12, 3, 25);
     let c, h;
-    if (n1 > 0.57) { c = [218, 206, 172]; h = 0.42; }       // fresh cream
-    else if (n1 > 0.48) { c = [166, 158, 118]; h = 0.52; }  // olive-tan
-    else { c = [120, 110, 92]; h = 0.6; }                   // older grey-brown
+    if (n1 > 0.57) { c = [204, 194, 162]; h = 0.42; }       // fresh cream
+    else if (n1 > 0.48) { c = [150, 146, 102]; h = 0.52; }  // olive-tan
+    else { c = [106, 98, 82]; h = 0.6; } // (darker than before: the camouflage must read at 10 m)                   // older grey-brown
     if (n2 > 0.62) c = [c[0] * 0.9 + 14, c[1] * 0.9 + 12, c[2] * 0.9 + 4];
     const f = pfbm(u * 48, v * 48, 48, 48, 2, 27); const k = 0.92 + (f - 0.5) * 0.16;
     return [cl(c[0] * k), cl(c[1] * k), cl(c[2] * k), h + (f - 0.5) * 0.06];
@@ -73,9 +73,9 @@ const BARK = {
     const st = pfbm(u * 12, v * 2, 12, 2, 3, 43);
     const f = pfbm(u * 40, v * 8, 40, 8, 2, 45);
     let c, h;
-    if (st > 0.6) { c = [172, 142, 104]; h = 0.75; }
-    else if (st > 0.56) { c = [120, 100, 78]; h = 0.6; }
-    else { c = n > 0.55 ? [196, 198, 182] : [222, 216, 200]; h = 0.4; }
+    if (st > 0.65) { c = [156, 128, 96]; h = 0.75; }
+    else if (st > 0.61) { c = [110, 92, 72]; h = 0.6; }
+    else { c = n > 0.55 ? [176, 174, 160] : [194, 188, 172]; h = 0.4; } // weathered grey-cream; pure cream read as white in game
     const k = 0.93 + (f - 0.5) * 0.14;
     return [cl(c[0] * k), cl(c[1] * k), cl(c[2] * k), h + f * 0.05];
   },

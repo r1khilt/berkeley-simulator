@@ -345,13 +345,13 @@ function genPollard(d, rnd) {
     sk.knobs.push({ c: e.clone().add(V3(0, P.knobR * 0.4, 0)), r: P.knobR * lerp(0.85, 1.2, rnd()) });
     // a secondary knob part-way along some limbs (old pruning cuts)
     if (rnd() < 0.5) sk.knobs.push({ c: pts[2].clone(), r: P.limbR * 1.25 });
-    const nw = P.whips + Math.floor(rnd() * 3);
+    const nw = Math.max(4, P.whips - 6 + Math.floor(rnd() * 9)); // some fists were cut back harder than others
     for (let w = 0; w < nw; w++) {
       const a = e.clone().add(V3(0, P.knobR * 0.6, 0)).addScaledVector(randUnit(rnd), P.knobR * 0.5);
       const dir = V3(Math.cos(th) * 0.35, 1, Math.sin(th) * 0.35).addScaledVector(randUnit(rnd), 0.45).normalize();
       const len = lerp(P.whipLen[0], P.whipLen[1], rnd());
       const b = a.clone().addScaledVector(dir, len);
-      sk.twigs.push({ pts: [a, a.clone().lerp(b, 0.5).add(V3(0, 0.03, 0)), b], rads: [P.whipR, P.whipR * 0.6, 0.002] });
+      sk.twigs.push({ pts: [a, a.clone().lerp(b, 0.5).add(V3(0, 0.03, 0)).addScaledVector(randUnit(rnd), len * 0.06), b], rads: [P.whipR, P.whipR * 0.6, 0.002] }); // slight bow
       sk.clumps.push({ c: b.clone(), a: a.clone().lerp(b, 0.45), r: P.clumpR, out: V3(Math.cos(th), 0, Math.sin(th)), dir, mode: 'tip' });
     }
   }
@@ -566,7 +566,7 @@ const SPECIES_DEF = {
     clumps: { twigR: 0.045 },
     cards: { n: 1500, vbias: 0.25, out: 1.0, face: 0.6, jit: 0.5 },
     normal: 'ellipsoid', lod1Core: true,
-    look: { cols: ['#55702d', '#62803a', '#7b8a5e'], ramp: [0.45, 0.93, 0.1, 0.06], twig: '#5b5045', rough: 0.6, leafSpec: 0.2, transBack: 0.4, transWrap: 0.2, blobK: 0.91, sway: 0.007, flutter: 0.0010, tintK: 1.0 },
+    look: { cols: ['#4f5c30', '#5d6a3a', '#767c55'], ramp: [0.45, 0.93, 0.12, 0.08], twig: '#5b5045', rough: 0.55, leafSpec: 0.3, transBack: 0.45, transWrap: 0.3, blobK: 0.91, sway: 0.007, flutter: 0.0010, tintK: 1.0 },
   },
   plane: {
     aoLift: 0.25, lod2K: 0.64, cardK: 1.0, name: 'London plane', arche: 'decurrent', leaf: 'plane', bark: 'plane', seed: 202, typical: { height: 18, crownR: 7.5 },
@@ -583,8 +583,8 @@ const SPECIES_DEF = {
     aoLift: 0.25, lod2K: 1.12, name: 'Pollarded London plane', arche: 'pollard', leaf: 'plane', bark: 'plane', seed: 303, typical: { height: 5.5, crownR: 2.8 },
     trunk: { h: 2.3, r0: 0.26, r1: 0.22, lean: 0.01, flare: 0.2, wiggle: 0.02, seg: 8 },
     crown: { base: 2.6, top: 5.5, R: 2.8, shape: ['superegg', 0.45, 2.5], irr: 0.1 },
-    pollard: { limbs: 5, reach: [1.3, 1.9], height: [3.0, 3.5], limbR: 0.12, knobR: 0.22, whips: 8, whipLen: [1.1, 1.9], whipR: 0.018, clumpR: 0.4 },
-    cards: { n: 1500, size: 0.9, vbias: 0.6, out: 0.6, face: 0.5, jit: 0.6 },
+    pollard: { limbs: 5, reach: [1.3, 1.9], height: [3.0, 3.5], limbR: 0.12, knobR: 0.22, whips: 14, whipLen: [0.6, 2.4], whipR: 0.016, clumpR: 0.3 }, // a year's whips: brooms on every fist
+    cardK: 0.35, cards: { n: 1500, size: 0.9, vbias: 0.6, out: 0.6, face: 0.5, jit: 0.6 },
     normal: 'ellipsoid', seasonal: 'pollard',
     look: { twig: '#6e6553', rough: 0.8, transBack: 0.7, transWrap: 0.3, blobK: 0.71, sway: 0.006, flutter: 0.0018, tintK: 0.3 },
   },
@@ -595,18 +595,18 @@ const SPECIES_DEF = {
     whorls: { spacing: 1.15, n: 4, elev: [-0.35, 0.3], droop: 0.12, r: 0.07, lenK: [0.85, 1.0], clumpK: 0.35, clumpR: [0.6, 1.4] },
     cards: { n: 1500, size: 1.5, vbias: 0.05, out: 1.0, face: 0.35, flat: 0.45, jit: 0.35 },
     normal: 'cone', lod1Core: true, lod1Limbs: 0,
-    look: { cols: ['#35522c', '#41602f', '#2d4627'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
+    look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
     lod2K: 0.5, cardK: 1.0, name: 'Blue gum eucalyptus', arche: 'decurrent', leaf: 'euc', bark: 'euc', seed: 505, typical: { height: 40, crownR: 9 },
-    trunk: { h: 26, r0: 0.85, r1: 0.35, lean: 0.03, flare: 0.3, wiggle: 0.03, segs: 8 },
-    crown: { base: 14, top: 40, R: 9, shape: ['superegg', 0.45, 2.0], irr: 0.35 },
+    trunk: { h: 26, r0: 0.85, r1: 0.3, lean: 0.03, flare: 0.5, wiggle: 0.04, segs: 8 },
+    crown: { base: 18, top: 40, R: 9, shape: ['superegg', 0.45, 2.0], irr: 0.45 }, // blue gums: tall clear boles, high ragged crowns
     limbs: { n: 8, h0: 0.55, h1: 1.0, up: [0.35, 0.85], reach: [0.55, 0.9], r: 0.5, arch: 0.12, wiggle: 0.4 },
-    clumps: { n: 46, r: [1.6, 2.6], shell: [0.5, 0.97], twigR: 0.07 },
+    clumps: { n: 38, r: [1.3, 2.3], shell: [0.5, 0.97], twigR: 0.07 }, // fewer, smaller clumps: sky shows through
     branch2: { n: 4, spread: 1.1, twigs: 2, up: [-0.5, 0.7] },
-    cards: { n: 1500, size: 2.4, vbias: -0.9, out: 0.35, face: 0.4, jit: 0.35 },
+    cards: { n: 1500, size: 2.4, vbias: -0.9, out: 0.35, face: 0.4, jit: 0.35, tangent: 0.2 }, // most sprays hang (pendulous) instead of forming a shell
     normal: 'ellipsoid',
-    look: { cols: ['#71866f', '#80937a', '#5f735f'], ramp: [0.4, 0.8, 0.25, 0.2], twig: '#8a7a62', rough: 0.7, transBack: 0.5, transWrap: 0.2, blobK: 0.79, sway: 0.012, flutter: 0.002, tintK: 0.8 },
+    look: { cols: ['#6f8070', '#7f8f7c', '#66745f'], ramp: [0.4, 0.8, 0.25, 0.2], twig: '#8a7a62', rough: 0.6, leafSpec: 0.3, transBack: 0.55, transWrap: 0.3, blobK: 0.79, sway: 0.012, flutter: 0.002, tintK: 0.8 },
   },
   pine: {
     lod2K: 0.57, cardK: 1.05, name: 'Monterey pine', arche: 'decurrent', leaf: 'needle', bark: 'pine', seed: 606, typical: { height: 22, crownR: 8 },
@@ -617,7 +617,7 @@ const SPECIES_DEF = {
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.35, 0.6] },
     cards: { n: 1500, size: 1.7, vbias: 0.45, out: 0.8, face: 0.55, jit: 0.5 },
     normal: 'ellipsoid',
-    look: { cols: ['#3b5530', '#476236', '#33492b'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#5a4636', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.63, sway: 0.009, flutter: 0.0008, tintK: 1.0 },
+    look: { cols: ['#3f5434', '#4b603b', '#384b30'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#5a4636', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.63, sway: 0.009, flutter: 0.0008, tintK: 1.0 },
   },
   cedar: {
     lod2K: 0.96, name: 'Deodar cedar', arche: 'conifer', leaf: 'tuft', bark: 'pine', seed: 707, typical: { height: 20, crownR: 6.5 },
@@ -668,7 +668,7 @@ const SPECIES_DEF = {
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.7, 0.7] },
     cards: { n: 1500, size: 1.35, vbias: 0.35, out: 0.9, face: 0.6, jit: 0.5 },
     normal: 'ellipsoid', lod1Core: true,
-    look: { cols: ['#304a26', '#3c582d', '#5a5430'], ramp: [0.4, 0.9, 0.1, 0.2], twig: '#4f4538', rough: 0.5, leafSpec: 0.45, transBack: 0.2, transWrap: 0.2, blobK: 1.6, sway: 0.006, flutter: 0.0008, tintK: 1.0 },
+    look: { cols: ['#34492a', '#405632', '#5c5834'], ramp: [0.4, 0.9, 0.1, 0.2], twig: '#4f4538', rough: 0.5, leafSpec: 0.45, transBack: 0.2, transWrap: 0.2, blobK: 1.6, sway: 0.006, flutter: 0.0008, tintK: 1.0 },
   },
   bay: {
     lod2K: 0.7, cardK: 1.2, name: 'California bay laurel', arche: 'decurrent', leaf: 'bay', bark: 'smooth', seed: 1212, typical: { height: 11, crownR: 5.5 },
@@ -679,7 +679,7 @@ const SPECIES_DEF = {
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.6, 0.7] },
     cards: { n: 1500, size: 1.2, vbias: 0.35, out: 0.9, face: 0.55, jit: 0.5 },
     normal: 'ellipsoid', lod1Core: true,
-    look: { cols: ['#5f7034', '#6e803c', '#53652e'], ramp: [0.35, 0.8, 0.15, 0.25], twig: '#5a4e40', rough: 0.7, transBack: 0.45, transWrap: 0.2, blobK: 1.01, sway: 0.008, flutter: 0.0012, tintK: 1.0 },
+    look: { cols: ['#5a6838', '#687642', '#505e32'], ramp: [0.35, 0.8, 0.15, 0.25], twig: '#5a4e40', rough: 0.6, leafSpec: 0.25, transBack: 0.45, transWrap: 0.3, blobK: 1.01, sway: 0.008, flutter: 0.0012, tintK: 1.0 },
   },
   palm: {
     lod2K: 0.75, name: 'Mexican fan palm', arche: 'palm', leaf: 'palm', bark: 'palm', seed: 1313, typical: { height: 18, crownR: 2.6 },
@@ -708,28 +708,28 @@ const SEASONAL = {
     spring: { cols: ['#6f9a3a', '#7ca843', '#5f8a33'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.85 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.9 },
-    'late-autumn': { cols: ['#8f8838', '#b3913f', '#7d5a31'], ramp: [0.3, 0.62, 0.45, 0.25], density: 0.55 },
+    'late-autumn': { cols: ['#8a8040', '#a28446', '#7a5836'], ramp: [0.3, 0.62, 0.5, 0.25], density: 0.32 }, // planes: browning, thinning
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.05 },
   },
   pollard: {
     spring: { cols: ['#74a03c', '#82ad45', '#669036'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.75 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.8 },
-    'late-autumn': { cols: ['#9b8a3e', '#a87c3a', '#76552f'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.14 },
+    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.03 }, // the esplanade pollards are nearly bare by late November
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.0 },
   },
   deciduous: {
     spring: { cols: ['#77a33f', '#86b048', '#689338'], ramp: [0.35, 0.8, 0.25, 0.2], density: 0.85 },
     summer: { cols: ['#4f7430', '#5e8138', '#46692a'], ramp: [0.35, 0.8, 0.25, 0.2], density: 1 },
     'early-autumn': { cols: ['#5f7a32', '#9a9a3a', '#c98a2e'], ramp: [0.45, 0.78, 0.7, 0.25], density: 0.9 },
-    'late-autumn': { cols: ['#a3401f', '#d4862a', '#dcb43a'], ramp: [0.33, 0.66, 0.9, 0.3], density: 0.6 },
+    'late-autumn': { cols: ['#6c7336', '#ad8a40', '#8c6838'], ramp: [0.36, 0.76, 0.75, 0.28], density: 0.5 }, // late Nov in Berkeley: some still olive, most ochre, a few russet; half the leaves down
     winter: { cols: ['#7a5a3a', '#8a6a40', '#6b5035'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.03 },
   },
   ginkgo: {
     spring: { cols: ['#86b04a', '#94bb52', '#79a242'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.8 },
     summer: { cols: ['#5b8a3a', '#679640', '#517d33'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#8fa33a', '#b8b83a', '#d8c23a'], ramp: [0.4, 0.75, 0.4, 0.2], density: 0.95 },
-    'late-autumn': { cols: ['#e3a516', '#f2bb1f', '#f8cf36'], ramp: [0.3, 0.7, 0.25, 0.2], density: 0.85 },
+    'late-autumn': { cols: ['#d29a1e', '#e2b02a', '#ecc444'], ramp: [0.3, 0.7, 0.25, 0.2], density: 0.75 },
     winter: { cols: ['#c9a030', '#d8b040', '#b8902a'], ramp: [0.4, 0.7, 0.2, 0.2], density: 0.02 },
   },
 };
