@@ -307,6 +307,7 @@ async function boot() {
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     // HUD (throttled)
     if (state === 'play' && frameN % 3 === 0) hud(date);
+    if (frameN % 20 === 0) ui.setNight(U.uNight.value); // ui-pro: light/dark UI follows the scene (landing too)
     if (state === 'play') { ui.compass(((-player.camYaw * 180 / Math.PI) % 360 + 360) % 360); ui.minimap(player.pos.x, player.pos.z, player.camYaw, settings.north); ui.prompt(player.activeInteraction ? player.activeInteraction.label : null); }
     audio.update(dt, { night: U.uNight.value, wind: U.uWind.value, bikeSpeed: player.mode === 'bike' ? player.speed : 0 });
     // bells
@@ -323,7 +324,7 @@ async function boot() {
     if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
   }
   function hud(date) {
-    ui.clock(clockString(date), timeSt.label, timeSt); ui.modes(); ui.setNight(U.uNight.value); // ui-pro
+    ui.clock(clockString(date), timeSt.label, timeSt); ui.modes(); // ui-pro
     // discovery
     for (const p of places) {
       const d = Math.hypot(p.p[0] - player.pos.x, p.p[1] - player.pos.z);

@@ -86,7 +86,7 @@ export class UI {
   titleTime(st) {
     let html = typeof st === 'string' ? st : '';
     if (st && typeof st === 'object') {
-      if (st.autoDay) html = `${icon('sun')}<span>Opening at ${fmtHour(st.hour)}. It's ${fmtHour(pacificHour(st.autoDay))} and dark in Berkeley right now. <button data-a="time">Change time</button></span>`;
+      if (st.autoDay) html = `${icon('sun')}<span>Daylight view at ${fmtHour(st.hour)} · Berkeley time is ${fmtHour(pacificHour(st.autoDay))}. <button data-a="time">Change time</button></span>`;
       else if (!st.live) html = `${icon('clock')}<span>Opening at ${fmtHour(st.hour)}${st.date ? ` on ${fmtDay(st.date)}` : ''}. <button data-a="time">Change</button></span>`;
     }
     this.titleTimeEl.innerHTML = html; this.titleTimeEl.classList.toggle('hidden', !html || !this.title.classList.contains('ready'));
@@ -94,7 +94,8 @@ export class UI {
   titlePlace(t) { const e = this.title.querySelector('.tf-place span'); if (e && e.textContent !== t) e.textContent = t; }
   showTitle(on) {
     this.title.classList.toggle('off', !on); this.hud.classList.toggle('off', on); this.state = on ? 'title' : 'play';
-    if (!on && !this._hinted) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('M')} Map <i></i> ${kbd('T')} Time <i></i> ${kbd('H')} Controls`, 9000), 900); }
+    let seen = false; try { seen = localStorage.getItem('bsim.hinted') === '1'; localStorage.setItem('bsim.hinted', '1'); } catch (e) {}
+    if (!on && !this._hinted && !seen) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('M')} Map <i></i> ${kbd('T')} Time <i></i> ${kbd('H')} Controls`, 8000), 900); }
   }
   fade(cb, hold = 300) { this.fadeEl.classList.add('on'); setTimeout(() => { cb && cb(); setTimeout(() => this.fadeEl.classList.remove('on'), hold); }, 380); }
   // ---------- HUD
@@ -125,7 +126,11 @@ export class UI {
     this.hud.addEventListener('click', (e) => {
       const btn = e.target.closest('button'); if (btn) btn.blur(); // keep Space/Enter for the game, not the focused button
       const h = e.target.closest('[data-h]'); if (h) { if (h.dataset.h === 'help') this.help(); else this.cb[h.dataset.h]?.(); return; }
-      const md = e.target.closest('[data-mode]'); if (md) this._pickMode(md.dataset.mode);
+      const md = e.target.closest('[data-mode]');
+      if (md) { // touch: the bar is collapsed to the current mode; first tap expands it
+        if (this.isTouch && !this.modesEl.classList.contains('open')) { this.modesEl.classList.add('open'); clearTimeout(this._mo); this._mo = setTimeout(() => this.modesEl.classList.remove('open'), 5000); return; }
+        this.modesEl.classList.remove('open'); this._pickMode(md.dataset.mode);
+      }
     });
     this.mmCanvas.addEventListener('click', () => this.cb.map?.());
     q('.mm-compass').addEventListener('click', (e) => { e.stopPropagation(); e.currentTarget.blur(); this.cb.toggleNorth?.(); });
@@ -227,9 +232,9 @@ export class UI {
       let dx = (p.p[0] - px) * S, dz = (p.p[1] - pz) * S;
       if (!north) { const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs; dx = rx; dz = rz; }
       if (Math.abs(dx) > lim || Math.abs(dz) > lim) continue;
-      c.beginPath(); c.arc(dx, dz, p.landmark ? 7 : 5, 0, Math.PI * 2);
-      c.fillStyle = p.found ? '#fdb515' : p.landmark ? '#003262' : '#ffffff'; c.fill();
-      c.lineWidth = 2.5; c.strokeStyle = p.landmark ? '#ffffff' : '#6b7280'; c.stroke();
+      c.beginPath(); c.arc(dx, dz, p.landmark ? 6 : 4.5, 0, Math.PI * 2);
+      c.fillStyle = p.landmark ? '#003262' : p.found ? '#fdb515' : '#ffffff'; c.fill();
+      c.lineWidth = 2; c.strokeStyle = p.landmark ? '#ffffff' : p.found ? '#b07a06' : '#8a8f98'; c.stroke();
     }
     if (north) c.rotate(-headingRad);
     const g = c.createRadialGradient(0, 0, 4, 0, 0, 70); g.addColorStop(0, 'rgba(37,113,226,.42)'); g.addColorStop(1, 'rgba(37,113,226,0)');
@@ -288,13 +293,14 @@ export class UI {
       const boxes = vis.map((v) => { const r = v.p.landmark ? 10 : 6.5; return [v.sx - r, v.sy - r, 2 * r, 2 * r]; }), hit = (b) => boxes.some((o) => b[0] < o[0] + o[2] && b[0] + b[2] > o[0] && b[1] < o[1] + o[3] && b[1] + b[3] > o[1]);
       const pri = (v) => (v.p === sel ? 0 : v.p === hover ? 1 : v.p.landmark ? 2 : 3);
       const order = vis.slice().sort((a, b) => pri(a) - pri(b) || a.p._d - b.p._d);
-      ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; const named = [];
       for (const v of order) {
+        if (named.some((o) => o.p.name === v.p.name && Math.hypot(o.sx - v.sx, o.sy - v.sy) < 140)) continue;
         const L = v.p.landmark, strong = v.p === sel || v.p === hover; if (!L && !strong && scale < 0.75) continue;
         const f = `${L || strong ? 600 : 500} ${L ? 12.5 : 12}px Inter, system-ui, sans-serif`, w = tw(v.p.name, f), r = L ? 9 : 5.5;
         const ok = (bb) => !hit(bb) && bb[0] > side() + 6 && bb[0] + bb[2] < W - 6 && bb[1] > 4 && bb[1] + bb[3] < H - 4;
         let b = [v.sx + r + 4, v.sy - 8, w + 4, 16]; if (!ok(b)) { b = [v.sx - r - 8 - w, v.sy - 8, w + 4, 16]; if (!ok(b) && !strong) continue; }
-        boxes.push(b); ctx.font = f; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText(v.p.name, b[0] + 2, v.sy); ctx.fillStyle = L ? '#0b2545' : '#33363b'; ctx.fillText(v.p.name, b[0] + 2, v.sy);
+        boxes.push(b); named.push(v); ctx.font = f; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText(v.p.name, b[0] + 2, v.sy); ctx.fillStyle = L ? '#0b2545' : '#33363b'; ctx.fillText(v.p.name, b[0] + 2, v.sy);
       }
       // selection pin
       if (sel) { const [sx, sy] = toScreen(sel.p[0], sel.p[1]); ctx.save(); ctx.translate(sx, sy - 6); ctx.fillStyle = '#e5484d'; ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 6; ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-4, -8, -11, -12, -11, -21); ctx.arc(0, -21, 11, Math.PI, 0); ctx.bezierCurveTo(11, -12, 4, -8, 0, 0); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -21, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
@@ -469,8 +475,8 @@ export class UI {
         dt.value = st.date || pacificDay();
         p.querySelectorAll('.presets [data-x]').forEach((b) => b.classList.toggle('on', !st.live && Math.abs(presetHour(b.dataset.x, st.date) - st.hour) < 0.02));
         p.querySelectorAll('.wx-seg [data-w]').forEach((b) => b.classList.toggle('on', b.dataset.w === (st.weather || 'live')));
-        const note = $q('.tp-note'); const msg = st.autoDay ? `Opened in daylight because it was ${fmtHour(pacificHour(st.autoDay))} and dark in Berkeley. Turn on Live for real time.` : '';
-        note.classList.toggle('hidden', !msg); note.querySelector('span').textContent = msg;
+        const note = $q('.tp-note'); const msg = st.autoDay ? `Opened in daylight · it was ${fmtHour(pacificHour(st.autoDay))} and dark in Berkeley` : '';
+        note.classList.toggle('hidden', !msg); note.querySelector('span').textContent = msg; $q('.tp-sun').classList.toggle('hidden', !!msg);
       };
       this._tday = null; this._timeRefresh = refresh;
       hr.addEventListener('input', () => { onChange('hour', +hr.value); refresh(); });
