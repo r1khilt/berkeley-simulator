@@ -598,7 +598,7 @@ const SPECIES_DEF = {
     look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
-    lod2K: 0.5, cardK: 1.0, name: 'Blue gum eucalyptus', arche: 'decurrent', leaf: 'euc', bark: 'euc', seed: 505, typical: { height: 40, crownR: 9 },
+    lod2K: 0.5, cardK: 0.9, name: 'Blue gum eucalyptus', arche: 'decurrent', leaf: 'euc', bark: 'euc', seed: 505, typical: { height: 40, crownR: 9 },
     trunk: { h: 26, r0: 0.85, r1: 0.3, lean: 0.03, flare: 0.5, wiggle: 0.04, segs: 8 },
     crown: { base: 18, top: 40, R: 9, shape: ['superegg', 0.45, 2.0], irr: 0.45 }, // blue gums: tall clear boles, high ragged crowns
     limbs: { n: 8, h0: 0.55, h1: 1.0, up: [0.35, 0.85], reach: [0.55, 0.9], r: 0.5, arch: 0.12, wiggle: 0.4 },

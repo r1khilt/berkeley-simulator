@@ -12,14 +12,15 @@ export function decodeTrees(buf) {
 }
 // gfx-trees: the bake assigns 'deciduous' to ~35% of interior campus trees at random, which made late-November
 // campus read as a New England autumn. The real core is dominated by evergreens (coast live oak, bay, redwood), so
-// part of the interior 'deciduous' class is re-labelled oak / bay (deterministic per tree; street trees and the
-// hills are left alone). Done at decode so the leaf-litter map and colliders agree with what is drawn.
+// part of the interior 'deciduous' class is re-labelled oak / bay (deterministic per tree;
+// city street trees are left alone). Done at decode so the leaf-litter map and colliders agree with what is drawn.
 function remapSpecies(t) {
   const DEC = 8, OAK = 0, BAY = 11;
   for (let i = 0; i < t.n; i++) {
     if (t.sp[i] !== DEC) continue;
     const x = t.x[i] / 10, z = t.z[i] / 10;
-    if (x < -660 || x > 420 || z < -330 || z > 230 || t.h[i] < 400) continue; // campus core, trees over 4 m
+    const core = x >= -660 && x <= 420 && z >= -330 && z <= 230, hills = x > 300; // campus core, and the oak/bay/eucalyptus hills
+    if (!(core || hills) || t.h[i] < 400) continue; // trees over 4 m
     const u = ((Math.sin(i * 78.233 + x * 0.917 + z * 0.311) * 43758.5453) % 1 + 1) % 1;
     if (u < 0.5) t.sp[i] = OAK; else if (u < 0.65) t.sp[i] = BAY;
   }
