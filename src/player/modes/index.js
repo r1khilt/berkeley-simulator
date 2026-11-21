@@ -3,4 +3,5 @@
 export function installModes(player, ctx) {
   // e.g. import('./scooter.js').then((m) => m.install(player, ctx));
   import('./grapple.js').then((m) => m.install(player, ctx)); // grappling hook: Q / right mouse (see grapple.js)
+  import('./horse.js').then((m) => m.install(player, ctx)); // rideable horse (Y), hitched at Faculty Glade
 }
