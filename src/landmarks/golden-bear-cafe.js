@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { Kit, polysGeo } from './lib/classic-kit.js';
 import { umbrellaField, buildUmbrellas, clerestory, glassBand, slotBand, pipeRail, parasol, tinted, tone, TEXAVG, outwardRing, pointInPoly } from './lib/b01-kit.js';
+import { cafeInterior } from './lib/int-gbc.js'; // interiors-cafe: enterable, furnished dining room + patio furniture
 
 export const info = {
   id: 'golden-bear-cafe',
@@ -45,7 +46,7 @@ export async function build(ctx) {
   const frame = tinted(M.darkBronze, 0x4e3e2c);
   const podium = tone(M.concrete, 0xb8b2a6);
   const navy = tinted(M.calBlue, 0x34465c);
-  const sglass = tinted(M.glassLight, 0x5c6b70, { opacity: 0.42 }); // transparent storefront glass
+  const sglass = tinted(M.glassLight, 0x7f9196, { opacity: 0.3 }); // transparent storefront glass (lighter: the furnished interior shows through — interiors-cafe)
   const interior = tinted(M.stucco, 0xe6c896);                  // warm-lit café interior seen through the glass
   const greenGlass = tinted(M.windowNight, 0x6f8a80);           // light-green clerestory glass
   const YT = 11.8, DEP = 0.92, TH = 0.3, FL = 7.0; // shell rim 11.8 + 0.2 m upturned rim = 12.0 (LiDAR) // umbrella rim, depth, slab; café / upper floor level
@@ -73,15 +74,23 @@ export async function build(ctx) {
 
   // cores
   K.prism(M.concreteDark, inset(wallW, 0.3), -1.5, 11.2);
-  K.prism(M.concreteDark, inset(wallE, 0.3), -1.5, 9.9);
-  K.box(M.concreteDark, 27.4, 9.85, -5.5, 32.05, 11.2, 10.4); K.box(M.concreteDark, 32.05, 9.85, -5.5, 39.7, 11.2, 7.8); K.box(M.concreteDark, 39.7, 9.85, -5.5, 41.7, 11.2, 10.4);
+  // interiors-cafe: the café's east body is a floor slab + solid kitchen block (u < UK); the dining room above FL is hollow
+  const UK = 32.05; // dining room / kitchen line = the slot between umbrella strips
+  K.prism(M.concreteDark, inset(wallE, 0.3), -1.5, FL - 0.02);
+  K.prism(M.concreteDark, [[27.4, 12.2], [UK, 12.2], [UK, -5.53], [30.75, -5.53], [30.75, -9.0], [27.4, -9.0]], FL - 0.03, 9.9);
+  K.box(M.concreteDark, 27.4, 9.85, -5.5, UK, 11.2, 10.4);
   K.box(M.concreteDark, 27.4, 9.85, -9.0, 30.2, 11.2, -5.4);
   // light-green clerestory band along the stepped south face of the café's upper core
-  for (const [a, b] of [[[27.4, 10.4], [32.05, 10.4]], [[32.05, 7.8], [39.7, 7.8]], [[39.7, 10.4], [41.7, 10.4]], [[32.05, 10.4], [32.05, 7.8]], [[39.7, 7.8], [39.7, 10.4]]]) {
+  for (const [a, b] of [[[27.4, 10.4], [32.05, 10.4]], [[32.05, 7.8], [39.7, 7.8]], [[39.7, 7.8], [39.7, 10.15]]]) { // (dining-room bays opened up: interiors-cafe)
     const R = K.run(a, b); glassBand(K, R, 0, R.L, 10.05, 11.2, { glass: greenGlass, frame, pitch: 1.2, rec: 0.05 });
   }
   K.box(white, 27.0, 9.85, 10.4, 42.1, 10.05, 12.65); // flat roof of the café's south wing (LiDAR 9.9 m)
-  colliders.push(K.colPoly(wallW, -2, 12), K.colPoly(wallE, -2, 12));
+  colliders.push(K.colPoly(wallW, -2, 12));
+  for (let i = 0; i < wallE.length; i++) { // interiors-cafe: wall segments, leaving the café's double door (v 1.4..4.2 on the east front) open
+    const a = wallE[i], b = wallE[(i + 1) % wallE.length];
+    if (a[0] > 41.9 && b[0] > 41.9) { const [hi, lo] = a[1] > b[1] ? [a, b] : [b, a]; colliders.push(K.colPoly([hi, [hi[0], 4.25]], -2, 12), K.colPoly([[lo[0], 1.35], lo], -2, 12), K.colPoly([[lo[0], 1.35], [lo[0], 4.25]], FL + 2.6, 12)); }
+    else colliders.push(K.colPoly([a, b], -2, 12));
+  }
 
   // façades per edge
   const faces = (ring, styleOf) => {
@@ -93,7 +102,7 @@ export async function build(ctx) {
         const y0 = band.y0 ?? gmin, y1 = band.y1;
         if (y1 - y0 < 0.2) continue;
         if (band.t === 'slot') slotBand(K, R, 0, R.L, y0, y1, { mat: precast, back: dark, jointMat: dark });
-        else if (band.t === 'glass') glassBand(K, R, 0, R.L, y0, y1, { glass: M.windowNight, frame, pitch: band.pitch ?? 1.45, transoms: band.tr || [], doors: band.doors || [] });
+        else if (band.t === 'glass') glassBand(K, R, 0, R.L, y0, y1, { glass: band.see ? sglass : M.windowNight, frame, pitch: band.pitch ?? 1.45, transoms: band.tr || [], doors: band.doors || [] });
         else if (band.t === 'solid') K.rbox(R, band.mat || podium, 0, y0, -0.3, R.L, y1, 0.0);
         if (band.cap) K.rbox(R, white, -0.05, y1 - 0.02, -0.3, R.L + 0.05, y1 + 0.22, 0.12);
       }
@@ -106,26 +115,36 @@ export async function build(ctx) {
     if (n[1] > 0.5) return [{ t: 'glass', y1: 6.4, tr: [5.6] }, { t: 'solid', y0: 6.4, y1: 7.4, mat: precast }, { t: 'glass', y0: 7.4, y1: 10.4, tr: [9.6] }];
     return [{ t: 'slot', y1: FL, cap: true }, { t: 'glass', y0: FL + 0.22, y1: 10.4, tr: [FL + 2.5] }];
   });
+  const dining = (a, b) => Math.max(a[0], b[0]) > UK + 0.5 && Math.min(a[1], b[1]) < 12.4; // edge of the hollow dining room (interiors-cafe)
   faces(wallE, (a, b) => {
-    const n = nrm(a, b);
+    const n = nrm(a, b); const see = dining(a, b);
     if (n[0] > 0.5 && a[0] > 42) return null; // café front, below
     if (n[1] > 0.5) return [{ t: 'solid', y1: FL, mat: podium }, { t: 'slot', y0: FL, y1: 9.85, cap: true }];
-    if (n[0] < -0.5) return [{ t: 'glass', y1: FL - 0.4, tr: [g(...a) + 2.6] }, { t: 'solid', y0: FL - 0.4, y1: FL + 0.2, mat: precast }, { t: 'glass', y0: FL + 0.2, y1: 10.4, tr: [FL + 2.6] }];
-    return [{ t: 'slot', y1: FL, cap: true }, { t: 'glass', y0: FL + 0.22, y1: 10.4, tr: [FL + 2.5] }];
+    if (n[0] < -0.5) return [{ t: 'glass', y1: FL - 0.4, tr: [g(...a) + 2.6] }, { t: 'solid', y0: FL - 0.4, y1: FL + 0.2, mat: precast }, { t: 'glass', y0: FL + 0.2, y1: 10.4, tr: [FL + 2.6], see }];
+    return [{ t: 'slot', y1: FL, cap: true }, { t: 'glass', y0: FL + 0.22, y1: 10.4, tr: [FL + 2.5], see }];
   });
   // clerestory glazing up to the umbrella soffits
   clerestory(K, F, wallW, 10.4, M.windowNight, frame, { thick: TH, cap: 11.25 });
-  clerestory(K, F, wallE, 10.4, M.windowNight, frame, { thick: TH, cap: 11.25, skip: (a, b, n) => n[0] > 0.5 && a[0] > 41.5 });
+  clerestory(K, F, wallE, 10.4, M.windowNight, frame, { thick: TH, cap: 11.25, skip: (a, b, n) => (n[0] > 0.5 && a[0] > 41.5) || (dining(a, b) && n[1] < 0.5) || (dining(a, b) && a[0] > 38) });
+  clerestory(K, F, wallE, 10.4, sglass, frame, { thick: TH, skip: (a, b, n) => (n[0] > 0.5 && a[0] > 41.5) || !((dining(a, b) && n[1] < 0.5) || (dining(a, b) && a[0] > 38)) }); // dining room: clear clerestory up to the soffits
 
   // ---- Golden Bear Café front (east, facing Ludwig's Fountain on Upper Sproul) ----
   {
     const uG = wallE.reduce((m, p) => Math.max(m, p[0]), -1e9); // café glass line
     const v0 = -9.15, v1 = 10.15; const R = K.run([uG, v1], [uG, v0]); // east façade S→N
     const doorS = v1 - 2.8; // double door just south of the middle column (v = 0.5)
-    K.rbox(R, interior, 0.2, FL, -0.29, R.L - 0.2, 11.15, -0.27); K.rbox(R, M.lampGlow, 0.2, 10.62, -0.27, R.L - 0.2, 10.7, -0.2, { detail: true });
-    for (let s = 2.2; s < R.L - 1; s += 3.1) if (Math.abs(s - doorS) > 2) K.rbox(R, M.calGold, s, FL + 1.0, -0.27, s + 1.0, FL + 1.8, -0.25, { detail: true }); // menu boards / posters behind the glass
+    // (interiors-cafe) the painted backdrop is gone: the furnished dining room is visible through the glass
     clerestory(K, F, [[uG, v0], [uG + 0.01, v0], [uG + 0.01, v1], [uG, v1]], 10.5, sglass, frame, { thick: TH, inset: 0.15, skip: (a, b, n) => !(n[0] > 0.5) });
-    glassBand(K, R, 0, R.L, FL, 10.5, { glass: sglass, frame, pitch: 1.3, transoms: [FL + 2.7], doors: [{ s0: doorS - 1.4, s1: doorS - 0.02, h: 2.45 }, { s0: doorS + 0.02, s1: doorS + 1.4, h: 2.45 }] });
+    const d0 = doorS - 1.4, d1 = doorS + 1.4; // automatic sliding double door, standing open
+    glassBand(K, R, 0, d0, FL, 10.5, { glass: sglass, frame, pitch: 1.3, transoms: [FL + 2.7] });
+    glassBand(K, R, d1, R.L, FL, 10.5, { glass: sglass, frame, pitch: 1.3, transoms: [FL + 2.7] });
+    glassBand(K, R, d0, d1, FL + 2.62, 10.5, { glass: sglass, frame, pitch: 1.4, transoms: [FL + 2.7] });
+    K.rbox(R, frame, d0 - 0.04, FL - 0.03, -0.2, d1 + 0.04, FL + 0.0, 0.05); // threshold
+    for (const [a, b] of [[d0 - 1.36, d0 + 0.02], [d1 - 0.02, d1 + 1.36]]) { // leaves slid open behind the fixed panes
+      for (const [p0, q0, y0, y1] of [[a, a + 0.07, FL + 0.02, FL + 2.58], [b - 0.07, b, FL + 0.02, FL + 2.58], [a, b, FL + 0.02, FL + 0.16], [a, b, FL + 2.5, FL + 2.58]]) K.rbox(R, frame, p0, y0, -0.32, q0, y1, -0.26);
+      K.rbox(R, sglass, a + 0.07, FL + 0.16, -0.30, b - 0.07, FL + 2.5, -0.28);
+    }
+    K.rbox(R, frame, d0 - 1.4, FL + 2.58, -0.36, d1 + 1.4, FL + 2.72, -0.22); // slider header
     // dark sign band over the entrance with gold "GOLDEN BEAR" lettering
     K.rbox(R, dark, doorS - 1.55, FL + 2.48, -0.1, doorS + 1.55, FL + 2.88, 0.02);
     const FONT = { G: ['01110', '10000', '10000', '10111', '10001', '10001', '01110'], O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'], L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
@@ -237,5 +256,8 @@ export async function build(ctx) {
   }
   const object3d = K.finish();
   object3d.name = 'golden-bear-cafe';
-  return { object3d, colliders, walkables };
+  // interiors-cafe: furnished, walkable dining room + patio furniture (distance-gated; see lib/int-gbc.js)
+  const IN = cafeInterior(ctx, { ANG, F, FL, uK: UK, TH, frame });
+  object3d.add(IN.object3d); colliders.push(...IN.colliders); walkables.push(...IN.walkables);
+  return { object3d, colliders, walkables, update: IN.update };
 }
