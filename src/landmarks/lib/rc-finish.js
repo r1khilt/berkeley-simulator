@@ -81,59 +81,72 @@ export function frontSteps(K, R, s0, s1, y, { mat, cheek = null, rail = true, ri
   return K.walkFn(Math.min(...us), Math.min(...vs), Math.max(...us), Math.max(...vs), heightAtUV);
 }
 
-// A finished entrance on run R centred at s: recessed opening through a surround, glazed double doors (aluminium or bronze
-// frames, push bars), transom, optional canopy, lanterns either side, building-name sign above, steps down to the ground.
-// y = door sill (finished floor). Returns { walk } (a walkable for the steps or null).
+// A finished entrance on run R centred at s. Built PROUD of the wall face (works on solid walls and over window bays):
+// a projecting surround (jambs + lintel + cap) frames glazed double doors set back `rec` from the surround face, with
+// transom, push bars and kick plates; optional flat canopy, lanterns either side, building-name sign, and steps/landing
+// seated on the terrain. y = door sill (finished floor). Returns { walk } (walkable for the steps, or null).
 export function entry(K, R, s, y, {
-  w = 2.4, h = 2.4, transom = 0.7, rec = 0.45, surround = null, surroundW = 0.45, surroundP = 0.12, frame = null, glass = null,
+  w = 2.4, h = 2.4, transom = 0.7, rec = 0.38, surround = null, surroundW = 0.45, frame = null, glass = null,
   canopy = null, canopyD = 1.6, lamps = 'lantern', lampMat = null, signText = null, signOpts = {}, steps = true, stepMat = null, cheek = null,
-  leaves = 2, mat = null,
+  leaves = 2, dp = 0.16, cap = true,
 } = {}) {
-  const M = K.M; frame = frame || M.darkBronze; glass = glass || M.windowNight;
-  const s0 = s - w / 2, s1 = s + w / 2, yT = y + h + transom;
-  // dark reveal box (the wall behind has no hole; we sit a recess box proud of it so it reads deep)
-  if (surround) {
-    K.rbox(R, surround, s0 - surroundW, y - 0.05, 0, s0, yT + surroundW * 0.8, surroundP);
-    K.rbox(R, surround, s1, y - 0.05, 0, s1 + surroundW, yT + surroundW * 0.8, surroundP);
-    K.rbox(R, surround, s0 - surroundW - 0.08, yT, 0, s1 + surroundW + 0.08, yT + surroundW * 0.8, surroundP + 0.04);
-    K.rbox(R, surround, s0 - surroundW - 0.16, yT + surroundW * 0.8, 0, s1 + surroundW + 0.16, yT + surroundW * 0.8 + 0.14, surroundP + 0.14);
-  }
-  // reveal returns + soffit (shadowed)
-  const rv = mat || M.concreteDark;
-  K.rbox(R, rv, s0 - 0.02, y, -rec, s0 + 0.02, yT, surround ? surroundP : 0.02, { detail: true });
-  K.rbox(R, rv, s1 - 0.02, y, -rec, s1 + 0.02, yT, surround ? surroundP : 0.02, { detail: true });
-  // glass doors + transom
-  K.rbox(R, glass, s0, y, -rec - 0.04, s1, yT, -rec);
-  const fw = 0.07, fd = 0.08;
-  K.rbox(R, frame, s0, y, -rec, s0 + fw, yT, -rec + fd); K.rbox(R, frame, s1 - fw, y, -rec, s1, yT, -rec + fd);
-  K.rbox(R, frame, s0, yT - fw, -rec, s1, yT, -rec + fd); K.rbox(R, frame, s0, y + h - fw / 2, -rec, s1, y + h + fw / 2, -rec + fd);
-  K.rbox(R, frame, s0, y, -rec, s1, y + 0.18, -rec + fd); // kick plates
+  const M = K.M; frame = frame || M.darkBronze; glass = glass || M.windowNight; const sur = surround || M.concreteDark;
+  const s0 = s - w / 2, s1 = s + w / 2, yT = y + h + transom; const D = dp + rec; const sw = surround ? surroundW : 0.22;
+  // surround: jambs, lintel, cap (proud of the wall by D)
+  K.rbox(R, sur, s0 - sw, y - 0.05, 0, s0, yT + sw * 0.9, D);
+  K.rbox(R, sur, s1, y - 0.05, 0, s1 + sw, yT + sw * 0.9, D);
+  K.rbox(R, sur, s0, yT, 0, s1, yT + sw * 0.9, D);
+  if (surround && cap) K.rbox(R, sur, s0 - sw - 0.12, yT + sw * 0.9, 0, s1 + sw + 0.12, yT + sw * 0.9 + 0.16, D + 0.12);
+  // glazed doors + transom at the back of the recess
+  K.rbox(R, glass, s0, y, dp, s1, yT, dp + 0.04);
+  const fw = 0.07, fd = 0.08, f0 = dp + 0.04;
+  K.rbox(R, frame, s0, y, f0, s0 + fw, yT, f0 + fd); K.rbox(R, frame, s1 - fw, y, f0, s1, yT, f0 + fd);
+  K.rbox(R, frame, s0, yT - fw, f0, s1, yT, f0 + fd); K.rbox(R, frame, s0, y + h - fw / 2, f0, s1, y + h + fw / 2, f0 + fd);
+  K.rbox(R, frame, s0, y, f0, s1, y + 0.2, f0 + fd); // kick plates
   const lw = w / leaves;
-  for (let i = 1; i < leaves; i++) K.rbox(R, frame, s0 + lw * i - 0.05, y, -rec, s0 + lw * i + 0.05, y + h, -rec + fd);
-  for (let i = 0; i < leaves; i++) { const cxs = s0 + lw * (i + 0.5); const side = i % 2 ? -1 : 1; K.rbox(R, M.iron, cxs + side * lw * 0.28 - 0.02, y + 0.9, -rec + fd, cxs + side * lw * 0.28 + 0.02, y + 1.15, -rec + fd + 0.06, { detail: true }); }
-  for (let i = 0; i < leaves; i++) K.rbox(R, galvMat(), s0 + lw * i + 0.12, y + 0.95, -rec + fd + 0.04, s0 + lw * (i + 1) - 0.12, y + 1.0, -rec + fd + 0.08, { detail: true }); // push bars
-  // threshold
-  K.rbox(R, stepMat || M.granite, s0 - 0.1, y - 0.3, -rec, s1 + 0.1, y, 0.05);
+  for (let i = 1; i < leaves; i++) K.rbox(R, frame, s0 + lw * i - 0.05, y, f0, s0 + lw * i + 0.05, y + h, f0 + fd);
+  for (let i = 0; i < leaves; i++) K.rbox(R, galvMat(), s0 + lw * i + 0.14, y + 0.95, f0 + fd, s0 + lw * (i + 1) - 0.14, y + 1.0, f0 + fd + 0.05, { detail: true }); // push bars
+  // threshold / landing slab
+  K.rbox(R, stepMat || M.granite, s0 - sw, y - 0.35, 0, s1 + sw, y, D + 0.08);
   if (canopy) {
-    const cy = yT + (surround ? surroundW * 0.8 + 0.2 : 0.15);
-    K.rbox(R, canopy, s0 - 0.6, cy, 0, s1 + 0.6, cy + 0.18, canopyD);
-    K.rbox(R, M.lampGlow, s - 0.25, cy - 0.01, canopyD * 0.4, s + 0.25, cy, canopyD * 0.6, { detail: true });
-    for (const ss of [s0 - 0.45, s1 + 0.45]) K.rbox(R, M.iron, ss - 0.015, cy + 0.18, 0, ss + 0.015, cy + 1.2, 0.03, { detail: true });
+    const cy = yT + sw * 0.9 + (surround && cap ? 0.16 : 0) + 0.12;
+    K.rbox(R, canopy, s0 - 0.7, cy, 0, s1 + 0.7, cy + 0.2, D + canopyD);
+    K.rbox(R, M.lampGlow, s - 0.25, cy - 0.01, D + canopyD * 0.4, s + 0.25, cy, D + canopyD * 0.6, { detail: true });
+    for (const ss of [s0 - 0.55, s1 + 0.55]) { const g = new THREE.BoxGeometry(0.03, 0.03, Math.hypot(canopyD + D, 1.1)); g.rotateX(Math.atan2(1.1, canopyD + D)); g.translate(ss, cy + 0.2 + 0.55, (canopyD + D) / 2); K.addRun(R, M.iron, g, { detail: true }); }
   }
-  if (lamps) { const off = (surround ? surroundW : 0) + 0.45; for (const ss of [s0 - off, s1 + off]) wallLamp(K, R, ss, y + 2.2, { style: lamps, mat: lampMat }); }
+  if (lamps) { const off = sw + 0.5; for (const ss of [s0 - off, s1 + off]) wallLamp(K, R, ss, y + 2.3, { style: lamps, mat: lampMat }); }
   if (signText) {
-    const sw = Math.min(Math.max(w + 1.2, signText.length * 0.26), w + 4), sh = signOpts.h ?? 0.42;
-    const sy = canopy ? yT + (surround ? surroundW * 0.8 + 0.2 : 0.15) + 0.35 : yT + (surround ? surroundW * 0.8 + 0.3 : 0.2);
-    sign(K, R, s, sy, signOpts.w ?? sw, sh, signText, { d: surround ? surroundP + 0.14 : 0, ...signOpts });
+    const sw2 = signOpts.w ?? Math.min(Math.max(w + 1.0, signText.length * 0.24), w + 5), sh = signOpts.h ?? 0.42;
+    const sy = canopy ? yT + sw * 0.9 + 0.55 : yT + sw * 0.9 + (surround && cap ? 0.3 : 0.15);
+    sign(K, R, s, sy, sw2, sh, signText, { d: canopy ? 0 : (surround && cap ? D + 0.12 : D) - 0.06 + 0.02, ...signOpts });
   }
   let walk = null;
   if (steps) {
-    const gg = gAt(K, R, s, 2.2);
-    if (y - gg > 0.12) walk = frontSteps(K, R, s0 - 0.5, s1 + 0.5, y, { mat: stepMat || M.granite, cheek, d0: surround ? surroundP : 0 });
-    else K.rbox(R, stepMat || M.granite, s0 - 0.6, Math.min(gg, y) - 0.5, 0, s1 + 0.6, y, 1.4); // apron slab
+    const gg = gAt(K, R, s, D + 2.2);
+    if (y - gg > 0.12) walk = frontSteps(K, R, s0 - sw, s1 + sw, y, { mat: stepMat || M.granite, cheek, d0: D + 0.08, land: 1.0 });
+    else K.rbox(R, stepMat || M.granite, s0 - sw - 0.4, Math.min(gg, y) - 0.5, D + 0.08, s1 + sw + 0.4, y, D + 1.5); // apron slab
   }
   return { walk };
 }
+
+// Positions s along run R where footpaths/steps from the data packet arrive at the facade (closest approach < maxD m).
+export function pathArrivals(K, ctx, R, { maxD = 5, minGap = 6, kinds = ['footway', 'path', 'steps', 'pedestrian', 'service', 'cycleway'] } = {}) {
+  const out = [];
+  for (const c of ctx.packet?.context || []) {
+    const t = c.tags || {}; if (!kinds.includes(t.highway)) continue; const P = c.pts || []; let best = null;
+    for (let k = 0; k < P.length - 1; k++) {
+      const [x0, z0] = P[k], [x1, z1] = P[k + 1]; const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.5));
+      for (let i = 0; i <= n; i++) { const [u, v] = K.uv(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n); const du = u - R.a[0], dv = v - R.a[1]; const ss = du * R.t[0] + dv * R.t[1], dd = du * R.n[0] + dv * R.n[1];
+        if (ss > 2 && ss < R.L - 2 && dd > -0.5 && dd < maxD && (!best || dd < best.d)) best = { s: ss, d: dd }; }
+    }
+    if (best) out.push(best);
+  }
+  out.sort((a, b) => a.d - b.d); const keep = [];
+  for (const o of out) if (!keep.some((k) => Math.abs(k.s - o.s) < minGap)) keep.push(o);
+  return keep.map((o) => o.s);
+}
+// Run of a polygon facing a compass side in the building frame ('S' = +v, 'N' = -v, 'E' = +u, 'W' = -u); longest wins.
+export function faceRun(runs, side) { const d = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[side]; let best = null; for (const R of runs) { const c = R.n[0] * d[0] + R.n[1] * d[1]; if (c > 0.85 && (!best || R.L > best.L)) best = R; } return best; }
 
 // Inverted-U bike rack row starting at (u,v) along angle rot (radians, building frame), n staples at 0.9 m.
 export function bikeRack(K, u, v, rot, n = 4) {
@@ -158,15 +171,16 @@ export function planter(K, u0, v0, u1, v1, { h = 0.55, mat = null, shrubs = true
   K.box(M.soil, u0 + t, g - 0.4, v0 + t, u1 - t, g + h - 0.08, v1 - t);
   if (shrubs) shrubRow(K, u0 + t + 0.2, v0 + t + 0.2, u1 - t - 0.2, v1 - t - 0.2, g + h - 0.1);
 }
-// Low clipped shrubs filling a rectangle (flat-shaded icosahedra), at base height y (default ground).
+// One low clipped shrub (flat-shaded icosahedron) at (u,v), base height y (default ground).
+export function shrubAt(K, u, v, y = null, { size = 0.55, h = 0.8, i = 0 } = {}) {
+  const yy = y ?? K.g(u, v); const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
+  const g = new THREE.IcosahedronGeometry(r, 1); g.scale(1.25, h / (2 * r), 1.1); g.rotateY(i * 1.7); g.translate(u, yy + h * 0.42, v);
+  K.add(i % 3 ? shrubMat() : shrubMat2(), g, { detail: true, uvMode: 'keep' });
+}
+// Low clipped shrubs filling a rectangle, at base height y (default ground).
 export function shrubRow(K, u0, v0, u1, v1, y = null, { size = 0.55, h = 0.8 } = {}) {
   const L = Math.max(u1 - u0, v1 - v0); const along = (u1 - u0) >= (v1 - v0); const n = Math.max(1, Math.round(L / (size * 1.5)));
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n; const u = along ? u0 + (u1 - u0) * t : (u0 + u1) / 2, v = along ? (v0 + v1) / 2 : v0 + (v1 - v0) * t;
-    const yy = y ?? K.g(u, v); const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
-    const g = new THREE.IcosahedronGeometry(r, 1); g.scale(1.25, h / (2 * r), 1.1); g.translate(u, yy + h * 0.45, v);
-    K.add(i % 3 ? shrubMat() : shrubMat2(), g, { detail: true, uvMode: 'keep' });
-  }
+  for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; shrubAt(K, along ? u0 + (u1 - u0) * t : (u0 + u1) / 2, along ? (v0 + v1) / 2 : v0 + (v1 - v0) * t, y, { size, h, i }); }
 }
 // Campus lamp post (black/dark green pole, lantern head), at ground under (u,v).
 export function lampPost(K, u, v, { h = 4.2, mat = null, style = 'lantern' } = {}) {
@@ -201,4 +215,27 @@ export function railing(K, R, s0, s1, y, { d = 0.1, h = 1.05, pitch = 1.5, mat =
   for (let i = 0; i <= n; i++) { const s = s0 + (s1 - s0) * i / n; K.rbox(R, m, s - 0.025, y, d - 0.025, s + 0.025, y + h, d + 0.025, { detail: true }); }
   K.rbox(R, m, s0, y + h - 0.05, d - 0.03, s1, y + h, d + 0.03, { detail: true }); K.rbox(R, m, s0, y + h * 0.45, d - 0.015, s1, y + h * 0.45 + 0.03, d + 0.015, { detail: true });
   if (pickets) for (let s = s0 + pickets; s < s1; s += pickets) K.rbox(R, m, s - 0.01, y + 0.1, d - 0.01, s + 0.01, y + h - 0.05, d + 0.01, { detail: true });
+}
+
+// Entrances wherever packet footpaths reach the facades of `runs` (closest first, at most `max`). y0 = ground-floor level;
+// a door on rising ground is lifted to sit just above the terrain in front of it. Returns walkables for the steps.
+export function autoEntries(K, ctx, runs, { y0 = 0.3, max = 3, minLen = 8, exclude = null, ...opts } = {}) {
+  const cand = [];
+  for (const R of runs) { if (R.L < minLen || (exclude && exclude(R))) continue; for (const s of pathArrivals(K, ctx, R)) cand.push({ R, s, d: 0 }); }
+  const walks = []; const placed = [];
+  for (const c of cand) {
+    if (placed.length >= max) break;
+    const p = c.R.at(c.s, 0); if (placed.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 10)) continue;
+    const s = Math.min(Math.max(c.s, 2.2), c.R.L - 2.2);
+    const g = gAt(K, c.R, s, 1.6); const y = Math.max(y0, g + 0.12);
+    if (y - g > 2.6) continue; // too high above the ground here (basement side): skip rather than build a tall stair
+    const { walk } = entry(K, c.R, s, y, opts); if (walk) walks.push(walk); placed.push(p);
+  }
+  return walks;
+}
+// Foundation planting along the base of a run (gaps where `skip` s-ranges are given, e.g. doors).
+export function baseShrubs(K, R, s0, s1, { skip = [], d = 0.9, size = 0.5 } = {}) {
+  let segs = [[s0, s1]];
+  for (const [a, b] of skip) { const ns = []; for (const [p, q] of segs) { if (b <= p || a >= q) { ns.push([p, q]); continue; } if (a > p) ns.push([p, a]); if (b < q) ns.push([b, q]); } segs = ns; }
+  let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
 }
