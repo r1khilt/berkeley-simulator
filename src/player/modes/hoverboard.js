@@ -97,7 +97,7 @@ export function install(player, ctx) {
       const pitchT = st.air ? clamp(st.vy * 0.05, -0.3, 0.3) : Math.atan(slope) * 0.85 + clamp(inp.f * 0.05, -0.05, 0.05) + Math.sin(st.bobT * 2.9) * 0.012;
       st.pitch += (pitchT - st.pitch) * damp(st.air ? 3 : 7, dt);
       // crouch spring (absorbs landings, compresses for ollies)
-      st.crouchV += ((st.air ? 0.28 : 0.12 + (inp.down ? 0.18 : 0)) - st.crouch) * 60 * dt - st.crouchV * 9 * dt; st.crouch = clamp(st.crouch + st.crouchV * dt, 0.02, 0.38);
+      st.crouchV += ((st.air ? 0.3 : 0.12 + (inp.down ? 0.18 : 0)) - st.crouch) * (st.air ? 110 : 60) * dt - st.crouchV * 11 * dt; st.crouch = clamp(st.crouch + st.crouchV * dt, 0.02, 0.38);
       st.x = nx; st.z = nz; st.y = ny;
       this._place(p); lastPos.copy(p.pos);
       p.vel.set(st.vx, st.vy, st.vz); p.onGround = !st.air;

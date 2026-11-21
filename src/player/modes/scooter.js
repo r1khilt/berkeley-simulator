@@ -14,7 +14,8 @@ import { U } from '../../materials.js';
 
 const KEY = 'KeyU'; // "unlock": ride the nearest parked scooter (E works too)
 const REACH = 1.9; // m, how close you must be to unlock
-const SHOW_DIST = 260; // m, parked clusters beyond this are hidden
+const SHOW_DIST = 180; // m, parked clusters beyond this are hidden
+const SHADOW_DIST = 70; // m, only nearby clusters cast shadows (far ones are sub-pixel anyway)
 // Parking clusters. ang = row direction (deg, atan2(dz,dx)); st = unit vector toward the street (scooters face it).
 // mix: l = Lime, v = Veo Astro, c = Veo Cosmo (seated). down = indices lying knocked over (a Berkeley classic).
 const CLUSTERS = [
@@ -36,6 +37,15 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>>
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _s1 = new THREE.Vector3(1, 1, 1);
 const store = { get(k, d) { try { const v = localStorage.getItem('bsim.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('bsim.' + k, JSON.stringify(v)); } catch (e) {} } };
 const NAMES = { lime: 'Lime scooter', veo: 'Veo scooter', cosmo: 'Veo Cosmo' };
+let blobRes = null; // soft contact shadow under parked scooters (one instanced draw per visible cluster)
+function blob() {
+  if (blobRes) return blobRes; const c = document.createElement('canvas'); c.width = 32; c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 32, 2, 16, 32, 16); g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(0.6, 'rgba(0,0,0,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.setTransform(1, 0, 0, 2, 0, -32); x.fillStyle = g; x.fillRect(0, 0, 32, 64);
+  const geo = new THREE.PlaneGeometry(0.42, 1.25); geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  return (blobRes = { geo, mat });
+}
 
 class Fleet {
   constructor(scene, ph, setupMaterials) {
@@ -44,17 +54,17 @@ class Fleet {
     CLUSTERS.forEach((c, ci) => {
       const r = rng(ci * 7919 + 13), a = c.ang * Math.PI / 180, rx = Math.cos(a), rz = Math.sin(a), n = c.mix.length;
       for (let i = 0; i < n; i++) {
-        const t = (i - (n - 1) / 2) * 0.86 + (r() - 0.5) * 0.16;
+        const t = (i - (n - 1) / 2) * 0.88 + (r() - 0.5) * 0.24;
         const x = c.x + rx * t + c.st[0] * (r() - 0.5) * 0.3, z = c.z + rz * t + c.st[1] * (r() - 0.5) * 0.3;
-        const face = Math.atan2(-c.st[0], -c.st[1]) + (r() - 0.5) * 0.34 + (r() < 0.15 ? Math.PI : 0); // mostly facing the street
+        const face = Math.atan2(-c.st[0], -c.st[1]) + (r() - 0.5) * 0.5 + (r() < 0.2 ? (r() - 0.5) * 0.7 : 0) + (r() < 0.15 ? Math.PI : 0); // mostly facing the street, a few askew
         const type = { l: 'lime', v: 'veo', c: 'cosmo' }[c.mix[i]];
-        const id = `${ci}:${i}`; const it = { id, type, x, z, yaw: face, y: 0, down: (c.down || []).includes(i), home: ci, group: null, idx: -1, circles: [] };
+        const id = `${ci}:${i}`; const it = { id, type, x, z, yaw: face, y: 0, down: (c.down || []).includes(i), home: ci, group: null, idx: -1, circles: [], tilt: TILT + (r() - 0.5) * 0.06 };
         const sv = saved[id]; if (sv && Number.isFinite(sv[0]) && Number.isFinite(sv[1])) { it.x = sv[0]; it.z = sv[1]; it.yaw = sv[2] || 0; it.down = false; }
         this.items.push(it);
       }
     });
     // groups: one per cluster (+ a loose group for scooters parked far from any cluster), each with one InstancedMesh per type
-    const mk = (cx, cz, cap, loose) => { const g = { cx, cz, loose, meshes: {}, members: {}, cap, r: 30, dirty: true }; for (const type of Object.keys(SPECS)) { const im = new THREE.InstancedMesh(parkedGeometry(type), this.mat, cap); im.count = 0; im.castShadow = true; im.receiveShadow = true; im.name = 'fleet:' + type; im.frustumCulled = !loose; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); g.meshes[type] = im; g.members[type] = []; } this.groups.push(g); return g; };
+    const mk = (cx, cz, cap, loose) => { const g = { cx, cz, loose, meshes: {}, members: {}, cap, r: 30, dirty: true, blobs: [] }; const B = blob(); g.blob = new THREE.InstancedMesh(B.geo, B.mat, cap * 3); g.blob.count = 0; g.blob.frustumCulled = !loose; g.blob.renderOrder = 1; g.blob.name = 'fleet:shadow'; scene.add(g.blob); for (const type of Object.keys(SPECS)) { const im = new THREE.InstancedMesh(parkedGeometry(type), this.mat, cap); im.count = 0; im.castShadow = true; im.receiveShadow = true; im.name = 'fleet:' + type; im.frustumCulled = !loose; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); g.meshes[type] = im; g.members[type] = []; } this.groups.push(g); return g; };
     CLUSTERS.forEach((c) => mk(c.x, c.z, c.mix.length + 3, false));
     this.loose = mk(0, 0, 10, true);
     setupMaterials && setupMaterials(this.groups[0].meshes.lime);
@@ -70,7 +80,8 @@ class Fleet {
   parkIn(g, it) {
     const list = g.members[it.type]; const im = g.meshes[it.type]; if (list.length >= im.instanceMatrix.count) { console.warn('fleet: no capacity for', it.id); return; } // never happens with the spare capacity
     it.group = g; it.idx = list.length; list.push(it); im.count = list.length;
-    this.ground(it); this.writeMatrix(it); g.dirty = true;
+    it.bidx = g.blobs.length; g.blobs.push(it); g.blob.count = g.blobs.length;
+    this.ground(it); this.writeMatrix(it); g.dirty = true; im.computeBoundingSphere(); im.visible = true; g.blob.computeBoundingSphere();
     // colliders: two small circles (deck + stem) so you can't walk through parked scooters
     const S = SPECS[it.type], fx = -Math.sin(it.yaw), fz = -Math.cos(it.yaw);
     if (!it.down) for (const k of [0.12, -0.3]) { this.ph.addCircle(it.x + fx * k * (S.wb / 0.9), it.z + fz * k * (S.wb / 0.9), 0.2, it.y, it.y + 1.1, 'fleet'); it.circles.push(this.ph.circles[this.ph.circles.length - 1]); }
@@ -78,23 +89,25 @@ class Fleet {
   unpark(it) {
     const g = it.group; if (!g) return; const list = g.members[it.type], im = g.meshes[it.type];
     const last = list.pop(); if (last !== it) { list[it.idx] = last; last.idx = it.idx; this.writeMatrix(last); }
-    im.count = list.length; im.instanceMatrix.needsUpdate = true; it.group = null; it.idx = -1; g.dirty = true;
+    im.count = list.length; im.instanceMatrix.needsUpdate = true; it.group = null; it.idx = -1; g.dirty = true; im.computeBoundingSphere();
+    const bl = g.blobs.pop(); if (bl !== it) { g.blobs[it.bidx] = bl; bl.bidx = it.bidx; it.group = null; bl.group && this.writeBlob(bl); } g.blob.count = g.blobs.length; g.blob.instanceMatrix.needsUpdate = true; g.blob.computeBoundingSphere();
     for (const c of it.circles) { c.y0 = Infinity; c.y1 = -Infinity; } it.circles.length = 0;
   }
   ground(it) { it.y = this.ph.groundAt(it.x, it.z, (it.y || this.ph.heightAt(it.x, it.z)) + 1.2).y; }
   writeMatrix(it) {
     const g = it.group; if (!g) return; const im = g.meshes[it.type];
     if (it.down) { _e.set(0, it.yaw, 1.36); _q.setFromEuler(_e); _v.set(it.x, it.y + 0.09, it.z); }
-    else { _e.set(0, it.yaw, TILT); _q.setFromEuler(_e); _v.set(it.x, it.y + 0.004, it.z); }
-    _m.compose(_v, _q, _s1); im.setMatrixAt(it.idx, _m); im.instanceMatrix.needsUpdate = true;
+    else { _e.set(0, it.yaw, it.tilt || TILT); _q.setFromEuler(_e); _v.set(it.x, it.y + 0.004, it.z); }
+    _m.compose(_v, _q, _s1); im.setMatrixAt(it.idx, _m); im.instanceMatrix.needsUpdate = true; this.writeBlob(it);
   }
+  writeBlob(it) { const g = it.group; if (!g || it.bidx == null) return; _e.set(0, it.yaw + (it.down ? 0 : 0), 0); _q.setFromEuler(_e); _v.set(it.x - (it.down ? Math.cos(it.yaw) * 0.45 : Math.cos(it.yaw) * 0.04), it.y + 0.02, it.z + (it.down ? Math.sin(it.yaw) * 0.45 : 0)); _m.compose(_v, _q, it.down ? _v2.set(2.2, 1, 0.95) : _s1); g.blob.setMatrixAt(it.bidx, _m); g.blob.instanceMatrix.needsUpdate = true; }
   // per frame: distance culling + lazy re-grounding (landmark walkables stream in after start-up)
   update(dt, cam) {
     this.refreshT -= dt;
     for (const g of this.groups) {
       if (g.dirty) { g.dirty = false; let n = 0, sx = 0, sz = 0; for (const list of Object.values(g.members)) for (const it of list) { sx += it.x; sz += it.z; n++; } if (n && !g.loose) { g.cx = sx / n; g.cz = sz / n; let r = 4; for (const list of Object.values(g.members)) for (const it of list) r = Math.max(r, Math.hypot(it.x - g.cx, it.z - g.cz) + 2); g.r = r; } for (const im of Object.values(g.meshes)) { im.computeBoundingSphere(); } }
       const d = g.loose ? 0 : Math.hypot(g.cx - cam.x, g.cz - cam.z) - g.r; const vis = g.loose || d < SHOW_DIST;
-      for (const im of Object.values(g.meshes)) im.visible = vis && im.count > 0;
+      for (const im of Object.values(g.meshes)) { im.visible = vis && im.count > 0; im.castShadow = g.loose || d < SHADOW_DIST; } g.blob.visible = vis && g.blob.count > 0 && (g.loose || d < 90);
       if (vis && d < 140 && this.refreshT <= 0) for (const list of Object.values(g.members)) for (const it of list) { const y0 = it.y; this.ground(it); if (Math.abs(it.y - y0) > 0.01) { this.writeMatrix(it); for (const c of it.circles) { c.y0 = it.y; c.y1 = it.y + 1.1; } } }
     }
     if (this.refreshT <= 0) this.refreshT = 2.5;
@@ -279,13 +292,13 @@ function poseRider(av, r, dt) {
   root.getWorldQuaternion(_qa);
   // avatar root: vehicle heading + lean (no pitch: riders stay upright on slopes)
   _ea.set(0, r.yaw, r.lean + r.tilt * 0.5, 'YXZ'); av.root.rotation.copy(_ea);
-  const crouch = clamp(-r.bumpY * 2.2, -0.05, 0.1) + (S.seated ? 0 : 0.04 + Math.min(0.05, Math.abs(r.lean) * 0.12));
+  const crouch = clamp(-r.bumpY * 2.2, -0.05, 0.1) + (S.seated ? 0 : 0.01 + Math.min(0.05, Math.abs(r.lean) * 0.14) + clamp(r.speed * 0.004, 0, 0.03));
   if (S.seated) {
     P.hips.position.set(0, 0.94, 0); P.hips.rotation.set(0, 0, 0);
     P.spine.rotation.set(-0.16 - clamp(r.accel * 0.02, -0.06, 0.06), 0, 0); P.neck && (P.neck.rotation.x = 0); P.head.rotation.set(0.12, 0, 0);
   } else {
-    P.hips.position.set(0, 0.94 - crouch, 0); P.hips.rotation.set(0, -0.32, 0);
-    P.spine.rotation.set(-0.2 - clamp(r.accel * 0.025, -0.08, 0.1), 0.26, 0); P.head.rotation.set(0.16, 0.06, 0);
+    P.hips.position.set(0, 0.965 - crouch, 0); P.hips.rotation.set(0, -0.3, 0);
+    P.spine.rotation.set(-0.24 - clamp(r.accel * 0.025, -0.08, 0.1), 0.24, -r.lean * 0.15); P.head.rotation.set(0.2, 0.06, r.lean * 0.3);
   }
   av.root.updateMatrixWorld(true);
   // feet
