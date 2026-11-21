@@ -19,8 +19,10 @@ const err = await page.evaluate(() => window.BSIM.error);
 if (err) { console.log('ERROR', err); { const seen = new Set(); const out = []; for (const l of logs) { const k = l.slice(0, 160); if (seen.has(k)) continue; seen.add(k); out.push(l); } console.log(out.slice(0, 40).join('\n')); } await browser.close(); process.exit(1); }
 fs.mkdirSync('/work/qa/shots', { recursive: true });
 const list = views.length ? views : [null];
+let shotN = 0;
 for (let i = 0; i < list.length; i++) {
   const v = list[i];
+  if (v && v.startsWith('T')) { await page.evaluate((h) => window.BSIM.setTime(h), parseFloat(v.slice(1))); continue; } // time-of-day switch
   const t1 = Date.now();
   const r = await page.evaluate(async (v) => {
     if (v) { const rel = v.startsWith('@'); const a = v.replace('@', '').split(',').map(Number); window.BSIM.setView(...a, rel); }
@@ -29,7 +31,7 @@ for (let i = 0; i < list.length; i++) {
     window.BSIM.renderOnce();
     return window.BSIM.snapshot(32, 18);
   }, v);
-  fs.writeFileSync(`/work/qa/shots/${name}${list.length > 1 ? '-' + i : ''}.jpg`, Buffer.from(r.url.split(',')[1], 'base64'));
+  fs.writeFileSync(`/work/qa/shots/${name}${list.length > 1 ? '-' + (shotN++) : ''}.jpg`, Buffer.from(r.url.split(',')[1], 'base64'));
   const px = r.px; let s = [0, 0, 0]; for (let k = 0; k < px.length; k += 4) { s[0] += px[k]; s[1] += px[k + 1]; s[2] += px[k + 2]; }
   console.log(`view ${i} ${v || ''} mean rgb ${s.map((x) => Math.round(x / (px.length / 4))).join(',')}  (${Date.now() - t1} ms)`);
 }

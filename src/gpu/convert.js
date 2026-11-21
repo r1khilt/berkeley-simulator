@@ -84,11 +84,22 @@ export function makeConverter(renderer) {
     if (!h && m.isShaderMaterial) h = extraHandlers.__shader;
     let nm = null;
     if (h) nm = h(m, un, ctx, key);
+    // Hand-written graphs capture per-material textures/uniforms as constants, so materials that share a GLSL
+    // cache key (e.g. every species' 'tree-bark-5', the three 'rings') must not share a compiled pipeline.
     if (!nm) nm = generic(m, un, key);
     const tag = base || (m.isShaderMaterial ? 'ShaderMaterial?' : m.type);
     stats.byKey[tag] = (stats.byKey[tag] || 0) + 1;
     return nm;
   }
+  // Hand-written graphs capture per-material textures/uniforms as constants, so materials that share a GLSL
+  // cache key (every species' 'tree-bark-5', the three 'rings', ...) must not share a compiled pipeline:
+  // make the renderer's program cache key unique per source material for anything a handler owns.
+  const handled = (m, k) => { if (m.isShaderMaterial) return true; const b = k.split('|')[0]; return !!handlers[b]; };
+  const nodesMgr = renderer._nodes;
+  if (nodesMgr && nodesMgr.getCustomProgramCacheKey) {
+    const origKey = nodesMgr.getCustomProgramCacheKey.bind(nodesMgr);
+    nodesMgr.getCustomProgramCacheKey = (material, scene) => { const k = origKey(material, scene); return material && !material.isNodeMaterial && handled(material, String(k)) ? k + '|' + material.uuid : k; };
+  } else console.warn('[webgpu] cannot scope program cache keys; custom materials may share pipelines');
   lib.fromMaterial = function (m) {
     if (!m || m.isNodeMaterial) return m;
     const c = cache.get(m);
