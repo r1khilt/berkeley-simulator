@@ -13,19 +13,22 @@ import { pacificParts } from '../../time.js';
 
 // ---------- interior lighting uniforms (shared by every interior material) ----------
 export const IU = {
-  uInAmb: { value: new THREE.Color(0.55, 0.52, 0.47) },   // scales the sky IBL indoors (occlusion + warm tint)
-  uInArt: { value: new THREE.Color(0.2, 0.155, 0.1) },     // warm artificial fill
-  uInSpec: { value: 0.3 },                                // scales sky reflections indoors
+  uInAmb: { value: new THREE.Color(0.25, 0.25, 0.25) },   // how much of the outdoor sky IBL reaches indoor surfaces
+  uInSky: { value: new THREE.Color(0.78, 0.75, 0.68) },   // indoor light from above (laylights, windows, ceiling bounce)
+  uInGnd: { value: new THREE.Color(0.36, 0.3, 0.24) },    // indoor light from below (warm floor bounce)
+  uInSpec: { value: 0.35 },                               // scales sky reflections indoors
 };
 function patch(mat, key) {
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uInAmb = IU.uInAmb; sh.uniforms.uInArt = IU.uInArt; sh.uniforms.uInSpec = IU.uInSpec;
+    sh.uniforms.uInAmb = IU.uInAmb; sh.uniforms.uInSky = IU.uInSky; sh.uniforms.uInGnd = IU.uInGnd; sh.uniforms.uInSpec = IU.uInSpec;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aBake;\nvarying float vBake;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vBake = aBake;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBake;\nuniform vec3 uInAmb; uniform vec3 uInArt; uniform float uInSpec;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBake;\nuniform vec3 uInAmb; uniform vec3 uInSky; uniform vec3 uInGnd; uniform float uInSpec;')
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  { float bk = vBake;
-   reflectedLight.indirectDiffuse = reflectedLight.indirectDiffuse * uInAmb * bk + uInArt * material.diffuseColor * bk;
+   vec3 nwI = inverseTransformDirection( normal, viewMatrix );
+   vec3 hemiI = mix( uInGnd, uInSky, nwI.y * 0.5 + 0.5 );
+   reflectedLight.indirectDiffuse = reflectedLight.indirectDiffuse * uInAmb * bk + hemiI * material.diffuseColor * bk;
    reflectedLight.indirectSpecular *= uInSpec * min(bk, 1.0);
    reflectedLight.directDiffuse *= mix(1.0, min(bk, 1.0), 0.3); }`);
   };
@@ -39,23 +42,27 @@ function mats() {
   const B = (key, o) => { const m = new THREE.MeshBasicMaterial(o); m.name = 'doeInt_' + key; return m; };
   const marble = TX.marbleTex(5), marbleG = TX.marbleTex(8, [176, 172, 164]), marbleW = TX.marbleTex(13, [242, 240, 234]);
   MATS = {
-    plaster: S('plaster', { color: 0xdccfb5, roughness: 0.92 }),
+    plaster: S('plaster', { color: 0xdcd2bd, roughness: 0.92 }),
     plasterLt: S('plasterLt', { color: 0xe6dcc6, roughness: 0.9 }),
-    trim: S('trim', { color: 0x6a5a44, roughness: 0.8 }),
-    vault: S('vault', { color: 0xffffff, roughness: 0.92 }, 1, TX.cofferTex()),
+    trim: S('trim', { color: 0x8c7a60, roughness: 0.8 }),
+    vault: S('vault', { color: 0xffffff, roughness: 0.92 }, 1, TX.cofferTex2()),
+    frieze: S('frieze', { color: 0x5a4a3c, roughness: 0.75 }),
+    fret: S('fret', { color: 0xffffff, roughness: 0.85 }, 1, TX.fretTex()),
+    painting: S('painting', { color: 0xffffff, roughness: 0.7 }, 1, TX.paintingTex(1)),
     lobbyCeil: S('lobbyCeil', { color: 0xf2ece0, roughness: 0.92 }, 1.6, TX.cofferTex()),
-    lino: S('lino', { color: 0xffffff, roughness: 0.34 }, 3, TX.linoTex()),
-    inlay: S('inlay', { color: 0x4a2e1e, roughness: 0.4 }),
-    darkOak: S('darkOak', { color: 0x6e4c34, roughness: 0.62 }, 1.2, TX.oakTex()),
+    lino: S('lino', { color: 0x9a8a76, roughness: 0.12 }, 3, TX.linoTex()),
+    inlay: S('inlay', { color: 0x9a8a72, roughness: 0.25 }),
+    darkOak: S('darkOak', { color: 0x806450, roughness: 0.55 }, 1.2, TX.oakTex()),
+    oakFloor: S('oakFloor', { color: 0xc8a47c, roughness: 0.38 }, 1.0, TX.oakTex()),
     books: S('books', { color: 0xffffff, roughness: 0.85 }, 1),
-    oak: S('oak', { color: 0xe2c49e, roughness: 0.42 }, 1.4, TX.oakTex()),
-    bronze: S('bronze', { color: 0x3c2c1f, roughness: 0.42, metalness: 0.85 }),
-    shade: S('shade', { color: 0x6a5634, roughness: 0.38, metalness: 0.8 }),
-    brass: S('brass', { color: 0xb8923a, roughness: 0.32, metalness: 1.0 }),
-    leather: S('leather', { color: 0x2c231b, roughness: 0.62 }),
-    marble: S('marble', { color: 0xffffff, roughness: 0.32 }, 2.4, marble),
-    marbleG: S('marbleG', { color: 0xffffff, roughness: 0.3 }, 2.4, marbleG),
-    marbleW: S('marbleW', { color: 0xffffff, roughness: 0.4 }, 2.0, marbleW),
+    oak: S('oak', { color: 0x8c8070, roughness: 0.45 }, 1.4, TX.oakTex()),
+    bronze: S('bronze', { color: 0x7a6044, roughness: 0.45, metalness: 0.35 }),
+    shade: S('shade', { color: 0x6f5d3c, roughness: 0.4, metalness: 0.45 }),
+    brass: S('brass', { color: 0xb08a40, roughness: 0.35, metalness: 0.55 }),
+    leather: S('leather', { color: 0x4a3a2c, roughness: 0.6 }),
+    marble: S('marble', { color: 0xffffff, roughness: 0.32 }, 1.4, marble),
+    marbleG: S('marbleG', { color: 0xffffff, roughness: 0.3 }, 1.4, marbleG),
+    marbleW: S('marbleW', { color: 0xffffff, roughness: 0.4 }, 1.4, marbleW),
     verde: S('verde', { color: 0x2f3a33, roughness: 0.25 }),
     granite: S('granite', { color: 0x222222, roughness: 0.2 }),
     panel: S('panel', { color: 0xffffff, roughness: 0.55 }, 1.8, TX.panelTex()),
@@ -63,15 +70,17 @@ function mats() {
     rug0: S('rug0', { color: 0xffffff, roughness: 1 }, 1, TX.rugTex(0)),
     rug1: S('rug1', { color: 0xffffff, roughness: 1 }, 1, TX.rugTex(1)),
     uph: S('uph', { color: 0xffffff, roughness: 0.75 }),
-    gilt: S('gilt', { color: 0xc49a48, roughness: 0.35, metalness: 0.9 }),
+    gilt: S('gilt', { color: 0xc49a48, roughness: 0.35, metalness: 0.55 }),
     canvas: S('canvas', { color: 0x5b4a32, roughness: 0.8 }),
     soot: S('soot', { color: 0x121010, roughness: 1 }),
     glow: B('glow', { color: new THREE.Color(2.4, 1.85, 1.15) }),
-    shadeGlow: B('shadeGlow', { color: new THREE.Color(2.0, 1.55, 1.0), side: THREE.DoubleSide }),
-    laylight: B('laylight', { color: new THREE.Color(1.2, 1.22, 1.18), map: TX.laylightTex() }),
+    shadeGlow: B('shadeGlow', { color: new THREE.Color(1.7, 1.35, 0.95), side: THREE.DoubleSide }),
+    laylight: B('laylight', { color: new THREE.Color(0.85, 0.82, 0.74), map: TX.laylightTex() }),
     globes: B('globes', { map: TX.globesTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5 }),
-    pool: B('pool', { map: TX.poolTex(), color: new THREE.Color(0.55, 0.38, 0.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    pool: B('pool', { map: TX.poolTex(), color: new THREE.Color(0.3, 0.24, 0.16), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     ember: B('ember', { color: new THREE.Color(2.2, 0.9, 0.3) }),
+    streak: B('streak', { map: TX.streakTex(), color: new THREE.Color(0.22, 0.23, 0.23), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    sheen: B('sheen', { color: new THREE.Color(0.2, 0.21, 0.21), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
   MATS.books.map = TX.booksTex();
   return MATS;
@@ -124,7 +133,7 @@ class Bld {
     const det = new THREE.Group(); det.userData.detail = true; det.name = 'doeInteriorDetail';
     for (const { mat, cast, detail, list } of this.b.values()) {
       const g = mergeGeometries(list, false); g.computeBoundingBox(); g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat); m.castShadow = cast; m.receiveShadow = true; (detail ? det : group).add(m);
+      const m = new THREE.Mesh(g, mat); m.castShadow = cast || (!detail && !mat.isMeshBasicMaterial); m.receiveShadow = true; (detail ? det : group).add(m);
     }
     if (det.children.length) group.add(det);
   }
@@ -149,7 +158,6 @@ function protoChair() {
   for (let k = -1; k <= 1; k++) { const a = k * 0.42; P.push(new THREE.BoxGeometry(0.05, 0.13, 0.19).rotateY(a).translate(-0.22 - Math.abs(k) * 0.035, 0.82, k * 0.15)); } // curved crest rail
   P.push(bx(0.03, 0.26, 0.09, -0.215, 0.62, 0));                                                       // splat
   for (const z of [-0.245, 0.245]) { P.push(bx(0.4, 0.035, 0.05, -0.02, 0.665, z)); P.push(bx(0.04, 0.2, 0.04, 0.16, 0.56, z)); } // arms
-  for (const z of [-0.2, 0.2]) P.push(bx(0.36, 0.03, 0.03, 0, 0.12, z));                             // stretchers
   return bakeAttr(uvs(geomOf(P), 1.4), (x, y) => 0.5 + 0.5 * sstep(0.0, 0.7, y));
 }
 function protoLamp() { // two-armed bronze reading lamp; arms along x; origin at table top
@@ -157,7 +165,7 @@ function protoLamp() { // two-armed bronze reading lamp; arms along x; origin at
     bx(0.055, 0.36, 0.055, 0, 0.275, 0), new THREE.CylinderGeometry(0.07, 0.04, 0.07, 8).translate(0, 0.49, 0), bx(0.68, 0.028, 0.028, 0, 0.535, 0),
     new THREE.SphereGeometry(0.035, 8, 6).translate(0, 0.6, 0), new THREE.TorusGeometry(0.06, 0.012, 5, 10, Math.PI).translate(0, 0.53, 0)];
   const prof = [[0.012, 0.53], [0.06, 0.52], [0.1, 0.49], [0.125, 0.445], [0.135, 0.405], [0.142, 0.39], [0.13, 0.39]].map(([r, y]) => new THREE.Vector2(r, y));
-  for (const x of [-0.33, 0.33]) { P.push(new THREE.LatheGeometry(prof, 14).translate(x, 0, 0)); P.push(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 6).translate(x, 0.535, 0)); }
+  for (const x of [-0.33, 0.33]) { P.push(new THREE.LatheGeometry(prof, 10).translate(x, 0, 0)); P.push(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 6).translate(x, 0.535, 0)); }
   return bakeAttr(uvs(geomOf(P)), () => 1);
 }
 function protoLampGlow() { const P = []; for (const x of [-0.33, 0.33]) P.push(new THREE.CircleGeometry(0.128, 14).rotateX(Math.PI / 2).translate(x, 0.392, 0)); return geomOf(P); }
@@ -190,25 +198,25 @@ export function buildDoeInterior(P) {
   const { F1, F2, cs } = P;
   // ---------------- North Reading Room ----------------
   const U0 = -50.7, U1 = 16.7, vN = -41.4, vS = -23.6, vc = (vN + vS) / 2, half = (vS - vN) / 2;
-  const yWs = 9.7, yWh = 15.4, yA = 15.6, yFr = 15.9, yCo = 16.35, ySp = 16.65, yCr = 22.6;
+  const yWs = 9.7, yWh = 15.4, yA = 15.62, yFr = 15.92, yCo = 16.5, ySp = 16.95, yCr = 22.65;
   const rise = yCr - ySp, R = (half * half + rise * rise) / (2 * rise), yc0 = yCr - R, TH = Math.asin(half / R);
-  const BK = 0.42, BKH = 2.25; // bookcase depth / height
+  const BK = 0.42, BKH = 2.4; // bookcase depth / height
   const doorU0 = cs - 1.1, doorU1 = cs + 1.1, doorH = 3.0;
   // table layout (perpendicular to the room axis, two banks either side of the central aisle)
   const tables = [];
-  for (let i = -9; i <= 9; i++) { const u = cs + i * 3.3; if (u < U0 + 2.2 || u > U1 - 2.2) continue; tables.push([u, -37.05]); if (i !== 0) tables.push([u, -27.95]); }
+  for (let i = -11; i <= 11; i++) { const u = cs + i * 3.05; if (u < U0 + 2.2 || u > U1 - 2.2) continue; tables.push([u, vc - 1.1 - 2.3]); if (i !== 0) tables.push([u, vc + 1.1 + 2.3]); }
   const TL = 4.6, TW = 1.2;
   const underTable = (u, v) => { let a = 1; for (const [tu, tv] of tables) { const du = Math.max(0, Math.abs(u - tu) - TW / 2), dv = Math.max(0, Math.abs(v - tv) - TL / 2); const d = Math.hypot(du, dv); if (d < 0.9) a = Math.min(a, 0.62 + 0.38 * sstep(0, 0.9, d)); } return a; };
-  const wells = [-37.0, cs, 2.9];
+  const wells = [-37.0, cs, 2.9], EWd = P.endWin;
   const nrrBake = (u, y, v, nu, ny, nv) => {
     const dW = Math.min(v - vN, vS - v, u - U0, U1 - u);
-    if (ny > 0.6 && y < F2 + 0.05) return (1 - 0.38 * Math.exp(-Math.max(0, dW - BK) / 0.7)) * underTable(u, v) * (1.0 + 0.08 * sstep(4, 0, Math.abs(v - vc)));
+    if (ny > 0.6 && y < F2 + 0.05) return (1 - 0.45 * Math.exp(-Math.max(0, dW - BK) / 1.0)) * underTable(u, v) * (1.0 + 0.15 * sstep(4, 0, Math.abs(v - vc)));
     if (y > ySp + 0.05) { // vault: dim, brighter near the laylight wells and the crown
       let w = 0; for (const c of wells) w = Math.max(w, Math.exp(-Math.pow(Math.max(0, Math.abs(u - c) - 6.5) / 4, 2)));
       const crown = sstep(ySp, yCr, y); const ends = 1 - 0.35 * Math.exp(-Math.min(u - U0, U1 - u) / 2.5);
-      return (0.55 + 0.25 * crown + 0.35 * w * crown) * ends;
+      return (0.5 + 0.3 * crown + 0.4 * w * crown) * ends;
     }
-    let k = 1 - 0.32 * Math.exp(-(y - F2) / 0.8) - 0.18 * Math.exp(-(ySp - y) / 0.6);
+    let k = 1.05 - 0.4 * Math.exp(-(y - F2) / 1.2) - 0.18 * Math.exp(-(ySp - y) / 0.6);
     if (nv > 0.6) k *= 0.82;              // north (window) wall: back-lit
     if (nv < -0.6) k *= 1.08;             // south wall faces the windows
     k *= 1 - 0.25 * Math.exp(-Math.min(u - U0, U1 - u) / 1.5);
@@ -218,7 +226,7 @@ export function buildDoeInterior(P) {
   B.floor(Mt.lino, U0, U1, vN, vS, F2, 1.2);
   B.box(Mt.plaster, U0 - 0.5, U1 + 0.5, F2 - 0.43, F2 - 0.012, -42.0, vS + 0.6, { cast: true, bake: 0.8 }); // floor slab (blocks sun to the floor below)
   // inlaid border stripes and aisle lines
-  for (const [a, b] of [[vN + BK + 0.35, vN + BK + 0.42], [vS - BK - 0.42, vS - BK - 0.35], [vc - 1.55, vc - 1.48], [vc + 1.48, vc + 1.55]]) B.box(Mt.inlay, U0 + BK + 0.35, U1 - BK - 0.35, F2, F2 + 0.004, a, b, { bake: 1 });
+  for (const [a, b] of [[vN + BK + 0.38, vN + BK + 0.42], [vS - BK - 0.42, vS - BK - 0.38], [vc - 1.53, vc - 1.49], [vc + 1.49, vc + 1.53]]) B.box(Mt.inlay, U0 + BK + 0.35, U1 - BK - 0.35, F2, F2 + 0.004, a, b, { bake: 1 });
   // north wall lining: piers, spandrels, heads, reveals (windows from the exterior façade)
   const wins = P.wins.slice().sort((a, b) => a[0] - b[0]);
   let cur = U0; const piers = [];
@@ -243,22 +251,23 @@ export function buildDoeInterior(P) {
   B.wallU(Mt.plaster, U0, doorU0, F2, ySp, vS - 0.01, false, 1.6); B.wallU(Mt.plaster, doorU1, U1, F2, ySp, vS - 0.01, false, 1.6); B.wallU(Mt.plaster, doorU0, doorU1, F2 + doorH, ySp, vS - 0.01, false, 1.6);
   for (const [a, b] of wins) {
     if (b > doorU0 - 0.6 && a < doorU1 + 0.6) continue;
-    const d = { detail: true }, t0 = vS - 0.05, t1 = vS - 0.01;
-    B.box(Mt.trim, a, a + 0.07, yWs, yWh, t0, t1, d); B.box(Mt.trim, b - 0.07, b, yWs, yWh, t0, t1, d); B.box(Mt.trim, a, b, yWs, yWs + 0.07, t0, t1, d); B.box(Mt.trim, a, b, yWh - 0.07, yWh, t0, t1, d);
-    B.box(Mt.plasterLt, a + 0.07, b - 0.07, yWs + 0.07, yWh - 0.07, vS - 0.03, vS - 0.01, d);
+    const d = { detail: true }, t0 = vS - 0.05, t1 = vS - 0.01, c = (a + b) / 2, w = 0.62;
+    B.box(Mt.trim, c - w / 2 - 0.06, c - w / 2, yWs, yWh, t0, t1, d); B.box(Mt.trim, c + w / 2, c + w / 2 + 0.06, yWs, yWh, t0, t1, d); B.box(Mt.trim, c - w / 2, c + w / 2, yWs, yWs + 0.06, t0, t1, d); B.box(Mt.trim, c - w / 2, c + w / 2, yWh - 0.06, yWh, t0, t1, d);
+
   }
   for (const [a, b] of piers) if (b - a > 1.0 && a > U0 + 0.5 && b < U1 - 0.5 && !(b > doorU0 - 1 && a < doorU1 + 1)) {
     const c = (a + b) / 2, w = Math.min(0.62, (b - a) * 0.4), d = { detail: true }, t0 = vS - 0.05, t1 = vS - 0.01;
     B.box(Mt.trim, c - w / 2 - 0.05, c - w / 2, yWs + 0.2, yWh - 0.3, t0, t1, d); B.box(Mt.trim, c + w / 2, c + w / 2 + 0.05, yWs + 0.2, yWh - 0.3, t0, t1, d);
     B.box(Mt.trim, c - w / 2, c + w / 2, yWs + 0.2, yWs + 0.25, t0, t1, d); B.box(Mt.trim, c - w / 2, c + w / 2, yWh - 0.35, yWh - 0.3, t0, t1, d);
-    B.add(Mt.trim, new THREE.CylinderGeometry(0.17, 0.17, 0.05, 14).rotateX(Math.PI / 2).translate(c, yWh - 0.75, vS - 0.04), d);
   }
   // entablature around the room (architrave, dark frieze, dentilled cornice) on the long walls
   const entab = (u0, u1, v, s) => { // s = +1 wall faces south (north wall), -1 faces north
     const f = (t) => v + s * t;
-    B.box(Mt.plasterLt, u0, u1, yA, yFr, f(0), f(0.12)); B.box(Mt.trim, u0, u1, yFr, yCo, f(0), f(0.08)); B.box(Mt.plasterLt, u0, u1, yCo, yCo + 0.1, f(0), f(0.22));
-    B.box(Mt.plasterLt, u0, u1, yCo + 0.1, ySp, f(0), f(0.42));
-    for (let u = u0 + 0.15; u < u1 - 0.1; u += 0.3) B.box(Mt.plasterLt, u - 0.07, u + 0.07, yCo - 0.02, yCo + 0.1, f(0.08), f(0.2), { detail: true });
+    B.box(Mt.plasterLt, u0, u1, yA, yA + 0.14, f(0), f(0.1)); B.box(Mt.plasterLt, u0, u1, yA + 0.14, yFr, f(0), f(0.14)); B.box(Mt.frieze, u0, u1, yFr, yCo, f(0), f(0.1));
+    B.box(Mt.plasterLt, u0, u1, yCo, yCo + 0.1, f(0), f(0.24)); B.box(Mt.plasterLt, u0, u1, yCo + 0.22, ySp - 0.14, f(0), f(0.5)); B.box(Mt.plasterLt, u0, u1, ySp - 0.14, ySp, f(0), f(0.66));
+    B.box(Mt.frieze, u0, u1, yCo + 0.1, yCo + 0.22, f(0), f(0.3));
+    for (let u = u0 + 0.15; u < u1 - 0.1; u += 0.3) B.box(Mt.plasterLt, u - 0.07, u + 0.07, yCo + 0.1, yCo + 0.22, f(0.24), f(0.36), { detail: true });
+
   };
   entab(U0, U1, vN + 0.05, 1); entab(U0, U1, vS - 0.01, -1);
   // end walls: plaster lunette plates with the great arched window, framed rosette panels, entablature returns
@@ -278,7 +287,7 @@ export function buildDoeInterior(P) {
     const sgn = east ? 1 : -1, t0 = u, t1 = u + sgn * 0.32;
     B.box(Mt.plasterLt, Math.min(t0, t1), Math.max(t0, t1), EW.y0, EW.ys, EW.vc - EW.hw, EW.vc - EW.hw + 0.03, { bake: 0.85 });
     B.box(Mt.plasterLt, Math.min(t0, t1), Math.max(t0, t1), EW.y0, EW.ys, EW.vc + EW.hw - 0.03, EW.vc + EW.hw, { bake: 0.85 });
-    for (let i = 0; i < 16; i++) { const a0 = (i / 16) * Math.PI, a1 = ((i + 1) / 16) * Math.PI; const ga = new THREE.Shape(); ga.absarc(0, 0, EW.hw, a0, a1, false); ga.absarc(0, 0, EW.hw - 0.03, a1, a0, true); const gg = new THREE.ExtrudeGeometry(ga, { depth: 0.32, bevelEnabled: false, curveSegments: 2 }); gg.rotateY(east ? Math.PI / 2 : -Math.PI / 2); gg.translate(u + (east ? 0 : 0), EW.ys, EW.vc); B.add(Mt.plasterLt, gg, { bake: 0.85 }); }
+    for (let i = 0; i < 24; i++) { const a0 = (i / 24) * Math.PI, a1 = ((i + 1) / 24) * Math.PI; const ga = new THREE.Shape(); ga.absarc(0, 0, EW.hw, a0, a1, false); ga.absarc(0, 0, EW.hw - 0.03, a1, a0, true); const gg = new THREE.ExtrudeGeometry(ga, { depth: 0.32, bevelEnabled: false, curveSegments: 2 }); gg.rotateY(east ? Math.PI / 2 : -Math.PI / 2); gg.translate(u + (east ? 0 : 0), EW.ys, EW.vc); B.add(Mt.plasterLt, gg, { bake: 0.85 }); }
     // framed panels with rosette borders flanking the window
     const inward = east ? -1 : 1, d = { detail: true };
     for (const [pa, pb] of [[vN + 1.6, EW.vc - EW.hw - 1.2], [EW.vc + EW.hw + 1.2, vS - 1.6]]) {
@@ -290,31 +299,46 @@ export function buildDoeInterior(P) {
     // entablature returns, broken by the arched window
     for (const [va, vb] of [[vN, EW.vc - EW.hw - 0.25], [EW.vc + EW.hw + 0.25, vS]]) {
       const lo = Math.min(u, u + inward * 0.42);
-      B.box(Mt.plasterLt, Math.min(u, u + inward * 0.12), Math.max(u, u + inward * 0.12), yA, yFr, va, vb); B.box(Mt.trim, Math.min(u, u + inward * 0.08), Math.max(u, u + inward * 0.08), yFr, yCo, va, vb);
-      B.box(Mt.plasterLt, lo, lo + 0.42, yCo, ySp, va, vb);
+      B.box(Mt.plasterLt, Math.min(u, u + inward * 0.14), Math.max(u, u + inward * 0.14), yA, yFr, va, vb); B.box(Mt.frieze, Math.min(u, u + inward * 0.1), Math.max(u, u + inward * 0.1), yFr, yCo, va, vb);
+      const lo2 = Math.min(u, u + inward * 0.62); B.box(Mt.plasterLt, lo2, lo2 + 0.62, yCo + 0.1, ySp, va, vb);
     }
   };
   endPlate(U0 + 0.01, false); endPlate(U1 - 0.01, true);
   // ---- coffered barrel vault with three laylight wells ----
-  const nA = 24, nL = 71, du = (U1 - U0) / nL, dth = (2 * TH) / nA;
+  const nA = 16, nL = 48, du = (U1 - U0) / nL, dth = (2 * TH) / nA;
   const P3 = (th, u) => [u, yc0 + R * Math.cos(th), vc + R * Math.sin(th)];
-  const wellJ = wells.map((c) => { const j0 = Math.round((c - U0) / du - 7); return [j0, j0 + 14]; });
-  const inWell = (i, j) => i >= 9 && i < 15 && wellJ.some(([a, b]) => j >= a && j < b);
-  { const pos = [], uv = [];
+  const wellJ = wells.map((c) => { const j0 = Math.round((c - U0) / du - 5); return [j0, j0 + 10]; });
+  const inWell = (i, j) => i >= 6 && i < 10 && wellJ.some(([a, b]) => j >= a && j < b);
+  { // each coffer: flat rib ring, sloped stepped sides, recessed field (0.11 m deep) with the rosette (texture)
+    const pos = [], uv = [], e1 = 0.17, e2 = 0.3, dep = 0.17;
+    const PR = (th, u, rr) => [u, yc0 + rr * Math.cos(th), vc + rr * Math.sin(th)];
+    const quad = (a, b, c, d, ta, tb, tc, td, ref) => { // a..d corners, t* uvs; orient so the normal faces ref
+      const n = new THREE.Vector3().subVectors(new THREE.Vector3(...d), new THREE.Vector3(...a)).cross(new THREE.Vector3().subVectors(new THREE.Vector3(...c), new THREE.Vector3(...a)));
+      if (n.dot(ref) >= 0) { pos.push(...a, ...d, ...c, ...a, ...c, ...b); uv.push(...ta, ...td, ...tc, ...ta, ...tc, ...tb); }
+      else { pos.push(...a, ...c, ...d, ...a, ...b, ...c); uv.push(...ta, ...tc, ...td, ...ta, ...tb, ...tc); }
+    };
     for (let j = 0; j < nL; j++) for (let i = 0; i < nA; i++) {
       if (inWell(i, j)) continue;
-      const A = P3(-TH + i * dth, U0 + j * du), Bq = P3(-TH + (i + 1) * dth, U0 + j * du), C = P3(-TH + (i + 1) * dth, U0 + (j + 1) * du), D = P3(-TH + i * dth, U0 + (j + 1) * du);
-      pos.push(...A, ...D, ...C, ...A, ...C, ...Bq); uv.push(0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0);
+      const t0 = -TH + i * dth, u0 = U0 + j * du, thm = t0 + dth / 2, um = u0 + du / 2;
+      const inward = new THREE.Vector3(0, -Math.cos(thm), -Math.sin(thm));
+      const ring = (e, rr) => [PR(t0 + e * dth, u0 + e * du, rr), PR(t0 + (1 - e) * dth, u0 + e * du, rr), PR(t0 + (1 - e) * dth, u0 + (1 - e) * du, rr), PR(t0 + e * dth, u0 + (1 - e) * du, rr)];
+      const tr = (e) => [[e, e], [1 - e, e], [1 - e, 1 - e], [e, 1 - e]];
+      const O = ring(0, R), Mr = ring(e1, R), Bt = ring(e2, R + dep), TO = tr(0), TM = tr(e1), TB = tr(e2);
+      for (let k = 0; k < 4; k++) { const k1 = (k + 1) % 4; quad(O[k], O[k1], Mr[k1], Mr[k], TO[k], TO[k1], TM[k1], TM[k], inward); }
+      const cen = new THREE.Vector3(...PR(thm, um, R + dep));
+      for (let k = 0; k < 4; k++) { const k1 = (k + 1) % 4; const fc = new THREE.Vector3(...Mr[k]).add(new THREE.Vector3(...Mr[k1])).multiplyScalar(0.5); const ref = cen.clone().sub(fc).normalize().add(inward.clone().multiplyScalar(0.3)); quad(Mr[k], Mr[k1], Bt[k1], Bt[k], TM[k], TM[k1], TB[k1], TB[k], ref); }
+      quad(Bt[0], Bt[1], Bt[2], Bt[3], TB[0], TB[1], TB[2], TB[3], inward);
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
     B.add(Mt.vault, g, { uv: 'keep' });
   }
   const yL = yCr + 0.45; // laylight plane
+  const globeM = [];
   for (const [j0, j1] of wellJ) {
-    const ua = U0 + j0 * du, ub = U0 + j1 * du, tha = -TH + 9 * dth, thb = -TH + 15 * dth;
+    const ua = U0 + j0 * du, ub = U0 + j1 * du, tha = -TH + 6 * dth, thb = -TH + 10 * dth;
     const pa = P3(tha, 0), pb = P3(thb, 0);
-    B.wallU(Mt.plasterLt, ua, ub, pa[1], yL, pa[2], true, 1.2, { bake: 0.95 }); B.wallU(Mt.plasterLt, ua, ub, pb[1], yL, pb[2], false, 1.2, { bake: 0.95 });
-    for (let i = 9; i < 15; i++) { // well end faces following the vault arc
+    B.wallU(Mt.fret, ua, ub, pa[1], yL, pa[2], true, 1.2, { bake: 0.9 }); B.wallU(Mt.fret, ua, ub, pb[1], yL, pb[2], false, 1.2, { bake: 0.9 });
+    for (let i = 6; i < 10; i++) { // well end faces following the vault arc
       const q0 = P3(-TH + i * dth, 0), q1 = P3(-TH + (i + 1) * dth, 0);
       for (const [u, e] of [[ua, true], [ub, false]]) {
         const pts = e ? [[u, q0[1], q0[2]], [u, yL, q0[2]], [u, yL, q1[2]], [u, q0[1], q0[2]], [u, yL, q1[2]], [u, q1[1], q1[2]]] : [[u, q0[1], q0[2]], [u, yL, q1[2]], [u, yL, q0[2]], [u, q0[1], q0[2]], [u, q1[1], q1[2]], [u, yL, q1[2]]];
@@ -329,12 +353,13 @@ export function buildDoeInterior(P) {
       const g = new THREE.PlaneGeometry(u1 - u0, vb - va - 2 * bw).rotateX(Math.PI / 2).translate((u0 + u1) / 2, yL - 0.02, (va + vb) / 2);
       extra.push(new THREE.Mesh(g, Mt.laylight));
       const g2 = g.clone().translate(0, -0.03, 0); const gm = new THREE.Mesh(g2, Mt.globes); gm.renderOrder = 2; extra.push(gm);
+      for (let a = 0; a <= 5; a++) for (let b = 0; b <= 4; b++) globeM.push(TRS(u0 + (a / 5) * (u1 - u0), yL - 0.42, va + bw + (b / 4) * (vb - va - 2 * bw), 0));
       for (const [x0, x1, z0, z1] of [[u0 - 0.06, u1 + 0.06, va + bw - 0.06, va + bw], [u0 - 0.06, u1 + 0.06, vb - bw, vb - bw + 0.06], [u0 - 0.06, u0, va + bw, vb - bw], [u1, u1 + 0.06, va + bw, vb - bw]]) B.box(Mt.trim, x0, x1, yL - 0.12, yL, z0, z1, { bake: 1 });
     }
-    // moulded rim where the well meets the vault
-    B.box(Mt.plasterLt, ua - 0.12, ub + 0.12, pa[1] - 0.12, pa[1] + 0.02, pa[2] - 0.14, pa[2] + 0.02, { bake: 0.9 }); B.box(Mt.plasterLt, ua - 0.12, ub + 0.12, pb[1] - 0.12, pb[1] + 0.02, pb[2] - 0.02, pb[2] + 0.14, { bake: 0.9 });
+
   }
-  // transverse ribs over the vault at the well ends (reads as bays)
+  { const gg = new THREE.SphereGeometry(0.09, 8, 5); const gl = inst(gg, Mt.glow, globeM); extra.push(gl);
+    const st = bakeAttr(uvs(new THREE.CylinderGeometry(0.008, 0.008, 0.36, 4).translate(0, 0.25, 0)), () => 1); extra.push(inst(st, Mt.bronze, globeM)); }
   // ---- bookcases on all four walls ----
   const bookcase = (axis, a, b, at, dir) => { // axis 'u': run along u at v=at, front toward v+dir*BK ; axis 'v': along v at u=at
     const d = BK, y0 = F2, y1 = F2 + BKH;
@@ -352,8 +377,13 @@ export function buildDoeInterior(P) {
     for (let p = a; p <= b + 1e-6; p += Math.max(0.6, L / Math.max(1, Math.round(L / 0.95)))) R2(p - 0.025, p + 0.025, Math.min(q(0), q(d + 0.01)), Math.max(q(0), q(d + 0.01)), y0, y1 - 0.2, Mt.darkOak, { detail: true });
   };
   bookcase('u', U0 + BK, U1 - BK, vN + 0.05, 1);
-  bookcase('u', U0 + BK, doorU0 - 0.45, vS - 0.01, -1); bookcase('u', doorU1 + 0.45, U1 - BK, vS - 0.01, -1);
-  bookcase('v', vN + 0.05, vS - 0.01, U0 + 0.01, 1); bookcase('v', vN + 0.05, vS - 0.01, U1 - 0.01, -1);
+  bookcase('u', U0 + BK, doorU0 - 0.8, vS - 0.01, -1); bookcase('u', doorU1 + 0.8, U1 - BK, vS - 0.01, -1);
+  for (const [u, dir] of [[U0 + 0.01, 1], [U1 - 0.01, -1]]) {
+    const dv0 = EWd.vc - 0.75, dv1 = EWd.vc + 0.75; bookcase('v', vN + 0.05, dv0 - 0.12, u, dir); bookcase('v', dv1 + 0.12, vS - 0.01, u, dir);
+    const t = (x) => [Math.min(u, u + dir * x), Math.max(u, u + dir * x)];
+    B.box(Mt.darkOak, ...t(0.08), F2, F2 + 2.6, dv0, dv1); B.box(Mt.darkOak, ...t(0.2), F2, F2 + 2.75, dv0 - 0.12, dv0); B.box(Mt.darkOak, ...t(0.2), F2, F2 + 2.75, dv1, dv1 + 0.12); B.box(Mt.darkOak, ...t(0.24), F2 + 2.6, F2 + 2.75, dv0 - 0.15, dv1 + 0.15);
+    for (const vv of [EWd.vc - 0.36, EWd.vc + 0.36]) { B.box(Mt.leather, ...t(0.1), F2 + 0.3, F2 + 2.3, vv - 0.28, vv + 0.28); B.box(Mt.brass, ...t(0.12), F2 + 1.0, F2 + 1.08, vv + (vv > EWd.vc ? -0.26 : 0.2), vv + (vv > EWd.vc ? -0.2 : 0.26)); }
+  }
   // ---- the doorway from the stair landing: aedicule, clock in an arched hood, open leather doors ----
   { const t = vS - 0.01, d = { detail: true };
     B.box(Mt.darkOak, doorU0 - 0.08, doorU0, F2, F2 + doorH, vS - 0.06, vS + 0.6); B.box(Mt.darkOak, doorU1, doorU1 + 0.08, F2, F2 + doorH, vS - 0.06, vS + 0.6); B.box(Mt.darkOak, doorU0 - 0.08, doorU1 + 0.08, F2 + doorH, F2 + doorH + 0.1, vS - 0.06, vS + 0.6);
@@ -385,7 +415,7 @@ export function buildDoeInterior(P) {
     const tM = [], cM = [], lM = [], pM = [];
     for (const [u, v] of tables) {
       tM.push(TRS(u, F2, v, 0));
-      for (const dv of [-1.15, 1.15]) { lM.push(TRS(u, F2 + 0.76, v + dv, 0)); pM.push(TRS(u, F2 + 0.766, v + dv, 0)); }
+      for (const dv of [-1.15, 1.15]) { lM.push(TRS(u, F2 + 0.76, v + dv, 0, 1.2)); pM.push(TRS(u, F2 + 0.766, v + dv, 0)); }
       for (const side of [-1, 1]) for (const dv of [-1.72, -0.58, 0.58, 1.72]) {
         const out = rnd() < 0.25 ? 0.22 + rnd() * 0.25 : rnd() * 0.06, rot = (rnd() - 0.5) * 0.3;
         cM.push(TRS(u + side * (0.86 + out), F2, v + dv + (rnd() - 0.5) * 0.12, (side < 0 ? 0 : Math.PI) + rot));
@@ -395,17 +425,24 @@ export function buildDoeInterior(P) {
     const poolG = new THREE.PlaneGeometry(1.3, 1.3).rotateX(-Math.PI / 2); const pools = inst(poolG, Mt.pool, pM); pools.renderOrder = 2; extra.push(pools);
     for (const [u, v] of tables) colliders.push({ pts: [[u - TW / 2 - 0.05, v - TL / 2 - 0.05], [u + TW / 2 + 0.05, v - TL / 2 - 0.05], [u + TW / 2 + 0.05, v + TL / 2 + 0.05], [u - TW / 2 - 0.05, v + TL / 2 + 0.05]], y0: F2 - 0.4, y1: F2 + 0.8 });
   }
+  { const L = 24, w = 3.0;
+    for (const [u0, s] of [[U0 + BK + 0.2, 1], [U1 - BK - 0.2, -1]]) { const g = new THREE.PlaneGeometry(w, L).rotateX(-Math.PI / 2).rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2).translate(u0 + s * L / 2, F2 + 0.004, P.endWin.vc); const m = new THREE.Mesh(g, Mt.streak); m.renderOrder = 2; extra.push(m); }
+    const sp = [];
+    for (const [a, b] of P.wins) sp.push(new THREE.PlaneGeometry(b - a, yWh - yWs).translate((a + b) / 2, (yWs + yWh) / 2, -41.72));
+    for (const [u, sg] of [[U0 - 0.28, 1], [U1 + 0.28, -1]]) { const sh = new THREE.Shape(); sh.moveTo(-EW.hw, EW.y0); sh.lineTo(EW.hw, EW.y0); sh.lineTo(EW.hw, EW.ys); sh.absarc(0, EW.ys, EW.hw, 0, Math.PI, false); sh.lineTo(-EW.hw, EW.y0); const g = new THREE.ShapeGeometry(sh, 24); g.rotateY(sg > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(u, 0, EW.vc); sp.push(g); }
+    const sm = new THREE.Mesh(mergeGeometries(sp.map((g) => { g.deleteAttribute('uv'); return g.index ? g.toNonIndexed() : g; })), Mt.sheen); sm.renderOrder = 1; extra.push(sm);
+  }
   // NRR physics
   walkables.push({ type: 'poly', pts: [[U0, vN], [U1, vN], [U1, vS], [doorU1, vS], [doorU1, vS + 0.62], [doorU0, vS + 0.62], [doorU0, vS], [U0, vS]], y: F2 });
   const yN0 = F2 - 0.6, yN1 = F2 + 10;
   segs([[U0 + BK, vN + BK + 0.05], [U1 - BK, vN + BK + 0.05]], yN0, yN1);
   segs([[U0 + BK, vN + BK + 0.05], [U0 + BK, vS - BK]], yN0, yN1); segs([[U1 - BK, vN + BK + 0.05], [U1 - BK, vS - BK]], yN0, yN1);
-  segs([[U0 + BK, vS - BK], [doorU0 - 0.45, vS - BK]], yN0, yN1); segs([[doorU1 + 0.45, vS - BK], [U1 - BK, vS - BK]], yN0, yN1);
-  segs([[doorU0 - 0.45, vS - BK], [doorU0, vS]], yN0, yN1); segs([[doorU1 + 0.45, vS - BK], [doorU1, vS]], yN0, yN1);
+  segs([[U0 + BK, vS - BK], [doorU0 - 0.8, vS - BK]], yN0, yN1); segs([[doorU1 + 0.8, vS - BK], [U1 - BK, vS - BK]], yN0, yN1);
+  segs([[doorU0 - 0.8, vS - BK], [doorU0, vS]], yN0, yN1); segs([[doorU1 + 0.8, vS - BK], [doorU1, vS]], yN0, yN1);
   segs([[doorU0, vS], [doorU0, vS + 0.6]], yN0, yN1); segs([[doorU1, vS], [doorU1, vS + 0.6]], yN0, yN1);
 
   // ---------------- landing, imperial stair and stair hall ----------------
-  const SU0 = -21.6, SU1 = -12.5, sU0 = SU0 + 0.05, sU1 = SU1 - 0.05, vL2 = vS + 0.6, vTop = -21.5, vLand = -17.6, vSW = -14.55, yHall = 17.0;
+  const SU0 = -21.6, SU1 = -12.5, sU0 = SU0 + 0.05, sU1 = SU1 - 0.05, vL2 = vS + 0.6, vTop = -21.5, vLand = -17.6, vSW = -14.55, yHall = 14.2;
   const nR = 28, r = (F2 - F1) / nR, HL = F1 + 14 * r, tread = (vLand - vTop) / 13;
   const cU0 = cs - 2.0, cU1 = cs + 2.0, wU1 = cU0 - 0.24, eU0 = cU1 + 0.24;
   const hallBake = (u, y, v, nu, ny, nv) => { if (y > yHall - 0.1) return 1.0; let k = 0.78 + 0.27 * sstep(F1, yHall, y); if (ny > 0.6) k *= 0.95; return k * (1 - 0.2 * Math.exp(-Math.min(u - SU0, SU1 - u) / 0.6)); };
@@ -421,19 +458,28 @@ export function buildDoeInterior(P) {
   { const ins = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.32).translate(cs, F2 + doorH + 0.32, vL2 + 0.03), new THREE.MeshStandardMaterial({ map: TX.textTex('NORTH READING ROOM', { w: 1024, h: 102, bg: '#ddd3bf', fg: '#2f2a24' }), roughness: 0.6 }));
     extra.push(ins);
     B.box(Mt.marbleW, doorU0 - 0.35, doorU1 + 0.35, F2 + doorH + 0.08, F2 + doorH + 0.12, vL2, vL2 + 0.06); B.box(Mt.marbleW, doorU0 - 0.45, doorU1 + 0.45, F2 + doorH + 0.56, F2 + doorH + 0.7, vL2, vL2 + 0.16);
-    for (const u of [doorU0 - 0.2, doorU1 + 0.2]) B.box(Mt.marbleW, u - 0.17, u + 0.17, F2, F2 + doorH + 0.08, vL2, vL2 + 0.07); }
+    for (const u of [doorU0 - 0.2, doorU1 + 0.2]) B.box(Mt.marbleW, u - 0.17, u + 0.17, F2, F2 + doorH + 0.08, vL2, vL2 + 0.07);
+    // lunette over the doorway and a frieze across the hall
+    const lr = new THREE.Shape(); lr.absarc(0, 0, 1.75, 0, Math.PI, false); lr.lineTo(-1.5, 0); lr.absarc(0, 0, 1.5, Math.PI, 0, true); lr.lineTo(1.75, 0);
+    const lg = new THREE.ExtrudeGeometry(lr, { depth: 0.14, bevelEnabled: false, curveSegments: 18 }); lg.translate(cs, F2 + doorH + 0.7, vL2); B.add(Mt.marbleW, lg, { bake: 0.95 });
+    B.add(Mt.marbleG, new THREE.CircleGeometry(1.5, 24, 0, Math.PI).translate(cs, F2 + doorH + 0.7, vL2 + 0.01), { bake: 0.8 });
+    B.add(Mt.gilt, new THREE.CircleGeometry(0.45, 20).translate(cs, F2 + doorH + 1.35, vL2 + 0.02), { bake: 1 });
+    B.box(Mt.marbleW, sU0, sU1, F2 + 6.0, F2 + 6.35, vL2, vL2 + 0.18); B.box(Mt.marbleW, sU0, sU1, F2 + 6.35, F2 + 6.5, vL2, vL2 + 0.3); }
   // marble cornice and blind arcade on the hall walls above the landing level
   for (const [u, s] of [[sU0, 1], [sU1, -1]]) {
     const lo = Math.min(u, u + s * 0.35), lo2 = Math.min(u, u + s * 0.2);
     B.box(Mt.marbleW, lo, lo + 0.35, yHall - 0.6, yHall - 0.3, vL2, vSW); B.box(Mt.marbleW, lo2, lo2 + 0.2, F2 + 7.0, F2 + 7.25, vL2, vSW);
     for (const vm of [(vL2 + vSW) / 2]) { // big blind arch
       const ar = new THREE.Shape(); ar.absarc(0, 0, 2.6, 0, Math.PI, false); ar.lineTo(-2.35, 0); ar.absarc(0, 0, 2.35, Math.PI, 0, true); ar.lineTo(2.6, 0);
-      const g = new THREE.ExtrudeGeometry(ar, { depth: 0.12, bevelEnabled: false, curveSegments: 16 }); g.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(u, F2 + 4.2, vm); B.add(Mt.marbleW, g, { bake: 0.95 });
-      for (const dv of [-2.475, 2.475]) B.box(Mt.marbleW, Math.min(u, u + s * 0.12), Math.max(u, u + s * 0.12), F2 + 0.2, F2 + 4.2, vm + dv - 0.125, vm + dv + 0.125);
+      const g = new THREE.ExtrudeGeometry(ar, { depth: 0.12, bevelEnabled: false, curveSegments: 16 }); g.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(u, F2 + 3.2, vm); B.add(Mt.marbleW, g, { bake: 0.95 });
+      for (const dv of [-2.475, 2.475]) B.box(Mt.marbleW, Math.min(u, u + s * 0.12), Math.max(u, u + s * 0.12), F2 + 0.2, F2 + 3.2, vm + dv - 0.125, vm + dv + 0.125);
+      const nf = new THREE.Shape(); nf.moveTo(-2.35, 0); nf.lineTo(2.35, 0); nf.lineTo(2.35, 0.01); nf.absarc(0, 0, 2.35, 0, Math.PI, false); nf.lineTo(-2.35, 0); // darker niche field
+      const ng = new THREE.ShapeGeometry(nf, 16); ng.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); ng.translate(u + s * 0.01, F2 + 3.2, vm); B.add(Mt.plaster, ng, { bake: 0.75 });
+      B.box(Mt.plaster, Math.min(u, u + s * 0.01), Math.max(u, u + s * 0.01), F2 + 0.2, F2 + 3.2, vm - 2.35, vm + 2.35, { bake: 0.75 });
     }
   }
   // south wall: a great arched window of frosted glass towards the light court
-  { const vm = vSW - 0.01, w = 2.6;
+  { const vm = vSW - 0.04, w = 2.6;
     const g = new THREE.Shape(); g.moveTo(-w, 0); g.lineTo(w, 0); g.lineTo(w, 3.2); g.absarc(0, 3.2, w, 0, Math.PI, false); g.lineTo(-w, 0);
     const gg = new THREE.ShapeGeometry(g, 16).rotateY(Math.PI).translate(cs, HL + 2.0, vm); const lm = new THREE.Mesh(gg, Mt.laylight); extra.push(lm);
     const fr = new THREE.Shape(); fr.moveTo(-w - 0.3, 0); fr.lineTo(w + 0.3, 0); fr.lineTo(w + 0.3, 3.2); fr.absarc(0, 3.2, w + 0.3, 0, Math.PI, false); fr.lineTo(-w - 0.3, 0);
@@ -442,6 +488,10 @@ export function buildDoeInterior(P) {
     for (let k = -2; k <= 2; k++) B.box(Mt.bronze, cs + k * 1.04 - 0.03, cs + k * 1.04 + 0.03, HL + 2.0, HL + 2.0 + 3.2 + Math.sqrt(Math.max(0, w * w - (k * 1.04) ** 2)), vm - 0.06, vm - 0.02, { detail: true });
     for (const yy of [1.1, 2.2, 3.2]) B.box(Mt.bronze, cs - w, cs + w, HL + 2.0 + yy - 0.03, HL + 2.0 + yy + 0.03, vm - 0.06, vm - 0.02, { detail: true });
   }
+  // landing wall below the window: marble dado panels; cornices on the hall's end walls
+  for (let k = -1; k <= 1; k++) { const c = cs + k * 2.9, d = { detail: true }; for (const [a, b2, y0, y1] of [[c - 1.2, c + 1.2, HL + 0.25, HL + 0.33], [c - 1.2, c + 1.2, HL + 1.55, HL + 1.63], [c - 1.2, c - 1.12, HL + 0.25, HL + 1.63], [c + 1.12, c + 1.2, HL + 0.25, HL + 1.63]]) B.box(Mt.marbleG, a, b2, y0, y1, vSW - 0.04, vSW, d); }
+  B.box(Mt.marbleG, sU0, sU1, HL, HL + 0.15, vSW - 0.05, vSW); B.box(Mt.marbleW, sU0, sU1, HL + 1.75, HL + 1.85, vSW - 0.1, vSW);
+  for (const [v, s] of [[vL2, 1], [vSW, -1]]) { B.box(Mt.marbleW, sU0, sU1, yHall - 0.6, yHall - 0.3, Math.min(v, v + s * 0.35), Math.max(v, v + s * 0.35)); }
   // laylight ceiling over the stair hall
   { const lu0 = sU0 + 1.2, lu1 = sU1 - 1.2, lv0 = vL2 + 1.2, lv1 = vSW - 1.2;
     for (const [a, b, c, d] of [[sU0, sU1, vL2, lv0], [sU0, sU1, lv1, vSW], [sU0, lu0, lv0, lv1], [lu1, sU1, lv0, lv1]]) B.ceil(Mt.lobbyCeil, a, b, c, d, yHall, 1.2, { bake: 0.9 });
@@ -450,12 +500,13 @@ export function buildDoeInterior(P) {
     for (const [x0, x1, z0, z1] of [[lu0 - 0.15, lu1 + 0.15, lv0 - 0.15, lv0], [lu0 - 0.15, lu1 + 0.15, lv1, lv1 + 0.15], [lu0 - 0.15, lu0, lv0, lv1], [lu1, lu1 + 0.15, lv0, lv1]]) B.box(Mt.trim, x0, x1, yHall - 0.18, yHall, z0, z1, { bake: 1 });
   }
   // the stair: central flight to the half landing, two return flights to the reading-room level (solid marble)
-  B.zone = (u, y, v, nu, ny) => (ny > 0.6 ? 1.0 : 0.82) * (0.85 + 0.15 * sstep(F1, F2, y));
+  B.zone = (u, y, v, nu, ny) => (ny > 0.6 ? 1.0 : 0.6) * (0.85 + 0.15 * sstep(F1, F2, y));
   for (let k = 1; k <= 13; k++) {
     const v0 = vTop + (k - 1) * tread, v1 = vTop + k * tread, y = F1 + k * r;
-    B.box(Mt.marbleW, cU0, cU1, F1 - 0.2, y, v0, v1); B.box(Mt.marbleW, cU0, cU1, y - 0.02, y, v0 - 0.03, v0, { detail: true });
+    B.box(Mt.marbleW, cU0, cU1, F1 - 0.2, y, v0, v1); B.box(Mt.marbleW, cU0, cU1, y - 0.045, y, v0 - 0.035, v0 + 0.02, { bake: 1.1 });
     const ys = HL + k * r, w0 = vLand - k * tread, w1 = vLand - (k - 1) * tread;
     B.box(Mt.marbleW, sU0, wU1, F1 - 0.2, ys, w0, w1); B.box(Mt.marbleW, eU0, sU1, F1 - 0.2, ys, w0, w1);
+    B.box(Mt.marbleW, sU0, wU1, ys - 0.045, ys, w1 - 0.02, w1 + 0.035, { bake: 1.1 }); B.box(Mt.marbleW, eU0, sU1, ys - 0.045, ys, w1 - 0.02, w1 + 0.035, { bake: 1.1 });
   }
   B.box(Mt.marbleW, sU0, sU1, F1 - 0.2, HL, vLand, vSW);
   B.box(Mt.marbleG, cU0 + 0.3, cU1 - 0.3, HL, HL + 0.004, vLand + 0.3, vSW - 0.3, { bake: 1 });
@@ -464,8 +515,8 @@ export function buildDoeInterior(P) {
     const sh = new THREE.Shape(); sh.moveTo(vTop, F1 - 0.2); sh.lineTo(vLand, F1 - 0.2); sh.lineTo(vLand, HL + 1.0); sh.lineTo(vTop, F2 + 1.0); sh.lineTo(vTop, F1 - 0.2);
     const g = new THREE.ExtrudeGeometry(sh, { depth: b - a, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(b, 0, 0); // shape x -> -z? fix below
     B.add(Mt.marbleW, g, { bake: 0.9 });
-    const lsh = new THREE.Shape(); lsh.moveTo(vTop, F2 + 0.95); lsh.lineTo(vLand, HL + 0.95); lsh.lineTo(vLand, HL + 1.1); lsh.lineTo(vTop, F2 + 1.1); lsh.lineTo(vTop, F2 + 0.95);
-    const lg = new THREE.ExtrudeGeometry(lsh, { depth: b - a + 0.1, bevelEnabled: false }); lg.rotateY(-Math.PI / 2); lg.translate(b + 0.05, 0, 0); 
+    const lsh = new THREE.Shape(); lsh.moveTo(vTop, F2 + 0.92); lsh.lineTo(vLand, HL + 0.92); lsh.lineTo(vLand, HL + 1.12); lsh.lineTo(vTop, F2 + 1.12); lsh.lineTo(vTop, F2 + 0.92);
+    const lg = new THREE.ExtrudeGeometry(lsh, { depth: b - a + 0.16, bevelEnabled: false }); lg.rotateY(-Math.PI / 2); lg.translate(b + 0.08, 0, 0); 
     B.add(Mt.marbleG, lg, { bake: 1 });
   }
   for (const u of [(wU1 + cU0) / 2, (cU1 + eU0) / 2]) {
@@ -544,6 +595,7 @@ export function buildDoeInterior(P) {
     B.add(Mt.bronze, new THREE.CylinderGeometry(0.28, 0.12, 0.12, 8).translate(cs, yC1 - 1.06, v));
     B.add(Mt.glow, new THREE.SphereGeometry(0.26, 14, 10).scale(1, 1.15, 1).translate(cs, yC1 - 1.38, v), { bake: 1 });
   }
+  { const pm = [-39.4, -33.0, -27.0].map((v) => TRS(cs, F1 + 0.006, v, 0, 1)); const pg = new THREE.PlaneGeometry(3.4, 3.4).rotateX(-Math.PI / 2); const pools = inst(pg, Mt.pool, pm); pools.renderOrder = 2; extra.push(pools); }
   // lobby physics
   walkables.push({ type: 'poly', pts: [[pU0, -42.35], [pU1, -42.35], [pU1, vNW], [VU1, vNW], [VU1, vVes], [LU1, vVes], [LU1, vTop], [LU0, vTop], [LU0, vVes], [VU0, vVes], [VU0, vNW], [pU0, vNW]], y: F1 });
   const yL0 = F1 - 1, yL1 = F2 - 0.5;
@@ -559,7 +611,7 @@ export function buildDoeInterior(P) {
   const MU0 = -50.75, MU1 = LU0 - 0.4, MV0 = vNW, MV1 = vS, yMC = yC1;
   const morBake = (u, y, v, nu, ny, nv) => { const dW = Math.min(u - MU0, MU1 - u, v - MV0, MV1 - v); if (y > yMC - 0.05) return 0.8 - 0.2 * Math.exp(-dW / 1.5); if (ny > 0.6) return 1 - 0.35 * Math.exp(-dW / 1.0); return 0.95 - 0.3 * Math.exp(-(y - F1) / 0.5) - 0.15 * Math.exp(-(yMC - y) / 0.4); };
   B.zone = morBake;
-  B.floor(Mt.darkOak, MU0, MU1, MV0, MV1, F1, 1.2); B.ceil(Mt.strap, MU0, MU1, MV0, MV1, yMC, 1.2);
+  B.floor(Mt.oakFloor, MU0, MU1, MV0, MV1, F1, 1.2); B.ceil(Mt.strap, MU0, MU1, MV0, MV1, yMC, 1.2);
   B.box(Mt.plaster, MU0 - 0.3, LU1 + 0.4, F1 - 0.5, F1 - 0.01, -42.0, vTop, { cast: true, bake: 0.8 });
   for (const [a, b, y0] of [[vNW, mDoor[0], F1 - 0.3], [mDoor[1], vS + 0.6, F1 - 0.3], [mDoor[0], mDoor[1], F1 + 3.3]]) B.box(Mt.plaster, LU0 - 0.4, LU0, y0, yC1, a, b, { bake: 0.8 }); B.box(Mt.plaster, LU1, LU1 + 0.4, F1 - 0.3, yC1, vNW, vTop, { bake: 0.8 }); // party walls
   // panelled walls (with the north and west windows from the façade)
@@ -575,12 +627,12 @@ export function buildDoeInterior(P) {
   // bookcases with busts along the south wall, between the piers
   for (let u = MU0 + 4.9; u < MU1 - 3; u += 6.2) { B.box(Mt.darkOak, u, u + 4.4, F1, F1 + 1.75, MV1 - 0.45, MV1 - 0.02); const pl = new THREE.PlaneGeometry(4.2, 1.5); const ua = pl.attributes.uv; for (let i = 0; i < ua.count; i++) ua.setXY(i, ua.getX(i) * 4.2 / 1.6 + u * 0.3, ua.getY(i) * 0.75 + 0.25); pl.rotateY(Math.PI).translate(u + 2.2, F1 + 0.85, MV1 - 0.455); B.add(Mt.books, pl, { uv: 'keep' }); B.add(Mt.marbleW, new THREE.SphereGeometry(0.17, 10, 8).scale(1, 1.25, 1).translate(u + 2.2, F1 + 2.17, MV1 - 0.25), { detail: true }); B.box(Mt.marbleW, u + 2.05, u + 2.35, F1 + 1.75, F1 + 1.97, MV1 - 0.35, MV1 - 0.12); }
   // paintings in gilt frames on the east wall
-  for (const v of [-38.0, -27.6]) { B.box(Mt.gilt, MU1 - 0.08, MU1 - 0.02, F1 + 1.5, F1 + 3.2, v - 0.75, v + 0.75); B.box(Mt.canvas, MU1 - 0.09, MU1 - 0.08, F1 + 1.62, F1 + 3.08, v - 0.63, v + 0.63); }
+  for (const v of [-38.0, -27.6]) { B.box(Mt.gilt, MU1 - 0.08, MU1 - 0.02, F1 + 1.5, F1 + 3.2, v - 0.75, v + 0.75); B.add(Mt.painting, new THREE.PlaneGeometry(1.26, 1.46).rotateY(-Math.PI / 2).translate(MU1 - 0.085, F1 + 2.35, v), { uv: 'keep' }); }
   // fireplace on the west wall (between its two windows)
   { const fv = (morWinW.length ? (morWinW[0][1] + morWinW[morWinW.length - 1][0]) / 2 : -32.0), u = MU0 + 0.02;
     B.box(Mt.marbleW, u, u + 0.45, F1, F1 + 1.35, fv - 0.92, fv + 0.92); B.box(Mt.soot, u, u + 0.46, F1, F1 + 0.95, fv - 0.6, fv + 0.6, { bake: 0.4 });
     B.box(Mt.marbleW, u, u + 0.6, F1 + 1.35, F1 + 1.47, fv - 1.0, fv + 1.0); B.box(Mt.darkOak, u, u + 0.2, F1 + 1.47, F1 + 3.4, fv - 0.9, fv + 0.9);
-    B.box(Mt.gilt, u + 0.2, u + 0.24, F1 + 1.8, F1 + 3.1, fv - 0.6, fv + 0.6); B.box(Mt.canvas, u + 0.24, u + 0.25, F1 + 1.9, F1 + 3.0, fv - 0.5, fv + 0.5);
+    B.box(Mt.gilt, u + 0.2, u + 0.24, F1 + 1.8, F1 + 3.1, fv - 0.6, fv + 0.6); B.add(Mt.painting, new THREE.PlaneGeometry(1.0, 1.1).rotateY(Math.PI / 2).translate(u + 0.245, F1 + 2.45, fv), { uv: 'keep' });
     B.box(Mt.marbleG, u + 0.45, u + 1.15, F1, F1 + 0.04, fv - 1.2, fv + 1.2);
     B.add(Mt.ember, new THREE.BoxGeometry(0.25, 0.12, 0.7).translate(u + 0.22, F1 + 0.1, fv), { bake: 1 });
     segs([[u, fv - 1.25], [u + 1.15, fv - 1.25], [u + 1.15, fv + 1.25], [u, fv + 1.25]], F1 - 1, F1 + 1.5); }
@@ -607,9 +659,11 @@ export function buildDoeInterior(P) {
     const pm = fl.map(([u, v]) => TRS(u, F1 + 0.012, v, 0)); const pg = new THREE.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2); const pools = inst(pg, Mt.pool, pm); pools.renderOrder = 2; extra.push(pools);
     for (const u of [mcU - 8.5, mcU, mcU + 8.5]) { // brass chandeliers with candle bulbs
       B.add(Mt.brass, new THREE.CylinderGeometry(0.015, 0.015, 0.9, 4).translate(u, yMC - 0.45, mcV), { detail: true });
-      B.add(Mt.brass, new THREE.TorusGeometry(0.45, 0.025, 5, 16).rotateX(Math.PI / 2).translate(u, yMC - 1.1, mcV));
-      B.add(Mt.brass, new THREE.SphereGeometry(0.1, 8, 6).translate(u, yMC - 1.05, mcV));
-      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; B.add(Mt.glow, new THREE.SphereGeometry(0.045, 6, 4).scale(1, 1.5, 1).translate(u + Math.cos(a) * 0.45, yMC - 0.98, mcV + Math.sin(a) * 0.45), { bake: 1 }); }
+      B.add(Mt.brass, new THREE.TorusGeometry(0.75, 0.03, 5, 20).rotateX(Math.PI / 2).translate(u, yMC - 1.15, mcV));
+      B.add(Mt.brass, new THREE.TorusGeometry(0.42, 0.025, 5, 16).rotateX(Math.PI / 2).translate(u, yMC - 0.85, mcV));
+      B.add(Mt.brass, new THREE.SphereGeometry(0.16, 10, 8).scale(1, 1.4, 1).translate(u, yMC - 1.1, mcV));
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; B.add(Mt.brass, new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6).translate(u + Math.cos(a) * 0.75, yMC - 1.08, mcV + Math.sin(a) * 0.75)); B.add(Mt.glow, new THREE.SphereGeometry(0.05, 6, 4).scale(1, 1.6, 1).translate(u + Math.cos(a) * 0.75, yMC - 0.97, mcV + Math.sin(a) * 0.75), { bake: 1 }); }
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.3; B.add(Mt.glow, new THREE.SphereGeometry(0.045, 6, 4).scale(1, 1.6, 1).translate(u + Math.cos(a) * 0.42, yMC - 0.7, mcV + Math.sin(a) * 0.42), { bake: 1 }); }
     }
     colliders.push({ pts: [[mcU - 9.15, mcV - 2.0], [mcU - 7.85, mcV - 2.0], [mcU - 7.85, mcV + 1.6], [mcU - 9.15, mcV + 1.6]], y0: F1 - 1, y1: F1 + 0.8 });
     for (const [u, v] of [[mcU + 7.6, mcV], [mcU + 9.4, mcV]]) colliders.push({ pts: [[u - 0.45, v - 1.15], [u + 0.45, v - 1.15], [u + 0.45, v + 1.15], [u - 0.45, v + 1.15]], y0: F1 - 1, y1: F1 + 0.9 });
@@ -630,14 +684,18 @@ export function buildDoeInterior(P) {
 // per-frame: interior uniforms for time of day, clock hands
 export function updateDoeInterior(st, env) {
   const night = env.night ?? 0, day = 1 - night;
-  IU.uInAmb.value.setRGB(0.62, 0.58, 0.52).multiplyScalar(0.55 + 0.45 * day);
-  IU.uInArt.value.setRGB(0.22, 0.165, 0.105).multiplyScalar(0.55 + 0.45 * day + 0.35 * night);
-  IU.uInSpec.value = 0.28;
+  IU.uInAmb.value.setScalar(0.25);
+  IU.uInSky.value.setRGB(0.46, 0.455, 0.43).multiplyScalar(day).add(new THREE.Color(0.3, 0.24, 0.16).multiplyScalar(night));
+  IU.uInGnd.value.setRGB(0.21, 0.19, 0.16).multiplyScalar(day).add(new THREE.Color(0.15, 0.115, 0.075).multiplyScalar(night));
+  IU.uInSpec.value = 0.35;
   const M = MATS;
   if (M) {
-    const k = 0.18 + 1.05 * day; M.laylight.color.setRGB(1.05 * k, 1.07 * k, 1.04 * k);
-    M.globes.opacity = 0.3 + 0.7 * night;
-    M.pool.color.setRGB(0.5, 0.34, 0.18).multiplyScalar(0.55 + 0.6 * night);
+    const k = 0.12 + 0.8 * day; M.laylight.color.setRGB(1.0 * k, 1.02 * k, 1.0 * k);
+    M.globes.opacity = 0.25 + 0.75 * night;
+    M.pool.color.setRGB(0.3, 0.24, 0.16).multiplyScalar(0.25 + 1.1 * night);
+    M.shadeGlow.color.setRGB(1.7, 1.35, 0.95).multiplyScalar(0.45 + 0.55 * night);
+    M.sheen.color.setRGB(0.2, 0.21, 0.21).multiplyScalar(day);
+    M.streak.color.setRGB(0.22, 0.23, 0.23).multiplyScalar(0.08 + 0.92 * day);
   }
   if (st.hands && env.time) {
     const p = pacificParts(env.time); const mins = (p.hour % 12) * 60 + p.minute + p.second / 60;

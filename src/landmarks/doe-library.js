@@ -151,7 +151,7 @@ export async function build(ctx) {
   for (const [name, at] of [['W', NW.u0], ['E', NW.u1]]) {
     const F = k.side(name, at);
     const s0 = Math.min(F.s(NW.v0), F.s(NW.v1)), s1 = Math.max(F.s(NW.v0), F.s(NW.v1)), sc = (s0 + s1) / 2;
-    const win = { s0: sc - 3.0, s1: sc + 3.0, y0: 8.2, y1: 20.6, arch: true };
+    const wr = 3.4, win = { s0: sc - wr, s1: sc + wr, y0: 8.2, y1: 20.6, arch: true }; // great arched window (~40% of the end wall)
     F.wall(rust, s0, s1, yFound, yBase, 0.8, [{ s0: sc - 2.6, s1: sc - 1.0, y0: 3.55, y1: 5.65 }, { s0: sc + 1.0, s1: sc + 2.6, y0: 3.55, y1: 5.65 }]);
     for (const c of [sc - 1.8, sc + 1.8]) F.window(c - 0.8, c + 0.8, 3.55, 5.65, { mullions: 1, depth: 0.45 });
     F.moulding(stone, s0, s1, yBase - 0.35, [[0.2, 0.12], [0.25, 0.3], [0.12, 0.42]]);
@@ -159,14 +159,14 @@ export async function build(ctx) {
     const yApex = yCorn + (s1 - s0) / 2 * ((yRidge - 0.3 - yCorn) / ((s1 - s0) / 2));
     F.wall(stone, s0, s1, ySill, yCorn, 0.9, [{ ...win, y1: Math.min(win.y1, yCorn) }].map((o) => ({ ...o, arch: false, y1: yCorn })));
     // tympanum with the arched window rising into it
-    const tri = new THREE.Shape(); tri.moveTo(s0, yCorn); tri.lineTo(win.s0, yCorn); tri.lineTo(win.s0, win.y1 - 3.0); tri.absarc(sc, win.y1 - 3.0, 3.0, Math.PI, 0, true); tri.lineTo(win.s1, yCorn); tri.lineTo(s1, yCorn); tri.lineTo(sc, yApex); tri.lineTo(s0, yCorn);
+    const tri = new THREE.Shape(); tri.moveTo(s0, yCorn); tri.lineTo(win.s0, yCorn); tri.lineTo(win.s0, win.y1 - wr); tri.absarc(sc, win.y1 - wr, wr, Math.PI, 0, true); tri.lineTo(win.s1, yCorn); tri.lineTo(s1, yCorn); tri.lineTo(sc, yApex); tri.lineTo(s0, yCorn);
     F.shape(stone, tri, -0.9, 0);
     F.window(win.s0, win.s1, win.y0, win.y1, { arch: true, mullions: 3, transoms: [11.0, 14.5], depth: 0.6 });
-    const ring = new THREE.Shape(); ring.absarc(sc, win.y1 - 3.0, 3.4, 0, Math.PI, false); ring.lineTo(sc - 3.0, win.y1 - 3.0); ring.absarc(sc, win.y1 - 3.0, 3.0, Math.PI, 0, true); ring.lineTo(sc + 3.4, win.y1 - 3.0);
+    const ring = new THREE.Shape(); ring.absarc(sc, win.y1 - wr, wr + 0.4, 0, Math.PI, false); ring.lineTo(sc - wr, win.y1 - wr); ring.absarc(sc, win.y1 - wr, wr, Math.PI, 0, true); ring.lineTo(sc + wr + 0.4, win.y1 - wr);
     F.shape(stone, ring, 0, 0.15, { detail: true });
     F.box(stone, sc - 0.3, sc + 0.3, win.y1 - 0.1, win.y1 + 0.6, 0, 0.22, { detail: true });
     // fluted pilasters either side, entablature returns broken by the window
-    for (const c of [s0 + 1.0, s0 + 2.6, sc - 4.1, sc + 4.1, s1 - 2.6, s1 - 1.0]) F.column(stone, c, ySill, yColTop, D, { tc: -0.25, style: 'composite' });
+    for (const c of [s0 + 1.0, s0 + 2.6, sc - wr - 1.1, sc + wr + 1.1, s1 - 2.6, s1 - 1.0]) F.column(stone, c, ySill, yColTop, D, { tc: -0.25, style: 'composite' });
     for (const [a, b] of [[s0 - 0.3, win.s0 - 0.4], [win.s1 + 0.4, s1 + 0.3]]) {
       F.moulding(stone, a, b, yColTop, [[0.7, 0.45], [0.85, 0.4], [0.3, 0.7], [0.3, 1.0], [Math.max(0.05, yCorn - yColTop - 2.15), 1.2]]);
     }
@@ -185,6 +185,11 @@ export async function build(ctx) {
   // tiled gable roof over the reading room (ridge along u)
   k.gableRoof(M.redTile, NW.u0 - 0.8, NW.u1 + 0.8, NW.v0 - 0.05, NW.v1 + 0.3, yCorn, yRidge, 'u', { soffit: false });
   k.box(stone, NW.u0 - 0.8, NW.u0, yCorn - 0.05, yCorn, NW.v0 - 0.05, NW.v1 + 0.3); k.box(stone, NW.u1, NW.u1 + 0.8, yCorn - 0.05, yCorn, NW.v0 - 0.05, NW.v1 + 0.3);
+  { // shadow caster just under the roof (single-sided roof planes only write back faces to the shadow map, and the wing is hollow now)
+    const u0 = NW.u0 - 0.8, u1 = NW.u1 + 0.8, v0 = NW.v0 - 0.05, v1 = NW.v1 + 0.3, vm = (v0 + v1) / 2, yE = yCorn - 0.1, yR = yRidge - 0.1;
+    const t = [[u0, yE, v0], [u1, yR, vm], [u0, yR, vm], [u0, yE, v0], [u1, yE, v0], [u1, yR, vm], [u0, yR, vm], [u1, yE, v1], [u0, yE, v1], [u0, yR, vm], [u1, yR, vm], [u1, yE, v1]];
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.flat(), 3)); k.add(stone, g);
+  }
   k.box(M.copper, NW.u0 - 0.8, NW.u1 + 0.8, yRidge - 0.05, yRidge + 0.22, (NW.v0 + NW.v1) / 2 - 0.25, (NW.v0 + NW.v1) / 2 + 0.25, { detail: true });
   {   // three low copper-framed glazed skylights on the north slope (lying on the slope, ~0.35 m proud)
     const vE = NW.v0 - 0.05, vR = (NW.v0 - 0.05 + NW.v1 + 0.3) / 2, th = Math.atan2(yRidge - yCorn, vR - vE);
@@ -205,7 +210,7 @@ export async function build(ctx) {
 
   // ===================== SOUTH BLOCK (1914–17) =====================
   const yCornS = 17.5, yDeck = 20.6;
-  const SH = { u0: -22.0, u1: -12.1, v1: -14.25, y1: 17.0 };   // stair-hall void (its finishes come from the interior)
+  const SH = { u0: -22.0, u1: -12.1, v1: -14.25, y1: 14.2 };   // stair-hall void (its finishes come from the interior)
   k.box(stone, SB.u0 + 0.6, SH.u0, yFound, yCornS, SB.v0, SB.v1 - 0.6); k.box(stone, SH.u1, SB.u1 - 0.6, yFound, yCornS, SB.v0, SB.v1 - 0.6);
   k.box(stone, SH.u0, SH.u1, yFound, yCornS, SH.v1, SB.v1 - 0.6); k.box(stone, SH.u0, SH.u1, SH.y1, yCornS, SB.v0, SH.v1);
   const range = (F, s0, s1, opts = {}) => {
@@ -304,7 +309,7 @@ export async function build(ctx) {
   walkables.push({ type: 'poly', pts: k.polyLocal([[BA.u1, 0.8], [BA.u1 + 1.9, 0.8], [BA.u1 + 1.9, 9.6], [BA.u1, 9.6]]), y: gBe + 0.75 });
 
   // ===================== INTERIORS =====================
-  const ig = buildDoeInterior({ F1, F2: ySill, cs: -17.06, wins: nrrWins, morWinN, morWinW: [[-32.05 - 2.6, -32.05 - 1.0], [-32.05 + 1.0, -32.05 + 2.6]], endWin: { vc: -32.05, hw: 3.0, y0: 8.2, ys: 17.6 } });
+  const ig = buildDoeInterior({ F1, F2: ySill, cs: -17.06, wins: nrrWins, morWinN, morWinW: [[-32.05 - 2.6, -32.05 - 1.0], [-32.05 + 1.0, -32.05 + 2.6]], endWin: { vc: -32.05, hw: 3.4, y0: 8.2, ys: 17.2 } });
   for (const c of ig.colliders) colliders.push({ type: 'poly', pts: k.polyLocal(c.pts), y0: c.y0, y1: c.y1 });
   for (const w of ig.walkables) {
     if (w.type === 'poly') { walkables.push({ type: 'poly', pts: k.polyLocal(w.pts), y: w.y }); continue; }
