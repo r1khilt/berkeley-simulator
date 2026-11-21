@@ -10,3 +10,4 @@ player.registerMode(name, plugin). Plugin fields, all optional except update:
 - onKey(e, player), onMouse(e, player, down)
 player.camera, player.camDistT, player.view ('third'|'first') are available for camera tweaks.
 Register in src/player/modes/index.js (one import + one install call per plugin).
+Grappling hook (grapple.js, mode 'grapple'): hold Q or right mouse in walk, bike or any plugin mode. A plugin can set `grapple: false` to switch it off in its mode. When a swing lands, the player is returned to the mode they fired from (via setMode, so canEnter still applies). For the HUD it sets label, icon (an inline SVG string that uses currentColor) and hint (one line of help text).

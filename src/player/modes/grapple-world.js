@@ -15,7 +15,7 @@ export class GrappleWorld {
     this.ph = physics; this.scene = scene; this.lm = lm;
     this.prisms = []; this.pgrid = new Map(); this.nSeg = 0; this.lmVersion = ''; this.hidden = new Set();
     this.raycaster = new THREE.Raycaster(); this.bboxCache = new WeakMap(); this.bgroup = null;
-    this._tmp = []; this._tmp2 = []; this._seen = new Set(); this._seenP = new Set(); this._seenW = new Set();
+    this._tmp = []; this._tmp2 = []; this._seen = new Set(); this._seenP = new Set(); this._seenW = new Set(); this._syncs = 0;
     this.sync();
   }
   // ---------------------------------------------------------------- prism index
@@ -39,6 +39,8 @@ export class GrappleWorld {
       i = Math.max(j, i + 1);
     }
     this.nSeg = n;
+    // landmarks stream in and out; every so often drop the volumes of unloaded ones from the index
+    if (++this._syncs % 900 === 0) { let dead = 0; for (const pr of this.prisms) if (pr.seg.y0 === Infinity) dead++; if (dead > 1500) this._compact(); }
     // landmark stand-ins: hidden OSM boxes whose colliders stay in physics; ignore them for roofs and inside tests
     const placed = this.lm ? this.lm.placed : [];
     const ver = placed.length + ':' + (placed.length ? placed[placed.length - 1].id : '');
@@ -59,6 +61,11 @@ export class GrappleWorld {
     for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
       const k = key(i, j); let l = this.pgrid.get(k); if (!l) this.pgrid.set(k, (l = [])); l.push(pr.idx);
     }
+  }
+  _compact() {
+    const keep = this.prisms.filter((pr) => pr.seg.y0 !== Infinity); this.prisms = []; this.pgrid = new Map();
+    for (const pr of keep) { pr.idx = this.prisms.length; this.prisms.push(pr);
+      for (let i = Math.floor(pr.b[0] / CELL); i <= Math.floor(pr.b[2] / CELL); i++) for (let j = Math.floor(pr.b[1] / CELL); j <= Math.floor(pr.b[3] / CELL); j++) { const k = key(i, j); let l = this.pgrid.get(k); if (!l) this.pgrid.set(k, (l = [])); l.push(pr.idx); } }
   }
   _hasWalkInside(pr) {
     for (const w of this.ph.walk) {
