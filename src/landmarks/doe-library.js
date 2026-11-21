@@ -333,7 +333,8 @@ export async function build(ctx) {
     update(dt, env) {
       st.frames++;
       const cp = env.camera.position, [u, v] = k.uv(cp.x - A.x, cp.z - A.z), ly = cp.y - A.y;
-      const near = u > -62 && u < 64 && v > -74 && v < 42 && ly < 45;
+      // interior is visible only from inside the building or through the open north portal
+      const near = ly < 40 && ((u > -53.5 && u < 19.5 && v > -44 && v < -13) || (Math.abs(u + 17.06) < 16 && v > -80 && v <= -44));
       if (st.frames === 4) ig.group.traverse((o) => { if (o.isMesh) o.frustumCulled = true; });
       ig.group.visible = st.frames < 4 || near;
       if (ig.group.visible) updateDoeInterior(st, env);

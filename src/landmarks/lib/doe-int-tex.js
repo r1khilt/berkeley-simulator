@@ -59,7 +59,7 @@ export function cofferTex() {
 }
 export function cofferTex2() {
   if (cache.coffer2) return cache.coffer2;
-  const S = 256, rib = [234, 226, 207], rec = [212, 202, 180], ros = [176, 152, 104], gilt = [206, 176, 112];
+  const S = 256, rib = [232, 224, 204], rec = [214, 204, 182], ros = [184, 168, 136], gilt = [214, 192, 140];
   cache.coffer2 = pix(S, S, (x, y) => {
     const u = (x + 0.5) / S - 0.5, v = (y + 0.5) / S - 0.5, d = Math.max(Math.abs(u), Math.abs(v));
     let c, h;
@@ -72,8 +72,8 @@ export function cofferTex2() {
     const r = Math.hypot(u, v), a = Math.atan2(v, u);
     if (r < 0.175) {
       const pet = 0.5 + 0.5 * Math.cos(a * 16), edge = 0.11 + 0.06 * pet;
-      if (r < 0.04) { c = [226, 208, 160]; h = 0.75; }
-      else if (r < 0.06) { c = [180, 158, 116]; h = 0.55; }
+      if (r < 0.04) { c = [226, 212, 176]; h = 0.75; }
+      else if (r < 0.06) { c = [190, 174, 142]; h = 0.55; }
       else if (r < edge) { const t = (r - 0.06) / (edge - 0.06); c = mixc(ros, gilt, t * t * pet); h = 0.5 + 0.2 * (1 - t); }
     }
     return [c[0], c[1], c[2], h];
@@ -179,10 +179,12 @@ export function linoTex() {
 // Cream marble with soft grey veining.
 export function marbleTex(seed = 5, base = [232, 226, 212]) {
   const key = 'marble' + seed; if (cache[key]) return cache[key];
-  const S = 512, f = fbmT(seed, S, 3, 4), g2 = fbmT(seed + 9, S, 8, 3);
+  const S = 512, f = fbmT(seed, S, 2, 5), g2 = fbmT(seed + 9, S, 6, 3), wx = fbmT(seed + 3, S, 4, 3), wy = fbmT(seed + 5, S, 4, 3);
   cache[key] = pix(S, S, (x, y) => {
-    const t = f(x, y) * 7 + g2(x, y) * 1.2, vein = Math.pow(Math.abs(Math.sin(t * 6.283)), 26);
-    const k = 0.975 + (g2(x, y) - 0.5) * 0.06; const c = mixc([base[0] * k, base[1] * k, base[2] * k], [base[0] * 0.72, base[1] * 0.71, base[2] * 0.7], vein * 0.55);
+    const qx = x + (wx(x, y) - 0.5) * 90, qy = y + (wy(x, y) - 0.5) * 90;          // domain warp
+    const t = f(((qx % S) + S) % S, ((qy % S) + S) % S), vein = 1 - Math.min(1, Math.abs(t - 0.5) / 0.012);
+    const cloud = (g2(x, y) - 0.5) * 0.08, k = 0.985 + cloud;
+    const c = mixc([base[0] * k, base[1] * k, base[2] * k], [base[0] * 0.78, base[1] * 0.77, base[2] * 0.76], Math.max(0, vein) * 0.45);
     return [c[0], c[1], c[2], 0.5];
   }, 0.3);
   return cache[key];
