@@ -44,7 +44,7 @@ class Grapple {
     this.len = 0; this.lenTarget = 0; this.reelRate = 0; this.taut = false; this.grounded = false;
     this.qHeld = false; this.mHeld = false; this.allowEnter = false; this.prevMode = 'walk';
     this.aim = { ok: false, hit: null }; this.camK = 0; this.userDist = null; this.lastSetDist = null; this.frustFov = 0; this.fovActive = false;
-    this.perch = null; this.perchOff = 0; this.safeT = 0; this.slideT = 0; this.lastPos = new THREE.Vector3(); this.speed = 0; this.wave = 0; this.retractT = 0;
+    this.perch = null; this.perchOff = 0; this.safeT = 0; this.slideT = 0; this.wallN = new THREE.Vector3(); this.wallT = 9; this.lastPos = new THREE.Vector3(); this.speed = 0; this.wave = 0; this.retractT = 0;
     this.stats = { coarseMs: 0, refineMs: 0, fires: 0, attaches: 0, rescues: 0, slides: 0 };
     this._o = new THREE.Vector3(); this._d = new THREE.Vector3();
     this._buildVisuals();
@@ -183,8 +183,10 @@ class Grapple {
     const p = this.p; this.state = 'retract'; this.retractT = 0; this.wave = 1;
     if (p.mode === 'grapple') {
       this.sub = 'fly';
+      // let go while against a wall: kick off it (keeps chains going instead of sliding down the facade)
+      if (this.wallT < 0.25 && !this.grounded) { p.vel.x += this.wallN.x * 6.5; p.vel.z += this.wallN.z * 6.5; p.vel.y = Math.max(p.vel.y, 0) + 5; }
       // a little lift on release makes chaining swings easier; momentum is otherwise kept as-is
-      if (!this.grounded && p.vel.y > -6 && p.vel.length() > 6) p.vel.y += 2.2;
+      else if (!this.grounded && p.vel.y > -6 && p.vel.length() > 6) p.vel.y += 2.2;
     }
     this._sfx('release');
   }
@@ -294,7 +296,7 @@ class Grapple {
     }
     // integrate in short sub-steps (no tunnelling through walls at swing speeds)
     const steps = Math.min(16, Math.max(1, Math.ceil(v.length() * dt / 0.22)));
-    const h = dt / steps; let landedRoof = null, landed = false; this.taut = false; this.blocked = false;
+    const h = dt / steps; let landedRoof = null, landed = false; this.taut = false; this.blocked = false; this.wallT += dt;
     for (let s = 0; s < steps; s++) { const r = this._step(h, this.state === 'attached' && this.sub === 'swing'); if (r) { landed = true; if (r !== true) landedRoof = r; } }
     this.grounded = landed;
     p.onGround = landed;
@@ -325,7 +327,7 @@ class Grapple {
     const res = ph.resolve(nx, nz, R, ny, H);
     if (res[2]) {
       const px = res[0] - nx, pz = res[1] - nz, pl = Math.hypot(px, pz);
-      if (pl > 1e-6) { const qx = px / pl, qz = pz / pl, vn = v.x * qx + v.z * qz; if (vn < 0) { v.x -= qx * vn * 1.05; v.z -= qz * vn * 1.05; } }
+      if (pl > 1e-6) { const qx = px / pl, qz = pz / pl, vn = v.x * qx + v.z * qz; if (vn < 0) { v.x -= qx * vn * 1.05; v.z -= qz * vn * 1.05; } this.wallN.set(qx, 0, qz); this.wallT = 0; }
       nx = res[0]; nz = res[1]; this.blocked = true;
     }
     // floors (terrain, decks) and solid roofs crossed from above
