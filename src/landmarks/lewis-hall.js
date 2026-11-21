@@ -3,6 +3,7 @@
 // cornice with a balustraded parapet hiding a low hip roof, and a round-arched entrance reached by semicircular steps; a lower
 // angled wing at the south end. Massing from LiDAR: eaves ~19 m, roof ridge ~23 m, south wing ~12.5 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, punchedBlock, punched, cols, runsOf, flatRoof, colFromXZ, tint , plain } from './lib/b04-kit.js';
 import { balustrade, arcBand } from './lib/classic-kit.js';
 
@@ -45,6 +46,7 @@ export async function build(ctx) {
   K.prism(M.concreteDark, sw.slice().reverse(), -2.5, 11.9);
   flatRoof(K, sw, 12.4, { parapet: 0.8, mat: S });
   colliders.push(colFromXZ(ctx.footprints[0].outer, -3, 23));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'lewis-hall';
   return { object3d, colliders, walkables };
 }

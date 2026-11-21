@@ -2,6 +2,7 @@
 // egg-crate of thin vertical fins and solid balcony-height spandrels over dark recessed glass, raised on a recessed, glazed
 // ground floor with a colonnade of slim piers. Massing from LiDAR: parapet ~35.5 m, penthouse ~37.5 m, plant to ~40.5 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, flatRoof, rect, runsOf, entrance, penthouse, colFromXZ, tint, glassTint , plain } from './lib/b04-kit.js';
 
 export const info = {
@@ -42,6 +43,7 @@ export async function build(ctx) {
   for (const R of [K.run([u0 + gi, v1 - gi], [u1 - gi, v1 - gi]), K.run([u1 - gi, v0 + gi], [u0 + gi, v0 + gi])]) entrance(K, R, R.L * 0.42, Math.max(0, K.g(...R.at(R.L * 0.42, 2))), { w: 4.0, h: 3.0, rec: 0.15, surround: false, glass: tint(M, 'glass', 0x1e2226), frame: FR });
   colliders.push(colFromXZ(K.polyXZ(rect(u0 - 0.85, v0 - 0.85, u1 + 0.85, v1 + 0.85)), 4.3, 41));
   colliders.push(colFromXZ(K.polyXZ(rect(u0 + gi, v0 + gi, u1 - gi, v1 - gi)), -2, 4.4));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'latimer-hall';
   return { object3d, colliders, walkables };
 }

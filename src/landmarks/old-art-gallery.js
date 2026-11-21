@@ -3,6 +3,7 @@
 // bays, a Lombard band of corbelled round arches runs under the eaves, the centre bay holds a big semicircular-arched
 // doorway, and the side bays carry the 1936 WPA mosaic murals. A low flat-roofed brick annex adjoins at the rear.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit } from './lib/classic-kit.js';
 import { tint, paleGlass, mosaicPanel, lombardFrieze, shrubRow, drapeStrip } from './lib/b05a-kit.js';
 
@@ -64,6 +65,7 @@ export async function build(ctx) {
   }
   shrubRow(K, [H.u0, H.v1], [H.u0, H.v0 + 2], 0.8, { h: 0.9 });
   drapeStrip(K, [[H.u0 - 2, H.v1], [H.u1 + 2, H.v1]], 3.5, M.paving, { closed: false });
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'old-art-gallery';
   return { object3d, colliders, walkables };
 }

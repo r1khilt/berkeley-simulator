@@ -5,6 +5,7 @@
 // scrolled consoles, flanked by a pair of Chinese guardian lions.
 // LiDAR: eaves ~14.7 m above the lowest ground, flat roof deck ~18.3 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 import { campusLamp, drapeStrip, shrubRow, paleGlass } from './lib/b05a-kit.js';
 
@@ -196,6 +197,8 @@ export async function build(ctx) {
     K.lathe(M.lampGlow, [[0.05, 0], [0.2, 0.12], [0.24, 0.4], [0.18, 0.62], [0.001, 0.7]], u, g0 + 3.55, v, 10, { detail: true });
     K.cyl(M.iron, u, g0 + 4.2, v, 0.08, 0.02, 0.18, 8, { detail: true });
   }
+  // refine-central: planted beds, lamps and a bike rack where the paths arrive
+  siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0 });
   const object3d = K.finish(); object3d.name = 'durant-hall';
   return { object3d, colliders, walkables };
 }

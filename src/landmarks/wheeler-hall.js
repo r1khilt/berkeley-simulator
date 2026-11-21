@@ -4,6 +4,7 @@
 // with 6 urns over the columns; secondary blocks with tiled hip roofs and quoins. Square plan broken by projecting end bays
 // on the east and west elevations; Wheeler Auditorium occupies the low central block (LiDAR: ~10–12 m roof inside a 20 m ring).
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, ionicColumn, pilaster, urn, corniceProfile, balustrade } from './lib/classic-kit.js';
 
 export const info = {
@@ -226,6 +227,8 @@ export async function build(ctx) {
   colliders.push(K.colPoly([[uC0, vS], [uC1, vS], [uC1, vEB], [uC0, vEB]], -2, 21));
   for (const u of [tU0 - 0.6, tU1]) colliders.push(K.colPoly([[u, vS], [u + 0.6, vS], [u + 0.6, tV1 + 4.5], [u, tV1 + 4.5]], -1.5, FL + 0.9));
 
+  // refine-central: foundation planting, lamp posts and bike racks where the paths arrive
+  siteDress(K, ctx, outline, { d: 1.2, lamps: 3 });
   const object3d = K.finish();
   object3d.name = 'wheeler-hall';
   return { object3d, colliders, walkables };

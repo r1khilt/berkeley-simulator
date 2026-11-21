@@ -3,6 +3,7 @@
 // a lower wing wrapped in horizontal aluminium sun-louvres, and set-back metal penthouses and roof terrace on top.
 // Massing from LiDAR: north bar ~28 m, main body ~25 m, lower west/south wings ~21.5 m, penthouse ~28 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, grid, curtain, flatRoof, rect, runsOf, entrance, penthouse, colFromXZ, tint, plain, glassTint } from './lib/b04-kit.js';
 
 export const info = {
@@ -54,6 +55,7 @@ export async function build(ctx) {
   entrance(K, K.run([-17.2, 12.3], [-12.6, 12.3]), 2.3, Math.max(0, K.g(-15, 13)), { w: 3.2, h: 3.0, rec: 0.2, glass: GL, frame: AL, canopy: 1.8, canopyMat: AL });
   entrance(K, K.run([9.0, 18.1], [15.6, 18.1]), 3.3, Math.max(0, K.g(12, 19)), { w: 3.6, h: 3.0, rec: 0.2, glass: GL, frame: AL, canopy: 1.8, canopyMat: AL });
   colliders.push(colFromXZ(ctx.footprints[0].outer, -2, 30));
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'campbell-hall';
   return { object3d, colliders, walkables };
 }

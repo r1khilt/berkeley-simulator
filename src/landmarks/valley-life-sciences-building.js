@@ -5,6 +5,7 @@
 // infilled with the 1990s atrium/library), lower three-storey end wings to the east and west.
 // Massing from the 2021 LiDAR: ranges ~24.6 m, central attic strip and penthouses ~29 m, end wings ~15 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, corniceProfile, tint, solid, flatRoof, courtWalls, polyWalls, inscription, rect } from './lib/b02-kit.js';
 
 export const info = {
@@ -218,6 +219,7 @@ export async function build(ctx) {
 
   // colliders: the real outline
   for (const fp of ctx.footprints) colliders.push({ type: 'poly', pts: fp.outer.map(([x, z]) => [x, z]), y0: -2, y1: 30 });
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'valley-life-sciences-building';
   return { object3d, colliders, walkables };
 }

@@ -239,3 +239,19 @@ export function baseShrubs(K, R, s0, s1, { skip = [], d = 0.9, size = 0.5 } = {}
   for (const [a, b] of skip) { const ns = []; for (const [p, q] of segs) { if (b <= p || a >= q) { ns.push([p, q]); continue; } if (a > p) ns.push([p, a]); if (b < q) ns.push([b, q]); } segs = ns; }
   let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
 }
+
+// Finish a rectangular/polygonal building's surroundings: foundation planting along every face (gaps where packet paths
+// arrive), campus lamp posts and a bike rack near the busiest arrival. poly: building-frame outline (any orientation).
+export function siteDress(K, ctx, poly, { shrubs = true, lamps = 2, racks = true, d = 1.0, gap = 3.2, skipSides = [] } = {}) {
+  let a = 0; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += p[0] * q[1] - q[0] * p[1]; }
+  const P = a > 0 ? poly.slice().reverse() : poly.slice(); const arrivals = [];
+  for (let i = 0; i < P.length; i++) {
+    const R = K.run(P[i], P[(i + 1) % P.length]); if (R.L < 4) continue;
+    const side = Math.abs(R.n[0]) > Math.abs(R.n[1]) ? (R.n[0] > 0 ? 'E' : 'W') : (R.n[1] > 0 ? 'S' : 'N'); if (skipSides.includes(side)) continue;
+    const hits = pathArrivals(K, ctx, R, { maxD: 6, minGap: 5 }); for (const s of hits) arrivals.push({ R, s });
+    if (shrubs) baseShrubs(K, R, 1.2, R.L - 1.2, { skip: hits.map((s) => [s - gap, s + gap]), d });
+  }
+  arrivals.slice(0, lamps).forEach(({ R, s }, k) => { for (const sg of [-1, 1]) { const [u, v] = R.at(Math.min(R.L - 1, Math.max(1, s + sg * (gap + 1.2))), 3.2); if (k < lamps) lampPost(K, u, v); } });
+  if (racks && arrivals.length) { const { R, s } = arrivals[0]; const ss = Math.min(R.L - 6, s + gap + 3); if (ss > 1) { const [u, v] = R.at(ss, 2.6); bikeRack(K, u, v, Math.atan2(R.t[1], R.t[0]), 5); } }
+  return arrivals.length;
+}

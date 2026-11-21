@@ -3,6 +3,7 @@
 // frieze of garlands and bulls' heads, and the attic inscription "TO RESCUE FOR HUMAN SOCIETY THE NATIVE VALUES OF RURAL
 // LIFE"; red-tile hip roofs above. LiDAR: eaves ~13 m, ridges ~18.5 m.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit, genParts, tint, solid, rect, hipPoly, orient } from './lib/b02-gen.js';
 import { inscription } from './lib/b02-kit.js';
 export const info = {
@@ -40,6 +41,7 @@ export async function build(ctx) {
   const gL = K.g(...R.at(sC, 6)); const n = Math.max(3, Math.round((2.4 - gL) / 0.16));
   const walk = K.stairs(tint(M.brick, 0x9a4535), 6.45, -2.5 - 0.0 + (17.2 - sC) - 17.2 + 0, 6.45 + n * 0.34, 2.5 + (17.2 - sC) - 17.2, gL, 2.4, '-u', n);
   for (const dv of [-3.2, 3.2]) { const [u, v] = [6.45 + 0.6, (17.2 - sC) + dv]; K.cyl(M.iron, u, 2.4, v, 0.08, 0.06, 3.0, 8, { detail: true }); K.lathe(M.lampGlow, [[0.05, 0], [0.2, 0.15], [0.22, 0.5], [0.1, 0.68]], u, 5.4, v, 10, { detail: true }); }
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'hilgard-hall';
   return { object3d, colliders, walkables: [walk] };
 }

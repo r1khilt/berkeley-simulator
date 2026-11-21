@@ -4,6 +4,7 @@
 // porch on round concrete columns. A carved pelican medallion sits over the door and a bronze pelican spreads its
 // wings in the lawn in front.
 import * as THREE from 'three';
+import { siteDress } from './lib/rc-finish.js';
 import { Kit } from './lib/classic-kit.js';
 import { tint, paleGlass, textPanel, shrubRow, drapeStrip } from './lib/b05a-kit.js';
 
@@ -109,6 +110,7 @@ export async function build(ctx) {
     colliders.push(K.colCyl(pu, pvv, 1.1, g0 - 0.5, g0 + 2.2));
   }
   shrubRow(K, [A.u0, A.v1], [P.u0 - 2.4, A.v1], 0.7, { h: 0.7 });
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'anthony-hall';
   return { object3d, colliders, walkables };
 }
