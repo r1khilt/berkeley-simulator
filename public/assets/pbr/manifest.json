@@ -1,0 +1,132 @@
+{
+ "asphalt": {
+  "src": "asphalt_02",
+  "size": 3.0,
+  "mean": [
+   0.0755,
+   0.0751,
+   0.0722
+  ],
+  "rough": 0.949
+ },
+ "sidewalk": {
+  "src": "asphalt_04",
+  "size": 4.04,
+  "mean": [
+   0.2665,
+   0.2593,
+   0.2481
+  ],
+  "rough": 0.968
+ },
+ "granite": {
+  "src": "acg:Granite002A",
+  "size": 1.0,
+  "mean": [
+   0.3685,
+   0.3591,
+   0.3435
+  ],
+  "rough": 0.557
+ },
+ "brick": {
+  "src": "brick_wall_006",
+  "size": 3.0,
+  "mean": [
+   0.3903,
+   0.1774,
+   0.0981
+  ],
+  "rough": 0.942
+ },
+ "lawn": {
+  "src": "leafy_grass",
+  "size": 2.0,
+  "mean": [
+   0.0594,
+   0.0912,
+   0.0301
+  ],
+  "rough": 0.953
+ },
+ "drygrass": {
+  "src": "withered_grass",
+  "size": 2.0,
+  "mean": [
+   0.2171,
+   0.1509,
+   0.0823
+  ],
+  "rough": 0.971
+ },
+ "litter": {
+  "src": "forest_leaves_02",
+  "size": 3.0,
+  "mean": [
+   0.1071,
+   0.07,
+   0.0301
+  ],
+  "rough": 0.99
+ },
+ "dirt": {
+  "src": "park_dirt",
+  "size": 3.0,
+  "mean": [
+   0.1847,
+   0.134,
+   0.0683
+  ],
+  "rough": 0.972
+ },
+ "stucco": {
+  "src": "white_stucco",
+  "size": 2.0,
+  "mean": [
+   0.5817,
+   0.5468,
+   0.4886
+  ],
+  "rough": 0.982
+ },
+ "boardconc": {
+  "src": "wood_textured_concrete",
+  "size": 1.8,
+  "mean": [
+   0.2781,
+   0.2688,
+   0.2576
+  ],
+  "rough": 0.974
+ },
+ "concrete": {
+  "src": "concrete_wall_004",
+  "size": 2.0,
+  "mean": [
+   0.307,
+   0.3003,
+   0.2759
+  ],
+  "rough": 0.938
+ },
+ "siding": {
+  "src": "wood_plank_wall",
+  "size": 1.0,
+  "mean": [
+   0.3371,
+   0.2913,
+   0.2773
+  ],
+  "rough": 0.854
+ },
+ "rooftile": {
+  "src": "roof_09",
+  "size": 4.0,
+  "mean": [
+   0.2539,
+   0.1274,
+   0.0681
+  ],
+  "rough": 0.888
+ }
+}

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
+import { PBR, PBR_GLSL, pbrUniforms } from './pbr.js'; // gfx-materials: PBR ground
+import { GROUND_PBR_GLSL } from './pbrGround.js';
 
 export const CHUNK = 64;
 const LODS = [64, 32, 16, 8, 4];
@@ -65,6 +67,8 @@ export class CoreTerrain {
       uAuxRect: { value: new THREE.Vector4(meta.core.x0, meta.core.z0, ax.nx * ax.step, ax.nz * ax.step) },
       uNight: U.uNight, uTime: U.uTime,
     };
+    pbrUniforms(this.uniforms); // gfx-materials: texture arrays + on/off switch
+    PBR.uGH.value = hTex; PBR.uGHRect.value.set(c.x0 + 0.5 * c.step, c.z0 + 0.5 * c.step, c.step, 0); PBR.uGHSize.value.set(c.nx, c.nz);
     this.material = this.makeMaterial();
     // per-chunk min/max for culling
     const ncx = Math.ceil((c.nx * c.step) / CHUNK), ncz = Math.ceil((c.nz * c.step) / CHUNK);
@@ -196,8 +200,9 @@ void groundShade(vec2 w, float dist){
   gBumpN = vec3((n3.b-0.5)*k, 0.0, (n3.a-0.5)*k);
   gEmis = texture(uLamp, (w - uLampRect.xy)/uLampRect.zw).rgb * uNight * (col * 2.6 + vec3(0.02, 0.016, 0.01));
 }`)
+        .replace('void groundShade(vec2 w, float dist){', PBR_GLSL + GROUND_PBR_GLSL + '\nvoid groundShade(vec2 w, float dist){') // gfx-materials
         .replace('#include <map_fragment>', `float gDist = length(vWPos - cameraPosition);
- groundShade(vWPos.xz, gDist);
+ if (uPbrOn > 0.5) groundShadePBR(vWPos.xz, gDist); else groundShade(vWPos.xz, gDist);
  diffuseColor.rgb = gCol;`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
  roughnessFactor = gRough;`)
@@ -214,7 +219,7 @@ void groundShade(vec2 w, float dist){
         .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  reflectedLight.indirectDiffuse *= gAO; reflectedLight.indirectSpecular *= gAO; reflectedLight.directDiffuse *= mix(1.0, gAO, 0.35);`);
     };
-    mat.customProgramCacheKey = () => 'coreTerrain-v7';
+    mat.customProgramCacheKey = () => 'coreTerrain-v7-pbr1';
     return mat;
   }
   update(camera) {

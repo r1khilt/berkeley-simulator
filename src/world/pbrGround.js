@@ -1,0 +1,189 @@
+// PBR ground shading for CoreTerrain (gfx-materials). Same inputs/outputs as groundShade() in terrain.js:
+// writes gCol (linear albedo), gRough, gBumpN (world-space normal offset), gAO, gEmis.
+// Real CC0 texture sets (see pbr.js) for asphalt, concrete sidewalks, granite and brick pavers, lawn, dry grass, leaf
+// litter and dirt; macro variation + rotated second taps so nothing visibly repeats; procedural decals for slab joints,
+// expansion joints, kerbs, gutters, cracks, sealant, utility patches, oil and gum stains.
+export const GROUND_PBR_GLSL = /* glsl */`
+float hq12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+vec2 cityGrid(vec2 w) { return vec2(0.98776 * w.x + 0.15600 * w.y, -0.15600 * w.x + 0.98776 * w.y); } // Berkeley grid ~9 deg off north
+PS pbrFarPS(float Lr) { PS s; s.c = PBR_MEAN[int(Lr + 0.5)]; s.r = 0.93; s.g = vec2(0.0); s.h = 0.5; return s; }
+// ground tap: world xz -> uv = w/size (+u east, +v south); g returned in world xz
+PS gTap(vec2 w, float size, float Lr, float k, float near) {
+  if (near <= 0.0) return pbrFarPS(Lr);
+  PS s = pbrIso(w, size, Lr, k);
+  if (near < 1.0) { PS f = pbrFarPS(Lr); s.c = mix(f.c, s.c, near); s.g *= near; }
+  return s;
+}
+// structured (pavers/brick): no rotation; per-cell uv offset is applied by the caller
+PS gTapS(vec2 uv, float Lr, float near) {
+  if (near <= 0.0) return pbrFarPS(Lr);
+  PS s = pbrTap(uv, Lr);
+  if (near < 1.0) { PS f = pbrFarPS(Lr); s.c = mix(f.c, s.c, near); s.g *= near; }
+  return s;
+}
+// anti-aliased thin line from a signed distance-like value d (units of its own gradient)
+float aaLine(float d, float wdt) { float fw = max(fwidth(d), 1e-5); return 1.0 - smoothstep(wdt, wdt + fw * 1.5, abs(d)); }
+
+void groundShadePBR(vec2 w, float dist) {
+  vec4 s = texture(uSdf, (w - uGround.xy) / uGround.zw);
+  vec2 ax = texture(uAux, (w - uAuxRect.xy) / uAuxRect.zw).rg;
+  float sp = floor(texture(uSpecial, (w - uGround.xy) / uGround.zw).r * 255.0 + 0.5);
+  vec4 n0 = texture(uNoise, w * 0.013); vec4 n1 = texture(uNoise, w * 0.071); vec4 n2 = texture(uNoise, w * 0.37);
+  float fade = clamp(dist / 120.0, 0.0, 1.0);
+  float near = 1.0 - smoothstep(180.0, 280.0, dist);
+  float det = 1.0 - smoothstep(25.0, 90.0, dist);         // small decals (joints, cracks, gum)
+  float edgeN = (n1.g - 0.5) * 0.9 + (n2.b - 0.5) * 0.35;
+  float dA = (s.r - 0.5) * 6.0, dP = (s.g - 0.5) * 6.0, dG = (s.b - 0.5) * 6.0, dD = (s.a - 0.5) * 6.0;
+  float mA = aaStep(dA + 0.05), mP = aaStep(dP + 0.05 + (n2.b - 0.5) * 0.06), mG = aaStep(dG + edgeN * 0.7), mD = aaStep(dD + edgeN);
+  float lush = ax.r, ao = ax.g;
+  float kIso = n1.r;
+  // final layer weights (same stacking order as the procedural shader: natural < lawn < dirt < pavement < asphalt)
+  float wA = mA, wP = mP * (1.0 - mA), wD = mD * (1.0 - mP) * (1.0 - mA), wG = mG * (1.0 - mD) * (1.0 - mP) * (1.0 - mA);
+  float wN = max(0.0, 1.0 - wA - wP - wD - wG);
+  vec3 col = vec3(0.0); float rough = 0.0; vec2 g = vec2(0.0); float bump = 0.0;
+  vec2 gq = cityGrid(w);
+
+  // ---- natural ground: dry golden November grass, greener where irrigated / lush
+  if (wN > 0.001) {
+    float kl = smoothstep(0.25, 0.85, lush + (n1.g - 0.5) * 0.25);
+    PS d = gTap(w, 2.0, L_DRYGRASS, kIso, near);
+    if (kl > 0.01) { PS l = gTap(w * 1.03, 2.0, L_LAWN, 1.0 - kIso, near); d = pbrMix(d, l, smoothstep(0.0, 1.0, kl + (l.h - d.h) * 0.3)); }
+    d.c *= 0.86 + 0.28 * n0.g;
+    col += wN * d.c; rough += wN * mix(d.r, 0.97, 0.5); g += wN * d.g * 0.9; bump += wN;
+  }
+  // ---- lawn: irrigated turf with dry patches and faint mowing stripes
+  if (wG > 0.001) {
+    PS l = gTap(w, 2.0, L_LAWN, kIso, near);
+    float dryP = smoothstep(0.55, 0.8, n0.r + (n1.b - 0.5) * 0.2) * 0.65 + smoothstep(0.55, 0.95, 1.0 - lush) * 0.5;
+    if (dryP > 0.02) { PS d = gTap(w * 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
+    l.c *= 0.84 + 0.3 * n0.g;
+    float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
+    col += wG * l.c; rough += wG * l.r; g += wG * l.g; bump += wG;
+  }
+  // ---- forest floor / dirt: eucalyptus + oak litter over packed dirt
+  if (wD > 0.001) {
+    PS a = gTap(w, 3.0, L_LITTER, kIso, near);
+    float kd = smoothstep(0.42, 0.62, n1.g + (n2.r - 0.5) * 0.3);
+    if (kd > 0.01) { PS b = gTap(w * 1.01, 3.0, L_DIRT, 1.0 - kIso, near); a = pbrMix(a, b, clamp(kd + (b.h - a.h) * 0.5, 0.0, 1.0)); }
+    a.c *= 0.85 + 0.3 * n0.b;
+    col += wD * a.c; rough += wD * a.r; g += wD * a.g; bump += wD;
+  }
+  // ---- pavement
+  if (wP > 0.001) {
+    PS p; float jointDark = 0.0;
+    if (sp > 3.5 && sp < 4.5) { // brick pavers (running bond, laid on the city grid)
+      vec2 uv = gq / vec2(3.0, 2.0);  // 3 m texture -> pavers ~2:1 instead of wall-brick 3:1
+      vec2 reg = floor(gq / 9.0);
+      p = gTapS(uv + vec2(hq12(reg), hq12(reg + 3.1)), L_BRICK, near);
+      p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y) * vec2(1.0, 1.5);
+      p.c *= vec3(0.86, 0.84, 0.86) * (0.85 + 0.3 * n1.r) * (0.9 + 0.2 * hq12(reg + 7.0));
+      p.r = mix(p.r, 0.9, 0.3);
+    } else if (sp > 4.5 && sp < 5.5) { // granite pavers: 0.9 m squares, each with its own crop of the stone and tone
+      vec2 cq = gq / 0.9; vec2 ci = floor(cq), cf = fract(cq);
+      p = gTapS(gq / 1.0 + vec2(hq12(ci), hq12(ci + 5.3)) * 3.0, L_GRANITE, near);
+      p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y);
+      p.c *= 0.88 + 0.2 * hq12(ci + 9.1);
+      float jd = min(min(cf.x, 1.0 - cf.x), min(cf.y, 1.0 - cf.y)) * 0.9;  // metres to the joint
+      float jt = (1.0 - smoothstep(0.004, 0.004 + max(fwidth(jd) * 1.5, 0.002), jd)) * det;
+      jointDark = jt; p.r = mix(p.r, 0.95, jt);
+      // slight edge bevel
+      float bv = (1.0 - smoothstep(0.004, 0.02, jd)) * det;
+      vec2 gn = vec2(cf.x < 0.5 ? -1.0 : 1.0, cf.y < 0.5 ? -1.0 : 1.0) * vec2(step(min(cf.x, 1.0 - cf.x), min(cf.y, 1.0 - cf.y)), step(min(cf.y, 1.0 - cf.y), min(cf.x, 1.0 - cf.x)));
+      p.g += vec2(0.98776 * gn.x - 0.15600 * gn.y, 0.15600 * gn.x + 0.98776 * gn.y) * bv * 0.6;
+      p.c *= 1.0 - 0.45 * jt;
+    } else { // poured concrete sidewalk: 1.52 m scored slabs on the city grid, expansion joints every 4th line
+      vec2 cq = gq / 1.52; vec2 ci = floor(cq), cf = fract(cq);
+      p = gTap(gq + vec2(hq12(ci), hq12(ci + 2.7)) * 4.0, 4.04, L_SIDEWALK, kIso, near);
+      p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y);
+      float tone = 0.9 + 0.16 * hq12(ci + 1.3) + 0.08 * (n0.g - 0.5);
+      p.c *= tone * vec3(1.0, 0.995, 0.985);
+      vec2 dj = min(cf, 1.0 - cf) * 1.52;                     // metres to the scored lines
+      float jd = min(dj.x, dj.y);
+      float exp4 = step(mod(ci.x + (cf.x > 0.5 ? 1.0 : 0.0), 4.0), 0.5) * step(dj.x, dj.y) + step(mod(ci.y + (cf.y > 0.5 ? 1.0 : 0.0), 4.0), 0.5) * step(dj.y, dj.x);
+      float jwid = mix(0.004, 0.009, clamp(exp4, 0.0, 1.0));
+      float jt = (1.0 - smoothstep(jwid, jwid + max(fwidth(jd) * 1.5, 0.002), jd)) * det;
+      float jdirt = (1.0 - smoothstep(0.0, 0.06, jd)) * 0.12 * det;  // grime collects along joints
+      jointDark = jt;
+      p.c *= (1.0 - 0.5 * jt) * (1.0 - jdirt);
+      // groove normal (both sides of the joint slope into it)
+      vec2 gn = vec2(cf.x < 0.5 ? 1.0 : -1.0, cf.y < 0.5 ? 1.0 : -1.0) * vec2(step(dj.x, dj.y), step(dj.y, dj.x));
+      p.g -= vec2(0.98776 * gn.x - 0.15600 * gn.y, 0.15600 * gn.x + 0.98776 * gn.y) * (1.0 - smoothstep(jwid, jwid + 0.01, jd)) * 0.5 * det;
+      // the odd cracked slab
+      float hc = hq12(ci + 4.4);
+      if (hc > 0.86) { float cl = dot(cf - 0.5, normalize(vec2(hq12(ci + 8.0) - 0.5, 0.5))) + (texture(uNoise, w * 0.9).g - 0.5) * 0.12; p.c *= 1.0 - 0.45 * aaLine(cl, 0.002) * det; }
+      // gum spots and drip stains (Telegraph classics)
+      vec2 gc = w * 3.0; vec2 gi = floor(gc); float hg = hq12(gi + 0.7);
+      if (hg > 0.965) { float gr = length(fract(gc) - 0.5 - (vec2(hq12(gi + 1.0), hq12(gi + 2.0)) - 0.5) * 0.4); p.c *= 1.0 - 0.35 * (1.0 - smoothstep(0.035, 0.06, gr)) * det; p.r = mix(p.r, 0.7, (1.0 - smoothstep(0.035, 0.06, gr)) * det); }
+      p.c *= 1.0 - 0.18 * smoothstep(0.6, 0.85, texture(uNoise, w * 0.19).r) * (0.5 + 0.5 * n1.b);
+    }
+    col += wP * p.c; rough += wP * p.r; g += wP * p.g; bump += wP;
+  }
+  // ---- asphalt
+  if (wA > 0.001) {
+    PS a = gTap(w, 3.0, L_ASPHALT, kIso, near);
+    float age = smoothstep(0.25, 0.8, n0.r);                     // weathered grey (old) vs dark (recent overlay)
+    a.c *= mix(0.78, 1.32, age) * (0.92 + 0.16 * n1.g);
+    // utility-cut patches: rectangles on the city grid, darker & smoother with a tar seam
+    vec2 pc = gq / vec2(11.0, 7.0); vec2 pi = floor(pc), pf = fract(pc);
+    if (hq12(pi + 17.0) > 0.7) {
+      vec2 r0 = vec2(0.1, 0.15) + vec2(hq12(pi + 3.0), hq12(pi + 5.0)) * vec2(0.4, 0.35);
+      vec2 r1 = r0 + vec2(0.15, 0.2) + vec2(hq12(pi + 7.0), hq12(pi + 9.0)) * vec2(0.3, 0.3);
+      vec2 dd = min(pf - r0, r1 - pf) * vec2(11.0, 7.0); float din = min(dd.x, dd.y);
+      float inR = smoothstep(-0.01, 0.01, din);
+      a.c = mix(a.c, a.c * 0.68, inR * (0.6 + 0.4 * hq12(pi + 11.0))); a.r = mix(a.r, 0.82, inR);
+      float seam = (1.0 - smoothstep(0.02, 0.05, abs(din))) * det; a.c = mix(a.c, vec3(0.018), seam * 0.85); a.r = mix(a.r, 0.45, seam);
+    }
+    // crack network (two scales of noise iso-lines) in the older surface, plus black sealant "tar snakes"
+    float c1 = texture(uNoise, w * 0.09).g - 0.5, c2 = texture(uNoise, w * 0.23 + 0.37).b - 0.5;
+    float crk = max(aaLine(c1, 0.0015), aaLine(c2, 0.002) * 0.7) * age * det;
+    float seal = (1.0 - smoothstep(0.006, 0.011, abs(c1))) * step(0.62, n1.r) * (1.0 - fade);
+    a.c *= 1.0 - 0.55 * crk; a.c = mix(a.c, vec3(0.016, 0.016, 0.017), seal * 0.9); a.r = mix(a.r, 0.38, seal);
+    // oil drips and tyre polish
+    float oil = smoothstep(0.66, 0.86, texture(uNoise, w * 0.17 + 0.5).r) * (0.4 + 0.6 * n2.g);
+    a.c *= 1.0 - 0.35 * oil; a.r = mix(a.r, 0.6, oil * 0.6);
+    // gutter: darker, dirtier band along the kerb where pavement meets the road
+    float gut = aaStep(dA) * (1.0 - smoothstep(0.0, 0.5, dA)) * smoothstep(-1.0, -0.2, dP);
+    a.c = mix(a.c, a.c * 0.7 + vec3(0.01, 0.009, 0.007), gut * 0.8);
+    col += wA * a.c; rough += wA * a.r; g += wA * a.g * 1.2; bump += wA;
+  }
+  // kerb: concrete band just outside the asphalt where there is pavement
+  float curb = (1.0 - aaStep(dA)) * aaStep(dA + 0.28) * mP;
+  if (curb > 0.001) {
+    PS k = gTap(w * 1.1, 4.04, L_SIDEWALK, 0.5, near);
+    float kd = smoothstep(-0.28, 0.0, dA);                  // toward the road edge: grime + worn arris
+    vec3 kc = k.c * 1.12 * (1.0 - 0.25 * kd) * (0.92 + 0.12 * n1.r);
+    col = mix(col, kc, curb); rough = mix(rough, k.r, curb); g = mix(g, k.g, curb);
+  }
+  // special surfaces keep their simple shading
+  if (sp > 0.5 && sp < 1.5) { col = mix(vec3(0.42, 0.17, 0.12), vec3(0.50, 0.22, 0.15), n2.b); rough = 0.9; g = vec2(0.0); }
+  else if (sp > 1.5 && sp < 2.5) { col = mix(vec3(0.20, 0.34, 0.30), vec3(0.24, 0.38, 0.33), n1.g); rough = 0.8; g = vec2(0.0); }
+  else if (sp > 2.5 && sp < 3.5) { PS d = gTap(w, 3.0, L_DIRT, kIso, near); col = mix(vec3(0.66, 0.58, 0.44), vec3(0.74, 0.66, 0.50), n2.r) * (0.75 + 0.5 * d.h); rough = 1.0; g = d.g * 0.5; }
+  else if (sp > 5.5 && sp < 6.5) { float stripe = step(0.5, fract(w.x / 6.0)); PS l = gTap(w, 2.0, L_LAWN, kIso, near); col = mix(vec3(0.16, 0.30, 0.09), vec3(0.19, 0.34, 0.11), stripe) * (0.65 + 0.35 * l.c.g / 0.0912); rough = 0.95; g = l.g * 0.6; }
+  // late-autumn leaf litter under deciduous trees (unchanged)
+  vec4 lf = texture(uLeaf, (w - uLampRect.xy) / uLampRect.zw);
+  if (lf.a > 0.01) {
+    float dens = clamp(lf.a * 3.0, 0.0, 0.9) * (1.0 - mA * 0.9);
+    vec2 lc = w * 8.0; vec2 li = floor(lc); vec2 lr = fract(lc) - 0.5;
+    float hh = fract(sin(dot(li, vec2(12.9898, 78.233))) * 43758.5453);
+    float ang = hh * 6.283; vec2 rr = vec2(cos(ang) * lr.x - sin(ang) * lr.y, sin(ang) * lr.x + cos(ang) * lr.y);
+    float shape = 1.0 - smoothstep(0.18, 0.3, length(rr * vec2(1.0, 1.9)));
+    float leaf = step(1.0 - dens, fract(hh * 7.13)) * shape;
+    float lodL = smoothstep(0.03, 0.12, max(fwidth(lc.x), fwidth(lc.y)));
+    leaf = mix(leaf, dens * 0.3, lodL);
+    vec3 leafC = mix(mix(vec3(0.70, 0.50, 0.14), vec3(0.52, 0.28, 0.09), fract(hh * 3.7)), vec3(0.78, 0.66, 0.20), step(0.8, fract(hh * 5.3)));
+    col = mix(col, leafC, leaf); rough = mix(rough, 0.95, leaf); g *= 1.0 - leaf;
+  }
+  // far: blend toward the real aerial photo colour
+  float farK = smoothstep(500.0, 1400.0, dist);
+  if (farK > 0.0) {
+    vec3 o = texture(uOrtho, (w - uAuxRect.xy) / uAuxRect.zw).rgb;
+    o = mix(o, vec3(dot(o, vec3(0.3, 0.59, 0.11))) * vec3(1.05, 0.98, 0.82), 0.25);
+    col = mix(col, o * 0.95, farK * 0.65);
+  }
+  gCol = col; gRough = clamp(rough, 0.3, 1.0); gAO = mix(1.0, ao, 0.9);
+  // texture slope -> world-space normal offset (heightfield normal has y = 2, so scale by 2)
+  float bk = (1.0 - smoothstep(60.0, 220.0, dist)) * 1.6;
+  gBumpN = vec3(g.x, 0.0, g.y) * bk;
+  gEmis = texture(uLamp, (w - uLampRect.xy) / uLampRect.zw).rgb * uNight * (col * 2.6 + vec3(0.02, 0.016, 0.01));
+}
+`;

@@ -26,6 +26,7 @@ import { Grass } from './world/grass.js';
 import { U, materials } from './materials.js';
 import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './time.js';
 import { installGrading, contactAO, GRADE } from './world/grading.js';
+import { initPBR, PBR } from './world/pbr.js'; // gfx-materials: PBR surface textures
 installGrading();
 
 const canvas = document.getElementById('c');
@@ -49,6 +50,7 @@ async function boot() {
   const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.2, 160000);
   Object.assign(BS, { renderer, scene, camera, settings });
   const t0 = performance.now();
+  const pbrP = initPBR(settings.quality); // gfx-materials: load PBR surface textures in parallel with the world data
   ui.note('Loading terrain, buildings and trees…');
   const [metaCore, metaFar] = await Promise.all([loadJSON('meta_core.json'), loadJSON('meta_far.json')]);
   const manifestP = loadManifest();
@@ -347,6 +349,7 @@ async function boot() {
   BS.debug = () => ({ terrain: terrain.stats, trees: treeSys && treeSys.counts, landmarks: lm.placed.map((l) => l.id), player: player.pos.toArray().map((v) => +v.toFixed(1)), mode: player.mode, render: renderer.info.render });
   phase('rest'); BS.timing = { phases: PH, load: Math.round(tLoad - t0), build: Math.round(performance.now() - tLoad), buildings: bres.stats, reversed: renderer.capabilities.reversedDepthBuffer, landmarks: lm.placed.length + '/' + lm.items.length, trees: trees.n };
   console.log('BSIM timing', JSON.stringify(BS.timing));
+  await Promise.race([pbrP, new Promise((r) => setTimeout(r, 8000))]); BS.pbr = PBR; // gfx-materials
   ui.progress(1); ui.ready(); BS.ready = true;
   if (qs.get('play')) startPlay();
 }
