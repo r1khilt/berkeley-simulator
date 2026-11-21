@@ -35,18 +35,19 @@ export async function build(ctx) {
   const insetVar = (P, ds) => { const n = P.length; const lines = P.map((a, i) => { const b = P[(i + 1) % n]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const nn = [-t[1], t[0]]; return { p: [a[0] - nn[0] * ds[i], a[1] - nn[1] * ds[i]], t }; });
     const out = []; for (let i = 0; i < n; i++) { const A = lines[(i - 1 + n) % n], B = lines[i]; const den = A.t[0] * B.t[1] - A.t[1] * B.t[0]; if (Math.abs(den) < 1e-6) { out.push(B.p); continue; } const q = ((B.p[0] - A.p[0]) * B.t[1] - (B.p[1] - A.p[1]) * B.t[0]) / den; out.push([A.p[0] + A.t[0] * q, A.p[1] + A.t[1] * q]); } return out; };
   const setb = styles.map((st) => st === 'punch' ? 0.0 : 3.2);
+  let yBc = T5 - 4 * 3.9; // height of the courtyard-front ground storey (set in the façade loop)
   // façades per edge
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length]; const R = K.run(a, b); const L = R.L; if (L < 0.8) continue;
     let gs = Infinity; for (let k = 0; k <= 4; k++) { const p = R.at(L * k / 4, 1); gs = Math.min(gs, ctx.groundAt(p[0], p[1])); }
-    const g0 = Math.max(gs, T5 - F1 - 4 * FH - 0.0); // ground floor level for this face (stepping site)
-    const style = styles[i];
-    const yB = g0 + F1; // top of the glazed/stone base
+    const style = styles[i]; const gMid = ctx.groundAt(...R.at(L / 2, 1.5)); const g0 = style === 'court' ? Math.max(gs, Math.min(gMid, 4.0), T5 - F1 - 4 * FH) : Math.max(gs, T5 - F1 - 4 * FH); // ground floor level for this face (stepping site)
+    const yB = style === 'court' ? Math.max(g0 + 4.6, T5 - 4 * 3.9) : g0 + F1; // top of the glazed/stone base
+    const FHf = style === 'court' ? (T5 + 0.3 - yB) / 4 : FH; if (style === 'court') yBc = yB;
     // ground floor: glazed storefront (recessed arcade on the courtyard), dark stone elsewhere with punched windows
     const PE = 3.6; // solid stone end piers of the courtyard front
     if (style === 'court') {
       const rec = 2.5;
-      K.rbox(R, M.windowNight, PE, g0, -rec - 0.05, L - PE, yB - 0.5, -rec);
+      { const nb2 = Math.max(2, Math.round((L - 2 * PE) / 1.5)); for (let k = 0; k < nb2; k++) { const a = PE + (L - 2 * PE) * k / nb2, b = PE + (L - 2 * PE) * (k + 1) / nb2; const gy = Math.max(g0, ctx.groundAt(...R.at((a + b) / 2, -rec + 0.3))); K.rbox(R, M.windowNight, a, gy, -rec - 0.05, b, yB - 0.5, -rec); K.rbox(R, BASE, a, base, -rec - 0.3, b, gy + 0.02, -rec + 0.02); } }
       const nm = Math.max(2, Math.round((L - 2 * PE) / 1.5)); for (let k = 0; k <= nm; k++) { const ss = PE + (L - 2 * PE) * k / nm; K.rbox(R, DK, ss - 0.04, g0, -rec, ss + 0.04, yB - 0.5, -rec + 0.1, { detail: k > 0 && k < nm }); }
       K.rbox(R, DK, PE, g0 + 3.0, -rec, L - PE, g0 + 3.08, -rec + 0.1, { detail: true });
       { const c = L / 2; K.rbox(R, DK, c - 1.9, g0, -rec + 0.02, c + 1.9, g0 + 2.6, -rec + 0.12); K.rbox(R, M.windowNight, c - 1.8, g0 + 0.05, -rec + 0.12, c - 0.05, g0 + 2.5, -rec + 0.14); K.rbox(R, M.windowNight, c + 0.05, g0 + 0.05, -rec + 0.12, c + 1.8, g0 + 2.5, -rec + 0.14); }
@@ -65,17 +66,17 @@ export async function build(ctx) {
     if (style === 'court') {
       // solid end piers with one narrow slot window per floor
       for (const [a0, a1] of [[0, PE], [L - PE, L]]) {
-        const ops = []; for (let f = 0; f < 4; f++) ops.push({ s0: (a0 + a1) / 2 - 0.45, s1: (a0 + a1) / 2 + 0.45, y0: yB + f * FH + 0.8, y1: yB + f * FH + 3.3, mull: 0, frame: DK, sill: false });
+        const ops = []; for (let f = 0; f < 4; f++) ops.push({ s0: (a0 + a1) / 2 - 0.45, s1: (a0 + a1) / 2 + 0.45, y0: yB + f * FHf + 0.8, y1: yB + f * FHf + 3.2, mull: 0, frame: DK, sill: false });
         openWall(K, R, ST, a0, a1, yB, T5 + 1.1, ops, { depth: 0.5, rev: 0.25, frame: DK, sill: false });
       }
       // central curtain wall recessed 0.6 m: blue-grey glass, slab-edge covers, white fins, louvre bands over the upper 60%
       const c0 = PE, c1 = L - PE; const nf = Math.max(3, Math.round((c1 - c0) / 3.6));
-      K.rbox(R, GL, c0, yB, -0.65, c1, T5 + 0.9, -0.6);
+      K.rbox(R, GL, c0, yB - 0.3, -0.65, c1, T5 + 0.9, -0.6);
       K.rbox(R, ST, c0, T5 + 0.3, -0.6, c1, T5 + 1.1, 0.1);                         // head band under the terrace
-      for (let f = 0; f < 4; f++) { const fy = yB + f * FH;
+      for (let f = 0; f < 4; f++) { const fy = yB + f * FHf;
         K.rbox(R, LOU, c0, fy - 0.2, -0.6, c1, fy + 0.25, 0.0);                       // slab-edge cover
-        for (let y = fy + 1.65; y < fy + FH - 0.25; y += 0.26) K.rbox(R, LOU, c0, y - 0.02, -0.55, c1, y + 0.02, -0.25, { detail: y > fy + 2.6 });
-        const nmu = Math.round((c1 - c0) / 1.2); for (let k = 1; k < nmu; k++) { const ss = c0 + (c1 - c0) * k / nmu; K.rbox(R, AL, ss - 0.03, fy + 0.25, -0.6, ss + 0.03, fy + FH - 0.2, -0.52, { detail: true }); }
+        for (let y = fy + 1.55; y < fy + FHf - 0.25; y += 0.26) K.rbox(R, LOU, c0, y - 0.02, -0.55, c1, y + 0.02, -0.25, { detail: y > fy + 2.6 });
+        const nmu = Math.round((c1 - c0) / 1.2); for (let k = 1; k < nmu; k++) { const ss = c0 + (c1 - c0) * k / nmu; K.rbox(R, AL, ss - 0.03, fy + 0.25, -0.6, ss + 0.03, fy + FHf - 0.2, -0.52, { detail: true }); }
       }
       for (let k = 0; k <= nf; k++) { const ss = c0 + (c1 - c0) * k / nf; const w = k === nf / 2 ? 0.45 : 0.3; K.rbox(R, LOU, ss - w / 2, yB - 0.3, -0.6, ss + w / 2, T5 + 0.3, 0.15); }
     } else if (style === 'west') {
@@ -100,7 +101,8 @@ export async function build(ctx) {
   }
   // core + terrace slab
   const inner = insetPoly(poly, 0.45);
-  K.prism(M.concreteDark, inner, base, T5 + 0.9);
+  K.prism(M.concreteDark, insetVar(poly, styles.map((st) => st === 'court' ? 2.7 : 0.45)), base, yBc);
+  K.prism(M.concreteDark, insetVar(poly, styles.map((st) => st === 'court' ? 0.8 : 0.45)), yBc, T5 + 0.9);
   K.prism(M.paving, inner, T5 + 0.9, T5 + 1.0);
   // set-back glass pavilion on top + thin floating roof slab + mechanical screen
   const pav = insetVar(poly, setb);
@@ -113,7 +115,6 @@ export async function build(ctx) {
   const roofP = insetVar(poly, setb.map((d) => d < 1 ? 0.3 : d - 0.6)); const FAS = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.5, metalness: 0.3 });
   K.prism(M.concrete, roofP, TOP - 0.6, TOP);
   K.loop(FAS, roofP, [[0.0, TOP - 0.3], [0.04, TOP - 0.3], [0.04, TOP + 0.05], [0.0, TOP + 0.05]]);
-  K.loop(M.iron, insetPoly(roofP, 0.3), [[0, TOP + 1.05], [0.03, TOP + 1.05], [0.03, TOP + 1.1], [0, TOP + 1.1]], { detail: true });
   const c = poly.reduce((s, p) => [s[0] + p[0] / poly.length, s[1] + p[1] / poly.length], [0, 0]);
   const SCR = new THREE.MeshStandardMaterial({ color: 0x9a9c9e, roughness: 0.6, metalness: 0.3 }); K.box(SCR, c[0] + 2, TOP, c[1] - 8, c[0] + 12, TOP + 1.3, c[1] - 2);
   walkables.push({ type: 'poly', pts: inner.map((p) => [+p[0].toFixed(2), +p[1].toFixed(2)]), y: T5 + 1.0 });
