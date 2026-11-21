@@ -22,9 +22,10 @@ export class Kit {
   groundMax(pts) { let m = -Infinity; for (const [u, v] of pts) m = Math.max(m, this.ground(u, v)); return m; }
 
   // geometry g is in frame coords; uvMode: 'box' (walls, level courses) | 'slope' (roof tiles parallel to eaves) | 'keep'
-  add(mat, g, { detail = false, uvMode = 'box' } = {}) {
+  add(mat, g, { detail = false, uvMode = 'box', clip = null } = {}) {
     if (!mat) throw new Error('missing material');
     g = g.index ? g.toNonIndexed() : g;
+    if (clip) { g = clip(g); if (!g) return null; } // optional triangle clip (frame coords), e.g. clipBelow('v', -26)
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
     g.clearGroups();
     if (uvMode === 'box') g = this.ctx.boxUV(g);
@@ -60,7 +61,7 @@ export class Kit {
     quad(a, A, B, b); quad(b, B, C, c); quad(c, C, D, d); quad(d, D, A, a);
     if (B[0] - A[0] > 1e-3 && D[2] - A[2] > 1e-3) quad(A, D, C, B);
     this.add(mat, triGeom(tris), { ...o, uvMode: 'slope' });
-    this.add(o.soffit || mat, triGeom([a, b, c, a, c, d]), { uvMode: 'box', detail: false });
+    if (o.soffit !== false) this.add(o.soffit || mat, triGeom([a, b, c, a, c, d]), { uvMode: 'box', detail: false, clip: o.soffitClip });
     return yR;
   }
   // Gable roof: ridge along 'u' or 'v'. Returns ridge height. Gable ends are open (cover with pediments).
@@ -76,7 +77,7 @@ export class Kit {
         [um, yRidge, v0], [um, yRidge, v1], [u1, yEave, v1], [um, yRidge, v0], [u1, yEave, v1], [u1, yEave, v0]];
     }
     this.add(mat, triGeom(tris), { ...o, uvMode: 'slope' });
-    this.add(o.soffit || mat, triGeom([[u0, yEave, v0], [u1, yEave, v0], [u1, yEave, v1], [u0, yEave, v0], [u1, yEave, v1], [u0, yEave, v1]]), { uvMode: 'box' });
+    if (o.soffit !== false) this.add(o.soffit || mat, triGeom([[u0, yEave, v0], [u1, yEave, v0], [u1, yEave, v1], [u0, yEave, v0], [u1, yEave, v1], [u0, yEave, v1]]), { uvMode: 'box', clip: o.soffitClip });
     return yRidge;
   }
   pyramid(mat, cu, cv, hu, hv, y0, h, o = {}) {
@@ -219,6 +220,26 @@ class Side {
   }
 }
 
+// Clip a non-indexed geometry's triangles to the half-space coord(axis) >= min (axis 'u'|'y'|'v' in frame coords).
+export function clipBelow(axis, min) {
+  const ai = { u: 0, y: 1, v: 2 }[axis];
+  return (g) => {
+    const p = g.attributes.position, out = [];
+    const V = (i) => [p.getX(i), p.getY(i), p.getZ(i)];
+    const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    for (let i = 0; i < p.count; i += 3) {
+      const tri = [V(i), V(i + 1), V(i + 2)], poly = [];
+      for (let k = 0; k < 3; k++) {
+        const a = tri[k], b = tri[(k + 1) % 3], ia = a[ai] >= min, ib = b[ai] >= min;
+        if (ia) poly.push(a);
+        if (ia !== ib) poly.push(lerp(a, b, (min - a[ai]) / (b[ai] - a[ai])));
+      }
+      for (let k = 1; k + 1 < poly.length; k++) out.push(...poly[0], ...poly[k], ...poly[k + 1]);
+    }
+    if (!out.length) return null;
+    const ng = new THREE.BufferGeometry(); ng.setAttribute('position', new THREE.Float32BufferAttribute(out, 3)); ng.computeVertexNormals(); return ng;
+  };
+}
 function triGeom(pts) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3));
