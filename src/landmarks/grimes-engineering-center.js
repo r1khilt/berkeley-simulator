@@ -61,13 +61,13 @@ export async function build(ctx) {
   const PAR = P1 + 0.55;       // band / parapet top (the hedge planters sit on it) (the podium-roof planters sit behind it)
   // Old Bechtel ground floor: square board-formed piers flush with the face, storefront glazing recessed `rec` behind
   // them, and a deep two-row precast band above (panel texture = 3.0 x 1.5 m panels with dark joints).
-  const arcade = (a, b, { rec = 1.0, piers, ent = null, top = PAR, corner = 1.5, pw = 0.6, raise = null, bandMat = G.panel, band0 = BAND0 }) => {
+  const arcade = (a, b, { rec = 1.0, piers, ent = null, top = PAR, corner = 1.5, pw = 0.6, raise = null, bandMat = G.panel, band0 = BAND0, solidTo = 0 }) => {
     const R = K.run(a, b), Ri = K.run(a, b, -rec); const L = R.L;
     const gl = gMin(Math.min(a[0], b[0]) - 0.5, Math.min(a[1], b[1]) - 0.5, Math.max(a[0], b[0]) + 0.5, Math.max(a[1], b[1]) + 0.5);
     const ps = [0, ...piers, L]; const ops = [];
     for (let i = 0; i < ps.length - 1; i++) {
       const s0 = ps[i] + (i === 0 ? corner : pw / 2), s1 = ps[i + 1] - (i === ps.length - 2 ? corner : pw / 2);
-      if (s1 - s0 < 0.8) continue;
+      if (s1 - s0 < 0.8 || s1 <= solidTo + 0.5) continue;
       const entry = ent != null && Math.abs((s0 + s1) / 2 - ent) < 1.5;
       ops.push({ s0, s1, y0: entry ? 0.3 : 0.3, y1: band0 - 0.1, sill: false, fw: 0.06, entry });
     }
@@ -79,7 +79,8 @@ export async function build(ctx) {
       K.rbox(Ri, G.frame, o.s0, o.y0 + 2.45, -0.1, o.s1, o.y0 + 2.57, 0.03);
       K.rbox(R, G.deck, o.s0 - 3, o.y0 - 0.3, -rec, o.s1 + 3, o.y0, 3.0);                  // entry apron under the band
     }
-    for (const s of piers) K.rbox(R, G.panel, s - pw / 2, gl - 1.2, -pw, s + pw / 2, band0 + 0.05, 0);
+    for (const s of piers) if (s > solidTo + 0.5) K.rbox(R, G.panel, s - pw / 2, gl - 1.2, -pw, s + pw / 2, band0 + 0.05, 0);
+    if (solidTo > 0) K.rbox(R, G.panel, 0, gl - 1.2, -rec, solidTo + pw / 2, band0 + 0.05, 0);   // solid old-Bechtel west end
     K.rbox(R, G.panel, 0, gl - 1.2, -rec, corner, band0 + 0.05, 0); K.rbox(R, G.panel, L - corner, gl - 1.2, -rec, L, band0 + 0.05, 0);
     const cut = raise ? raise.s0 : L;
     K.rbox(R, bandMat, -0.02, band0, -rec - 0.05, cut, top, 0.02);                            // deep band (underside = arcade soffit)
@@ -92,8 +93,8 @@ export async function build(ctx) {
   };
   {
     // south front: recessed storefront between square piers, centred glass entrance under the band
-    const R = arcade([bW, bS], [bE, bS], { rec: 1.0, piers: [7.65, 13.8, 19.95, 26.1, 33.1, 41.6, 50.2], ent: 29.6, raise: { s0: 33.4, h: 0.95 } });
-    sign(K, R, 'GRIMES ENGINEERING CENTER', 29.6, (BAND0 + PAR) / 2 + 0.05, 0.42, { color: '#57534d', metal: 0.35, weight: '500', spacing: 0.16, d: 0.05 });
+    const R = arcade([bW, bS], [bE, bS], { rec: 1.0, piers: [7.65, 13.8, 19.95, 26.1, 33.1, 41.6, 50.2], ent: 29.6, raise: { s0: 33.4, h: 0.95 }, pw: 0.6 });
+    sign(K, R, 'GRIMES ENGINEERING CENTER', 29.6, (BAND0 + PAR) / 2 + 0.05, 0.56, { color: '#2c2f33', metal: 0.2, weight: '600', spacing: 0.14, d: 0.05 });
   }
   { // east face: tall plain concrete wall with a band of storefront at the plaza end (podium + level 2 flush)
     const R = K.run([bE, bS], [bE, bN]); const gl = gMin(bE, bN, bE + 1.5, bS);
@@ -103,7 +104,7 @@ export async function build(ctx) {
   }
   const WS = { v0: -16.0, vT: -3.4, vT1: -0.6 };   // west stair stations (north -> south): one straight flight + top landing
   { // west face (toward Memorial Glade): glazing recessed deep under the deck edge, behind square piers
-    arcade([bW, bN], [bW, bS], { rec: 3.0, piers: [5.0, 10.5, 16.0, 21.5, 27.0, 32.5], top: P1 + 0.02, pw: 0.7, corner: 1.2, bandMat: G.whitePanel, band0: P1 - 1.2 });
+    arcade([bW, bN], [bW, bS], { rec: 3.0, piers: [5.0, 10.5, 16.0, 21.5, 27.0, 32.5], top: P1 + 0.02, pw: 0.6, corner: 1.0, bandMat: G.whitePanel, band0: P1 - 1.2 });
   }
   { const R = K.run([bE, bN], [bW, bN]); K.wall(R, G.panel, 0, R.L, gMin(bW, bN - 1, bE, bN) - 1.2, TER + 0.18, [], 0.45); }
   // podium roof: planters along the south, a deck along the west with a picket guardrail
@@ -123,15 +124,17 @@ export async function build(ctx) {
   {
     const runs = [{ R: K.run([sW, sS], [bE, sS]), bay: 8.1 }, { R: K.run([sW, bN], [sW, sS]), bay: 8.1, s0: 2.0 }];
     for (const { R, bay, s0 = 0 } of runs) {
-      const y0 = P1, y1 = TER - 0.95;
-      const ops = bays(s0 + 0.4, R.L - 0.4, bay, y0 + 0.1, y1 - 0.08, 0.75);
-      K.wall(R, G.whitePanel, 0, R.L, y0 - 0.05, y1, ops, 0.4);
-      for (const o of ops) K.fill(R, o, { rev: 0.25, glass: G.storeGlass, frame: G.frame, mull: Math.max(2, Math.round((o.s1 - o.s0) / 1.6) - 1), tran: [] });
-      K.rbox(R, G.whitePanel, -0.15, TER - 1.1, -0.2, R.L + 0.15, TER + 0.18, 0.16);            // solid white fascia band
+      const y0 = P1, yb = TER - 0.42;   // glass runs floor to slab edge; thin (~0.6 m) white slab-edge band above
+      K.rbox(R, G.glass, s0, y0, -0.32, R.L, yb, -0.26);
+      const n = Math.max(3, Math.round((R.L - s0) / 1.4)); const nb = Math.max(1, Math.round((R.L - s0) / 4.2 / ((R.L - s0) / n)));
+      for (let i = 0; i <= n; i++) { const s = s0 + (R.L - s0) * i / n; const big = i % nb === 0; K.rbox(R, G.frame, s - (big ? 0.11 : 0.03), y0, -0.3, s + (big ? 0.11 : 0.03), yb, big ? -0.06 : -0.18, { detail: !big }); }
+      K.rbox(R, G.ceiling, s0, yb - 0.02, -3.4, R.L, yb, -0.3);                                      // ceiling read through the glass
+      K.rbox(R, G.interiorWall, s0, y0, -3.5, R.L, yb, -3.4);                                         // lit back wall ~3 m in
+      K.rbox(R, G.frame, s0, y0, -0.3, R.L, y0 + 0.08, -0.14); K.rbox(R, G.frame, s0, y0 + 2.6, -0.3, R.L, y0 + 2.65, -0.18, { detail: true });
+      K.rbox(R, G.metalPanel, -0.15, yb, -0.2, R.L + 0.15, TER + 0.18, 0.16);                  // thin white slab-edge band
     }
-    sign(K, runs[0].R, 'Grimes Engineering Center', runs[0].R.L - 10.5, TER - 0.42, 0.32, { color: '#5b5e60', metal: 0.3, spacing: 0.04, d: 0.18 });
-    colliders.push(K.colPoly([[sW, bN], [bE, bN], [bE, sS], [sW, sS]], P1 - 0.1, TER - 0.05));
-    K.box(M.concreteDark, sW + 0.5, P1, bN + 0.5, bE - 0.5, TER - 0.3, sS - 0.5);
+        colliders.push(K.colPoly([[sW, bN], [bE, bN], [bE, sS], [sW, sS]], P1 - 0.1, TER - 0.05));
+    K.box(M.concreteDark, sW + 3.6, P1, bN + 0.5, bE - 0.5, TER - 0.3, sS - 3.6);
   }
 
   // =============================== 3. TERRACE + GLASS PAVILION ===============================
@@ -142,7 +145,7 @@ export async function build(ctx) {
   walkables.push(K.walkPoly(terPoly, TER));
   const terRail = [[[sW + 0.12, sS - 0.12], [bE - 0.12, sS - 0.12]], [[bE - 0.12, sS - 0.12], [bE - 0.12, bN + 0.5]], [[sW + 0.12, bN + 0.5], [sW + 0.12, sS - 0.12]]];
   for (const [a, b] of terRail) { pickets(K, G.steel, a, b, TER + 0.18, 1.07, 0.11); railCol(a, b, TER - 0.2, TER + 1.3); }
-  for (const [u0, v0, u1, v1] of [[-13.0, -14.8, -3.0, -12.8], [4.0, -14.8, 14.0, -12.8], [-26.1, 4.0, -24.5, 9.0], [27.6, -2.0, 29.8, 8.0]]) {
+  for (const [u0, v0, u1, v1] of [[27.6, -2.0, 29.8, 8.0]]) {
     K.box(G.panel, u0, TER, v0, u1, TER + 0.55, v1); K.box(G.planting, u0 + 0.15, TER + 0.55, v0 + 0.15, u1 - 0.15, TER + 0.95, v1 - 0.15, { detail: true });
     colliders.push(K.colPoly(quad(u0, v0, u1, v1), TER, TER + 0.6));
   }
@@ -152,11 +155,10 @@ export async function build(ctx) {
   const pRuns = [K.run([pW, pS], [pE, pS]), K.run([pE, pS], [pE, pN]), K.run([pE, pN], [pW, pN]), K.run([pW, pN], [pW, pS])];
   for (const R of pRuns) {
     K.rbox(R, G.glass, 0, TER, -0.06, R.L, RF, -0.03);
-    const n = Math.max(2, Math.round(R.L / 1.55)); for (let i = 0; i <= n; i++) { const s = R.L * i / n; K.rbox(R, G.frame, s - 0.035, TER, -0.04, s + 0.035, RF, 0.12, { detail: i % 3 !== 0 }); }
-    for (const y of [TER + 3.05, F4 + 3.05]) K.rbox(R, G.frame, 0, y - 0.03, -0.04, R.L, y + 0.03, 0.1, { detail: true });
+    const n = Math.max(2, Math.round(R.L / 1.55)); for (let i = 0; i <= n; i++) { const s = R.L * i / n; K.rbox(R, G.frame, s - 0.03, TER, -0.04, s + 0.03, RF, 0.1, { detail: i % 3 !== 0 }); }
     K.rbox(R, G.frame, 0, TER, -0.04, R.L, TER + 0.08, 0.1, { detail: true });
-    K.rbox(R, G.metalPanel, -0.02, F4 - 0.55, -0.1, R.L + 0.02, F4 + 0.45, 0.24);                // white floor band
-    K.rbox(R, G.metalPanel, -0.02, RF - 0.05, -0.1, R.L + 0.02, RF + 0.55, 0.24);                // roof edge band
+    K.rbox(R, G.metalPanel, -0.02, F4 - 0.3, -0.1, R.L + 0.02, F4 + 0.22, 0.2);                 // thin white slab-edge band
+    K.rbox(R, G.metalPanel, -0.02, RF - 0.05, -0.1, R.L + 0.02, RF + 0.4, 0.2);                  // roof edge band
   }
   K.box(G.slab, pW - 0.1, RF + 0.1, pN - 0.1, pE + 0.1, RF + 0.5, pS + 0.1);                    // pavilion roof
   colliders.push(K.colPoly(pavPoly, TER - 0.5, CT));
@@ -167,7 +169,8 @@ export async function build(ctx) {
     K.flat(G.ceiling, ip, F4 - 0.46, [voidH], true);
     K.flat(G.ceiling, ip, RF - 0.25, [], true);
     K.flat(G.deck, ip, F4 - 0.04, [voidH]);
-    for (const [u0, v0, u1, v1] of [[14.0, -5.2, 21.5, 1.0], [-18.0, 8.0, -13.5, 16.0], [-2.0, 12.5, 4.0, 16.4]]) K.box(G.interiorWall, u0, TER, v0, u1, RF - 0.25, v1);
+    K.box(G.interiorWall, 14.0, TER, -5.2, 21.5, RF - 0.25, 1.0);
+    for (const [u0, v0, u1, v1] of [[-18.0, 10.0, -13.5, 11.2], [-2.0, 13.0, 4.0, 14.2]]) K.box(G.darkFrame, u0, TER, v0, u1, TER + 1.05, v1, { detail: true });
     for (let i = 0; i < 14; i++) { const t = i / 14; K.box(G.steel, -4.5 + t * 7.0, TER + (F4 - TER) * t - 0.05, 8.0, -4.5 + t * 7.0 + 0.55, TER + (F4 - TER) * t + 0.25, 9.4, { detail: true }); }
     for (let u = pW + 3; u < pE - 3; u += 4.5) for (const [v, y] of [[pS - 1.6, TER], [pS - 1.6, F4], [pN + 1.6, F4], [pN + 1.6, TER]]) { K.box(G.metalPanel, u - 1.2, y + 0.72, v - 0.45, u + 1.2, y + 0.76, v + 0.45, { detail: true }); K.box(G.darkFrame, u - 0.05, y, v - 0.05, u + 0.05, y + 0.72, v + 0.05, { detail: true }); }
   }
@@ -180,10 +183,10 @@ export async function build(ctx) {
     for (let k = 6; k >= 0; k--) ring.push([cW + (cE - cW) * k / 6, cN]);
     for (let j = 1; j <= 2; j++) ring.push([cW, cN + (cS - cN) * j / 3]);
     for (const [u, v] of ring) {
-      { const cg = new THREE.CylinderGeometry(0.25, 0.25, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
-      K.box(G.steel, u - 0.34, TER, v - 0.34, u + 0.34, TER + 0.06, v + 0.34, { detail: true });
-      K.box(G.steel, u - 0.3, CU - 0.4, v - 0.3, u + 0.3, CU, v + 0.3, { detail: true });
-      colliders.push(K.colCyl(u, v, 0.25, TER - 0.2, CU));
+      { const cg = new THREE.CylinderGeometry(0.19, 0.19, CU - TER, 16, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
+      K.box(G.steel, u - 0.3, TER, v - 0.3, u + 0.3, TER + 0.06, v + 0.3, { detail: true });
+      K.box(G.steel, u - 0.24, CU - 0.3, v - 0.24, u + 0.24, CU, v + 0.24, { detail: true });
+      colliders.push(K.colCyl(u, v, 0.2, TER - 0.2, CU));
     }
     // SMA tension rods: a V on every column, apex at the column foot on the terrace, the two arms rising in the column
     // plane to the canopy beams about a third of the way toward each neighbouring column (18 columns, 36 rods). Each rod
@@ -194,7 +197,7 @@ export async function build(ctx) {
       for (const nb of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
         const t = [c[0] + (nb[0] - c[0]) * 0.32, c[1] + (nb[1] - c[1]) * 0.32];
         const p0 = [c[0] + (nb[0] - c[0]) * 0.03, yFoot, c[1] + (nb[1] - c[1]) * 0.03], p1 = [t[0], yTop, t[1]];
-        strut(K, G.rod, p0, p1, 0.07, 6);
+        strut(K, G.rod, p0, p1, 0.08, 6);
         const f0 = 0.78, f1 = 0.9; const q = (f) => [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f, p0[2] + (p1[2] - p0[2]) * f];
         strut(K, G.sleeve, q(f0), q(f1), 0.11, 8);
       }
@@ -204,12 +207,12 @@ export async function build(ctx) {
 
   // =============================== 4. ROOF CANOPY (open louvred lattice) ===============================
   {
-    const fasc = (u0, v0, u1, v1) => K.box(G.steel, u0, CT - 0.26, v0, u1, CT + 0.05, v1);
+    const fasc = (u0, v0, u1, v1) => K.box(G.steel, u0, CT - 0.2, v0, u1, CT + 0.05, v1);   // thin crisp white edge
     fasc(kW, kS - 0.24, kE, kS); fasc(kW, kN, kE, kN + 0.24); fasc(kW, kN, kW + 0.24, kS); fasc(kE - 0.24, kN, kE, kS);
     const beam = (u0, v0, u1, v1, d = CT - CU - 0.05, w = 0.18, mat = G.steel, opts) => { const L = Math.hypot(u1 - u0, v1 - v0), a = Math.atan2(v1 - v0, u1 - u0); K.obox(mat, (u0 + u1) / 2, CT - d / 2, (v0 + v1) / 2, L, d, w, a, opts); };
     // primary grid on the column lines, carried out to the fascia
     // full-depth between the column lines, slimmed to the 0.3 m edge depth over the cantilevers (thin white edge)
-    const TH = 0.3;
+    const TH = 0.22;
     for (let k = 0; k <= 6; k++) { const u = cW + (cE - cW) * k / 6; beam(u, cN, u, cS); beam(u, kN, u, cN, TH); beam(u, cS, u, kS, TH); }
     for (let j = 0; j <= 3; j++) { const v = cS + (cN - cS) * j / 3; beam(cW, v, cE, v); beam(kW, v, cW, v, TH); beam(cE, v, kE, v, TH); }
     // (no diagonal corner beams: from the plaza they read as hip lines; the real canopy reads as one flat plane)
@@ -218,7 +221,8 @@ export async function build(ctx) {
     for (const u of [kW + (cW - kW) / 3, kW + 2 * (cW - kW) / 3, cE + (kE - cE) / 2]) beam(u, kN, u, kS, 0.38, 0.1);
     // louvre blades running perpendicular to the long facades (sky reads through them from the plaza)
     // translucent white soffit veil just under the blades: from the plaza the louvre field reads as one pale, light plane
-    K.flat(G.veil, quad(kW + 0.24, kN + 0.24, kE - 0.24, kS - 0.24), CT - 0.23);
+    { const W = kE - kW - 0.48, D = kS - kN - 0.48; const pg = new THREE.PlaneGeometry(W, D); pg.rotateX(Math.PI / 2); pg.translate((kW + kE) / 2, CT - 0.24, (kN + kS) / 2);
+      const uv = pg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * W / 2.4); K.add(G.slats, pg, { uvMode: 'keep' }); }   // slat lines: 4 slats per 2.4 m
     const n = Math.round((kE - kW) / 0.6);
     for (let i = 1; i < n; i++) { const u = kW + (kE - kW) * i / n; K.box(G.louvre, u - 0.02, CT - 0.22, kN + 0.24, u + 0.02, CT - 0.04, kS - 0.24); }
   }
@@ -251,8 +255,20 @@ export async function build(ctx) {
     const sv0 = 22.6, sv1 = 29.4, suTop = -36.6, suBot = -45.0; const yTop = K.g(suTop + 0.5, (sv0 + sv1) / 2), yBot = K.g(suBot - 0.5, (sv0 + sv1) / 2);
     if (yTop - yBot > 0.45) {
       const ns = Math.round((yTop - yBot) / 0.15);
-      walkables.push(K.stairs(G.brick, suBot, sv0, suTop, sv1, yBot, yTop, '-u', ns, { foot: 1.5 }));
-      for (const v of [sv0 - 0.5, sv1]) { K.box(G.panel, suBot - 0.3, yBot - 1.0, v, suTop + 0.3, yTop + 1.0, v + 0.5); colliders.push(K.colPoly(quad(suBot - 0.3, v, suTop + 0.3, v + 0.5), yBot - 1, yTop + 1)); }
+      walkables.push(K.stairs(G.slab, suBot, sv0, suTop, sv1, yBot, yTop, '+u', ns, { foot: 1.5 }));
+      { const rise = (yTop - yBot) / ns, tr = (suTop - suBot) / ns; for (let i = 0; i < ns; i++) { const top = yBot + rise * (i + 1); K.box(G.brick, suBot + tr * i + 0.03, top, sv0 + 0.02, suBot + tr * (i + 1) - 0.01, top + 0.025, sv1 - 0.02); } }   // brick treads, concrete risers
+      // sloped board-formed concrete cheek walls (profile in u-y, extruded across v)
+      const cheek = (va, vb, ua, ub, ya, yb, mat = G.panel) => { const sh = new THREE.Shape(); const base = Math.min(ya, yb) - 1.4; sh.moveTo(ua, base); sh.lineTo(ua, ya); sh.lineTo(ub, yb); sh.lineTo(ub, base); sh.lineTo(ua, base);
+        const eg = new THREE.ExtrudeGeometry(sh, { depth: vb - va, bevelEnabled: false }); eg.translate(0, 0, va); K.add(mat, eg); };
+      for (const v of [sv0 - 0.5, sv1]) { cheek(v, v + 0.5, suBot - 0.3, suTop + 0.3, yBot + 0.55, yTop + 0.55); colliders.push(K.colPoly(quad(suBot - 0.3, v, suTop + 0.3, v + 0.5), yBot - 1, yTop + 0.6)); }
+      // accessible ramp alongside (south), concrete curb wall + dark steel rail
+      const rv0 = sv1 + 0.5, rv1 = sv1 + 2.3, ru0 = suBot - 7.5, ru1 = suTop + 0.3; const yr0 = Math.min(yBot, K.g(ru0 + 0.5, (rv0 + rv1) / 2)), yr1 = yTop;
+      cheek(rv0, rv1, ru0, ru1, yr0 + 0.02, yr1 + 0.02, G.slab);
+      cheek(rv1, rv1 + 0.3, ru0, ru1, yr0 + 0.4, yr1 + 0.4);
+      strut(K, G.darkFrame, [ru0, yr0 + 0.95, rv1 + 0.15], [ru1, yr1 + 0.95, rv1 + 0.15], 0.028, 6, { detail: true });
+      for (let i = 0; i <= 8; i++) { const f = i / 8, u = ru0 + (ru1 - ru0) * f, y = yr0 + (yr1 - yr0) * f; K.box(G.darkFrame, u - 0.025, y + 0.4, rv1 + 0.125, u + 0.025, y + 0.95, rv1 + 0.175, { detail: true }); }
+      walkables.push(K.walkFn(ru0, rv0, ru1, rv1, (u, v) => (u < ru0 - 0.05 || u > ru1 + 0.05 || v < rv0 - 0.05 || v > rv1 + 0.05) ? null : yr0 + 0.02 + (yr1 - yr0) * (u - ru0) / (ru1 - ru0)));
+      colliders.push(K.colPoly(quad(ru0, rv1, ru1, rv1 + 0.3), yr0 - 1, yr1 + 1.1));
       for (const v of [sv0 + 0.4, (sv0 + sv1) / 2, sv1 - 0.4]) strut(K, G.darkFrame, [suBot, yBot + 0.9, v], [suTop, yTop + 0.9, v], 0.025, 5, { detail: true });
     }
   }
@@ -270,6 +286,18 @@ export async function build(ctx) {
     const tr = new THREE.BoxGeometry(0.07, 0.07, L); tr.rotateX(a); tr.translate(u1 + 0.15, (yHi + yLo) / 2 + 1.1, (vLo + vHi) / 2); K.add(G.steel, tr, { detail: true });
     walkables.push(K.walkFn(u0, vHi, u1, vLo, (u, v) => (u < u0 - 0.05 || u > u1 + 0.05 || v < vHi - 0.05 || v > vLo + 0.05) ? null : yLo + (yHi - yLo) * (vLo - v) / (vLo - vHi)));
     colliders.push(K.colPoly(quad(u1, vHi, u1 + 0.3, vLo), -2, yHi + 1.2));
+  }
+
+  // ============ TERRACED CONCRETE PLANTERS stepping down toward the SW corner ============
+  {
+    const tiers = [[-35.5, 30.3, -23.5, 33.0, 1.1], [-36.5, 33.1, -27.0, 35.6, 0.8], [-37.5, 35.7, -30.0, 38.0, 0.5]];
+    for (const [u0, v0, u1, v1, h] of tiers) {
+      const g = K.g((u0 + u1) / 2, (v0 + v1) / 2), top = g + h;
+      K.box(G.panel, u0, g - 1.6, v0, u1, top, v1);
+      K.box(G.mulch, u0 + 0.22, top - 0.04, v0 + 0.22, u1 - 0.22, top + 0.02, v1 - 0.22, { detail: true });
+      for (let u = u0 + 0.75; u < u1 - 0.5; u += 1.05) for (let v = v0 + 0.7; v < v1 - 0.5; v += 1.15) { const r = 0.34 + (((u * 3.7 + v * 1.3) % 1) + 1) % 1 * 0.22; const ico = new THREE.IcosahedronGeometry(r, 1); ico.scale(1.2, 0.75, 1.1); ico.translate(u, top + r * 0.45, v); K.add(G.planting, ico, { detail: true }); }
+      colliders.push(K.colPoly(quad(u0, v0, u1, v1), g - 1.6, top + 0.3));
+    }
   }
 
   // =============================== SITE ===============================
