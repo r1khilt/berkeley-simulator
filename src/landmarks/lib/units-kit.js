@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { Kit } from './classic-kit.js';
 import { nightGlow } from '../../materials.js';
+import { siteMat, signMat, runSign, planterBed, bikeRack, bench, bins, lampPost, fdc, rooftopUnits, roofRail, charcoalMat } from './rsw-site.js';
 
 const matCache = new WeakMap();
 // tinted copy of a shared textured material; base = average sRGB colour of that texture (so the result averages `hex`)
@@ -58,8 +59,16 @@ export function tower(ctx, P) {
   const { u0, u1, v0, v1 } = P; const nb = P.nb ?? 9; const NF = P.floors ?? 8; const u3 = P.style === 'u3';
   const rnd = rng(P.seed || 'unit');
   const T = P.tint || {};
-  const mWall = paintTint(M, T.wall ?? 0xd8d0b8), mSpan = paintTint(M, T.span ?? 0xe0d9c6), mBase = paintTint(M, T.base ?? 0x8f9078);
-  const mGlass = glassMat(M), mCurt = curtainMat(M), mFrame = plainMat(M, 'units-frame', { color: 0xc9c6b2, roughness: 0.5, metalness: 0.2 }), mRail = M.iron;
+  const mWall = paintTint(M, T.wall ?? 0xd8d0b8), mSpan = paintTint(M, T.span ?? 0xe0d9c6);
+  // refine-south-west: windows use the shared M.windowNight (the furnished-room window shader upgrade lands there);
+  // P.sharedGlass === false restores the old local glass.
+  const mGlass = P.sharedGlass === false ? glassMat(M) : M.windowNight, mCurt = curtainMat(M), mFrame = plainMat(M, 'units-frame', { color: 0xc9c6b2, roughness: 0.5, metalness: 0.2 }), mRail = charcoalMat(M);
+  const mBrace = T.brace != null ? paintTint(M, T.brace) : mWall; // seismic frame colour (Unit 2 braces are a contrasting terracotta)
+  const mGround = concreteTint(M, T.ground ?? 0xa9a59b); // recessed ground storey: plain board-formed concrete
+  const mBase = mGround;
+  const mFas = charcoalMat(M); const mPave = M.concrete;
+  K.siteMats = { galv: mFrame, dark: mFas };
+  const NAME = (P.name || String(P.seed || '').replace(/-/g, ' ')).toUpperCase();
   const mRoof = M.concreteDark, mRing = paintTint(M, T.ring ?? T.wall ?? 0xe4dcc4);
   const colliders = [], walkables = [];
   // entrance level & vertical grid
@@ -108,24 +117,50 @@ export function tower(ctx, P) {
       const role = roles[bayU(j)]; const sA = j * bw + PW / 2, sB = (j + 1) * bw - PW / 2; const w = sB - sA;
       const isEnt = bayU(j) === eBayU && ((eFace === 'S') === isS);
       // ground storey: recessed, darker
-      const gr = -0.9; // recess
-      if (isEnt || role === 'balc') {
-        // glazed lobby bay
-        K.rbox(R, mBase, sA, F0, gr - 0.3, sB, F0 + 0.35, gr);
-        K.rbox(R, mGlass, sA, F0 + 0.35, gr - 0.12, sB, F0 + GH - 0.5, gr - 0.06);
-        for (let k = 1; k < 4; k++) K.rbox(R, mFrame, sA + w * k / 4 - 0.04, F0 + 0.35, gr - 0.06, sA + w * k / 4 + 0.04, F0 + GH - 0.5, gr, { detail: true });
-        K.rbox(R, mFrame, sA, F0 + 2.4, gr - 0.06, sB, F0 + 2.48, gr, { detail: true });
-        K.rbox(R, mBase, sA, F0 + GH - 0.5, gr - 0.3, sB, F0 + GH, gr);
+      const gr = -0.55; // recess of the ground-storey glazing (must stay in front of the 0.7 m core inset)
+      const gKind = isEnt ? 'ent' : role === 'balc' ? 'lobby' : (j === 0 || j === nb - 1) ? 'solid' : (((j * 7 + (isS ? 3 : 5) + (P.seed || '').length) % 5) < 3 ? 'lounge' : 'solid');
+      if (gKind === 'ent' || gKind === 'lobby' || gKind === 'lounge') {
+        // glazed lobby / lounge bay: aluminium storefront on a low concrete upstand, mullions ~1.2 m, transom bar
+        K.rbox(R, mGround, sA, F0 - 0.05, gr - 0.3, sB, F0 + (gKind === 'ent' ? 0.02 : 0.45), gr);
+        const g0 = F0 + (gKind === 'ent' ? 0.02 : 0.45), g1 = F0 + GH - 0.5;
+        K.rbox(R, mGlass, sA, g0, gr - 0.1, sB, g1, gr - 0.06);
+        const nm = Math.max(2, Math.round(w / 1.2));
+        for (let k = 0; k <= nm; k++) { const sm = sA + w * k / nm; K.rbox(R, mFrame, sm - 0.05, g0, gr - 0.06, sm + 0.05, g1, gr + 0.03, { detail: k > 0 && k < nm }); }
+        for (const yy of [g0 + 0.03, F0 + 2.55, g1 - 0.04]) K.rbox(R, mFrame, sA, yy - 0.04, gr - 0.06, sB, yy + 0.04, gr + 0.03, { detail: true });
+        K.rbox(R, mGround, sA, g1, gr - 0.3, sB, F0 + GH, gr);
+        // soffit over the recess
+        K.rbox(R, mSpan, sA, F0 + GH - 0.32, gr - 0.02, sB, F0 + GH - 0.28, 0.0);
+        if (gKind === 'lounge') { // a few blinds half down
+          for (let k = 0; k < nm; k++) if (rnd() < 0.45) { const a = sA + w * k / nm + 0.06, b = sA + w * (k + 1) / nm - 0.06; const bh = (g1 - F0 - 2.6) + rnd() * 1.2; K.rbox(R, mCurt, a, g1 - bh, gr - 0.05, b, g1 - 0.02, gr - 0.045); }
+        }
+        if (gKind === 'ent') {
+          // pair of glass doors with heavy stiles, push bars and a transom, centred in the bay
+          const dc = (sA + sB) / 2;
+          for (const sg of [-1, 1]) {
+            const a = dc + sg * 0.02, b = dc + sg * 0.92; const lo = Math.min(a, b), hi = Math.max(a, b);
+            K.rbox(R, mFrame, lo, F0 + 0.02, gr - 0.04, lo + 0.11, F0 + 2.3, gr + 0.06); K.rbox(R, mFrame, hi - 0.11, F0 + 0.02, gr - 0.04, hi, F0 + 2.3, gr + 0.06);
+            K.rbox(R, mFrame, lo, F0 + 0.02, gr - 0.04, hi, F0 + 0.25, gr + 0.06); K.rbox(R, mFrame, lo, F0 + 2.2, gr - 0.04, hi, F0 + 2.3, gr + 0.06);
+            K.rbox(R, mFas, lo + 0.15, F0 + 1.0, gr + 0.06, hi - 0.15, F0 + 1.06, gr + 0.12, { detail: true });
+          }
+          K.rbox(R, mFrame, dc - 0.95, F0 + 2.3, gr - 0.05, dc + 0.95, F0 + 2.42, gr + 0.05);
+          // card reader on a post beside the doors
+          K.rbox(R, mFas, dc + 1.25, F0, gr + 0.1, dc + 1.37, F0 + 1.15, gr + 0.22, { detail: true });
+          K.rbox(R, mGlass, dc + 1.23, F0 + 1.0, gr + 0.22, dc + 1.39, F0 + 1.22, gr + 0.25, { detail: true });
+        }
       } else {
-        const ops = [{ s0: sA + w * 0.2, s1: sB - w * 0.2, y0: F0 + 1.3, y1: F0 + 2.7 }];
-        K.wall(R, mBase, sA, sB, F0, F0 + GH, ops, 0.3);
-        for (const o of ops) K.fill(R, o, { rev: 0.18, frame: mFrame, mull: 1, sill: false });
+        // solid bay: board-formed concrete with a high strip window (bathrooms / service rooms)
+        const ops = [{ s0: sA + 0.4, s1: sB - 0.4, y0: F0 + 2.05, y1: F0 + 2.95 }];
+        K.wall(R, mGround, sA, sB, F0, F0 + GH, ops, 0.3);
+        for (const o of ops) K.fill(R, o, { rev: 0.16, glass: mGlass, frame: mFrame, mull: 2, sill: false });
+        // shallow form-tie grid / panel joints for texture
+        for (const yy of [F0 + 0.95, F0 + 1.9]) K.rbox(R, mGround, sA + 0.05, yy - 0.02, 0.0, sB - 0.05, yy + 0.02, 0.025, { detail: true });
+        K.rbox(R, mGround, sA, F0 - 0.05, 0.0, sB, F0 + 0.35, 0.06); // base course
       }
       // exposed basement wall where the ground falls away (drawn as a plain face in the recess plane)
       const gHere = Math.min(K.g(...(() => { const p = R.at((sA + sB) / 2, 0.5); return p; })()), F0);
       if (F0 - gHere > 0.6) K.rbox(R, mBase, sA, gHere - 0.6, gr - 0.3, sB, F0, gr);
       // slab edge over the ground storey
-      K.rbox(R, mSpan, sA, F0 + GH - 0.3, -0.25, sB, F0 + GH, 0.02);
+      K.rbox(R, mSpan, sA, F0 + GH - 0.3, -0.25, sB, F0 + GH, 0.04);
       // residential floors
       for (let f = 0; f < NF; f++) {
         const y = fy(f), y2 = fy(f + 1);
@@ -146,10 +181,14 @@ export function tower(ctx, P) {
         K.wall(R, mSpan, sA, sB, y, y2, ops, 0.3);
         for (const o of ops) {
           K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false });
-          const r = rnd(); if (r < 0.62) { // curtains drawn behind the glass
-            const cw = (o.s1 - o.s0) * (0.3 + 0.7 * rnd()); const left = rnd() < 0.5;
+          const r = rnd();
+          if (r < 0.34) { // roller / venetian blind lowered from the head to a random height
+            const bh = (o.y1 - o.y0) * (0.15 + 0.8 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
+          } else if (r < 0.56) { // curtain drawn to one side
+            const cw = (o.s1 - o.s0) * (0.25 + 0.5 * rnd()); const left = rnd() < 0.5;
             K.rbox(R, mCurt, left ? o.s0 + 0.04 : o.s1 - 0.04 - cw, o.y0 + 0.05, -0.235, left ? o.s0 + 0.04 + cw : o.s1 - 0.04, o.y1 - 0.06, -0.228);
           }
+          if (!balcF) K.rbox(R, mFrame, o.s0 - 0.03, o.y0 - 0.05, -0.25, o.s1 + 0.03, o.y0 + 0.01, 0.05, { detail: true }); // aluminium sill flashing
         }
         if (balcF) {
           // cantilevered balcony slab with a dark picket railing
@@ -165,14 +204,17 @@ export function tower(ctx, P) {
       if (role === 'brace') {
         const s0 = j * bw + PW / 2, s1 = (j + 1) * bw - PW / 2;
         // bracing frame columns on the pier faces
-        for (const sp of [j * bw, (j + 1) * bw]) K.rbox(R, mWall, sp - PW / 2 - 0.05, fy(0) - 0.2, PP, sp + PW / 2 + 0.05, fy(NF) + 0.1, PP + 0.42);
+        for (const sp of [j * bw, (j + 1) * bw]) K.rbox(R, mBrace, sp - PW / 2 - 0.05, fy(0) - 0.2, PP, sp + PW / 2 + 0.05, fy(NF) + 0.1, PP + 0.42);
         for (let f = 0; f + 1 < NF + 0.5; f += 2) {
           const ya = fy(f), yb = fy(Math.min(NF, f + 2));
-          bar(K, R, mWall, s0 - PW / 2, ya, s1 + PW / 2, yb, 0.4, PP + 0.02, PP + 0.42);
-          bar(K, R, mWall, s0 - PW / 2, yb, s1 + PW / 2, ya, 0.4, PP + 0.04, PP + 0.4);
-          K.rbox(R, mWall, s0 - PW / 2, yb - 0.2, PP + 0.02, s1 + PW / 2, yb + 0.2, PP + 0.42);
+          bar(K, R, mBrace, s0 - PW / 2, ya, s1 + PW / 2, yb, 0.4, PP + 0.02, PP + 0.42);
+          bar(K, R, mBrace, s0 - PW / 2, yb, s1 + PW / 2, ya, 0.4, PP + 0.04, PP + 0.4);
+          K.rbox(R, mBrace, s0 - PW / 2, yb - 0.2, PP + 0.02, s1 + PW / 2, yb + 0.2, PP + 0.42);
+          // cast node where the diagonals cross, and gusset blocks at the beam-column joints
+          const xm = (s0 + s1) / 2, ym = (ya + yb) / 2; K.rbox(R, mBrace, xm - 0.42, ym - 0.42, PP + 0.0, xm + 0.42, ym + 0.42, PP + 0.5);
+          for (const xs of [s0 - PW / 2, s1 + PW / 2]) for (const yy of [ya, yb]) K.rbox(R, mBrace, xs - 0.32, yy - 0.32, PP + 0.0, xs + 0.32, yy + 0.32, PP + 0.47, { detail: true });
         }
-        K.rbox(R, mWall, s0 - PW / 2, fy(0) - 0.2, PP + 0.02, s1 + PW / 2, fy(0) + 0.2, PP + 0.42);
+        K.rbox(R, mBrace, s0 - PW / 2, fy(0) - 0.2, PP + 0.02, s1 + PW / 2, fy(0) + 0.2, PP + 0.42);
       }
     }
   };
@@ -228,6 +270,10 @@ export function tower(ctx, P) {
     for (const R of [runS, runN, runE, runW]) K.rbox(R, mSpan, -0.05, deck + 0.55, -0.45, R.L + 0.05, deck + 0.68, 0.06);
     // thin roof slab overhanging the fins (reads as the flat lid in the 2021 LiDAR)
     K.box(mRing, u0 - 0.6, deck + 0.68, v0 - PP - 0.1, u1 + 0.6, deck + 0.95, v1 + PP + 0.1);
+    { // a deeper fascia band around the lid's edge (the heavy cornice read of the Unit 3 towers)
+      const a = u0 - 0.6, b = v0 - PP - 0.1, c = u1 + 0.6, d = v1 + PP + 0.1, t = 0.28, y0 = deck + 0.38, y1 = deck + 0.7;
+      K.box(mRing, a, y0, b, c, y1, b + t); K.box(mRing, a, y0, d - t, c, y1, d); K.box(mRing, a, y0, b + t, a + t, y1, d - t); K.box(mRing, c - t, y0, b + t, c, y1, d - t);
+    }
   }
   // penthouse
   if (P.pent) {
@@ -242,26 +288,63 @@ export function tower(ctx, P) {
     }
     // vents / flues on the roof
     for (let k = 0; k < 4; k++) { const uu = u0 + 3 + rnd() * (L - 6), vv = v0 + 2 + rnd() * (W - 4); if (uu > p.u0 - 1 && uu < p.u1 + 1 && vv > p.v0 - 1 && vv < p.v1 + 1) continue; K.cyl(mFrame, uu, deck, vv, 0.18, 0.18, 1.1, 8, { detail: true }); }
+    // rooftop mechanical plant (condensers / exhaust fans) beside the penthouse, a guard rail and a ladder up to its roof
+    rooftopUnits(K, [u0 + 1.6, v0 + 1.6, u1 - 1.6, v1 - 1.6], deck, rnd, { n: 3, big: true, avoid: [[p.u0 - 0.5, p.v0 - 0.5, p.u1 + 0.5, p.v1 + 0.5]] });
+    roofRail(K, [p.u0 - 0.15, p.v0 - 0.15, p.u1 + 0.15, p.v1 + 0.15], top);
+    { const RL = K.run([p.u1, p.v1], [p.u1, p.v0]); for (const ss of [1.0, 1.45]) RL && K.rbox(RL, mFrame, ss - 0.03, deck, 0.18, ss + 0.03, top + 1.0, 0.22, { detail: true }); for (let y = deck + 0.3; y < top; y += 0.3) K.rbox(RL, mFrame, 1.0, y - 0.015, 0.18, 1.45, y + 0.015, 0.22, { detail: true }); }
   }
-  // ---- entrance canopy + steps ----
+  // ---- entrance: deep canopy with the hall's name on a dark metal fascia, downlights, steel columns, steps; site details ----
+  const walkPolys = [];
   {
-    const R = eFace === 'S' ? runS : runN; const s = eFace === 'S' ? eU - u0 : u1 - eU;
-    const sc = Math.min(R.L - 2, Math.max(2, s));
-    K.rbox(R, mRing, sc - 2.2, F0 + 3.05, -0.9, sc + 2.2, F0 + 3.25, 2.6);
-    K.rbox(R, mFrame, sc - 2.2, F0 + 3.0, 2.45, sc + 2.2, F0 + 3.05, 2.6, { detail: true });
-    for (const ds of [-2.0, 2.0]) K.rbox(R, mFrame, sc + ds - 0.06, F0 - 0.1, 2.3, sc + ds + 0.06, F0 + 3.05, 2.42);
-    // doors
-    K.rbox(R, mFrame, sc - 1.0, F0, -0.86, sc + 1.0, F0 + 2.3, -0.8);
-    K.rbox(R, mGlass, sc - 0.92, F0 + 0.05, -0.8, sc + 0.92, F0 + 2.22, -0.78);
-    // landing / steps down to the path
-    const gE = K.g(...R.at(sc, 3.5));
-    K.rbox(R, M.concrete, sc - 2.4, Math.min(gE, F0) - 1.0, -0.9, sc + 2.4, F0, 1.2);
-    if (F0 - gE > 0.25) {
+    const R = eFace === 'S' ? runS : runN;
+    const sc = (eFace === 'S' ? eBayU + 0.5 : nb - 1 - eBayU + 0.5) * bw; // centre of the entrance bay along the run
+    const cw = 2.7, cy = F0 + 3.15, cd = 3.4;
+    K.rbox(R, mRing, sc - cw, cy, -0.3, sc + cw, cy + 0.32, cd);
+    K.rbox(R, mFrame, sc - cw - 0.04, cy - 0.06, cd - 0.02, sc + cw + 0.04, cy + 0.5, cd + 0.06);
+    for (const sg of [-1, 1]) K.rbox(R, mFrame, sc + sg * (cw + 0.04) - 0.04, cy - 0.06, -0.3, sc + sg * (cw + 0.04) + 0.04, cy + 0.5, cd);
+    runSign(K, R, signMat(M, NAME, { bg: '#2c2f32', fg: '#efe8d8', size: 0.6, track: 0.12 }), sc, cy + 0.03, Math.min(4.4, 0.3 * NAME.length + 0.5), 0.38, cd + 0.065);
+    for (const ds of [-1.6, 0, 1.6]) K.rbox(R, M.lampGlow, sc + ds - 0.13, cy - 0.025, cd * 0.55 - 0.13, sc + ds + 0.13, cy, cd * 0.55 + 0.13, { detail: true });
+    for (const ds of [-cw + 0.3, cw - 0.3]) { const [cu, cv] = R.at(sc + ds, cd - 0.35); K.cyl(mFas, cu, Math.min(F0, K.g(cu, cv)) - 0.3, cv, 0.11, 0.11, cy - Math.min(F0, K.g(cu, cv)) + 0.3, 10); }
+    // landing under the canopy, steps down to the path where the ground is lower
+    const gE = K.g(...R.at(sc, cd + 1.2));
+    K.rbox(R, M.concrete, sc - cw, Math.min(gE, F0) - 1.0, -0.3, sc + cw, F0, cd + 0.2);
+    walkPolys.push([[R.at(sc - cw, -0.3), R.at(sc + cw, -0.3), R.at(sc + cw, cd + 0.2), R.at(sc - cw, cd + 0.2)], F0]);
+    if (F0 - gE > 0.2) {
       const n = Math.max(2, Math.round((F0 - gE) / 0.16)); const tr = 0.3;
-      for (let i = 0; i < n; i++) K.rbox(R, M.concrete, sc - 2.0, gE - 1.0, 1.2 + (n - 1 - i) * tr, sc + 2.0, gE + (F0 - gE) * (i + 1) / n - 0.0, 1.2 + (n - i) * tr);
+      for (let i = 0; i < n; i++) K.rbox(R, M.concrete, sc - 2.0, gE - 1.0, cd + 0.2 + (n - 1 - i) * tr, sc + 2.0, gE + (F0 - gE) * (i + 1) / n, cd + 0.2 + (n - i) * tr);
+      for (const sg of [-1, 1]) { const x = sc + sg * 1.85; K.rbox(R, mFas, x - 0.02, F0 + 0.88, cd + 0.2, x + 0.02, F0 + 0.92, cd + 0.2 + n * tr, { detail: true }); }
+    }
+    // everyday details: bike racks, bench, bins, lamp posts, fire-department connection
+    if (P.site !== false) {
+      const gS = (ss, dd) => K.g(...R.at(ss, dd));
+      const bs = sc + cw + 2.6; if (bs + 2.5 < R.L) bikeRack(K, R, bs, cd + 0.4, gS(bs, cd + 0.4), 5, { pitch: 0.85 });
+      const bn = sc - cw - 2.4; if (bn - 1 > 0) bench(K, R, bn, cd - 0.2, gS(bn, cd - 0.2), 1.9);
+      bins(K, R, sc + cw + 0.4, 0.9, Math.max(F0, gS(sc + cw + 0.4, 0.9)) - 0.0);
+      for (const sg of [-1, 1]) { const [lu, lv] = R.at(sc + sg * (cw + 1.0), cd + 1.6); lampPost(K, lu, lv, K.g(lu, lv), 4.2); }
+      fdc(K, R, sc - cw - 0.6, F0);
+    }
+  }
+  // paving apron along the long faces (flat segments that step with the terrain) + planting beds against the base
+  if (P.site !== false) {
+    const AP = 2.2;
+    for (const [R, isS] of [[runS, true], [runN, false]]) {
+      const isEntF = (eFace === 'S') === isS;
+      for (let j = 0; j < nb; j++) {
+        const s0 = j * bw, s1 = (j + 1) * bw; const d0 = PP, d1 = PP + AP;
+        let gmax = -Infinity, gmin = Infinity; for (let k = 0; k <= 4; k++) for (const dd of [d0, d1]) { const gg = K.g(...R.at(s0 + (s1 - s0) * k / 4, dd)); gmax = Math.max(gmax, gg); gmin = Math.min(gmin, gg); }
+        if (gmax - gmin > 1.2) continue; // too steep: leave the terrain
+        const top = Math.min(F0 - 0.02, gmax + 0.06);
+        if (F0 - top > 1.5) continue;
+        K.rbox(R, mPave, s0, gmin - 0.4, d0, s1, top, d1);
+        for (let k = 1; k < 4; k++) K.rbox(R, mGround, s0 + (s1 - s0) * k / 4 - 0.01, top, d0, s0 + (s1 - s0) * k / 4 + 0.01, top + 0.004, d1, { detail: true });
+        walkPolys.push([[R.at(s0, d0), R.at(s1, d0), R.at(s1, d1), R.at(s0, d1)], top]);
+        const role = roles[isS ? j : nb - 1 - j];
+        if (!isEntF && role !== 'balc' && j % 3 === 1 && Math.abs(top - F0) < 0.5) planterBed(K, R, s0 + 0.25, s1 - 0.25, d1 + 0.05, d1 + 1.25, top, { seed: j + (isS ? 11 : 29) });
+      }
     }
   }
   colliders.push(K.colPoly([[u0 - PP, v0 - PP], [u1 + PP, v0 - PP], [u1 + PP, v1 + PP], [u0 - PP, v1 + PP]], gLow, deck + 4));
   const object3d = K.finish();
+  for (const [poly, y] of walkPolys) walkables.push(K.walkPoly(poly, y));
   return { object3d, colliders, walkables, F0, FH };
 }
