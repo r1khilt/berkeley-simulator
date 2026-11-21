@@ -209,10 +209,10 @@ function buildTack(bind, skeleton, rig) {
   const tOfZ = (z) => (1.25 - z) / 2.0;
   const SPINEB = SPINE;
   // saddle pad: gold piping slab underneath, Cal-blue slab on top
-  const padTh = (t) => { const e = Math.min(1, Math.min(t - tOfZ(1.06), tOfZ(-0.18) - t) / 0.07); const w = 1.42 - 0.22 * (1 - Math.max(0, e)); return [-w, w]; };
-  add(slab(body, A, B, tOfZ(1.06), tOfZ(-0.18), padTh, 14, 22, () => 0.012, 0.03), '#e0a516', SPINEB);
-  const padIn = (t) => { const [a2, b2] = padTh(t); return [a2 + 0.06, b2 - 0.06]; };
-  add(slab(body, A, B, tOfZ(1.02), tOfZ(-0.14), padIn, 14, 22, () => 0.03, 0.035), '#0b2f57', SPINEB);
+  const padTh = (t) => { const e = Math.min(1, Math.min(t - tOfZ(1.1), tOfZ(-0.3) - t) / 0.08); const w = 1.55 - 0.25 * (1 - Math.max(0, e)); return [-w, w]; };
+  add(slab(body, A, B, tOfZ(1.1), tOfZ(-0.3), padTh, 12, 18, () => 0.012, 0.03), '#e0a516', SPINEB);
+  const padIn = (t) => { const [a2, b2] = padTh(t); return [a2 + 0.07, b2 - 0.07]; };
+  add(slab(body, A, B, tOfZ(1.06), tOfZ(-0.26), padIn, 12, 18, () => 0.03, 0.035), '#0b2f57', SPINEB);
   // saddle seat: dished between a raised pommel and cantle
   const sT0 = tOfZ(0.9), sT1 = tOfZ(0.06);
   const seatOff = (t, th) => { const u = (t - sT0) / (sT1 - sT0); const pom = Math.exp(-((u - 0.02) ** 2) / 0.006) * 0.2 * Math.max(0, 1 - Math.abs(th) / 0.55); const can = Math.exp(-((u - 0.97) ** 2) / 0.008) * 0.16 * Math.max(0, 1 - Math.abs(th) / 0.75); return 0.07 + pom + can + 0.03 * Math.cos(th); };
@@ -233,12 +233,12 @@ function buildTack(bind, skeleton, rig) {
   add(slab(head, HA, HB, 0.06, 0.1, () => [1.75, Math.PI * 2 - 1.75], 1, 10, () => off, th), strap, HEADS);          // throatlatch
   add(slab(head, HA, HB, 0.16, 0.2, () => [-1.15, 1.15], 1, 12, () => off, th), '#0b2f57', HEADS);                    // browband
   add(slab(head, HA, HB, 0.6, 0.66, () => [0, Math.PI * 2], 1, 26, () => off, th * 1.2), strap, HEADS);              // noseband
-  for (const s of [-1, 1]) add(slab(head, HA, HB, 0.05, 0.84, () => (s > 0 ? [1.5, 1.66] : [-1.66, -1.5]), 12, 1, () => off * 1.5, th), strap, HEADS); // cheekpieces
+  for (const s of [-1, 1]) add(slab(head, HA, HB, 0.05, 0.76, (t) => { const k = (t - 0.05) / 0.71; const a0 = 1.5 + 0.35 * k, a1 = a0 + 0.16; return s > 0 ? [a0, a1] : [-a1, -a0]; }, 12, 1, () => off * 1.5, th), strap, HEADS); // cheekpieces
   // bit rings at the corners of the mouth
   const F = frame(HA, HB); const o = {}; rig.bitPts = [];
   for (const s of [1, -1]) {
-    surf(head, HA, HB, F, 0.86, s * 1.75, o); const c = o.p.clone().addScaledVector(o.d, 0.03); rig.bitPts.push([c.x, c.y, c.z]);
-    const ring = new THREE.TorusGeometry(0.075, 0.014, 6, 14); ring.rotateY(Math.PI / 2); ring.translate(c.x, c.y, c.z);
+    surf(head, HA, HB, F, 0.77, s * 1.95, o); const c = o.p.clone().addScaledVector(o.d, 0.035); rig.bitPts.push([c.x, c.y, c.z]);
+    const ring = new THREE.TorusGeometry(0.06, 0.013, 6, 14); ring.rotateY(Math.PI / 2); ring.translate(c.x, c.y, c.z);
     add(ring, '#c8ccd2', HEADS);
   }
   // ---- anchors for the rider (model units)

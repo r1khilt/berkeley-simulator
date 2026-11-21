@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { loadHorseRig, GAITS } from './horse-rig.js';
 
 const KEY = 'KeyY';
+// monochrome line icon for the HUD (inherits currentColor)
+const ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20.5c-.4-3.8.6-7 2.6-9.3L6.3 10.6c-1-.2-1.4-1.2-.8-2l3.3-4C9.8 3.4 11.4 2.8 13 3l.9-1.5.9 1.9c2.9 1.1 4.6 4 4.4 7.4-.2 3.5-1.4 6.5-1.9 9.7"/><path d="M12.6 6.6h.01"/><path d="M14.6 3.6c-1 1.6-1.4 3.4-1.1 5.3"/></svg>';
 const HITCH = { x: 141.9, z: 81.5, len: 2.8 };                // rail along the Faculty Glade loop path (runs north-south)
 const SPEED = { walk: 1.6, trot: 3.6, canter: 7.0, gallop: 14.5, back: -1.1 };
 const RIDE_LIFT = 0.8;                                        // player.pos sits this far above the horse's hooves while riding (eye height)
@@ -29,7 +31,7 @@ function gaitWeights(v, out) {
 // stride frequency (Hz) per gait at speed v; some hoof slip is accepted at the fast end
 const CAD = { walk: (v) => clamp(0.35 + v * 0.5, 0.55, 1.3), trot: (v) => clamp(1.2 + v * 0.22, 1.6, 2.4), canter: (v) => clamp(1.45 + v * 0.08, 1.8, 2.3), gallop: (v) => clamp(1.7 + v * 0.06, 2.2, 2.75) };
 
-class Horse {
+export class Horse {
   constructor(player, ctx) {
     this.player = player; this.ctx = ctx; this.ph = ctx.physics; this.scene = ctx.scene;
     this.rig = null; this.loading = null; this.state = 'parked'; // parked | coming | ridden
@@ -73,7 +75,7 @@ class Horse {
     this.ph.addCircle(hx + 0.1, hz + 2.65, 0.62, ty - 1, ty + 0.5, 'horse-hitch');
     this.railY = (y0 + y1) / 2 + 1.04;
     // reins (dynamic tube), lead rope, stirrups
-    const leather = new THREE_.MeshStandardMaterial({ color: '#2a180d', roughness: 0.6 });
+    const leather = new THREE_.MeshStandardMaterial({ color: '#3d2615', roughness: 0.55 });
     this.reins = new THREE_.Mesh(new THREE_.BufferGeometry(), leather); this.reins.frustumCulled = false; this.reins.castShadow = true; this.scene.add(this.reins);
     this.reinPts = Array.from({ length: 17 }, () => new THREE_.Vector3()); this._tube(this.reins, this.reinPts, 0.012, true);
     this.rope = new THREE_.Mesh(new THREE_.BufferGeometry(), new THREE_.MeshStandardMaterial({ color: '#b9a37a', roughness: 0.9 })); this.rope.frustumCulled = false; this.scene.add(this.rope);
@@ -117,9 +119,11 @@ class Horse {
   _move(dt, wantVX, wantVZ) {
     const ph = this.ph; const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     let x = this.pos.x + wantVX * dt, z = this.pos.z + wantVZ * dt; let hitFront = false, hit = false;
+    // while jumping (and just after landing) the legs are tucked: low obstacles under the body don't snag the hind end
+    const tuck = this.air || this.landT > 0 ? 0.8 : 0; if (this.landT > 0) this.landT -= dt;
     for (let it = 0; it < 2; it++) for (let c = 0; c < BODY.length; c++) {
       const [o, r] = BODY[c]; const px = x + fx * o, pz = z + fz * o;
-      const res = ph.resolve(px, pz, r, this.pos.y + 0.1, 2.5);
+      const res = ph.resolve(px, pz, r, this.pos.y + 0.1 + tuck, 2.5 - tuck);
       if (res[2]) { hit = true; if (c === 0) hitFront = true; x += res[0] - px; z += res[1] - pz; }
     }
     // ground: sample under front & hind hooves for pitch, centre for height (step up to 0.6 m)
@@ -141,6 +145,7 @@ class Horse {
     return { hit, hitFront };
   }
   onLand() {
+    this.landT = 0.45;
     if (this.jumpT >= 0 && this.rig) this.jumpT = Math.max(this.jumpT, 1.17);
     this.hoofAll(0.9);
   }
@@ -286,14 +291,16 @@ class Horse {
     P.hips.rotation.set(0, 0, 0);
     P.spine.rotation.set((-lean) * e, 0, -this.roll * 0.5);
     P.neck.rotation.set(0, 0, 0); P.head.rotation.set((lean * 0.8 + 0.05) * e, this.look * 0.5, 0);
+    // (avatar faces -z: +x rotation swings a limb forward)
     for (const sd of [-1, 1]) {
-      // legs straddle the barrel, knees bent, feet in the stirrups
-      P['hip' + sd].rotation.set(-1.15 * e - 0.25 * gal, 0, sd * 0.42 * e);
-      P['kn' + sd].rotation.set((1.45 + 0.3 * gal) * e, 0, -sd * 0.12 * e);
-      P['ft' + sd].rotation.set(-0.25 * e, 0, 0);
-      // hands forward and low, holding the reins
-      P['sh' + sd].rotation.set(-0.55 * e - 0.25 * gal, 0, -sd * 0.14 * e);
-      P['el' + sd].rotation.set(-1.05 * e + 0.2 * gal, 0, 0);
+      // legs straddle the barrel, knees bent, heels down in the stirrups
+      const hip = (1.05 + 0.3 * gal) * e, knee = -(1.4 + 0.35 * gal) * e;
+      P['hip' + sd].rotation.set(hip, 0, sd * 0.56 * e);           // thighs wrap the barrel (knees clear the flaps)
+      P['kn' + sd].rotation.set(knee, 0, -sd * 0.42 * e);          // lower legs hang close to the horse's sides
+      P['ft' + sd].rotation.set(-(hip + knee) + 0.12 * e, 0, 0);
+      // hands forward and low over the withers, holding the reins
+      P['sh' + sd].rotation.set((0.42 + 0.75 * gal) * e, 0, -sd * 0.16 * e);
+      P['el' + sd].rotation.set((0.95 - 0.35 * gal) * e, 0, 0);
     }
     av.root.updateMatrixWorld(true);
   }
@@ -304,14 +311,14 @@ class Horse {
     const r = this.rig; if (!r || !this.reins) return;
     r.root.updateMatrixWorld(true);
     const bL = r.boneWorld('Head', r.bit[0], new THREE.Vector3()), bR = r.boneWorld('Head', r.bit[1], new THREE.Vector3());
-    let hL, hR; if (ridden && this.mountT <= 0) { hL = this._hand(av, 1, new THREE.Vector3()); hR = this._hand(av, -1, new THREE.Vector3()); } else { const w = r.boneWorld('Torso3', r.withers, new THREE.Vector3()); hL = w.clone(); hR = w.clone(); }
-    const P = this.reinPts; const n = P.length, half = (n - 1) / 2;
-    for (let i = 0; i < n; i++) {
-      if (i <= half) { const t = i / half; P[i].lerpVectors(bL, hL, t); P[i].y -= Math.sin(t * Math.PI) * (ridden ? 0.05 : 0.12); }
-      else { const t = (i - half) / half; P[i].lerpVectors(hR, bR, t); P[i].y -= Math.sin(t * Math.PI) * (ridden ? 0.05 : 0.12); }
+    let hL, hR; if (ridden && this.mountT <= 0) { hL = this._hand(av, -1, new THREE.Vector3()); hR = this._hand(av, 1, new THREE.Vector3()); } else { const w = r.boneWorld('Torso3', r.withers, new THREE.Vector3()); hL = w.clone(); hR = w.clone(); }
+    // each rein runs from its bit ring along the side of the neck to the hand (quadratic curve bowed outward and down)
+    const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw); const P = this.reinPts; const half = (P.length - 1) / 2; const c = new THREE.Vector3();
+    for (const [b, h, sd, i0] of [[bL, hL, -1, 0], [bR, hR, 1, half]]) {
+      c.lerpVectors(b, h, 0.5); c.x += rx * sd * 0.15; c.z += rz * sd * 0.15; c.y -= ridden ? 0.05 : 0.1;
+      for (let i = 0; i <= half; i++) { const t = sd < 0 ? i / half : 1 - i / half; const u = 1 - t; const q = P[i0 + i]; q.set(u * u * b.x + 2 * u * t * c.x + t * t * h.x, u * u * b.y + 2 * u * t * c.y + t * t * h.y, u * u * b.z + 2 * u * t * c.z + t * t * h.z); }
     }
-    if (!ridden || this.mountT > 0) { const mid = P[half]; mid.copy(hL); }
-    this._tube(this.reins, P, 0.011);
+    this._tube(this.reins, P, 0.016);
     // lead rope to the rail while tied at the hitch
     const tied = this.state === 'parked' && Math.hypot(this.pos.x - (HITCH.x - 1.75), this.pos.z - HITCH.z) < 0.6;
     this.rope.visible = tied;
@@ -370,6 +377,7 @@ class Horse {
 }
 
 export function install(player, ctx) {
+  if (new URLSearchParams(location.search).has('nohorse')) return null;   // A/B and perf comparisons
   const H = new Horse(player, ctx);
   if (window.BSIM) window.BSIM.horse = H; // debug / QA hook
   let savedDist = null;
@@ -379,7 +387,7 @@ export function install(player, ctx) {
   const prevInteract = player.onInteract;
   player.onInteract = (it) => { if (it && it.horse) { if (player.mode !== 'horse') player.setMode('horse'); return; } prevInteract && prevInteract(it); };
   player.registerMode('horse', {
-    key: KEY, label: 'Horse', icon: '🐎', hint: 'W ride · Shift gallop · C walk · Space jump · Y dismount',
+    key: KEY, label: 'Horse', icon: ICON, hint: 'W ride · Shift gallop · C walk · Space jump · Y dismount',
     canEnter(p) {
       if (!H.rig) { H.ensure(); H.pendingSummon = true; return false; }
       if (H.canMount()) return true;
