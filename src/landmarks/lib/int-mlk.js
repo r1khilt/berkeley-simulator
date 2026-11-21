@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { Kit, polysGeo } from './classic-kit.js';
 import { tinted, tone, TEXAVG, glassBand } from './b01-kit.js';
-import { furnitureLib, Instancer, Atlas, signQuad, menuBoard, fitText, lightPools, glowMat, warmFill, gate } from './int-kit.js';
+import { furnitureLib, Instancer, Atlas, signQuad, menuBoard, fitText, lightPools, glowMat, warmFill, gate, furnMat, sidePred } from './int-kit.js';
 
 export const MLK_IN = { u0: -25.4, u1: -14.2, v0: -26.0, v1: 22.0, nU: -10.85, nV0: 9.5, nV1: 19.0, ceil: 4.5 };
 
@@ -23,12 +23,11 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
   const colliders = [], walkables = [];
   const { u0, u1, v0, v1, nU, nV0, nV1, ceil } = MLK_IN; const fy = floor.at; const iu0 = u0 + 0.32, iu1 = -13.85, iv0 = v0 + 0.32, iv1 = v1 - 0.32;
   // ---- materials ----
-  const conc = warmFill(tinted(M.whitePaint, 0xaeaaa2, { roughness: 0.32, metalness: 0.0 }), 0.24); // polished concrete: smooth, light grey
-  const plaster = warmFill(tinted(M.whitePaint, 0xf4f2ee), 0.36); const ceilM = warmFill(tinted(M.whitePaint, 0xf6f4f0), 0.55);
+  const conc = warmFill(tinted(M.whitePaint, 0xc3c0b9, { roughness: 0.32, metalness: 0.0 }), 0.34, 0xfff2e4); // polished concrete: smooth, light grey
+  const plaster = warmFill(tinted(M.whitePaint, 0xf3f2ee), 0.45, 0xfff6ec); const ceilM = warmFill(tinted(M.whitePaint, 0xf7f7f5), 0.8, 0xfff8f0);
   const walnut = warmFill(tone(M.wood, 0x8f5d38, TEXAVG.wood), 0.34);
   const ply = warmFill(tone(M.wood, 0xbf8a56, TEXAVG.wood), 0.36);
-  const quartz = warmFill(tinted(M.whitePaint, 0xf1f1ee, { roughness: 0.3 }), 0.3);
-  const white = warmFill(tinted(M.whitePaint, 0xf3f2ef), 0.3);
+  const quartz = plaster, white = plaster;
   const board = warmFill(tone(M.concrete, 0xa59e93, TEXAVG.concrete), 0.18);
   const chrome = tinted(M.iron, 0xd3d6d8, { metalness: 0.9, roughness: 0.22 });
   const black = tinted(M.blackPaint, 0x202020, { roughness: 0.5 });
@@ -36,9 +35,9 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
   const teal = warmFill(new THREE.MeshStandardMaterial({ color: 0x6f9599, roughness: 0.92 }), 0.2);
   const rugM = warmFill(new THREE.MeshStandardMaterial({ color: 0x77716a, roughness: 0.95 }), 0.18);
   const slate = warmFill(tinted(M.blackPaint, 0x3c4857, { roughness: 0.7 }), 0.18);
-  const maple = warmFill(tone(M.wood, 0xd6bd92, TEXAVG.wood), 0.28);
+  const maple = warmFill(tinted(M.whitePaint, 0xdcc49a, { roughness: 0.7 }), 0.35);
   const caseGlass = tinted(M.glassLight, 0xc9dadd, { opacity: 0.22, depthWrite: false });
-  const glow = glowMat(0xfff4e2, 0xffd9a8, 2.3), glowCool = glowMat(0xffffff, 0xfff1e0, 1.7);
+  const glow = glowMat(0xfff4e2, 0xffd9a8, 2.3), glowCool = glow;
   const vend = { asado: 0xa8432c, pi: 0x1f4f63, root: 0x4d7a3c };
   const mc = new Map(); const paint = (hex, k = 0.2) => { if (!mc.has(hex)) mc.set(hex, warmFill(tinted(M.whitePaint, hex, { roughness: 0.9 }), k)); return mc.get(hex); };
   // ---- floor (tilted plane) + ceiling ----
@@ -52,12 +51,12 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
   K.flat(ceilM, fpoly, ceil, [], true);
   // ---- north end: walnut slat feature wall; partition where the wing meets the main block ----
   K.box(walnut, iu0, fy(iu0) - 0.1, iv0, iu1, ceil, iv0 + 0.04);
-  for (let u = iu0 + 0.05; u < iu1 - 0.05; u += 0.16) K.box(walnut, u, fy(u), iv0 + 0.04, u + 0.08, ceil - 0.02, iv0 + 0.12, { detail: true });
+  for (let u = iu0 + 0.05; u < iu1 - 0.05; u += 0.16) K.box(walnut, u, fy(u), iv0 + 0.04, u + 0.08, ceil - 0.02, iv0 + 0.12);
   // round white columns
   const colsUV = [[-20.4, -17.6], [-20.4, -8.6], [-20.4, 0.4], [-20.4, 9.4], [-20.4, 17.4]];
   for (const [u, v] of colsUV) { K.cyl(white, u, fy(u) - 0.05, v, 0.42, 0.42, ceil - fy(u) + 0.06, 20); colliders.push(K.colCyl(u, v, 0.46, -1, ceil)); }
   // ---- food court along the main block (counters face -u / west) ----
-  const A = new Atlas(2048, 1024); const sg = [];
+  const A = new Atlas(2048, 1024); const sg = []; const pools = [];
   const bays = [
     { key: 'asado', name: 'ASADO', sub: 'Mexican Grill', c: -19.0, items: ['Carne Asada Burrito', 'Al Pastor Tacos', 'Chicken Bowl', 'Veggie Quesadilla', 'Chips & Salsa'] },
     { key: 'pi', name: 'HOUSE OF PI', sub: 'Pizza by the Slice', c: -7.9, items: ['Cheese Slice', 'Pepperoni Slice', 'Margherita', 'BBQ Chicken', 'Garlic Knots'] },
@@ -105,25 +104,25 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
     const Rs = K.run([iu1, a1], [iu1, a0]); const L = a1 - a0; // faces -u... run from a1 to a0 has outward normal -u
     glassBand(K, Rs, 0, 2.6, y0, 3.15, { glass: caseGlass, frame: alu, pitch: 1.3 }); glassBand(K, Rs, L - 2.6, L, y0, 3.15, { glass: caseGlass, frame: alu, pitch: 1.3 });
     // niche: floor shared (tilted), walls, ceiling, merchandise
-    K.box(maple, nU, fy(nU) - 0.1, a0, nU + 0.05, ceil, a1); K.box(white, iu1, fy(iu1) - 0.1, a0, nU, ceil, a0 + 0.05); K.box(white, iu1, fy(iu1) - 0.1, a1 - 0.05, nU, ceil, a1);
+    K.box(plaster, nU, fy(nU) - 0.1, a0, nU + 0.05, ceil, a1); K.box(white, iu1, fy(iu1) - 0.1, a0, nU, ceil, a0 + 0.05); K.box(white, iu1, fy(iu1) - 0.1, a1 - 0.05, nU, ceil, a1);
     colliders.push(K.colPoly([[iu1, a0], [nU + 0.05, a0]], -1, ceil), K.colPoly([[nU + 0.05, a0], [nU + 0.05, a1]], -1, ceil), K.colPoly([[nU + 0.05, a1], [iu1, a1]], -1, ceil), K.colPoly([[iu1 + 0.02, a0], [iu1 + 0.02, a0 + 2.6]], -1, 3.2), K.colPoly([[iu1 + 0.02, a1 - 2.6], [iu1 + 0.02, a1]], -1, 3.2));
     // slatwall towers with caps (navy/gold), apparel rails, jersey wall
     const capN = paint(0x0b2a55), capG = paint(0xf4b324, 0.25);
     for (const vt of [a0 + 1.6, a1 - 1.6]) { const ut = nU - 0.9; K.box(maple, ut - 0.3, fy(ut), vt - 0.3, ut + 0.3, fy(ut) + 2.1, vt + 0.3); colliders.push(K.colCyl(ut, vt, 0.45, -1, 3));
-      for (let k = 0; k < 5; k++) for (const s of [-1, 1]) { const y = fy(ut) + 0.55 + k * 0.32; for (let j = 0; j < 2; j++) K.box((k + j) % 2 ? capG : capN, ut + s * 0.3 + (s > 0 ? 0 : -0.14), y, vt - 0.22 + j * 0.24, ut + s * 0.3 + (s > 0 ? 0.14 : 0), y + 0.12, vt - 0.06 + j * 0.24, { detail: true }); } }
-    const tees = [0x0b2a55, 0xf4b324, 0xffffff, 0x1d1d1d, 0x5a6b7c, 0x0b2a55];
+      for (let k = 0; k < 5; k++) for (const s of [-1, 1]) { const y = fy(ut) + 0.55 + k * 0.32; for (let j = 0; j < 2; j++) K.box((k + j) % 2 ? capG : capN, ut + s * 0.3 + (s > 0 ? 0 : -0.14), y, vt - 0.22 + j * 0.24, ut + s * 0.3 + (s > 0 ? 0.14 : 0), y + 0.12, vt - 0.06 + j * 0.24); } }
+    const tees = [0x0b2a55, 0xf4b324, 0x0b2a55, 0xf4b324, 0x0b2a55, 0xf4b324];
     for (const vr of [12.55, 15.95]) { const ua = -13.25, ub = -11.65; // apparel rails along the depth, central aisle left open
       for (const u of [ua, ub - 0.04]) K.box(chrome, u, fy(u), vr - 0.02, u + 0.04, fy(u) + 1.4, vr + 0.02); K.box(chrome, ua, fy(ua) + 1.38, vr - 0.015, ub, fy(ua) + 1.41, vr + 0.015);
-      for (let j = 0; j < 9; j++) { const u = ua + 0.12 + j * 0.16; const tm = paint(tees[(j + (vr > 14 ? 1 : 0)) % tees.length]); K.box(tm, u, fy(u) + 0.62, vr - 0.26, u + 0.04, fy(u) + 1.36, vr + 0.26, { detail: true }); }
+      for (let j = 0; j < 9; j++) { const u = ua + 0.12 + j * 0.16; const tm = paint(tees[(j + (vr > 14 ? 1 : 0)) % tees.length]); K.box(tm, u, fy(u) + 0.62, vr - 0.26, u + 0.04, fy(u) + 1.36, vr + 0.26); }
       colliders.push(K.colPoly([[ua - 0.05, vr - 0.3], [ub + 0.05, vr - 0.3], [ub + 0.05, vr + 0.3], [ua - 0.05, vr + 0.3]], -1, 1.5)); }
-    for (let j = 0; j < 6; j++) { const tm = paint(j % 2 ? 0xf4b324 : 0x0b2a55); K.box(tm, nU - 0.06, fy(nU) + 1.5, a0 + 1.2 + j * 1.2, nU - 0.02, fy(nU) + 2.3, a0 + 1.9 + j * 1.2, { detail: true }); }
-    for (const v of [a0 + 2.0, (a0 + a1) / 2, a1 - 2.0]) K.box(glowCool, nU + 0.3, ceil - 0.12, v - 1.2, nU + 0.42, ceil - 0.08, v + 1.2); }
+    for (let j = 0; j < 6; j++) { const tm = paint(j % 2 ? 0xf4b324 : 0x0b2a55); K.box(tm, nU - 0.06, fy(nU) + 1.5, a0 + 1.2 + j * 1.2, nU - 0.02, fy(nU) + 2.3, a0 + 1.9 + j * 1.2); }
+    for (const u of [nU - 0.8, nU - 2.2]) for (const v of [a0 + 2.0, (a0 + a1) / 2, a1 - 2.0]) { K.box(glowCool, u - 0.06, ceil - 0.12, v - 1.2, u + 0.06, ceil - 0.08, v + 1.2); pools.push([u, fy(u), v, 1.6]); } }
   // ---- window bar along the Lower Sproul glass (skip the doors) ----
   const doorsV = [[-13.8, -11.2], [4.2, 6.8]];
   const ledges = [[-25.3, -14.3], [-10.7, 3.7], [7.3, 21.4]];
   for (const [a, b] of ledges) { const u = iu0 + 0.05; K.box(walnut, u, fy(u) + 1.02, a, u + 0.45, fy(u) + 1.07, b); for (let v = a + 0.4; v < b; v += 2.0) K.box(chrome, u + 0.18, fy(u), v, u + 0.22, fy(u) + 1.02, v + 0.04); colliders.push(K.colPoly([[u + 0.5, a], [u + 0.5, b]], -1, 1.1)); }
   // ---- furniture ----
-  const lib = furnitureLib(); const I = new Instancer(lib, ctx.boxUV); const pools = [];
+  const lib = furnitureLib(); const I = new Instancer(lib, ctx.boxUV);
   const near = (u, v, r) => colsUV.some(([cu, cv]) => Math.hypot(u - cu, v - cv) < r) || doorsV.some(([a, b]) => v > a - 0.9 && v < b + 0.9 && u < -17.5);
   const tbl = (u, v) => { I.add('roundTable', u, fy(u), v, 0); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; const cu = u + Math.cos(a) * 0.66, cv = v + Math.sin(a) * 0.66; I.addFacing('shellChair', cu, fy(cu), cv, u, v); } colliders.push(K.colCyl(u, v, 0.45, -1, 1)); pools.push([u, fy(u) + 0.75, v, 0.65], [u, fy(u), v, 1.6]); };
   for (const u of [-22.5, -18.3]) for (let v = -24.2; v < 2.2; v += 2.25) if (!near(u, v, 1.75)) tbl(u, v);
@@ -137,7 +136,7 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
   }
   I.add('binStation', -15.3, fy(-15.3), 2.6, Math.PI / 2); colliders.push(K.colCyl(-15.3, 2.6, 0.6, -1, 1.2));
   // ---- light fixtures: linear pendants over the dining room, downlights elsewhere ----
-  for (const u of [-22.5, -18.3]) for (let v = -24.0; v < 1.5; v += 4.5) { K.box(black, u - 0.06, 3.55, v - 1.4, u + 0.06, 3.6, v + 1.4); K.box(glow, u - 0.05, 3.535, v - 1.38, u + 0.05, 3.55, v + 1.38); for (const dv of [-1.2, 1.2]) K.box(black, u - 0.004, 3.6, v + dv - 0.004, u + 0.004, ceil, v + dv + 0.004, { detail: true }); }
+  for (const u of [-22.5, -18.3]) for (let v = -24.0; v < 1.5; v += 4.5) { K.box(black, u - 0.06, 3.55, v - 1.4, u + 0.06, 3.6, v + 1.4); K.box(glow, u - 0.05, 3.535, v - 1.38, u + 0.05, 3.55, v + 1.38); for (const dv of [-1.2, 1.2]) K.box(black, u - 0.004, 3.6, v + dv - 0.004, u + 0.004, ceil, v + dv + 0.004); }
   for (let u = -24.0; u < -15; u += 2.6) for (let v = 3.0; v < 21.5; v += 2.6) K.cyl(glowCool, u, ceil - 0.03, v, 0.1, 0.1, 0.03, 10);
   for (const b of bays) { K.box(glowCool, FU + 0.2, BH - 0.04, b.c - 2.4, FU + 0.35, BH - 0.01, b.c + 2.4); pools.push([FU + 0.3, fy(FU) + 1.04, b.c, 1.6], [FU - 1.0, fy(FU - 1.0), b.c, 2.2]); }
   for (let v = -24.5; v < 21; v += 3.0) pools.push([iu0 + 0.3, fy(iu0) + 1.07, v, 0.8]);
@@ -147,10 +146,10 @@ export function mlkInterior(ctx, { ANG, floor, sGlass, frame, alu }) {
   // ---- assemble ----
   const fit = K.finish(); fit.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
   const furn = new THREE.Group(); furn.rotation.y = -ANG;
-  const tris = I.build(furn, { seat: ply, metal: chrome, top: white, white, fabric: teal, dark: black, barStool: { seat: walnut, metal: chrome } });
+  const fm = furnMat(); const tris = I.buildVC(furn, fm, { seat: 0xd4a877, metal: 0xc9ccce, top: 0xf2f2ef, white: 0xf2f2ef, fabric: 0x6f9599, dark: 0x262626, barStool: { seat: 0x8f5d38, metal: 0xc9ccce } });
   const pm = lightPools(pools, { color: 0xffc98e, opacity: 0.4 }); furn.add(pm);
   const root = new THREE.Group(); root.name = 'mlk-interior'; root.add(fit, furn);
   const [cx, cz] = K.xz(-19.5, -2); 
-  const update = gate({ group: root, centre: [ctx.anchor.x + cx, ctx.anchor.z + cz], showR: 170, glow: [glow, glowCool, atlasM], fills: [conc, plaster, ceilM, walnut, ply, quartz, white, board, teal, rugM, slate, maple, ...mc.values()], pools: [pm] });
+  const update = gate({ group: root, centre: [ctx.anchor.x + cx, ctx.anchor.z + cz], showR: 140, side: sidePred(ctx.anchor, ANG, (u, v) => u < -12 || v > 21), glow: [glow, glowCool, atlasM], fills: [conc, plaster, ceilM, walnut, ply, board, teal, rugM, slate, maple, ...mc.values()], pools: [pm] });
   return { object3d: root, colliders, walkables, update, stats: { furniture: I.count(), furnTris: tris } };
 }
