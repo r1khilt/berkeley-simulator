@@ -20,7 +20,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-4.3)); const M = ctx.M;
-  const W = M.stuccoWhite.clone(); W.color = new THREE.Color(0xfbf9f2); W.name = 'minor-paint';        // painted concrete, warm off-white
+  const W = M.stucco.clone(); W.color = new THREE.Color().setRGB(0.98, 1.08, 1.34, THREE.LinearSRGBColorSpace); W.name = 'minor-paint'; // coarse sand-float paint, warm off-white (#E9E7E1)
   const WD = M.stuccoWhite.clone(); WD.color = new THREE.Color(0xe6e3da); WD.name = 'minor-plinth';
   const SAGE = new THREE.MeshStandardMaterial({ color: 0x7e8a74, roughness: 0.55, metalness: 0.3, name: 'minor-sash' });
   const DOOR = M.whitePaint;
@@ -29,8 +29,8 @@ export async function build(ctx) {
   const gAvg = (K.g(u0, 0) + K.g(u1, 0)) / 2; const gMin = K.gMin(u0, v0, u1, v1, 8); const yB = gMin - 1.2;
   const F0 = Math.max(0.0, gAvg) + 0.45; // ground-floor level (a low plinth above grade)
   const floors = [F0, F0 + 4.1, F0 + 8.0, F0 + 11.9];
-  const rows = [{ y0: F0 + 0.7, h: 3.1 }, { y0: floors[1] + 0.75, h: 2.75 }, { y0: floors[2] + 0.75, h: 2.75 }, { y0: floors[3] + 0.7, h: 2.35 }];
-  const BAY = 3.6, WW = 1.5;
+  const rows = [{ y0: F0 + 0.55, h: 3.25 }, { y0: floors[1] + 0.6, h: 3.0 }, { y0: floors[2] + 0.6, h: 3.0 }, { y0: floors[3] + 0.55, h: 2.6 }];
+  const BAY = 3.6, WW = 1.35;
   // entrances on the west front where the paths arrive (v = -18.5 main, 8.6), and on the east front (v = 23.2)
   const ents = { W: [{ v: -18.5, main: true }, { v: 8.6 }], E: [{ v: 23.2 }] };
   const defs = { S: [[u0, v1], [u1, v1]], E: [[u1, v1], [u1, v0]], N: [[u1, v0], [u0, v0]], W: [[u0, v0], [u0, v1]] };
@@ -42,19 +42,20 @@ export async function build(ctx) {
     const near = (c) => E.find((e) => Math.abs(c - e.s) < (e.main ? 2.6 : 2.0));
     const ops = [];
     for (const c of cs) for (let r = 0; r < rows.length; r++) { const e = near(c); if (e && r === 0) continue;
-      ops.push({ s0: c - WW / 2, s1: c + WW / 2, y0: rows[r].y0, y1: rows[r].y0 + rows[r].h, muntins: r === 0 ? 6 : 5, sillMat: W }); }
+      ops.push({ s0: c - WW / 2, s1: c + WW / 2, y0: rows[r].y0, y1: rows[r].y0 + rows[r].h, muntins: r === 0 ? 7 : 6, sillMat: W, fw: 0.05 }); }
     // entrance recesses (cut through the wall; doors set back in a lined reveal)
     for (const e of E) ops.push({ s0: e.s - (e.main ? 1.35 : 1.05), s1: e.s + (e.main ? 1.35 : 1.05), y0: F0, y1: F0 + (e.main ? 3.9 : 3.3), entrance: e, sill: false });
-    K.wall(R, W, 0, L, yB, eave, ops, 0.42);
+    K.wall(R, W, 0, L, yB, eave, ops, 0.5);
     for (const o of ops) {
       if (o.entrance) continue;
-      K.fill(R, o, { rev: 0.3, frame: SAGE, mull: 2, tran: [o.y0 + (o.y1 - o.y0) * 0.36] });
+      K.fill(R, o, { rev: 0.38, frame: SAGE, mull: 2, tran: [o.y0 + (o.y1 - o.y0) * 0.36] });
     }
     // plinth, thin pilaster strips between bays, slab cornice
     K.rbox(R, WD, -0.03, yB, 0, L + 0.03, F0 + 0.15, 0.04);
-    for (let i = 0; i <= nb; i++) { const s = 0.8 + bw * i; if (E.some((e) => Math.abs(s - e.s) < 2.4)) continue; K.rbox(R, W, s - 0.07, F0 + 0.15, 0, s + 0.07, eave - 0.6, 0.035, { detail: true }); }
     K.rbox(R, W, -0.1, eave - 0.6, 0, L + 0.1, eave - 0.3, 0.12);
     K.rbox(R, W, -0.55, eave - 0.3, 0, L + 0.55, eave + 0.05, 0.55);
+    K.rbox(R, W, -0.1, eave + 0.05, -0.3, L + 0.1, eave + 1.0, 0.05);              // plain parapet hiding the low roof
+    K.rbox(R, WD, -0.15, eave + 1.0, -0.35, L + 0.15, eave + 1.15, 0.12);          // coping
     // entrances
     for (const e of E) {
       const hw = e.main ? 1.35 : 1.05, top = F0 + (e.main ? 3.9 : 3.3), dep = e.main ? 1.3 : 0.9;
@@ -91,7 +92,7 @@ export async function build(ctx) {
   }
   // core, low hipped tile roof (LiDAR ~22.5 m ridge)
   K.box(M.concreteDark, u0 + 0.6, yB, v0 + 0.6, u1 - 0.6, eave, v1 - 0.6);
-  K.hip(M.redTile, u0 - 0.5, v0 - 0.5, u1 + 0.5, v1 + 0.5, eave + 0.05, 0.6);
+  K.hip(M.redTile, u0 + 0.3, v0 + 0.3, u1 - 0.3, v1 - 0.3, eave + 0.7, 0.58);
   K.box(M.concreteDark, u0, eave - 0.1, v0, u1, eave + 0.05, v1);
   colliders.push(colFromXZ(ctx.footprints[0].outer, yB, 23));
   const object3d = K.finish(); object3d.name = 'minor-hall';
