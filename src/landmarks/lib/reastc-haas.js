@@ -88,7 +88,7 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
     const { w: ow, proj: op, gap } = oriel; const y0 = yTop + 1.05 + gap; const y1 = y0 + Math.min(oriel.h, (oriel.maxTop ?? Infinity) - y0);
     for (const c of [s - ow / 2 + 0.45, s, s + ow / 2 - 0.45]) for (let k = 0; k < 4; k++) K.rbox(R, X.cast, c - 0.34, y0 - 0.38 * (k + 1), 0, c + 0.34, y0 - 0.38 * k, op * (1 - k * 0.22));
     K.rbox(R, X.cast, s - ow / 2 - 0.1, y0 - 0.25, 0, s + ow / 2 + 0.1, y0, op + 0.12); // sill slab
-    const ch = 0.7; // canted corners
+    const ch = 0.9; // canted corners
     const A = R.at(s - ow / 2, 0), B = R.at(s - ow / 2 + ch, op), C = R.at(s + ow / 2 - ch, op), D = R.at(s + ow / 2, 0);
     for (const [p, q] of [[A, B], [B, C], [C, D]]) {
       const Rr = K.run(p, q); const L = Rr.L; const nm = Math.max(1, Math.round(L / 0.55));
@@ -159,4 +159,12 @@ export function arcade(K, R, s0, s1, g, h, { X, pitch = 4.0, dep = 2.4, pier = 0
 export class FrameKit extends Kit {
   constructor(main, a) { super(main.ctx, a); this.buckets = main.buckets; this.detail = main.detail; this.extra = main.extra; this.pre = new THREE.Matrix4().makeRotationY(main.a - a); }
   add(mat, geo, opts) { const g = super.add(mat, geo, opts); g.applyMatrix4(this.pre); return g; }
+}
+
+// Hip roof with overhang and a soffit ring (a thin prism, so it is visible from below and never mirrored).
+// Note: b05b-kit hipRoof builds its soffit with classic-kit K.flat(..., down=true), which mirrors v; avoid it off the v=0 axis.
+export function haasHip(K, mat, u0, v0, u1, v1, yE, slope, ov = 0.8, { soffit, yTop = Infinity } = {}) {
+  const y = K.hip(mat, u0 - ov, v0 - ov, u1 + ov, v1 + ov, yE - ov * slope, slope, { yTop });
+  if (soffit) { const r = (a, b, c, d) => [[a, d], [c, d], [c, b], [a, b]]; K.prism(soffit, r(u0 - ov, v0 - ov, u1 + ov, v1 + ov), yE - ov * slope - 0.1, yE - ov * slope - 0.02, {}, [r(u0 + 0.05, v0 + 0.05, u1 - 0.05, v1 - 0.05)]); }
+  return y;
 }

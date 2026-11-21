@@ -8,8 +8,7 @@
 // east range ~16.5 / 20 m, lower flat-roofed strips on the south ~16.5 m; the site rises ~8 m to the east.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
-import { hipRoof } from './lib/b05b-kit.js';
-import { haasMats, loggia, discLamp } from './lib/reastc-haas.js';
+import { haasMats, loggia, discLamp, haasHip } from './lib/reastc-haas.js';
 
 export const info = {
   id: 'student-services-building',
@@ -74,7 +73,7 @@ export async function build(ctx) {
       face(R, eave, { lg, siding: lg });
     }
     K.box(M.concreteDark, u0 + 0.5, gm - 1.2, v0 + 0.5, u1 - 0.5, eave - 0.05, v1 - 0.5);
-    if (roof === 'hip') { const top = hipRoof(K, X.roof, u0, v0, u1, v1, eave + 0.05, slope, ov, { soffit: X.cast, yTop: yTop ?? Infinity });
+    if (roof === 'hip') { const top = haasHip(K, X.roof, u0, v0, u1, v1, eave + 0.05, slope, ov, { soffit: X.cast, yTop: yTop ?? Infinity });
       K.loop(X.fascia, [[u0 - ov, v1 + ov], [u1 + ov, v1 + ov], [u1 + ov, v0 - ov], [u0 - ov, v0 - ov]], [[0.02, eave + 0.05 - ov * slope - 0.3], [0.02, eave + 0.05 - ov * slope + 0.02]]); void top; }
     else if (roof === 'flat') { K.box(M.concreteDark, u0 + 0.2, eave - 0.3, v0 + 0.2, u1 - 0.2, eave, v1 - 0.2); K.loop(X.cast, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], [[0.08, eave - 0.2], [0.08, eave + 0.7], [-0.3, eave + 0.7], [-0.3, eave + 0.5]]); }
     colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], gm - 1.2, eave + 5));
@@ -97,7 +96,7 @@ export async function build(ctx) {
   block(-21.0, -12.9, 6.2, 9.6, 17.0, { faces: 'N', court: 'N', slope: 0.55, roof: 'none' });
   block(6.2, -10.2, 26.7, 9.6, 17.0, { faces: 'N', court: 'N', slope: 0.55, roof: 'none' });
   { const ov = 0.85, slope = 0.55, eave = 17.0, u0 = -21.0, v0 = -12.9, u1 = 26.7, v1 = 9.6;
-    hipRoof(K, X.roof, u0, v0, u1, v1, eave + 0.05, slope, ov, { soffit: X.cast });
+    haasHip(K, X.roof, u0, v0, u1, v1, eave + 0.05, slope, ov, { soffit: X.cast });
     K.loop(X.fascia, [[u0 - ov, v1 + ov], [u1 + ov, v1 + ov], [u1 + ov, v0 - ov], [u0 - ov, v0 - ov]], [[0.02, eave + 0.05 - ov * slope - 0.3], [0.02, eave + 0.05 - ov * slope + 0.02]]);
     void dormer;
     // louvred lantern at mid-roof (LiDAR ~27 m)

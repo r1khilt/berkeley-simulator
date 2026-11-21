@@ -6,8 +6,8 @@
 // with a canted oriel on stepped corbels above it; a canted, pyramid-roofed bay tower closes the north end.
 // Massing follows the 2021 LiDAR (frame -4°): eaves ~16.5 m, ridges ~21.5–22 m, west annex ~15 m.
 import * as THREE from 'three';
-import { Kit, deg, openWall, hipRoof } from './lib/b05b-kit.js';
-import { haasMats, archPart, archPortal, discLamp, FrameKit } from './lib/reastc-haas.js';
+import { Kit, deg, openWall } from './lib/b05b-kit.js';
+import { haasMats, archPart, archPortal, discLamp, FrameKit, haasHip } from './lib/reastc-haas.js';
 
 export const info = {
   id: 'earl-f-cheit-hall',
@@ -65,7 +65,7 @@ export async function build(ctx) {
       K.box(M.concreteDark, uP, gm - 1.2, vB, u1 - 0.45, eave, v1 - 0.45);
       K.box(M.concreteDark, uP, yP, vA, u1 - 0.45, eave, vB);
     } else K.box(M.concreteDark, u0 + 0.45, gm - 1.2, v0 + 0.45, u1 - 0.45, eave, v1 - 0.45);
-    const top = hipRoof(K, ROOF, u0, v0, u1, v1, eave + 0.05, slope, 1.0, { soffit: CREAM });
+    const top = haasHip(K, ROOF, u0, v0, u1, v1, eave + 0.05, slope, 1.0, { soffit: CREAM });
     K.loop(X.fascia, [[u0 - 1.0, v1 + 1.0], [u1 + 1.0, v1 + 1.0], [u1 + 1.0, v0 - 1.0], [u0 - 1.0, v0 - 1.0]], [[0.02, eave + 0.05 - 1.0 * slope - 0.16], [0.02, eave + 0.05 - 1.0 * slope + 0.02]]);
     void cupolas; void top;
     if (opts.porch) { const { vA, vB } = opts.porch; // leave the through-passage walkable
@@ -110,13 +110,13 @@ export async function build(ctx) {
       G.rbox(R, CREAM, -0.05, g - 1.5, 0, L + 0.05, g + 0.55, 0.06);
       for (const [a0, a1] of [[-0.05, sA - W / 2 - 1.25], [sA + W / 2 + 1.25, L + 0.05]]) G.rbox(R, CREAM, a0, g + 4.0, 0, a1, g + 4.3, 0.1);
       for (const [a0, a1] of (R === Rc ? [[-0.05, sA - 3.5], [sA + 3.5, L + 0.05]] : [[-0.05, L + 0.05]])) G.rbox(R, CREAM, a0, ge - 0.6, 0, a1, ge - 0.3, 0.14);
-      archPortal(G, R, sA, g, W, crown, { depth: R === Rc ? (gv1 - gv0) - 0.9 : 0.01, X, wallD: 0.45, through: true, gFar: g, oriel: R === Rc ? { w: 6.4, h: 3.6, proj: 1.8, gap: 0.12, maxTop: ge - 0.45 } : null });
+      archPortal(G, R, sA, g, W, crown, { depth: R === Rc ? (gv1 - gv0) - 0.9 : 0.01, X, wallD: 0.45, through: true, gFar: g, oriel: R === Rc ? { w: 6.6, h: 3.6, proj: 2.3, gap: 0.12, maxTop: ge - 0.45 } : null });
     }
     // solid piers either side of the passage + the mass over it; slate hip roof with copper-brown fascia
     const pa = uc - W / 2 - 0.3, pb = uc + W / 2 + 0.3;
     G.box(M.concreteDark, gu0 + 0.45, g - 1.5, gv0 + 0.45, pa, ge, gv1 - 0.45); G.box(M.concreteDark, pb, g - 1.5, gv0 + 0.45, gu1 - 0.45, ge, gv1 - 0.45);
     G.box(M.concreteDark, pa, crown + 0.6, gv0 + 0.45, pb, ge, gv1 - 0.45);
-    hipRoof(G, ROOF, gu0, gv0, gu1, gv1, ge + 0.05, 0.55, 0.8, { soffit: CREAM });
+    haasHip(G, ROOF, gu0, gv0, gu1, gv1, ge + 0.05, 0.55, 0.8, { soffit: CREAM });
     G.loop(X.fascia, [[gu0 - 0.8, gv1 + 0.8], [gu1 + 0.8, gv1 + 0.8], [gu1 + 0.8, gv0 - 0.8], [gu0 - 0.8, gv0 - 0.8]], [[0.02, ge + 0.05 - 0.44 - 0.2], [0.02, ge + 0.05 - 0.44 + 0.02]]);
     // colliders (local x/z) for the two piers; walkable passage floor
     const toL = (u, v) => G.xz(u, v).map((q) => +q.toFixed(3));
