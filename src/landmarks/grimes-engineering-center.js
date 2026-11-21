@@ -26,9 +26,10 @@ export const info = {
   replaces: ['w/25079275'],
   // New outline (2025 aerial imagery; landmark-local x,z) replacing the old Bechtel OSM outline for tree hiding and the map,
   // and areas where the 2021 LiDAR trees no longer stand: inside the new base, and the open paving west of it (the two
-  // ~26 m trees there are gone in the 2025 imagery).
+  // ~26 m trees there are gone in the 2025 imagery), and the re-landscaped strip in front of the west half of the south front
+  // (gravel beds and a walk in the 2025 SOM photos where the 2021 LiDAR has three 4-8 m trees).
   footprint: [[-34.9, -7.06], [28.5, -24.96], [39.5, 14.04], [-23.9, 32.04]],
-  clear: [_rect(-33.2, -17.8, 35.7, 25.8), _rect(-44.5, -1.0, -33.2, 21.5)],
+  clear: [_rect(-33.2, -17.8, 35.7, 25.8), _rect(-44.5, -1.0, -33.2, 21.5), _rect(-36.0, 25.8, 6.0, 34.0)],
 };
 
 export async function build(ctx) {
@@ -36,17 +37,17 @@ export async function build(ctx) {
   const K = new Kit(ctx, ANG); const M = ctx.M; const G = grimesMats(M);
   const colliders = [], walkables = [];
   // ---- levels (y = 0 is the lowest grade on the old footprint; the plazas around are ~0.0-0.9)
-  const P1 = 4.6;    // podium roof = level 2 floor
-  const TER = 8.4;   // terrace = pavilion lower floor
-  const F4 = 12.6;   // pavilion upper floor
-  const RF = 16.8;   // top of pavilion glazing
-  const CU = 17.55;  // canopy underside (beams)
-  const CT = 18.2;   // canopy top
+  const P1 = 5.8;    // podium roof = old Bechtel roof (2021 LiDAR top ~6.0 incl. its landscaping) = new level-1 floor
+  const TER = 9.9;   // terrace = pavilion lower floor (level 2)
+  const F4 = 13.7;   // pavilion upper floor (level 3)
+  const RF = 17.5;   // top of pavilion glazing
+  const CU = 18.0;   // canopy underside (beams)
+  const CT = 18.6;   // canopy top (~61 ft)
   // ---- plan (building frame: u along the long axis ~ESE, v ~SSW-wards, metres)
   const bN = -16.3, bS = 24.0, bW = -29.4, bE = 30.8;   // podium (old Bechtel lower level + south infill)
   const sS = 20.5, sW = -26.4;                          // set-back level-2 faces (south, west); east and north are flush
   const pW = -19.0, pE = 24.3, pN = -6.0, pS = 17.0;    // glass pavilion
-  const cW = -20.2, cE = 25.5, cN = -7.2, cS = 18.2;    // perimeter column lines
+  const cW = -20.8, cE = 26.1, cN = -7.8, cS = 18.8;    // perimeter column lines (1.8 m outside the glass)
   const kW = -29.6, kE = 31.4, kN = -10.0, kS = 23.6;   // roof canopy outline
   const gMin = (u0, v0, u1, v1) => K.gMin(u0, v0, u1, v1, 8);
   const quad = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
@@ -55,12 +56,12 @@ export async function build(ctx) {
   const glaze = (R, o, frame = G.frame, rev = 0.45) => K.fill(R, o, { rev, glass: G.storeGlass, frame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.5) - 1), tran: [o.y1 - 0.7] });
 
   // =============================== 1. PODIUM ===============================
-  K.box(M.concreteDark, bW + 0.6, -1.0, bN + 0.6, bE - 0.6, P1 - 0.3, bS - 0.6);
-  const BAND0 = 3.4;           // underside of the deep precast band over the recessed ground floor
-  const PAR = P1 + 1.3;        // band / parapet top (the podium-roof planters sit behind it)
+  K.box(M.concreteDark, bW + 3.7, -1.0, bN + 0.6, bE - 0.6, P1 - 0.3, bS - 1.6);   // interior fill, kept behind the recessed storefronts
+  const BAND0 = 3.7;           // underside of the deep precast band over the recessed ground floor
+  const PAR = P1 + 0.55;       // band / parapet top (the hedge planters sit on it) (the podium-roof planters sit behind it)
   // Old Bechtel ground floor: square board-formed piers flush with the face, storefront glazing recessed `rec` behind
   // them, and a deep two-row precast band above (panel texture = 3.0 x 1.5 m panels with dark joints).
-  const arcade = (a, b, { rec = 1.0, piers, ent = null, top = PAR, corner = 1.5, pw = 0.6, raise = null, bandMat = G.panel }) => {
+  const arcade = (a, b, { rec = 1.0, piers, ent = null, top = PAR, corner = 1.5, pw = 0.6, raise = null, bandMat = G.panel, band0 = BAND0 }) => {
     const R = K.run(a, b), Ri = K.run(a, b, -rec); const L = R.L;
     const gl = gMin(Math.min(a[0], b[0]) - 0.5, Math.min(a[1], b[1]) - 0.5, Math.max(a[0], b[0]) + 0.5, Math.max(a[1], b[1]) + 0.5);
     const ps = [0, ...piers, L]; const ops = [];
@@ -68,23 +69,23 @@ export async function build(ctx) {
       const s0 = ps[i] + (i === 0 ? corner : pw / 2), s1 = ps[i + 1] - (i === ps.length - 2 ? corner : pw / 2);
       if (s1 - s0 < 0.8) continue;
       const entry = ent != null && Math.abs((s0 + s1) / 2 - ent) < 1.5;
-      ops.push({ s0, s1, y0: entry ? 0.3 : 0.45, y1: BAND0 - 0.12, sill: false, fw: 0.07, entry });
+      ops.push({ s0, s1, y0: entry ? 0.3 : 0.3, y1: band0 - 0.1, sill: false, fw: 0.06, entry });
     }
-    K.wall(Ri, G.panel, 0, L, gl - 1.2, BAND0 + 0.3, ops, 0.3);
+    K.wall(Ri, G.panel, 0, L, gl - 1.2, band0 + 0.3, ops, 0.3);
     for (const o of ops) {
-      if (!o.entry) { K.fill(Ri, o, { rev: 0.18, glass: G.storeGlass, frame: G.frame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.6) - 1), tran: [o.y1 - 0.75] }); continue; }
+      if (!o.entry) { K.fill(Ri, o, { rev: 0.18, glass: G.storeGlass, frame: G.frame, mull: Math.max(1, Math.round((o.s1 - o.s0) / 1.5) - 1), tran: [] }); continue; }
       K.rbox(Ri, G.storeGlass, o.s0, o.y0, -0.12, o.s1, o.y1, -0.08);
       for (let i = 0; i <= 4; i++) { const s = o.s0 + (o.s1 - o.s0) * i / 4; K.rbox(Ri, G.frame, s - 0.06, o.y0, -0.1, s + 0.06, o.y1, 0.03); }
       K.rbox(Ri, G.frame, o.s0, o.y0 + 2.45, -0.1, o.s1, o.y0 + 2.57, 0.03);
       K.rbox(R, G.deck, o.s0 - 3, o.y0 - 0.3, -rec, o.s1 + 3, o.y0, 3.0);                  // entry apron under the band
     }
-    for (const s of piers) K.rbox(R, G.panel, s - pw / 2, gl - 1.2, -pw, s + pw / 2, BAND0 + 0.05, 0);
-    K.rbox(R, G.panel, 0, gl - 1.2, -rec, corner, BAND0 + 0.05, 0); K.rbox(R, G.panel, L - corner, gl - 1.2, -rec, L, BAND0 + 0.05, 0);
+    for (const s of piers) K.rbox(R, G.panel, s - pw / 2, gl - 1.2, -pw, s + pw / 2, band0 + 0.05, 0);
+    K.rbox(R, G.panel, 0, gl - 1.2, -rec, corner, band0 + 0.05, 0); K.rbox(R, G.panel, L - corner, gl - 1.2, -rec, L, band0 + 0.05, 0);
     const cut = raise ? raise.s0 : L;
-    K.rbox(R, bandMat, -0.02, BAND0, -rec - 0.05, cut, top, 0.02);                            // deep band (underside = arcade soffit)
+    K.rbox(R, bandMat, -0.02, band0, -rec - 0.05, cut, top, 0.02);                            // deep band (underside = arcade soffit)
     K.rbox(R, G.slab, -0.06, top, -0.45, cut, top + 0.07, 0.06);                              // thin light coping
     if (raise) {   // taller block east of the entrance, band pushed slightly forward
-      K.rbox(R, G.panel, raise.s0, BAND0 - 0.25, -rec - 0.05, L + 0.02, top + raise.h, 0.3);
+      K.rbox(R, G.panel, raise.s0, band0 - 0.25, -rec - 0.05, L + 0.02, top + raise.h, 0.3);
       K.rbox(R, G.slab, raise.s0 - 0.06, top + raise.h, -0.6, L + 0.06, top + raise.h + 0.07, 0.36);
     }
     return R;
@@ -100,9 +101,9 @@ export async function build(ctx) {
     K.wall(R, G.panel, 0, R.L, gl - 1.2, TER - 0.95, ops, 0.45); for (const o of ops) glaze(R, o);
     K.rbox(R, G.metalPanel, -0.15, TER - 0.95, -0.2, R.L + 0.15, TER + 0.18, 0.14);
   }
-  const WS = { v0: -13.2, vL0: -9.0, vL1: -7.4, vT: -3.4, vT1: -0.6 };   // west stair stations (north -> south)
+  const WS = { v0: -16.0, vT: -3.4, vT1: -0.6 };   // west stair stations (north -> south): one straight flight + top landing
   { // west face (toward Memorial Glade): glazing recessed deep under the deck edge, behind square piers
-    arcade([bW, bN], [bW, bS], { rec: 3.0, piers: [5.0, 10.5, 16.0, 21.5, 27.0, 32.5], top: P1 + 0.02, pw: 0.7, corner: 1.2, bandMat: G.whitePanel });
+    arcade([bW, bN], [bW, bS], { rec: 3.0, piers: [5.0, 10.5, 16.0, 21.5, 27.0, 32.5], top: P1 + 0.02, pw: 0.7, corner: 1.2, bandMat: G.whitePanel, band0: P1 - 1.2 });
   }
   { const R = K.run([bE, bN], [bW, bN]); K.wall(R, G.panel, 0, R.L, gMin(bW, bN - 1, bE, bN) - 1.2, TER + 0.18, [], 0.45); }
   // podium roof: planters along the south, a deck along the west with a picket guardrail
@@ -179,7 +180,7 @@ export async function build(ctx) {
     for (let k = 6; k >= 0; k--) ring.push([cW + (cE - cW) * k / 6, cN]);
     for (let j = 1; j <= 2; j++) ring.push([cW, cN + (cS - cN) * j / 3]);
     for (const [u, v] of ring) {
-      { const cg = new THREE.CylinderGeometry(0.21, 0.21, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
+      { const cg = new THREE.CylinderGeometry(0.23, 0.23, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
       K.box(G.steel, u - 0.34, TER, v - 0.34, u + 0.34, TER + 0.06, v + 0.34, { detail: true });
       K.box(G.steel, u - 0.3, CU - 0.4, v - 0.3, u + 0.3, CU, v + 0.3, { detail: true });
       colliders.push(K.colCyl(u, v, 0.25, TER - 0.2, CU));
@@ -193,9 +194,9 @@ export async function build(ctx) {
       for (const nb of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
         const t = [c[0] + (nb[0] - c[0]) * 0.32, c[1] + (nb[1] - c[1]) * 0.32];
         const p0 = [c[0] + (nb[0] - c[0]) * 0.03, yFoot, c[1] + (nb[1] - c[1]) * 0.03], p1 = [t[0], yTop, t[1]];
-        strut(K, G.rod, p0, p1, 0.05, 6);
+        strut(K, G.rod, p0, p1, 0.065, 6);
         const f0 = 0.78, f1 = 0.9; const q = (f) => [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f, p0[2] + (p1[2] - p0[2]) * f];
-        strut(K, G.sleeve, q(f0), q(f1), 0.09, 8);
+        strut(K, G.sleeve, q(f0), q(f1), 0.11, 8);
       }
       K.box(G.steel, c[0] - 0.32, TER + 0.06, c[1] - 0.32, c[0] + 0.32, yFoot + 0.12, c[1] + 0.32, { detail: true });   // rod anchor plate
     }
@@ -211,35 +212,31 @@ export async function build(ctx) {
     const TH = 0.3;
     for (let k = 0; k <= 6; k++) { const u = cW + (cE - cW) * k / 6; beam(u, cN, u, cS); beam(u, kN, u, cN, TH); beam(u, cS, u, kS, TH); }
     for (let j = 0; j <= 3; j++) { const v = cS + (cN - cS) * j / 3; beam(cW, v, cE, v); beam(kW, v, cW, v, TH); beam(cE, v, kE, v, TH); }
-    beam(cE, cS, kE, kS, 0.42); beam(cW, cS, kW, kS, 0.42); beam(cE, cN, kE, kN, 0.42); beam(cW, cN, kW, kN, 0.42);
+    // (no diagonal corner beams: from the plaza they read as hip lines; the real canopy reads as one flat plane)
     // secondary beams at third points
     for (let k = 0; k < 6; k++) for (const f of [1 / 3, 2 / 3]) { const u = cW + (cE - cW) * (k + f) / 6; beam(u, kN, u, kS, 0.38, 0.1); }
     for (const u of [kW + (cW - kW) / 3, kW + 2 * (cW - kW) / 3, cE + (kE - cE) / 2]) beam(u, kN, u, kS, 0.38, 0.1);
     // louvre blades running perpendicular to the long facades (sky reads through them from the plaza)
-    const n = Math.round((kE - kW) / 0.32);
-    for (let i = 1; i < n; i++) { const u = kW + (kE - kW) * i / n; K.box(G.louvre, u - 0.016, CT - 0.24, kN + 0.24, u + 0.016, CT - 0.04, kS - 0.24); }
+    const n = Math.round((kE - kW) / 0.6);
+    for (let i = 1; i < n; i++) { const u = kW + (kE - kW) * i / n; K.box(G.louvre, u - 0.02, CT - 0.22, kN + 0.24, u + 0.02, CT - 0.04, kS - 0.24); }
   }
 
   // =============================== WEST FRONT: WHITE STAIR + SIGN BOX, BRICK STAIR ===============================
   {
     const u0 = bW - 2.1, u1 = bW - 0.05; const gFoot = Math.max(-0.5, K.g(u0 + 1, WS.v0));
-    const yMid = (gFoot + P1) / 2;
     const flight = (va, vb, ya, yb) => { const n = Math.max(3, Math.round((yb - ya) / 0.165)); const tr = (vb - va) / n;
       for (let i = 0; i < n; i++) { const yy = ya + (yb - ya) * (i + 1) / n; K.box(G.slab, u0, yy - 0.06, va + tr * i, u1, yy, va + tr * (i + 1) + 0.02); K.box(G.steel, u0, yy - 0.22, va + tr * i, u1, yy - 0.06, va + tr * i + 0.04, { detail: true }); }
       const L = Math.hypot(vb - va, yb - ya), a = Math.atan2(yb - ya, vb - va);
       const pl = new THREE.BoxGeometry(u1 - u0, 0.16, L); pl.rotateX(-a); pl.translate((u0 + u1) / 2, (ya + yb) / 2 - 0.34, (va + vb) / 2); K.add(G.metalPanel, pl);   // closed soffit
       const gd = new THREE.BoxGeometry(0.14, 1.7, L); gd.rotateX(-a); gd.translate(u0 - 0.07, (ya + yb) / 2 + 0.25, (va + vb) / 2); K.add(G.metalPanel, gd);    // solid white stringer/guard
       const hr = new THREE.BoxGeometry(0.05, 0.05, L); hr.rotateX(-a); hr.translate(u1 - 0.1, (ya + yb) / 2 + 0.95, (va + vb) / 2); K.add(G.steel, hr, { detail: true }); };
-    flight(WS.v0, WS.vL0, gFoot, yMid); flight(WS.vL1, WS.vT, yMid, P1);
-    K.box(G.slab, u0, yMid - 0.3, WS.vL0, u1, yMid, WS.vL1); K.box(G.metalPanel, u0 - 0.14, yMid - 0.65, WS.vL0, u0, yMid + 1.1, WS.vL1);
+    flight(WS.v0, WS.vT, gFoot, P1);
     K.box(G.slab, u0, P1 - 0.3, WS.vT, u1, P1, WS.vT1); K.box(G.metalPanel, u0 - 0.14, P1 - 0.65, WS.vT, u0, P1 + 1.1, WS.vT1);
-    { const v = (WS.vL0 + WS.vL1) / 2, gg = K.g(u0 + 0.6, v); K.box(G.metalPanel, u0 + 0.2, gg - 0.4, v - 0.25, u0 + 1.0, yMid - 0.3, v + 0.25); }
-    const sp = { gFoot, yMid };
+    for (const f of [0.45, 0.75]) { const v = WS.v0 + (WS.vT - WS.v0) * f, gg = K.g(u0 + 0.6, v), yy = gFoot + (P1 - gFoot) * f; K.box(G.metalPanel, u0 + 0.75, gg - 0.4, v - 0.15, u0 + 1.05, yy - 0.45, v + 0.15); }   // slim white posts under the flight
+    const sp = { gFoot };
     walkables.push(K.walkFn(u0, WS.v0, u1, WS.vT1, (u, v) => {
       if (u < u0 - 0.05 || u > u1 + 0.05 || v < WS.v0 - 0.05 || v > WS.vT1 + 0.05) return null;
-      if (v <= WS.vL0) return sp.gFoot + (sp.yMid - sp.gFoot) * Math.max(0, (v - WS.v0) / (WS.vL0 - WS.v0));
-      if (v <= WS.vL1) return sp.yMid;
-      if (v <= WS.vT) return sp.yMid + (P1 - sp.yMid) * (v - WS.vL1) / (WS.vT - WS.vL1);
+      if (v <= WS.vT) return sp.gFoot + (P1 - sp.gFoot) * Math.max(0, (v - WS.v0) / (WS.vT - WS.v0));
       return P1; }));
     railCol([u0 - 0.1, WS.v0], [u0 - 0.1, WS.vT1], -2, P1 + 1.2);
     // low white sign box at the stair head, just below the deck guardrail
