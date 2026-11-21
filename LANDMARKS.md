@@ -45,6 +45,8 @@ export async function build(ctx) {
     walkables: [],     // surfaces the player can stand on above terrain (decks, stairs, seating, bridges):
                        //  {type:'poly', pts:[[x,z],...], y} flat, or {type:'fn', bounds:[x0,z0,x1,z1], heightAt:(x,z)=>y|null}
     interactions: [],  // optional: {id, pos:[x,y,z], radius, label:'Ride the elevator to the observation deck', teleport:[x,y,z]}
+    replacesColliders, // optional true: the module supplies all walls (e.g. a walkable interior); the procedural footprint
+                       //  colliders of the `replaces` buildings are switched off while it is loaded (see Doe Library)
     update(dt, env) {} // optional per-frame animation; env = {time: Date (real Pacific time), night: 0..1, camera}
   };
 }

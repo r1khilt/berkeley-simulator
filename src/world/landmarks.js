@@ -53,6 +53,9 @@ export class LandmarkManager {
         else if (w.type === 'fn') { const f = w.heightAt; ph.addWalkable({ type: 'fn', tag, bounds: [w.bounds[0] + a.x, w.bounds[1] + a.z, w.bounds[2] + a.x, w.bounds[3] + a.z], heightAt: (x, z) => { const v = f(x - a.x, z - a.z); return v == null ? null : v + a.y; } }); }
       }
       for (const hpoly of res.terrainHoles || []) ph.addHole(hpoly.map(([x, z]) => [x + a.x, z + a.z]), tag);
+      // [interiors] a landmark with walkable interiors (res.replacesColliders) supplies its own walls: switch off the
+      // procedural footprint colliders of the buildings it replaces while it is loaded (restored on unload)
+      // [interiors-doe] replacesColliders: now covered for every landmark by physics.suspendTag below (integration)
       l.inter = (res.interactions || []).map((it) => ({ ...it, landmark: l.id, pos: [it.pos[0] + a.x, it.pos[1] + a.y, it.pos[2] + a.z], teleport: it.teleport ? [it.teleport[0] + a.x, it.teleport[1] + a.y, it.teleport[2] + a.z] : null }));
       l.anchors = {}; for (const [k, v] of Object.entries(res.anchors || {})) if (Array.isArray(v)) l.anchors[k] = [v[0] + a.x, v[1] + a.y, v[2] + a.z];
       Object.assign(l, { obj, res, details, packetAnchor: a, info: mod.info || {} });
