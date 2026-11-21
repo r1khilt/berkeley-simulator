@@ -92,20 +92,21 @@ export function cutRanges(s0, s1, cuts) { let segs = [[s0, s1]]; for (const [a, 
 // (with occasional doubled panels): "alternating metal panels and glazing", about half glass.
 export function panelStorey(K, R, s0, s1, ya, yb, k, mats, o = {}) {
   const W = o.module ?? 1.5, pw = o.panelW ?? 0.42, dep = o.panelD ?? 0.36; const L = s1 - s0; if (L < 0.4) return;
+  const fin = o.finMat || mats.metal; const stagger = o.stagger ?? true;
   K.rbox(R, mats.glass, s0, ya, -0.2, s1, yb, -0.14);
-  K.rbox(R, mats.spandrel, s0, ya, -0.14, s1, ya + 0.55, -0.125);
-  K.rbox(R, mats.band, s0 - 0.01, ya - 0.22, -0.16, s1 + 0.01, ya + 0.03, 0.03);
-  K.rbox(R, mats.mull, s0, ya + (yb - ya) * 0.74 - 0.04, -0.14, s1, ya + (yb - ya) * 0.74 + 0.04, -0.08, { detail: true });
-  const n = Math.max(1, Math.round(L / W)); const w = L / n; const off = (k % 2) ? 0.5 : 0.0;
+  K.rbox(R, o.bandMat || mats.band, s0 - 0.01, ya - 0.2, -0.16, s1 + 0.01, ya + 0.02, 0.04);
+  K.rbox(R, mats.mull, s0, ya + (yb - ya) * 0.74 - 0.03, -0.14, s1, ya + (yb - ya) * 0.74 + 0.03, -0.09, { detail: true });
+  const n = Math.max(1, Math.round(L / W)); const w = L / n; const off = stagger && (k % 2) ? 0.5 : 0.0;
   const g = [];
   for (let i = -1; i < n + 1; i++) {
-    const s = s0 + (i + off + 0.25) * w; if (s - pw / 2 < s0 - 0.01 || s + pw / 2 > s1 + 0.01) continue;
+    const s = s0 + (i + off + 0.25) * w; const pwi = typeof pw === 'function' ? pw(i) : pw; if (s - pwi / 2 < s0 - 0.01 || s + pwi / 2 > s1 + 0.01) continue;
     const h = hash(i + Math.round(R.a[0] * 7), k + Math.round(R.a[1] * 3));
-    g.push(bowPanel(s, pw, ya + 0.08, yb - 0.32, -0.15, dep));
-    if (h > 0.8 && s + pw * 1.6 < s1) g.push(bowPanel(s + pw + 0.05, pw, ya + 0.08, yb - 0.32, -0.15, dep));
-    if (o.mullions !== false) K.rbox(R, mats.mull, s + w / 2 - 0.03, ya + 0.08, -0.14, s + w / 2 + 0.03, yb - 0.42, -0.09, { detail: true });
+    const y0 = stagger ? ya + 0.08 : ya + 0.02, y1 = stagger ? yb - 0.3 : yb - 0.2;
+    g.push(bowPanel(s, pwi, y0, y1, -0.15, dep));
+    if (stagger && h > 0.8 && s + pwi * 1.6 < s1) g.push(bowPanel(s + pwi + 0.05, pwi, y0, y1, -0.15, dep));
+    if (o.mullions !== false) K.rbox(R, mats.mull, s + w / 2 - 0.03, ya + 0.04, -0.14, s + w / 2 + 0.03, yb - 0.2, -0.09, { detail: true });
   }
-  for (const gg of g) K.addRun(R, mats.metal, gg, { uvMode: 'keep' });
+  for (const gg of g) K.addRun(R, fin, gg, { uvMode: 'keep' });
 }
 
 // Flush ribbon curtain wall (courtyard faces): glass, silver mullion caps on the module, dark spandrel band at each slab.
@@ -212,13 +213,13 @@ export function engineTrees(spec) {
 // UVs are boxUV metres/2; one tile = 4 modules (6 m) x one storey (floorH m), aligned to floor lines at y0.
 export function interiorMap(floorH, y0, { seed = 1, blinds = 0.5 } = {}) {
   const W = 512, H = 448, NM = 8; const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
-  g.fillStyle = '#b9bcbd'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#c4c7c8'; g.fillRect(0, 0, W, H);
   for (let f = 0; f < 2; f++) {
     const yy = (m) => H - (f * floorH + m) / (2 * floorH) * H; // metres above this floor -> px
     for (let i = 0; i < NM; i++) {
       const x0 = i * W / NM, w = W / NM; const r = (k) => hash(i * 13 + f * 101 + seed * 7, k);
       const grd = g.createLinearGradient(0, yy(floorH - 0.6), 0, yy(0));
-      const d = 138 + Math.floor(r(1) * 40); grd.addColorStop(0, `rgb(${d + 44},${d + 46},${d + 46})`); grd.addColorStop(0.35, `rgb(${d},${d + 3},${d + 6})`); grd.addColorStop(1, `rgb(${d - 34},${d - 31},${d - 28})`);
+      const d = 150 + Math.floor(r(1) * 36); grd.addColorStop(0, `rgb(${d + 44},${d + 46},${d + 46})`); grd.addColorStop(0.35, `rgb(${d},${d + 3},${d + 6})`); grd.addColorStop(1, `rgb(${d - 34},${d - 31},${d - 28})`);
       g.fillStyle = grd; g.fillRect(x0, yy(floorH - 0.6), w, yy(0) - yy(floorH - 0.6));
       g.fillStyle = '#f4f2ec'; g.fillRect(x0, yy(floorH - 0.55), w, 6);
       if (r(2) < blinds) { const bh = 0.5 + r(3) * 2.4; g.fillStyle = r(4) < 0.5 ? '#e2e1dc' : '#cfd0cc'; g.fillRect(x0 + 2, yy(floorH - 0.6), w - 4, yy(floorH - 0.6 - bh) - yy(floorH - 0.6)); }
@@ -259,4 +260,19 @@ export function roundPoly(poly, r, seg = 5) {
     for (let k = 0; k <= seg; k++) { const aa = a0 + da * k / seg; out.push([C[0] + Math.cos(aa) * rr, C[1] + Math.sin(aa) * rr]); }
   }
   return out;
+}
+
+// Catmull-Rom resample of the open vertex run poly[i0..i1] (inclusive) at ~step metres; returns the new ring.
+export function smoothRun(poly, i0, i1, step = 2.2, closed = true) {
+  const n = poly.length; const P = (k) => { const kk = Math.max(i0 - 1, Math.min(i1 + 1, k)); return closed ? poly[((kk % n) + n) % n] : poly[Math.max(i0, Math.min(i1, kk))]; };
+  const out = [];
+  for (let k = i0; k < i1; k++) {
+    const p0 = P(k - 1), p1 = poly[k], p2 = poly[k + 1], p3 = P(k + 2);
+    const L = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]); const m = Math.max(1, Math.round(L / step));
+    for (let j = 0; j < m; j++) { const t = j / m, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]); }
+  }
+  out.push(poly[i1]);
+  return [...poly.slice(0, i0), ...out, ...poly.slice(i1 + 1)];
 }

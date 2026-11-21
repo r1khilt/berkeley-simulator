@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { polyRuns, inset, std, tint } from './lib/b06-modern.js';
 import { nightGlow } from '../materials.js';
-import { inRing, distToRing, ringHits, nearestHit, ringPath, sagArc, drape, cutRanges, panelStorey, ribbonStorey, storefront, youngTree2, signMaterial, offsetPoly, flatDown, groundMat, engineTrees, interiorMap, dayNightGlow, roundPoly } from './lib/gw-kit.js';
+import { inRing, distToRing, ringHits, nearestHit, ringPath, sagArc, drape, cutRanges, panelStorey, ribbonStorey, storefront, youngTree2, signMaterial, offsetPoly, flatDown, groundMat, engineTrees, interiorMap, dayNightGlow, roundPoly, smoothRun } from './lib/gw-kit.js';
 
 export const info = {
   id: 'the-gateway',
@@ -21,6 +21,13 @@ export const info = {
   subtitle: 'Barbara and Gerson Bakar Gateway · Weiss/Manfredi with Gensler · 2026',
   blurb: 'Opened in 2026 on the former Tolman Hall site at Hearst Avenue and Arch Street, the 367,000 sq ft Bakar Gateway is the home of the College of Computing, Data Science, and Society, Berkeley\'s first new college in more than 50 years.',
   replaces: ['w/1460048471'],
+  // landmark-local zones where the 2021 LiDAR trees are gone (paved plaza, rebuilt courtyard, construction strip south/east;
+  // checked against 2025-26 imagery); the engine should hide trees (and their colliders) inside these.
+  clear: [
+    [[-18.1, -32.2], [-18.7, -20.1], [-19.8, -14.1], [-22.0, -7.2], [-24.3, -3.1], [-27.1, -0.9], [-28.0, -0.8], [-30.8, -0.6], [-34.3, -3.0], [-37.9, -8.2], [-41.1, -15.8], [-43.8, -24.4], [-45.6, -31.0], [-39.0, -36.6], [-31.0, -40.6], [-22.0, -43.0], [-15.6, -33.0]],
+    [[22.7, 29.0], [21.2, 25.1], [19.4, 19.2], [18.2, 12.5], [18.4, 6.1], [20.4, 0.9], [24.4, -1.9], [27.3, -2.4], [32.5, -1.3], [38.1, 1.8], [44.9, 7.5], [50.5, 13.5], [58.0, 23.0], [62.0, 31.0], [40.0, 37.0], [26.0, 36.0]],
+    [[-20.0, 32.5], [22.0, 28.0], [58.0, 22.5], [90.7, 16.3], [94.0, 9.0], [104.0, 14.0], [103.0, 26.0], [66.0, 37.0], [50.0, 36.5], [10.0, 47.0], [-14.0, 41.0]],
+  ],
 };
 
 const Y1 = 3.5;                                    // level 1 = Morgan Bikeway passage grade
@@ -33,18 +40,20 @@ export async function build(ctx) {
   const colliders = [], walkables = [], interactions = []; const treeSpec = [];
   const glassOpts = { rough: 0.05, metal: 0.55, envMapIntensity: 2.0, emissive: 0xffe2b8, emissiveIntensity: 0.9 };
   const mats = {
+    lid: std(0xe8e6e1, 'gwLid', { rough: 0.45, metal: 0.05 }),
+    finSilver: std(0xe1e4e4, 'gwFinSilver', { rough: 0.28, metal: 0.55 }),
     get frame() { return this.mull; }, get column() { return this.white; }, get roofSoffit() { return this.white; },
     glass: dayNightGlow(std(0xbccad3, 'gwGlass', glassOpts), 0.05, 1.0),
     glassLow: dayNightGlow(std(0xb4c0c6, 'gwGlassLow', { ...glassOpts, metal: 0.25, rough: 0.08, emissiveIntensity: 1.3 }), 0.28, 1.0),
     glass5: dayNightGlow(std(0xc3d0d8, 'gwGlass5', { ...glassOpts, metal: 0.5, emissiveIntensity: 1.2 }), 0.08, 1.0),
     spandrel: std(0x8d9aa4, 'gwSpandrel', { rough: 0.25, metal: 0.5 }),
-    band: std(0x6d7276, 'gwBand', { rough: 0.4, metal: 0.5 }),
+    band: std(0xd3c5ad, 'gwBand', { rough: 0.38, metal: 0.4 }),
     mull: std(0x3b3835, 'gwMull', { rough: 0.5, metal: 0.45 }),
-    metal: std(0xd2bd98, 'gwPanel', { rough: 0.3, metal: 0.6 }),
+    metal: std(0xd6c7a8, 'gwPanel', { rough: 0.3, metal: 0.5 }),
     silver: std(0xc6cbcf, 'gwSilver', { rough: 0.35, metal: 0.55 }),
     soffit: std(0xe6dccb, 'gwSoffit', { rough: 0.6, metal: 0.1, emissive: 0x4a4236 }),
     roofPlane: tint(M.concrete, 0xe4e4e0, 'gwRoofPlane'),
-    deck: tint(M.wood, 0xa36a4c, 'gwDeck'),
+    deck: tint(M.paving, 0xb9786a, 'gwDeck'),
     white: std(0xf2f2ef, 'gwWhite', { rough: 0.45 }),
     leaf: std(0x56783a, 'gwLeaf', { rough: 0.92 }), trunk: std(0x5b4b3d, 'gwTrunk', { rough: 0.9 }),
     core: tint(M.concrete, 0x8f9294, 'gwCore'),
@@ -58,7 +67,10 @@ export async function build(ctx) {
   // ---------- plan ----------
   const raw = ctx.footprints[0].outer.map(([x, z]) => [x, z]);
   // drop the near-collinear kink on the south wall (OSM node at -25.8, 34.5) so the campus facade is one straight run
-  const fp = raw.filter(([x, z]) => Math.hypot(x + 25.8, z - 34.5) > 0.5);
+  let fp = raw.filter(([x, z]) => Math.hypot(x + 25.8, z - 34.5) > 0.5);
+  { const idx = (x, z) => fp.findIndex((p) => Math.hypot(p[0] - x, p[1] - z) < 0.3);
+    const a1 = idx(-18.1, -32.2), b1 = idx(-43.8, -24.4); if (a1 >= 0 && b1 > a1 + 2) fp = smoothRun(fp, a1 + 1, b1 - 1, 2.0, false);
+    const a2 = idx(22.7, 29.0), b2 = idx(50.5, 13.5); if (a2 >= 0 && b2 > a2 + 2) fp = smoothRun(fp, a2 + 1, b2 - 1, 2.0, false); }
   const P16 = [-55.6, 37.9], P18 = [22.7, 29.0];
   const sT = [(P18[0] - P16[0]), (P18[1] - P16[1])]; const sL = Math.hypot(...sT); sT[0] /= sL; sT[1] /= sL;
   const sN = [-sT[1], sT[0]];                                   // outward (south)
@@ -98,7 +110,11 @@ export async function build(ctx) {
       const ya = FL[k], yb = FL[k + 1]; if (yb < gLo + 0.3) continue;
       const cut = isSouth ? [[sC - PORT[k][0], sC + PORT[k][0]]] : [];
       for (const [a, b] of cutRanges(0, R.L, cut)) {
-        if (kind === 'out') panelStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, k, mats); else ribbonStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, mats);
+        // wings read differently in the photos: west wing a warm champagne pier rhythm, east wing dense deep silver fins
+        const west = mid[0] < -18;
+        const fo = west ? { module: 1.5, panelW: (i) => (i % 2 ? 0.26 : 0.4), panelD: 0.3, stagger: false, finMat: mats.metal, bandMat: mats.band }
+                        : { module: 0.75, panelW: 0.13, panelD: 0.42, stagger: false, finMat: mats.finSilver, bandMat: mats.silver, mullions: false };
+        if (kind === 'out') panelStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, k, mats, fo); else ribbonStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, mats);
       }
     }
     // top of L4: dark slab band, light coping, glass guard of the level-5 terrace ring
@@ -114,7 +130,7 @@ export async function build(ctx) {
     for (let k = 2; k <= 4; k++) {
       for (const R of arcRuns(arcOf(k))) ribbonStorey(K, R, 0, R.L, FL[k], FL[k + 1], mats);
       // slab edge fascia along the arc
-      for (const R of arcRuns(arcOf(k, k === 2 ? 28 : 12))) K.rbox(R, k === 2 ? mats.mull : mats.silver, -0.03, FL[k] - (k === 2 ? 0.95 : 0.62), -0.05, R.L + 0.03, FL[k] + 0.1, 0.12);
+      for (const R of arcRuns(arcOf(k, k === 2 ? 28 : 12))) K.rbox(R, k === 2 ? mats.mull : mats.silver, -0.03, FL[k] - 0.95, -0.05, R.L + 0.03, FL[k] + 0.12, 0.14);
     }
     // soffits (warm champagne under the sign slab, cooler above): lunes between successive arcs
     const chord = (k) => k === 5 ? [onS(sC - 15), onS(sC + 15)] : arcOf(k);
@@ -122,7 +138,7 @@ export async function build(ctx) {
       const upper = k + 1; const lower = arcOf(k);
       const up = upper === 5 ? [onS(sC - PORT[k][0]), onS(sC + PORT[k][0])] : (() => { const a = arcOf(upper); const [hw] = PORT[k]; return [onS(sC - hw), ...a, onS(sC + hw)]; })();
       const lune = [...up, ...lower.slice().reverse().slice(1, -1)];
-      flatDown(K, k === 2 ? mats.soffit : mats.silver, lune, FL[upper] - 0.62);
+      flatDown(K, mats.soffit, lune, FL[upper] - 0.62);
     }
     // name on the sign fascia (L2 slab edge), brushed aluminium letters following the curve
     const sm = signMaterial('BARBARA & GERSON BAKAR GATEWAY', { bg: '#3b3835' });
@@ -180,21 +196,22 @@ export async function build(ctx) {
   const Qa = nearestHit(ringHits(ring5, 'z', -6), [-39.5, -6]);        // north court, west flank (terrace wraps the apex)
   const Qh = nearestHit(ringHits(ring5, 'x', -12), [-12, -31]);       // Hearst edge east of the court (imagery: court's east flank is low)
   const T_n = [[-12, -13], [12, -13], [14, -19.5], [50, -19.5]];
-  const L5W = [...ringPath(ring5, Qa, Q2), [-12, 7.5], [-31, 7.5]];
+  const L5W = [...ringPath(ring5, Qa, Q2), [-12, 7.5], [-38.5, 7.5]];
   const L5N = [...ringPath(ring5, Q1, Qh), ...T_n];
-  const TER = [...ringPath(ring5, Qh, Qa), [-31, 7.5], [-12, 7.5], ...ringPath(ring5, Q2, Q1), ...T_n.slice().reverse()];
+  const TER = [...ringPath(ring5, Qh, Qa), [-38.5, 7.5], [-12, 7.5], ...ringPath(ring5, Q2, Q1), ...T_n.slice().reverse()];
   const L5 = L5W; void L5N;
   K.prism(apronM, fp, FL[5] - 0.6, FL[5]);
   K.prism(mats.deck, TER, FL[5], FL[5] + 0.12);
   {
     const mats5 = { glass: mats.glass5, spandrel: mats.band, silver: mats.mull };
     for (const poly of [L5W, L5N]) {
-      for (const { R } of polyRuns(K, poly)) ribbonStorey(K, R, 0, R.L, FL[5] + 0.55, ROOF - 0.45, mats5, { module: 1.5 });
+      for (const { R } of polyRuns(K, poly)) ribbonStorey(K, R, 0, R.L, FL[5] + 0.55, ROOF - 1.6, mats5, { module: 1.5 });
       K.prism(mats.core, offsetPoly(poly, 0.3), FL[5], ROOF - 0.5);
-      const roofP = roundPoly(offsetPoly(poly, -1.25, 1.6), 4.5);
-      K.prism(mats.roofPlane, roofP, ROOF - 0.38, ROOF);
-      K.prism(mats.silver, offsetPoly(roofP, 0.02), ROOF - 0.02, ROOF + 0.04);
-      flatDown(K, mats.roofSoffit, roofP, ROOF - 0.39);
+      const base = roundPoly(offsetPoly(poly, -0.05, 1.6), 5.0, 6);
+      const top = roundPoly(offsetPoly(poly, -1.3, 1.6), 5.5, 6);
+      K.prism(mats.roofPlane, top, ROOF - 0.5, ROOF);
+      K.loop(mats.lid, base, [[0, ROOF - 1.7], [0.5, ROOF - 1.58], [0.88, ROOF - 1.3], [1.12, ROOF - 0.92], [1.24, ROOF - 0.5], [1.25, ROOF - 0.12], [1.12, ROOF + 0.02]], { uvMode: 'keep' });
+      flatDown(K, mats.roofSoffit, base, ROOF - 1.69);
     }
     // rooftop mechanical yard behind louvred screens (north band, per imagery)
     const mech = new THREE.BoxGeometry(21, 2.2, 6.5); mech.rotateY(0.157); mech.translate(20, ROOF + 1.1, -29.5); K.add(mats.silver, mech);
@@ -204,7 +221,7 @@ export async function build(ctx) {
   }
   // signature white roof blade sweeping down over the north court (dips over the apex, rises to the wing roofs)
   {
-    const sc = [[-43.8, -24.4], [-41.1, -15.8], [-37.9, -8.2], [-34.3, -3.0], [-30.8, -0.6], [-28.0, -0.8], [-27.1, -0.9], [-24.3, -3.1], [-22.0, -7.2], [-19.8, -14.1], [-18.7, -20.1], [-18.1, -32.2]];
+    const sc = smoothRun([[-43.8, -24.4], [-41.1, -15.8], [-37.9, -8.2], [-34.3, -3.0], [-30.8, -0.6], [-28.0, -0.8], [-27.1, -0.9], [-24.3, -3.1], [-22.0, -7.2], [-19.8, -14.1], [-18.7, -20.1], [-18.1, -32.2]], 0, 11, 1.8, false);
     const L = []; let acc = 0; L.push(0); for (let i = 1; i < sc.length; i++) { acc += Math.hypot(sc[i][0] - sc[i - 1][0], sc[i][1] - sc[i - 1][1]); L.push(acc); }
     const hAt = (t) => { const lo = FL[5] + 2.4; const prof = t < 0.5 ? Math.pow(Math.cos(t / 0.5 * Math.PI / 2), 1.6) : 0.25 * Math.pow(Math.sin((t - 0.5) / 0.5 * Math.PI / 2), 1.4); return lo + (ROOF - lo) * prof; };
     for (let i = 0; i < sc.length - 1; i++) {
