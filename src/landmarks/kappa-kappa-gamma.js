@@ -4,7 +4,7 @@
 // shutters, a lower recessed north wing and a flat-roofed rear addition; formal boxwood garden in front.
 // LiDAR: main eaves ~12 m, ridge ~15.8 m; north wing ~13 m; rear addition ~11 m.
 import * as THREE from 'three';
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { hedge, railing } from './lib/b12-greek.js';
 
 export const info = {
@@ -18,7 +18,7 @@ export const info = {
 export async function build(ctx) {
   const white = ['paint', '#f4f4f0'], wall = ['stucco', '#a3a8ae'], roof = ['roof', '#686c6e'];
   const F = 4.2;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -10.43, floor: F, storeyH: 3.8, ov: 0.75,
     wall, trim: white, frame: white, roof, base: ['stucco', '#60666b'], door: ['paint', '#26282a'],
     win: { w: 1.05, h: 1.9, bay: 3.2, sill: 0.8, tran: 0.55, casing: 0.15, muntins: 2 }, belts: false,
@@ -55,7 +55,7 @@ export async function build(ctx) {
       const R = faceRun(b, 'E'); const a0 = R.at(9.75, 1.7), a1 = R.at(9.75, 4.3), c0 = R.at(12.35, 1.7), c1 = R.at(12.35, 4.3);
       railing(api, [a0, a1], K.g(a1[0], a1[1]) + 0.2, { h: 0.9, step: 0.6 }); railing(api, [c0, c1], K.g(c1[0], c1[1]) + 0.2, { h: 0.9, step: 0.6 });
     },
-  });
+  }, { number: '2328' });
   r.object3d.name = 'kappa-kappa-gamma';
   return r;
 }

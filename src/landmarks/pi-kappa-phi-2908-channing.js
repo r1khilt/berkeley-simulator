@@ -2,7 +2,7 @@
 // warm greige with a very low-pitched roof and deep thin-edged eaves, aluminium sliders, a stone-veneer base, dark
 // vertical fins with balcony rails on the Prospect wing, and big dark ΠΚΦ letters stacked on the corner end wall.
 // LiDAR: main block ~12 m, rear wing ~9 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { hedge } from './lib/b12-greek.js';
 
 export const info = {
@@ -16,7 +16,7 @@ export const info = {
 export async function build(ctx) {
   const st = ['stucco', '#c9bba8'], fin = ['paint', '#3e3a34'], frame = ['metal', '#d8d8d2'], stone = ['stone', '#8a7e70'];
   const F = 2.6;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.531, floor: F, storeyH: 2.85, ov: 0.9,
     wall: st, trim: ['paint', '#4a4640'], frame, roof: ['roof', '#4a4640'], base: stone, door: ['metal', '#9a9a94'],
     win: { w: 1.25, h: 1.05, bay: 3.6, sill: 1.0, tran: 0, casing: 0, mull: 1 }, belt: false, frieze: false,
@@ -36,7 +36,7 @@ export async function build(ctx) {
         K.rbox(R, mat(stone), -0.05, 0.0, 0, R.L + 0.05, 2.0 + 1.2, 0.06); }
       hedge(api, [[-13.6, -13.6], [8.8, -13.6]], { h: 1.0, t: 0.8 });
     },
-  });
+  }, { number: '2908' });
   r.object3d.name = 'pi-kappa-phi-2908-channing';
   return r;
 }

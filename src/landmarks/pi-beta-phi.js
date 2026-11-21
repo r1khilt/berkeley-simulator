@@ -3,7 +3,7 @@
 // a recessed centre with a second-floor loggia and two shed dormers, a smaller half-timbered gable beside a big brick
 // chimney, and a flat-roofed porch with a balcony at the south end; long wings run back up the slope.
 // LiDAR: main ridge ~14 m parallel to Piedmont, rear wings ~11.5-13.5 m, one-storey link ~6 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { gardenWall, hedge, railing } from './lib/b12-greek.js';
 
 export const info = {
@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const dark = ['paint', '#2f2b28'], wall = ['stucco', '#e6dfcd'], roof = ['slate', '#5d6166'], brick = ['brick', '#a4584a'];
   const F = 1.7, half = { mat: ['paint', '#3a3430'] };
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.836, floor: F, storeyH: 3.6, ov: 0.35,
     wall, trim: dark, frame: dark, roof, base: brick, door: ['wood', '#5a1e14'],
     win: { w: 0.62, h: 1.55, bay: 2.9, sill: 0.8, tran: 0.72, casing: 0.08, pair: true, mull: 1, muntins: 2 }, belt: true, frieze: false,
@@ -48,7 +48,7 @@ export async function build(ctx) {
       gardenWall(api, [[-20.6, 19.4], [-20.6, 22.0]], { h: 1.0, t: 0.4, mat: brick, cap: ['brick', '#8e4a3e'] });
       hedge(api, [[-17.0, -8.5], [-17.0, 1.2]], { h: 1.0, t: 0.8 }); hedge(api, [[-17.0, 9.0], [-17.0, 17.0]], { h: 0.9, t: 0.8 });
     },
-  });
+  }, { number: '2325' });
   r.object3d.name = 'pi-beta-phi';
   return r;
 }

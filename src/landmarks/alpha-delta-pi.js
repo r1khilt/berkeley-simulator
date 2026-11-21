@@ -3,7 +3,7 @@
 // upper floors, beside a three-storey flat-roofed block (later wing) with paired casements, a long gabled north wing on
 // Channing and a tall brick garden wall with piers along the sidewalk. LiDAR: flat block ~14 m, gable ~14.5 m,
 // north wing ridge ~12.8 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { gardenWall, hedge } from './lib/b12-greek.js';
 
 export const info = {
@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const wall = ['stucco', '#cbc5ba'], timber = ['paint', '#4a4740'], trim = ['paint', '#3f4743'], roof = ['roof', '#5a5a5c'], brick = ['brick', '#8a5444'];
   const F = 2.7, half = { mat: timber };
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.405, floor: F, storeyH: 3.55, ov: 0.35,
     wall, trim, frame: trim, roof, base: ['stucco', '#b5afa4'], door: ['wood', '#4a3022'],
     win: { w: 0.85, h: 1.45, bay: 3.0, sill: 0.85, tran: 0.7, casing: 0, pair: true, mull: 1, muntins: 2 }, belt: false,
@@ -45,7 +45,7 @@ export async function build(ctx) {
       for (const v of [-6.0, -1.8, 2.4, 6.0, 11.0, 16.0]) { const g = K.g(16.6, v); K.box(mat(brick), 16.3, g - 0.5, v - 0.3, 16.9, g + 1.75, v + 0.3); }
       hedge(api, [[15.4, -5.4], [15.4, 1.8]], { h: 1.7, t: 1.0 }); hedge(api, [[15.4, 6.6], [15.4, 15.4]], { h: 1.7, t: 1.0 });
     },
-  });
+  }, { number: '2400' });
   r.object3d.name = 'alpha-delta-pi';
   return r;
 }

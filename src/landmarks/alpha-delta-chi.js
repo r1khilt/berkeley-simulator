@@ -3,7 +3,7 @@
 // small belvedere at the ridge, and a later one-storey flat-roofed stucco front addition carrying blue ΑΔΧ letters over
 // a big gridded window, reached by steps from the drive. LiDAR: ridges ~13 m, eaves ~9.6 m, addition ~4 m.
 import * as THREE from 'three';
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { hedge, railing } from './lib/b12-greek.js';
 
 export const info = {
@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const lav = ['clap', '#c4b2d6'], pink = ['paint', '#c98fc8'], blue = ['paint', '#3f5bb5'], roof = ['roof', '#6e6a4e'];
   const F = 1.3, half = null;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -4.49, floor: F, storeyH: 3.3, ov: 0.6,
     wall: lav, trim: pink, frame: blue, roof, base: ['stucco', '#a89cb4'], door: ['paint', '#2a2a30'],
     win: { w: 0.85, h: 1.85, bay: 2.8, sill: 0.8, tran: 0.5, casing: 0.12 }, belt: true,
@@ -51,7 +51,7 @@ export async function build(ctx) {
       for (const bi of [1, 2]) { const b = blocks[bi]; const R = faceRun(b, 'S'); for (const s of [0.15, R.L - 0.15]) { const a = R.at(s, 0), c = R.at(s, 0.55); beam(mat(blue), [a[0], b.eave - 0.9, a[1]], [c[0], b.eave - 0.05, c[1]], 0.14, 0.14); } }
       hedge(api, [[-8.6, 3.6], [-3.6, 3.6]], { h: 0.8, t: 0.7, color: '#4f6a3a' });
     },
-  });
+  }, { number: '2730' });
   r.object3d.name = 'alpha-delta-chi';
   return r;
 }

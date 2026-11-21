@@ -2,7 +2,7 @@
 // charcoal-green half-timbering and belt timbers at each floor, a tall half-timbered street gable over a central bay of
 // glazed doors and casements, jettied upper floors on carved brackets, black metal balconies tied by a fire escape,
 // and a raised red-painted wooden deck in front. LiDAR: main roof ~12 m (flat behind the street gable), west wing ~6.5 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { hedge, railing } from './lib/b12-greek.js';
 
 export const info = {
@@ -16,7 +16,7 @@ export const info = {
 export async function build(ctx) {
   const st = ['stucco', '#ecebe6'], tim = ['paint', '#2e3838'], roof = ['roof', '#3f4243'], deck = ['wood', '#8a3b2e'];
   const F = 2.9;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -7.878, floor: F, storeyH: 2.95, ov: 0.6,
     wall: st, trim: tim, frame: tim, roof, base: ['stucco', '#d9d8d2'], door: ['paint', '#2e3838'],
     win: { w: 0.6, h: 1.45, bay: 3.0, sill: 0.8, tran: 0.7, casing: 0.1, pair: true, mull: 1, muntins: 2 }, belt: true, belts: true, frieze: false,
@@ -43,7 +43,7 @@ export async function build(ctx) {
         railing(api, [R.at(-1.0, 6.0), R.at(1.5, 6.0)], F - 0.05, { h: 0.9, mat: deck, step: 0.2 }); railing(api, [R.at(5.6, 6.0), R.at(L + 1.0, 6.0)], F - 0.05, { h: 0.9, mat: deck, step: 0.2 }); }
       hedge(api, [[11.0, -6.6], [16.0, -6.6]], { h: 1.2, t: 0.9 });
     },
-  });
+  }, { number: '2434' });
   r.object3d.name = 'sigma-pi-2434-warring';
   return r;
 }

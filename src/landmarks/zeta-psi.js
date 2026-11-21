@@ -3,7 +3,7 @@
 // recessed entry between brick piers at the east end; above it a terracotta-brown panelled upper storey cantilevers
 // ~0.75 m on a cream soffit band, with vertical fins and a row of wide sliders under a flat roof with a thin fascia.
 // A long east wing and a lower south-west wing close the yard. LiDAR: roofs ~9-10.5 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { gardenWall, hedge } from './lib/b12-greek.js';
 
 export const info = {
@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const brick = ['brick', '#c46a50'], panel = ['paint', '#94553f'], cream = ['paint', '#d8cfbf'], frameC = ['paint', '#5b4636'];
   const F = 3.1, H = 2.95, YU = F + H, YE = 9.0;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.904, floor: F, storeyH: H, ov: 0.6, split: H,
     wall: panel, wall0: brick, trim: cream, frame: frameC, roof: ['roof', '#5a4e46'], base: ['brick', '#a85a44'], door: ['paint', '#2e2a28'],
     win: { w: 2.0, h: 1.1, bay: 4.6, sill: 1.2, tran: 0, casing: 0, mull: 1, st: [{ w: 1.0, h: 1.5, sill: 0.9, mull: 1 }] },
@@ -52,7 +52,7 @@ export async function build(ctx) {
       gardenWall(api, [[-16.5, -24.6], [-0.2, -24.6]], { h: 0.35, t: 0.3, mat: brick }); gardenWall(api, [[2.6, -24.6], [13.3, -24.6]], { h: 0.35, t: 0.3, mat: brick });
       hedge(api, [[-16.0, -23.4], [-1.0, -23.4]], { h: 1.2, t: 0.9 }); hedge(api, [[5.0, -23.4], [12.8, -23.4]], { h: 1.2, t: 0.9 });
     },
-  });
+  }, { number: '2728' });
   r.object3d.name = 'zeta-psi';
   return r;
 }

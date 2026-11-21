@@ -2,7 +2,7 @@
 // over a raised basement under low hipped roofs with deep, dark flat soffits; banded dark-framed casements, a pent roof
 // over a big ground-floor window group, a centred entrance between square pilasters with red ΘΧ letters above, and
 // red-brick steps climbing the lawn from the street. LiDAR: eaves ~8 m, ridges ~9.6-10.8 m.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { gardenWall, hedge } from './lib/b12-greek.js';
 
 export const info = {
@@ -16,7 +16,7 @@ export const info = {
 export async function build(ctx) {
   const dark = ['paint', '#2b2b2b'], white = ['stucco', '#f2f1ec'], roof = ['roof', '#3a2e2a'], red = ['paint', '#b22234'], brick = ['brick', '#a24a38'];
   const F = 1.8;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.126, floor: F, storeyH: 3.15, ov: 0.95,
     wall: white, trim: ['paint', '#3a2e2a'], frame: dark, roof, base: ['stucco', '#dcdad2'], door: ['paint', '#2a2422'],
     win: { w: 0.62, h: 1.45, bay: 3.2, sill: 0.85, tran: 0.7, casing: 0, pair: true, mull: 2, muntins: 2 }, belt: false,
@@ -41,7 +41,7 @@ export async function build(ctx) {
       gardenWall(api, [[-17.6, 4.4], [-17.6, 11.0]], { h: 0.6, t: 0.35, mat: brick, cap: ['stucco', '#f2f1ec'] });
       hedge(api, [[-8.6, -2.6], [-8.6, 1.6]], { h: 0.9, t: 0.8 }); hedge(api, [[-8.6, 4.2], [-8.6, 8.8]], { h: 0.9, t: 0.8 });
     },
-  });
+  }, { number: '2499' });
   r.object3d.name = 'theta-chi';
   return r;
 }

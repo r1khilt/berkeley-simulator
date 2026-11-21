@@ -1,7 +1,7 @@
 // Pi Kappa Alpha (ΠΚΑ), 2324 Piedmont Avenue. Two-and-a-half-storey grey stucco Craftsman house on a raised basement:
 // hipped main roof with deep bracketed eaves, a front-gabled wing to the north on Piedmont, a wide shed dormer, and a recessed
 // entry porch with square white posts under a flat balcony whose panelled parapet carries the letters. One-storey rear wing.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-247336859',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.267, front: { block: 0, face: 'E', above: 1.0 }, storeyH: 3.0, ov: 0.85,
     wall: ['stucco', '#9ca0a3'], trim: ['paint', '#f2f2f0'], roof: ['roof', '#45484d'], base: ['stucco', '#84888c'], door: ['paint', '#8b1a1e'],
     win: { w: 0.95, h: 1.55, bay: 3.4, sill: 0.8, tran: 0.62, casing: 0.12, pair: true },
@@ -26,7 +26,7 @@ export async function build(ctx) {
       parapet: { h: 1.0, mat: ['paint', '#e8e8e6'] }, letters: { text: 'ΠΚΑ', mat: ['paint', '#7f8285'], h: 0.5 } }],
     dormers: [{ block: 0, side: 'E', s: 13.6, w: 4.0, h: 1.35, inset: 1.2, type: 'shed', nwin: 3 }],
     chimneys: [{ u: -2.0, v: -9.3, w: 0.9, d: 0.7, top: 14.0 }],
-  });
+  }, { number: '2324' });
   r.object3d.name = 'building-247336859';
   return r;
 }

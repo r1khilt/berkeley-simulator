@@ -1,7 +1,7 @@
 // Pi Lambda Phi (ΠΛΦ), 2727 Channing Way. Three-storey Berkeley brown-shingle house with a hipped roof (LiDAR eaves ~9 m,
 // ridge ~12.8 m), white-trimmed windows, a shingled front porch on Channing and a gabled dormer. Style from the street
 // context; no verified photo of this house was available.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-473598471',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.964, front: { block: 0, face: 'S', above: 1.0 }, storeyH: 2.9, ov: 0.7,
     wall: ['shingle', '#8a6a4c'], trim: ['paint', '#efeae0'], roof: ['roof', '#4d4a46'], base: ['brick', '#8a4a3a'],
     win: { w: 0.85, h: 1.5, bay: 2.5, sill: 0.8, tran: 0.62, casing: 0.11, pair: true },
@@ -24,7 +24,7 @@ export async function build(ctx) {
     porches: [{ block: 0, face: 'S', s0: 1.5, s1: 11.1, depth: 2.4, cols: 3, colStyle: 'pier', colD: 0.38, pedMat: ['shingle', '#8a6a4c'], colMat: ['paint', '#efeae0'], roofMat: ['roof', '#4d4a46'], fascia: ['paint', '#efeae0'], letters: { text: 'ΠΛΦ', mat: ['paint', '#1f3f73'], h: 0.34 } }],
     dormers: [{ block: 0, side: 'S', s: 6.3, w: 2.6, h: 1.4, inset: 1.0 }],
     chimneys: [{ u: -6.0, v: 2.0, w: 0.9, d: 0.7, top: 13.4 }],
-  });
+  }, { number: '2727' });
   r.object3d.name = 'building-473598471';
   return r;
 }
