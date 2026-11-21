@@ -28,7 +28,7 @@ import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './tim
 import { installGrading, contactAO, GRADE } from './world/grading.js';
 installGrading();
 
-const canvas = document.getElementById('c');
+let canvas = document.getElementById('c'); // [gfx-webgpu] let: the WebGPU fallback may swap in a fresh canvas
 const qs = new URLSearchParams(location.search);
 const BS = (window.BSIM = { qs });
 const isTouch = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
@@ -40,8 +40,12 @@ const ui = new UI(document.getElementById('ui'));
 onProgress((f) => ui.progress(f * 0.75));
 
 async function boot() {
-  let renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
-  if (!renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
+  // [gfx-webgpu] ?renderer=webgpu tries WebGPURenderer (src/gpu/); without WebGPU it falls back to the unchanged WebGL path
+  let gpu = null;
+  if (qs.get('renderer') === 'webgpu') { const r = await (await import('./gpu/webgpu.js')).createWebGPU({ canvas, qs }); if (r.renderer) gpu = r; else { canvas = r.canvas; BS.rendererFallback = r.fail; } }
+  BS.gpu = gpu;
+  let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
+  if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
   renderer.setPixelRatio(Math.min(devicePixelRatio, Q.dpr)); renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.CustomToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -146,13 +150,14 @@ async function boot() {
   await tick(); ui.progress(0.94);
   // ---- sky + CSM shadows
   const sky = new SkySystem({ renderer, scene, camera }); BS.sky = sky;
+  if (gpu) gpu.patchSky(sky); // [gfx-webgpu]
   const useCSM = qs.get('csm') !== '0';
   class SimpleSun { // fallback: one shadowed directional light following the camera
     constructor() { this.lights = [new THREE.DirectionalLight(0xffffff, 3)]; const l = this.lights[0]; l.castShadow = true; l.shadow.mapSize.set(Q.shadow || 2048, Q.shadow || 2048); const c = l.shadow.camera; c.left = -180; c.right = 180; c.top = 180; c.bottom = -180; c.near = 1; c.far = 3000; l.shadow.bias = -0.0004; l.shadow.normalBias = 0.05; scene.add(l, l.target); this.lightDirection = new THREE.Vector3(0, -1, 0); this.fade = false; }
     setupMaterial() {} updateFrustums() {}
     update() { const l = this.lights[0]; const t = camera.position; l.target.position.copy(t); l.position.copy(t).addScaledVector(this.lightDirection, -1500); l.target.updateMatrixWorld(); }
   }
-  const csm = !useCSM ? new SimpleSun() : new CSM({ maxFar: Q.far, cascades: Q.cascades, mode: 'practical', parent: scene, shadowMapSize: Q.shadow, lightDirection: new THREE.Vector3(-0.5, -0.8, -0.3).normalize(), camera, lightIntensity: 3, lightNear: 1, lightFar: 6000, shadowBias: -0.00025, lightMargin: 400 });
+  const csm = gpu ? gpu.makeCSM({ scene, camera, cascades: Q.cascades, maxFar: Q.far, shadowMapSize: Q.shadow, lightMargin: 400 }) /* [gfx-webgpu] */ : !useCSM ? new SimpleSun() : new CSM({ maxFar: Q.far, cascades: Q.cascades, mode: 'practical', parent: scene, shadowMapSize: Q.shadow, lightDirection: new THREE.Vector3(-0.5, -0.8, -0.3).normalize(), camera, lightIntensity: 3, lightNear: 1, lightFar: 6000, shadowBias: -0.00025, lightMargin: 400 });
   csm.fade = true;
   if (qs.get('bias')) for (const l of csm.lights) l.shadow.bias = parseFloat(qs.get('bias'));
   if (qs.get('noshadow')) { for (const l of csm.lights) l.castShadow = false; }
@@ -160,7 +165,7 @@ async function boot() {
   csm.lights.forEach((l, i) => { l.shadow.normalBias = [0.07, 0.22, 0.5, 0.9][i] ?? 0.9; l.shadow.bias = [-0.0003, -0.0006, -0.001, -0.0015][i] ?? -0.0015; });
   const csmDone = new WeakSet();
   const aoCore = { v4: terrain.uniforms.uCore.value, size: terrain.uniforms.uCoreSize.value };
-  const setupMaterials = (root) => root.traverse((o) => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (!m || csmDone.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue; csmDone.add(m); if (o.parent !== terrain.group && !m.transparent && o.name !== 'bay' && !(m.customProgramCacheKey && /coreTerrain|ring|bayWater|creek/.test(m.customProgramCacheKey()))) contactAO(m, terrain.uniforms.uHeight.value, aoCore); const prev = m.onBeforeCompile; if (!useCSM) continue; const k1 = String(m.customProgramCacheKey()); csm.setupMaterial(m); const hook = m.onBeforeCompile; m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); hook.call(this, sh, r); }; m.customProgramCacheKey = () => k1 + '|csm'; m.needsUpdate = true; } });
+  const setupMaterials = (root) => root.traverse((o) => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (!m || csmDone.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue; csmDone.add(m); if (o.parent !== terrain.group && !m.transparent && o.name !== 'bay' && !(m.customProgramCacheKey && /coreTerrain|ring|bayWater|creek/.test(m.customProgramCacheKey()))) contactAO(m, terrain.uniforms.uHeight.value, aoCore); const prev = m.onBeforeCompile; if (!useCSM || gpu) continue; const k1 = String(m.customProgramCacheKey()); csm.setupMaterial(m); const hook = m.onBeforeCompile; m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); hook.call(this, sh, r); }; m.customProgramCacheKey = () => k1 + '|csm'; m.needsUpdate = true; } });
   BS.csm = csm;
   // ---- player
   const physicsPlayer = new Player({ scene, camera, physics, dom: canvas, look: store.get('look', {}) });
@@ -296,7 +301,7 @@ async function boot() {
       const rk = `${pp.month}-${pp.day}-${pp.hour}`;
       if (((pp.hour === 7 && pp.minute === 50) || (pp.hour === 12 && pp.minute === 0 && pp.second > 40) || (pp.hour === 18 && pp.minute === 0 && pp.second > 40)) && !recitalDone.has(rk)) { recitalDone.add(rk); audio.carillon(d, pan, 50); }
     }
-    if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
+    if (gpuPost) gpuPost.render(U.uNight.value); /* [gfx-webgpu] */ else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
   }
   function hud(date) {
     ui.clock(clockString(date), timeSt.label);
@@ -316,8 +321,9 @@ async function boot() {
     const { x, z } = player.pos; ui.location(x > 380 && z < 300 ? 'Berkeley Hills' : z > 420 ? 'Southside' : z < -480 ? 'Northside' : x < -800 ? 'Downtown Berkeley' : 'UC Berkeley campus', 'Berkeley, California');
   }
   // post: bloom for emissives (lamps, windows, sun glints)
-  let composer = null, bloom = null;
-  if ((settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) {
+  let composer = null, bloom = null, gpuPost = null;
+  if (gpu && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) gpuPost = await gpu.makePost({ scene, camera }); // [gfx-webgpu]
+  if (!gpu && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) {
     const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: 4 });
     composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
