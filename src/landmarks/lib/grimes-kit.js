@@ -1,7 +1,16 @@
 // Helpers for the Grimes Engineering Center (SOM 2025): precast-panel concrete, white steel struts/rods,
 // picket railings, louvre bands and signage. Built on classic-kit's Kit (building frame u,v; y up).
 import * as THREE from 'three';
-import { nightGlow } from '../../materials.js';
+import { nightGlow, U } from '../../materials.js';
+
+// Daylight bounce for white-painted steel and louvres: a small emissive lift that fades out at night (inverse of nightGlow),
+// so the white structure and the louvre soffit read white in shade instead of grey.
+function dayLift(mat, hex, key) {
+  mat.emissive = new THREE.Color(hex);
+  mat.onBeforeCompile = (sh) => { sh.uniforms.uNight = U.uNight; sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= (1.0 - uNight);'); };
+  mat.customProgramCacheKey = () => 'grimesDayLift' + key;
+  return mat;
+}
 
 let _mats = null;
 // Canvas texture of large precast concrete panels: one tile = 2 m x 2 m (boxUV maps metres/2), panels 2.0 x 1.0 m.
@@ -37,17 +46,17 @@ export function grimesMats(M) {
   _mats = {
     panel: std({ color: 0xffffff, map: panelTexture([206, 201, 190], 0.7), roughness: 0.9, name: 'grimes-precast' }),
     whitePanel: std({ color: 0xffffff, map: panelTexture([236, 234, 228], 0.93), roughness: 0.7, metalness: 0.05, name: 'grimes-white-cladding' }),
-    steel: std({ color: 0xf4f4f1, roughness: 0.5, metalness: 0.05, name: 'grimes-white-steel' }),
-    louvre: std({ color: 0xf5f7f7, roughness: 0.65, metalness: 0.0, name: 'grimes-louvre' }),
-    veil: std({ color: 0xe8ecef, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false, name: 'grimes-canopy-veil' }),
+    steel: dayLift(std({ color: 0xf4f4f1, roughness: 0.5, metalness: 0.05, name: 'grimes-white-steel' }), 0x50504e, 's'),
+    louvre: dayLift(std({ color: 0xf5f7f7, roughness: 0.65, metalness: 0.0, name: 'grimes-louvre' }), 0x5c6064, 'l'),
+    veil: dayLift(std({ color: 0xeef1f3, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false, name: 'grimes-canopy-veil' }), 0x7a7f84, 'v'),
     metalPanel: std({ color: 0xffffff, map: panelTexture([240, 240, 236], 0.9), roughness: 0.5, metalness: 0.1, name: 'grimes-white-panel' }),
     soffit: std({ color: 0xc9d0d4, roughness: 0.6, metalness: 0.2, name: 'grimes-soffit' }),
-    rod: std({ color: 0xf4f5f3, roughness: 0.4, metalness: 0.1, name: 'grimes-sma-rod' }),
+    rod: dayLift(std({ color: 0xf4f5f3, roughness: 0.4, metalness: 0.1, name: 'grimes-sma-rod' }), 0x5a5a58, 'r'),
     sleeve: std({ color: 0xd4d7d8, roughness: 0.3, metalness: 0.45, name: 'grimes-sma-sleeve' }),
     storeGlass: nightGlow(std({ color: 0x7b95a4, roughness: 0.06, metalness: 0.25, envMapIntensity: 1.3, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
     frame: std({ color: 0xe4e6e6, roughness: 0.4, metalness: 0.4, name: 'grimes-mullion' }),
     darkFrame: std({ color: 0x3a3d40, roughness: 0.45, metalness: 0.5, name: 'grimes-dark-frame' }),
-    glass: std({ color: 0x6f8e9c, roughness: 0.04, metalness: 0.35, transparent: true, opacity: 0.62, envMapIntensity: 1.4, depthWrite: false, name: 'grimes-glass' }),
+    glass: std({ color: 0x84a4b3, roughness: 0.04, metalness: 0.3, transparent: true, opacity: 0.5, envMapIntensity: 1.4, depthWrite: false, name: 'grimes-glass' }),
     deck: std({ color: 0xffffff, map: floorTexture(), roughness: 0.85, name: 'grimes-deck' }),
     slab: std({ color: 0xdcdad4, roughness: 0.9, name: 'grimes-slab' }),
     ceiling: nightGlow(std({ color: 0xd2c2aa, roughness: 0.8, emissive: 0xffd9a0, emissiveIntensity: 0.9, name: 'grimes-wood-ceiling' }), 1.0),
