@@ -5,6 +5,7 @@
 // the taller east block ~14.5 m above the low west grade).
 import * as THREE from 'three';
 import { Kit, mats, punched, rect, rectRuns, bays, gAt, gMinRun, signText } from './lib/b03-kit.js';
+import { pathEntrances, entry, planting, bikes } from './lib/rn-kit.js';
 
 export const info = {
   id: 'north-gate-hall',
@@ -17,8 +18,9 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-9.1);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
-  const SH = B.shingle, TRIM = new THREE.MeshStandardMaterial({ color: 0x4e2a22, roughness: 0.8 });
-  const ROOF = new THREE.MeshStandardMaterial({ color: 0x8a6a58, roughness: 0.95, map: M.shingle.map, normalMap: M.shingle.normalMap, roughnessMap: M.shingle.roughnessMap });
+  const SH = B.shingle.clone(); SH.color.setRGB(1.62, 1.6, 1.58); // weathered redwood shingle (the base texture reads almost black)
+  const TRIM = new THREE.MeshStandardMaterial({ color: 0x2f3a2a, roughness: 0.75 }); // dark bottle-green trim
+  const ROOF = new THREE.MeshStandardMaterial({ color: 0x80705f, roughness: 0.95, map: M.shingle.map, normalMap: M.shingle.normalMap, roughnessMap: M.shingle.roughnessMap });
   const BRICK = M.brick;
   const GL = M.windowNight.clone(); GL.color.set(0x4a4a40); GL.onBeforeCompile = M.windowNight.onBeforeCompile; GL.customProgramCacheKey = M.windowNight.customProgramCacheKey;
   const CRF = new THREE.MeshStandardMaterial({ color: 0xc8b88a, roughness: 0.7 }); // cream window frames
@@ -77,6 +79,13 @@ export async function build(ctx) {
     const ops = bays(0, R.L, 6).map((c) => ({ s0: c - 1.6, s1: c + 1.6, y0: fl2 + 0.8, y1: fl2 + 2.5 }));
     for (const o of ops) { K.rbox(R, GL, o.s0, o.y0, 0.6, o.s1, o.y1, 0.62); K.rbox(R, TRIM, o.s0 - 0.1, o.y0 - 0.12, 0.6, o.s1 + 0.1, o.y0, 0.7); for (let k = 1; k < 4; k++) K.rbox(R, TRIM, o.s0 + (o.s1 - o.s0) * k / 4 - 0.04, o.y0, 0.62, o.s0 + (o.s1 - o.s0) * k / 4 + 0.04, o.y1, 0.66, { detail: true }); }
   }
+  // entrances where the packet's paths arrive (recessed porches with paired glazed wood doors and steps), street-front planting, bikes
+  { const per = [K.run([-26.8, -16.3], [-26.8, 23.7]), K.run([-26.1, 23.7], [3.3, 23.7]), K.run([31.0, 6.1], [31.0, -16.3]), K.run([31.0, -16.3], [-26.8, -16.3])];
+    const ents = pathEntrances(K, ctx, per, { maxDist: 4.5 }).slice(0, 3); const skip = new Map();
+    for (const e of ents) { const r = entry(K, e.R, e.s, { w: 2.0, h: 2.7, surround: TRIM, sw: 0.25, sp: 0.3, frame: TRIM, door: 'wood', doorMat: M.woodDark, landing: 1.3, canopy: { d: 1.6, mat: ROOF, t: 0.18, w: 3.6 } });
+      walkables.push(...r.walkables); colliders.push(...r.colliders); skip.set(e.R, [...(skip.get(e.R) || []), [e.s - 2.8, e.s + 2.8]]); }
+    for (const R of per) planting(K, R, 1.0, R.L - 1.0, { d0: 0.15, depth: 1.2, h: 0.9, skip: skip.get(R) || [], seed: 141 });
+    colliders.push(...bikes(K, per[0], per[0].L * 0.35, 2.4, 4, 2)); }
   const object3d = K.finish(); object3d.name = 'north-gate-hall';
-  return { object3d, colliders, walkables };
+  return { object3d, colliders: colliders.filter(Boolean), walkables };
 }
