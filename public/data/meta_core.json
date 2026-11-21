@@ -1,0 +1,35 @@
+{
+ "core": {
+  "x0": -1248.0,
+  "z0": -1040.0,
+  "x1": 2048.0,
+  "z1": 1360.0,
+  "step": 1.0,
+  "nx": 3296,
+  "nz": 2400,
+  "enc": "int16 planar-predictor residual of cm, gz"
+ },
+ "groundTex": {
+  "step": 1.6,
+  "nx": 2060,
+  "nz": 1500,
+  "channels": "sdf asphalt,paved,grass,dirt quantized 0..63 (31.5=edge, range 3m); row-delta int8 per channel (channel-major)",
+  "enc": "rowdelta64",
+  "int8": true,
+  "special": "uint8 ids 1 m: 1 track,2 court,3 sand,4 brick,5 granite pavers,6 turf,7 water",
+  "snx": 3296,
+  "snz": 2400
+ },
+ "aux": {
+  "step": 2.0,
+  "nx": 1648,
+  "nz": 1200,
+  "channels": "lushness, ao (0..63) planar residual int8, channel-major"
+ },
+ "origin": {
+  "lat": 37.87207892857143,
+  "lon": -122.2578392857143,
+  "mlat": 110994.0306429804,
+  "mlon": 87984.89681550451
+ }
+}

@@ -1,0 +1,19 @@
+<!doctype html><html><body><script type="module">
+// Build-only smoke test of every landmark module (no rendering): catches exceptions and reports triangle counts.
+import * as THREE from 'three';
+import { materials, U, boxUV } from '/src/materials.js';
+const ids = (new URLSearchParams(location.search).get('ids') || '').split(',').filter(Boolean);
+const M = materials(); const out = {};
+for (const id of ids) {
+  const t0 = performance.now();
+  try {
+    const pk = await (await fetch(`/dev-data/landmarks/${id}.json`)).json();
+    const g = pk.ground; const groundAt = (x, z) => { const fx = (x - g.x0) / g.step, fz = (z - g.z0) / g.step; const i = Math.max(0, Math.min(g.nz - 2, Math.floor(fz))), j = Math.max(0, Math.min(g.nx - 2, Math.floor(fx))); const u = Math.max(0, Math.min(1, fx - j)), v = Math.max(0, Math.min(1, fz - i)); const h = g.h; return h[i][j] * (1 - u) * (1 - v) + h[i][j + 1] * u * (1 - v) + h[i + 1][j] * (1 - u) * v + h[i + 1][j + 1] * u * v; };
+    const mod = await import(`/src/landmarks/${id}.js`);
+    const res = await mod.build({ THREE, M, U, boxUV, groundAt, footprints: pk.footprints, anchor: pk.anchor, packet: pk });
+    let tris = 0, meshes = 0; res.object3d.traverse((o) => { if (o.isMesh) { meshes++; const gg = o.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } });
+    out[id] = { ok: true, ms: Math.round(performance.now() - t0), tris: Math.round(tris), meshes, replaces: mod.info && mod.info.replaces };
+  } catch (e) { out[id] = { ok: false, err: String(e && e.message || e).slice(0, 200) }; }
+}
+window.__bc = out;
+</script></body></html>

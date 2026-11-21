@@ -1,0 +1,10 @@
+<!doctype html><html><body><script type="module">
+import { loadJSON } from '/src/data.js';
+import { buildBuildings, initSkeleton } from '/src/world/buildings.js';
+const data = await loadJSON('buildings.json.gz');
+await initSkeleton();
+const record = {};
+const t0 = performance.now();
+buildBuildings(data, { record });
+window.__roofs = { record, ms: performance.now() - t0, n: Object.keys(record).length };
+</script></body></html>
