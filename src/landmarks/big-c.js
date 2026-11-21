@@ -1,7 +1,12 @@
-// The Big C on Charter Hill (1905). A six-inch concrete slab letter on the steep west-facing slope above
-// Memorial Stadium, painted gold, with the class-rush plaque in its lower arm and a small flat viewing area.
+// The Big C on Charter Hill (1905). A gold-painted concrete block letter laid flush on the steep west-facing
+// grass slope above Memorial Stadium: a squared C with chamfered outer corners, an angled end on the upper arm and a
+// small upturned spur on the lower one, about 22 m tall on the slope. No terrace or wall: just the slab in open grass
+// (the LiDAR trees frame the clearing in game), a worn path climbing to it and the class-rush plaque on the lower arm.
+// refine-east: rebuilt letterform (was a narrow 3-rectangle bracket) aligned to the measured fall line; removed the
+// invented concrete terrace; textured, edge-worn gold paint; slab follows the terrain with real thickness.
 import * as THREE from 'three';
-import { Geo, boxGeo, mergeUV } from './lib/venue-util.js';
+import { Kit } from './lib/classic-kit.js';
+import { drapePoly } from './lib/b11-sports.js';
 
 export const info = {
   id: 'big-c',
@@ -11,77 +16,70 @@ export const info = {
   replaces: [],
 };
 
-const FT = 0.3048;
-const HGT = 60 * FT, WID = 26 * FT, STROKE = 8 * FT, THICK = 0.15; // letter 60 ft tall on the slope, 26 ft wide
+const H = 22.0, WD = 16.0, S = 3.3, CO = 3.2, CI = 1.1, THICK = 0.2;
 
 export async function build(ctx) {
-  const { M, boxUV, groundAt } = ctx;
-  const root = new THREE.Group(); root.name = 'big-c';
-  const detail = new THREE.Group(); detail.userData.detail = true; root.add(detail);
-  // in-plan "up" of the letter points away from campus (campus centre lies to the west-southwest)
-  const anchor = ctx.anchor || { x: 723, z: -277 };
-  let ux = anchor.x, uz = anchor.z; const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul; // from campus origin towards the hill
-  const rx = -uz, rz = ux; // right-hand direction for a viewer looking up the hill
-  // slope along U to convert slope length to plan length
-  const s0 = groundAt(-ux * 6, -uz * 6), s1 = groundAt(ux * 6, uz * 6); const slope = (s1 - s0) / 12; const kPlan = Math.cos(Math.atan(slope));
-  const b0 = -HGT / 2; // letter centred on the anchor
+  const { M, groundAt } = ctx;
+  // fall line from the terrain (uphill direction), letter "up" = uphill so it reads from campus below
+  const R0 = 8; const gx = (groundAt(R0, 0) - groundAt(-R0, 0)) / (2 * R0), gz = (groundAt(0, R0) - groundAt(0, -R0)) / (2 * R0);
+  let ux = gx, uz = gz; const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul;
+  const rx = -uz, rz = ux; // to the right for a viewer looking uphill (the C opens this way)
+  const kPlan = Math.cos(Math.atan(Math.hypot(gx, gz))); // slope length -> plan length
+  const K = new Kit(ctx, 0);
+  const b0 = -H / 2;
   const P = (a, b) => { const bp = (b0 + b) * kPlan; return [a * rx + bp * ux, a * rz + bp * uz]; };
-  // block C as union of rectangles in letter space (a across, b up the slope)
-  const rects = [[-WID / 2, -WID / 2 + STROKE, 0, HGT], [-WID / 2 + STROKE, WID / 2, 0, STROKE], [-WID / 2 + STROKE, WID / 2, HGT - STROKE, HGT]];
-  const inC = (a, b) => rects.some(([a0, a1, c0, c1]) => a >= a0 && a <= a1 && b >= c0 && b <= c1);
-  const top = new Geo(), side = new Geo();
-  const STEP = 0.5;
-  const V = (a, b, dy) => { const [x, z] = P(a, b); return [x, groundAt(x, z) + dy, z]; };
-  for (const [a0, a1, c0, c1] of rects) {
-    const na = Math.max(1, Math.round((a1 - a0) / STEP)), nb = Math.max(1, Math.round((c1 - c0) / STEP));
-    for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
-      const aa = a0 + (a1 - a0) * i / na, ab = a0 + (a1 - a0) * (i + 1) / na, ba = c0 + (c1 - c0) * j / nb, bb = c0 + (c1 - c0) * (j + 1) / nb;
-      top.quad(V(aa, ba, THICK), V(ab, ba, THICK), V(ab, bb, THICK), V(aa, bb, THICK));
-    }
-    // edges (only where the neighbour is outside the letter)
-    const edge = (pa, pb, outA, outB) => {
-      const n = Math.max(1, Math.round(Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) / STEP));
-      for (let k = 0; k < n; k++) {
-        const t0 = k / n, t1 = (k + 1) / n; const qa = [pa[0] + (pb[0] - pa[0]) * t0, pa[1] + (pb[1] - pa[1]) * t0], qb = [pa[0] + (pb[0] - pa[0]) * t1, pa[1] + (pb[1] - pa[1]) * t1];
-        const mid = [(qa[0] + qb[0]) / 2 + outA, (qa[1] + qb[1]) / 2 + outB]; if (inC(mid[0], mid[1])) continue;
-        side.quad(V(qa[0], qa[1], -0.35), V(qb[0], qb[1], -0.35), V(qb[0], qb[1], THICK), V(qa[0], qa[1], THICK));
-      }
-    };
-    edge([a0, c0], [a1, c0], 0, -0.05); edge([a1, c0], [a1, c1], 0.05, 0); edge([a1, c1], [a0, c1], 0, 0.05); edge([a0, c1], [a0, c0], -0.05, 0);
-  }
-  // make side faces outward-facing regardless of winding: render double sided
-  const goldMat = M.calGold.clone(); goldMat.color = new THREE.Color(0xf2b01e); goldMat.roughness = 0.75;
-  const sideMat = goldMat.clone(); sideMat.side = THREE.DoubleSide;
-  root.add(new THREE.Mesh(mergeUV([top.geometry()], boxUV), goldMat));
-  root.add(new THREE.Mesh(mergeUV([side.geometry()], boxUV), sideMat));
-  // bronze plaque in the lower arm
-  {
-    const [px, pz] = P(WID / 2 - 1.2, STROKE / 2); const y = groundAt(px, pz) + THICK + 0.03;
-    const pl = boxGeo(0.9, 0.06, 0.6, px, y, pz, Math.atan2(ux, uz)); detail.add(new THREE.Mesh(boxUV(pl.toNonIndexed()), M.bronze));
-  }
-  // flat viewing area at the foot of the letter (level terrace with a low retaining wall on the downhill side)
-  const vw = 9, vd = 4.5; const [vcx, vcz] = P(0, -3.2);
-  const corners = [[-vw / 2, -vd / 2], [vw / 2, -vd / 2], [vw / 2, vd / 2], [-vw / 2, vd / 2]].map(([a, d]) => [vcx + a * rx + d * ux, vcz + a * rz + d * uz]);
-  let ty = -1e9; for (const [x, z] of corners) ty = Math.max(ty, groundAt(x, z) - 0.05);
-  ty = Math.min(ty, groundAt(vcx, vcz) + 0.6);
-  const terrace = [];
-  { // slab: thick box from well below ground to the walking level
-    const depth = ty - Math.min(...corners.map(([x, z]) => groundAt(x, z))) + 0.8;
-    terrace.push(boxGeo(vw, depth, vd, vcx, ty - depth / 2, vcz, Math.atan2(ux, uz)));
-  }
-  const ang = Math.atan2(ux, uz);
-  // low wall along the downhill edge + two benches
-  const wallC = [vcx - ux * (vd / 2 - 0.15), vcz - uz * (vd / 2 - 0.15)];
-  terrace.push(boxGeo(vw, 0.55, 0.3, wallC[0], ty + 0.275, wallC[1], ang));
-  for (const s of [-2.4, 2.4]) { const bx = vcx + rx * s + ux * 0.7, bz = vcz + rz * s + uz * 0.7; terrace.push(boxGeo(1.8, 0.45, 0.45, bx, ty + 0.225, bz, ang)); }
-  root.add(new THREE.Mesh(mergeUV(terrace, boxUV), M.concreteDark));
-  const colliders = [{ type: 'poly', pts: [[-vw / 2, -vd / 2], [vw / 2, -vd / 2], [vw / 2, -vd / 2 + 0.3], [-vw / 2, -vd / 2 + 0.3]].map(([a, d]) => [vcx + a * rx + d * ux, vcz + a * rz + d * uz]), y0: ty - 3, y1: ty + 0.55 }];
-  // walkables: the letter surface (climbable slab) and the level terrace
-  const inv = (x, z) => { const a = x * rx + z * rz; const bp = x * ux + z * uz; return [a, bp / kPlan - b0]; };
-  const walkables = [
-    { type: 'poly', pts: corners, y: ty },
-    { type: 'fn', bounds: [-15, -15, 15, 15], heightAt: (x, z) => { const [a, b] = inv(x, z); return inC(a, b) ? groundAt(x, z) + THICK : null; } },
+  const inv = (x, z) => [x * rx + z * rz, (x * ux + z * uz) / kPlan - b0];
+  // letter outline in letter space (a across, b up the slope)
+  const L = -WD / 2, Rr = WD / 2, topEnd = L + WD * 0.86;
+  const outline = [
+    [L + CO, 0], [Rr, 0], [Rr, S + 0.75], [Rr - 1.1, S],               // lower arm with upturned spur
+    [L + S + CI, S], [L + S, S + CI], [L + S, H - S - CI], [L + S + CI, H - S], // counter (inner bowl)
+    [topEnd - 1.0, H - S], [topEnd, H],                                // upper arm, end cut on a slant
+    [L + CO, H], [L, H - CO], [L, CO],                                 // chamfered outer corners
   ];
-  const interactions = [{ id: 'big-c-view', pos: [vcx, ty + 1, vcz], radius: 5, label: 'Look out over campus and the Bay from the Big C' }];
-  return { object3d: root, colliders, walkables, interactions };
+  const inside = (a, b) => { let c = false; for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) { const p = outline[i], q = outline[j]; if ((p[1] > b) !== (q[1] > b) && a < (q[0] - p[0]) * (b - p[1]) / (q[1] - p[1]) + p[0]) c = !c; } return c; };
+  const ring = outline.map(([a, b]) => P(a, b));
+  // gold paint over concrete: textured, slightly worn
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf6b41f, roughness: 0.82, map: M.concrete.map || null });
+  const edge = new THREE.MeshStandardMaterial({ color: 0xc99a2e, roughness: 0.9, map: M.concrete.map || null, side: THREE.DoubleSide });
+  drapePoly(K, gold, ring, { maxEdge: 0.9, off: THICK });
+  // slab edges: vertical bands from below grade to the painted top, following the slope
+  {
+    const pos = [];
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length]; const len = Math.hypot(q[0] - p[0], q[1] - p[1]); const n = Math.max(1, Math.ceil(len / 0.6));
+      for (let k = 0; k < n; k++) {
+        const t0 = k / n, t1 = (k + 1) / n; const a = [p[0] + (q[0] - p[0]) * t0, p[1] + (q[1] - p[1]) * t0], b = [p[0] + (q[0] - p[0]) * t1, p[1] + (q[1] - p[1]) * t1];
+        const ga = groundAt(a[0], a[1]), gb = groundAt(b[0], b[1]);
+        pos.push(a[0], ga - 0.3, a[1], b[0], gb - 0.3, b[1], b[0], gb + THICK, b[1], a[0], ga - 0.3, a[1], b[0], gb + THICK, b[1], a[0], ga + THICK, a[1]);
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    K.add(edge, g);
+  }
+  // scuffed, sun-faded patches where people sit (slightly paler decals on the lower bowl and arms)
+  {
+    const pale = new THREE.MeshStandardMaterial({ color: 0xf3c95a, roughness: 0.9, map: M.concrete.map || null, polygonOffset: true, polygonOffsetFactor: -2 });
+    for (const [a0, b0_, a1, b1] of [[L + 0.4, 4.5, L + S - 0.5, 9], [L + 0.4, 12.5, L + S - 0.4, 17], [0.5, 0.5, 4.5, S - 0.6]]) {
+      drapePoly(K, pale, [P(a0, b0_), P(a1, b0_), P(a1, b1), P(a0, b1)], { maxEdge: 0.9, off: THICK + 0.012, detail: true });
+    }
+  }
+  // bronze class-rush plaque set into the lower arm
+  {
+    const [px, pz] = P(Rr - 4.2, S * 0.5); const y = groundAt(px, pz) + THICK + 0.02;
+    const pl = new THREE.BoxGeometry(0.9, 0.05, 0.6); pl.rotateY(Math.atan2(ux, uz)); pl.translate(px, y, pz); K.add(M.bronze, pl, { detail: true });
+  }
+  // worn dirt path climbing from the fire trail below to the foot of the letter
+  {
+    const dirt = new THREE.MeshStandardMaterial({ color: 0x9a8a63, roughness: 1.0, map: M.concrete.map || null, polygonOffset: true, polygonOffsetFactor: -1 });
+    const pts = []; for (let k = 0; k <= 10; k++) { const t = k / 10; pts.push([L + WD * 0.2 + Math.sin(t * 2.2) * 2.5, -1 - t * 26]); }
+    const left = [], right = [];
+    for (let k = 0; k < pts.length; k++) { const [a, b] = pts[k]; const w = 0.7 + 0.25 * Math.sin(k); left.push(P(a - w, b)); right.push(P(a + w, b)); }
+    drapePoly(K, dirt, [...left, ...right.reverse()], { maxEdge: 1.2, off: 0.04 });
+  }
+  const object3d = K.finish(); object3d.name = 'big-c';
+  const foot = P(0, -1.5);
+  const walkables = [{ type: 'fn', bounds: [-16, -16, 16, 16], heightAt: (x, z) => { const [a, b] = inv(x, z); return inside(a, b) ? groundAt(x, z) + THICK : null; } }];
+  const interactions = [{ id: 'big-c-view', pos: [foot[0], groundAt(foot[0], foot[1]) + 1, foot[1]], radius: 6, label: 'Look out over campus and the Bay from the Big C' }];
+  return { object3d, colliders: [], walkables, interactions };
 }
