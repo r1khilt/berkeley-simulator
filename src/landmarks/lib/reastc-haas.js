@@ -6,6 +6,7 @@
 // Built on classic-kit's Kit runs (s along the run, y up, d outward).
 import * as THREE from 'three';
 import { boardTex } from './b05b-kit.js';
+import { Kit } from './classic-kit.js';
 
 const _cache = new WeakMap();
 export function haasMats(M) {
@@ -150,4 +151,11 @@ export function arcade(K, R, s0, s1, g, h, { X, pitch = 4.0, dep = 2.4, pier = 0
   if (pergola) { const yP = g + h + 0.62; const ns = Math.max(1, Math.round(L / 0.6));
     for (let i = 0; i <= ns; i++) { const s = s0 + L * i / ns; K.rbox(R, X.steel, s - 0.05, yP, 0.1, s + 0.05, yP + 0.16, dep + 1.2, { detail: true }); }
     K.rbox(R, X.steel, s0, yP, dep + 1.05, s1, yP + 0.2, dep + 1.2, { detail: true }); }
+}
+
+// A Kit authoring in its own rotated frame (angle a, Kit convention) that merges into the main kit's material buckets.
+// (Frame -> main-frame rotation is rotY(main.a - a), so that main.finish()'s rotY(-main.a) yields rotY(-a) overall.)
+export class FrameKit extends Kit {
+  constructor(main, a) { super(main.ctx, a); this.buckets = main.buckets; this.detail = main.detail; this.extra = main.extra; this.pre = new THREE.Matrix4().makeRotationY(main.a - a); }
+  add(mat, geo, opts) { const g = super.add(mat, geo, opts); g.applyMatrix4(this.pre); return g; }
 }

@@ -6,8 +6,8 @@
 // with a canted oriel on stepped corbels above it; a canted, pyramid-roofed bay tower closes the north end.
 // Massing follows the 2021 LiDAR (frame -4°): eaves ~16.5 m, ridges ~21.5–22 m, west annex ~15 m.
 import * as THREE from 'three';
-import { Kit, SubKit, deg, openWall, hipRoof } from './lib/b05b-kit.js';
-import { haasMats, archPart, archPortal, discLamp } from './lib/reastc-haas.js';
+import { Kit, deg, openWall, hipRoof } from './lib/b05b-kit.js';
+import { haasMats, archPart, archPortal, discLamp, FrameKit } from './lib/reastc-haas.js';
 
 export const info = {
   id: 'earl-f-cheit-hall',
@@ -94,7 +94,7 @@ export async function build(ctx) {
   // stepped archivolt carries a passage from O'Donnell Courtyard out to the south-west, with a corbelled oriel over the
   // courtyard mouth. Authored in its own frame (+u from Cheit toward Student Services, +v from the courtyard outward).
   {
-    const G = new SubKit(K, deg(41));
+    const G = new FrameKit(K, deg(41));
     const toG = (u, v) => { const [x, z] = K.xz(u, v); return G.uv(x, z); };
     const A = toG(13.6, 15.7), B = toG(7.4, 21.9);                    // Cheit chamfer ends (courtyard end A, outer end B)
     const gu0 = Math.min(A[0], B[0]) + 0.1, gv0 = Math.min(A[1], B[1]), gv1 = Math.max(A[1], B[1]); const gu1 = gu0 + 14.1;
