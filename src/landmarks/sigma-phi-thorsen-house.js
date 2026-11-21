@@ -4,7 +4,7 @@
 // a front-gabled cross-wing toward Piedmont and a hooded entry. Massing from the 2021 LiDAR: main roof ridge
 // ~13 m (N-S), Piedmont range ~10 m.
 import * as THREE from 'three';
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { nightGlow } from '../materials.js';
 import { rafters, gardenWall, hedge, hood } from './lib/b12-greek.js';
 
@@ -17,15 +17,14 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const stain = ['paint', '#3a2a1e'], roof = ['roof', '#7d8a78'], clinker = ['brick', '#9c7262'];
-  const glass = nightGlow(new THREE.MeshStandardMaterial({ color: 0x5c6f80, roughness: 0.08, metalness: 0.45, envMapIntensity: 1.8, emissive: 0xffc77a, emissiveIntensity: 1.6 }), 1.0);
-  const r = greekHouse(ctx, {
+  const stain = ['paint', '#2f2219'], roof = ['roof', '#3b3a36'], clinker = ['brick', '#9c5a40'];
+  const r = rseHouse(ctx, {
     ang: -7.292, floor: 1.9, storeyH: 3.1, ov: 1.3,
-    glass, wall: ['shingle', '#4a3426'], trim: stain, frame: ['paint', '#3a2a1f'], roof, base: clinker, door: ['wood', '#8c4e2c'],
+    wall: ['clap', '#5c4331'], trim: stain, frame: ['paint', '#3a2a1f'], roof, base: clinker, door: ['wood', '#8c4e2c'],
     win: { w: 1.05, h: 1.4, bay: 3.7, sill: 0.85, tran: 0.74, casing: 0.15, pair: true, mull: 1, muntins: 2 }, belt: true, frieze: false,
     blocks: [
       // main block toward Bancroft: low gable, ridge N-S (LiDAR ~13.2 m), eaves E/W ~9 m
-      { u0: -6.4, u1: 14.4, v0: -9.09, v1: 2.8, eave: 10.6, roof: { type: 'gable', axis: 'v', ridge: 12.8, ov: 1.5, brackets: true, gableWin: { w: 2.6, h: 1.1 } } },
+      { u0: -6.4, u1: 14.4, v0: -9.09, v1: 2.8, eave: 9.1, storeys: 2, winAll: { bay: 4.6 }, roof: { type: 'gable', axis: 'v', ridge: 12.8, ov: 1.5, brackets: true, gableWin: { w: 2.6, h: 1.1 } } },
       // range along Piedmont (ridge N-S ~10.2 m)
       { u0: -9.68, u1: -0.4, v0: -1.39, v1: 14.66, eave: 8.6, storeys: 2, roof: { type: 'gable', axis: 'v', ridge: 9.95, ov: 1.4, brackets: true } },
       // front-gabled cross-wing at the Bancroft corner, gable facing Piedmont
@@ -53,7 +52,7 @@ export async function build(ctx) {
       for (const [u0, v0, u1, v1] of [[-12.7, -1.39, -9.68, 14.66], [-12.7, -10.4, -11.18, -1.39], [-11.18, -10.4, 6.0, -9.09]]) { const g = K.gMin(u0, v0, u1, v1, 4); K.box(api.M.turf, u0, g - 0.5, v0, u1, 1.62, v1); }
       hedge(api, [[-14.2, 15.0], [-14.2, 5.0]], { h: 1.2, t: 0.9 }); hedge(api, [[-14.2, -2.0], [-14.2, -11.5]], { h: 1.0, t: 0.9, color: '#4d6b33' });
     },
-  });
+  }, { number: '2307', walk: false, plants: false });
   r.object3d.name = 'sigma-phi-thorsen-house';
   return r;
 }
