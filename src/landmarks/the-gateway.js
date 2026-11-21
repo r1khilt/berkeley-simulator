@@ -93,7 +93,7 @@ export async function build(ctx) {
   const gRange = (R, d = 0.6) => { let lo = Infinity, hi = -Infinity; for (let s = 0; s <= R.L + 0.01; s += Math.min(1.5, R.L / 2)) { const g = G(...R.at(Math.min(s, R.L), d)); lo = Math.min(lo, g); hi = Math.max(hi, g); } return [lo, hi]; };
   const passCuts = (R) => { const cuts = []; let a = null; const st = 0.25; for (let s = 0; s <= R.L + 1e-6; s += st) { const ins = inRing(...R.at(s, -0.3), passOpen); if (ins && a === null) a = s; if (!ins && a !== null) { cuts.push([a - st / 2, s - st / 2]); a = null; } } if (a !== null) cuts.push([a, R.L]); return cuts; };
   const runs = polyRuns(K, fp);
-  const SAG = { bay: 7.5, dip: 0.36, topK: 0.3 }; let arcAcc = 0;   // sagging slab-edge eyebrows, phase = arc length round the ring
+  const SAG = { bay: 7.5, dip: 0, topK: 0.3 }; let arcAcc = 0;   // slab-edge bands: level in elevation (photos: they curve only in plan; the 'sag' is perspective). dip > 0 would make them sag per bay
   for (const { R } of runs) {
     const sOff = arcAcc; arcAcc += R.L;
     const mid = R.at(R.L / 2); const kind = scoopN(mid) ? 'N' : scoopSE(mid) ? 'SE' : 'out';
@@ -117,11 +117,11 @@ export async function build(ctx) {
         const west = mid[0] < -18;
         const fo = isSouth ? { module: 1.5, panelW: 0.09, panelD: 0.16, stagger: false, finMat: mats.mull, bandMat: mats.band } : west ? { module: 1.5, panelW: (i) => (i % 2 ? 0.26 : 0.4), panelD: 0.3, stagger: false, finMat: mats.metal, bandMat: mats.band }
                         : { module: 0.75, panelW: 0.13, panelD: 0.42, stagger: false, finMat: mats.finSilver, bandMat: mats.silver, mullions: false };
-        if (kind === 'out') panelStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, k, mats, { ...fo, sag: { ...SAG, sOff } }); else ribbonStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, mats, { sag: { ...SAG, sOff, dip: 0.3 } });
+        if (kind === 'out') panelStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, k, mats, { ...fo, sag: { ...SAG, sOff } }); else ribbonStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, mats, { sag: { ...SAG, sOff, dip: 0 } });
       }
     }
     // top of L4: dark slab band, light coping, glass guard of the level-5 terrace ring
-    { const ch = isSouth ? [[sC - PORT[3][0], sC + PORT[3][0]]] : []; for (const [a, b] of cutRanges(-0.02, R.L + 0.02, ch)) sagBand(K, R, mats.band, a, b, FL[5] + 0.02, FL[5] - 0.36, -0.16, 0.34, { ...SAG, sOff, topK: 0, dip: 0.26 });
+    { const ch = isSouth ? [[sC - PORT[3][0], sC + PORT[3][0]]] : []; for (const [a, b] of cutRanges(-0.02, R.L + 0.02, ch)) sagBand(K, R, mats.band, a, b, FL[5] + 0.02, FL[5] - 0.36, -0.16, 0.34, { ...SAG, sOff, topK: 0, dip: 0 });
       for (const [a, b] of ch) sagBand(K, R, mats.band, a, b, FL[5] + 0.02, FL[5] - 0.5, -0.16, 0.34, { ...SAG, sOff, dip: 0 }); }
     K.rbox(R, mats.silver, -0.02, FL[5], -0.3, R.L + 0.02, FL[5] + 0.12, 0.08);
     K.rbox(R, mats.rail, 0, FL[5] + 0.12, -0.24, R.L, FL[5] + 1.2, -0.2);
@@ -142,7 +142,7 @@ export async function build(ctx) {
     // the double-height opening: the L3 slab edge (sign band) is the lip, concave in plan and sagging; under it the L2 glass curves
     // back over the passage, with a warm uplit soffit beneath the L3 slab
     const NA = 40; const A3 = arcOf(3, NA), B2 = arcOf(2, NA);
-    const yLip = FL[3] - 0.3, S3 = 1.3; const lipY = (t) => yLip - S3 * (1 - (2 * Math.min(1, Math.max(0, t)) - 1) ** 2);   // the lip sags in a shallow catenary-like smile
+    const yLip = FL[3] - 0.3, S3 = 0; /* level lip, concave in plan (the photo's dip is perspective on the deeper middle) */ const lipY = (t) => yLip - S3 * (1 - (2 * Math.min(1, Math.max(0, t)) - 1) ** 2);   // the lip sags in a shallow catenary-like smile
     const NV = 8; const VP = (ii, jj) => { const v = jj / NV; const a = A3[ii], b = B2[ii]; return [b[0] + (a[0] - b[0]) * v, FL[3] - 0.6, b[1] + (a[1] - b[1]) * v]; };
     for (let i = 3; i < NA - 2; i += 4) for (const j of [3, 6]) { const p = VP(i, j); const c = new THREE.CircleGeometry(0.14, 8); c.rotateX(Math.PI / 2); c.translate(p[0], p[1] - 0.04, p[2]); K.add(M.lampGlow, c, { uvMode: 'keep', detail: true }); }
     // arched aluminium sign band on the L3 slab edge (face + underside), name following the arch
