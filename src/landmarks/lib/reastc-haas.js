@@ -17,9 +17,9 @@ export function haasMats(M) {
     stucco: clone('stuccoWhite', 0xebdabd, 'stucco'),       // smooth sand-beige render (~#D8C9AE)
     cast: clone('stuccoWhite', 0xf8eedb, 'cast'),          // lighter cast-stone trim, plinths, voussoirs (~#E3D5BC)
     siding,                                                  // grey-taupe horizontal siding (~#7B766E)
-    roof: clone('slate', 0xbdbab5, 'roof', { roughness: 0.8 }),  // dark charcoal slate/concrete tile (~#3A3C40)
+    roof: clone('slate', 0x8f8d8a, 'roof', { roughness: 0.8 }),  // near-black charcoal slate/concrete tile (~#2E3034)
     fascia: new THREE.MeshStandardMaterial({ color: 0x8a4a32, roughness: 0.55, metalness: 0.25, name: 'haas-fascia' }), // copper-brown eave band
-    teal: new THREE.MeshStandardMaterial({ color: 0x4a6b5c, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
+    teal: new THREE.MeshStandardMaterial({ color: 0x4f7a63, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
     steel: new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.45, metalness: 0.55, name: 'haas-steel' }),   // pergola / trellis
   };
   _cache.set(M, X); return X;
@@ -42,7 +42,7 @@ export function archPart(s, w, yTop, y0, y1) {
 // Great arched portal on run R (the wall itself must already have the arch hole, see archPart): stepped archivolt with
 // impost blocks, a barrel-vaulted porch `depth` deep with glazed teal doors at the back, and an oriel bay above the crown
 // carried on stepped corbels. g = floor level, s = centre, w = clear width, yTop = crown height.
-export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5.2, h: 4.2, proj: 1.25, gap: 0.6 }, wallD = 0.4 } = {}) {
+export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5.2, h: 4.2, proj: 1.25, gap: 0.6 }, wallD = 0.4, through = false, gFar = null } = {}) {
   const M = K.M; const r = w / 2, spring = yTop - r;
   // archivolt: three stepped orders + keystone, impost bands and plinths
   for (const [r0, r1, d1] of [[r, r + 0.35, 0.12], [r + 0.35, r + 0.7, 0.24], [r + 0.7, r + 0.95, 0.34]]) {
@@ -60,8 +60,18 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
   // porch: side walls, barrel vault, paving, back wall of glazed doors
   for (const sg of [-1, 1]) K.rbox(R, X.stucco, sg < 0 ? s - r - 0.3 : s + r, g - 0.6, -depth - wallD, sg < 0 ? s - r : s + r + 0.3, spring, -wallD + 0.01);
   { const vg = new THREE.CylinderGeometry(r, r, depth, 18, 1, true, Math.PI / 2, Math.PI); vg.rotateX(Math.PI / 2); vg.scale(-1, 1, 1); vg.translate(s, spring, -wallD - depth / 2); K.addRun(R, X.cast, vg); }
-  K.rbox(R, M.paving, s - r, g - 0.3, -depth - wallD, s + r, g + 0.02, 0.0);
-  const back = K.run(R.at(s - r, -depth - wallD), R.at(s + r, -depth - wallD));
+  if (through) { // open through-passage: level for the first third, then a broad flight down to the far side; doors in the side walls
+    const gf = gFar ?? g; const d0 = Math.min(depth * 0.35, 6.0); const len = depth + wallD - d0; const n = Math.max(1, Math.round(Math.abs(g - gf) / 0.16));
+    K.rbox(R, M.paving, s - r, Math.min(g, gf) - 0.6, -d0, s + r, g + 0.02, 0.0);
+    for (let k = 0; k < n; k++) { const ya = g - (g - gf) * (k + 1) / n; K.rbox(R, M.paving, s - r, Math.min(g, gf) - 0.6, -d0 - len * (k + 1) / n, s + r, ya + 0.02, -d0 - len * k / n); }
+    for (const sg of [-1, 1]) { const Rs = sg < 0 ? K.run(R.at(s - r, -wallD - 0.6), R.at(s - r, -wallD - 3.6)) : K.run(R.at(s + r, -wallD - 3.6), R.at(s + r, -wallD - 0.6));
+      K.rbox(Rs, M.windowNight, 0.2, g + 0.05, 0.02, 2.8, g + 2.7, 0.04); for (const x of [0.2, 1.5, 2.8]) K.rbox(Rs, X.teal, x - 0.05, g + 0.05, 0.04, x + 0.05, g + 2.7, 0.1); K.rbox(Rs, X.teal, 0.2, g + 2.65, 0.04, 2.8, g + 2.75, 0.1); }
+    K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.12, -wallD - 3.0, s + 0.25, spring + r - 0.02, -wallD - 2.5, { detail: true });
+    K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.12, -wallD - depth + 3.0, s + 0.25, spring + r - 0.02, -wallD - depth + 3.5, { detail: true });
+    K.rbox(R, M.bronze, s + r + 0.25, g + 1.5, 0.3, s + r + 0.85, g + 2.1, 0.33, { detail: true });
+  } else K.rbox(R, M.paving, s - r, g - 0.3, -depth - wallD, s + r, g + 0.02, 0.0);
+  const back = through ? null : K.run(R.at(s - r, -depth - wallD), R.at(s + r, -depth - wallD));
+  if (back) {
   // glazed back wall filling the arch: storefront doors below a transom, a gridded fanlight above (reads as a lit passage)
   const bo = { s0: 0.05, s1: w - 0.05, y0: g, y1: yTop - 0.05, arch: true };
   K.wall(back, X.stucco, -0.3, w + 0.3, g - 0.6, yTop + 0.4, [bo], 0.3);
@@ -70,7 +80,8 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
   const nm = Math.max(2, Math.round(w / 1.1)); for (let i = 1; i < nm; i++) { const x = w * i / nm; const top = spring + Math.sqrt(Math.max(0, (w / 2) ** 2 - (x - w / 2) ** 2)); K.rbox(back, X.teal, x - 0.05, g, -0.2, x + 0.05, top, -0.1); }
   for (const yy of [g + 2.7, spring]) { const half = Math.sqrt(Math.max(0, (w / 2) ** 2 - Math.max(0, yy - spring) ** 2)); K.rbox(back, X.teal, w / 2 - half, yy - 0.06, -0.2, w / 2 + half, yy + 0.06, -0.1); }
   K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.12, -wallD - depth * 0.5 - 0.25, s + 0.25, spring + r - 0.02, -wallD - depth * 0.5 + 0.25, { detail: true }); // pendant light in the vault
-  K.rbox(R, M.bronze, s + r + 0.25, g + 1.5, 0.24, s + r + 0.85, g + 2.1, 0.27, { detail: true }); // name plaque on the right pier
+  K.rbox(R, M.bronze, s + r + 0.25, g + 1.5, 0.3, s + r + 0.85, g + 2.1, 0.33, { detail: true }); // name plaque on the right pier
+  }
   // oriel bay over the crown on stepped corbels
   if (oriel) {
     const { w: ow, proj: op, gap } = oriel; const y0 = yTop + 1.05 + gap; const y1 = y0 + Math.min(oriel.h, (oriel.maxTop ?? Infinity) - y0);
@@ -84,8 +95,10 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
       K.wall(Rr, X.stucco, 0, L, y0, y1, [o], 0.25);
       K.fill(Rr, o, { rev: 0.12, frame: X.teal, mull: nm - 1 });
     }
-    // copper-brown capped roof slab
-    K.rbox(R, X.fascia, s - ow / 2 - 0.15, y1, -0.05, s + ow / 2 + 0.15, y1 + 0.3, op + 0.2);
+    // small hipped cap (slate) with the copper-brown fascia line, tucked under the main eave
+    K.rbox(R, X.fascia, s - ow / 2 - 0.15, y1, -0.05, s + ow / 2 + 0.15, y1 + 0.22, op + 0.25);
+    { const a = R.at(s - ow / 2 - 0.25, -0.3), b = R.at(s + ow / 2 + 0.25, op + 0.35); const ua = [Math.min(a[0], b[0]), Math.max(a[0], b[0])], va = [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+      K.hip(X.roof, ua[0], va[0], ua[1], va[1], y1 + 0.22, 0.55); }
   }
 }
 
