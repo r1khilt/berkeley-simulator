@@ -35,7 +35,7 @@ export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
-  const C = tint(M.concrete, 0xd9d7d2, 'mfConc');          // cast-in-place concrete, weathered warm grey (~#a9a69f)
+  const C = tint(M.concrete, 0xe1dfda, 'mfConc');          // cast-in-place concrete, weathered warm grey (~#a9a69f)
   const CT = tint(M.concrete, 0xddd6cd, 'mfTower');        // the stair towers read a touch warmer
   const CD = tint(M.concrete, 0xaaa8a3, 'mfConcDark');     // soffits, recesses, weathered parapets
   const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0);
@@ -92,7 +92,7 @@ export async function build(ctx) {
     const g = new THREE.ExtrudeGeometry(sh, { depth: s1 - s0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s1, 0, 0); K.addRun(R, mat, g);
   };
   const glassStorey = (R, s0, s1, y0, y1, o = {}) => {
-    curtain(K, R, s0, s1, y0, y1, [], { glass: GL, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
+    curtain(K, R, s0, s1, y0, y1, [], { glass: o.glass || GL, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
     const n = Math.max(1, Math.round((s1 - s0) / 6)); for (let i = 1; i < n; i++) { const s = s0 + (s1 - s0) * i / n; K.rbox(R, FR, s - 0.07, y0, -0.08, s + 0.07, y1, 0.06); }
     K.rbox(R, FR, s0, y0, -0.1, s1, y0 + 0.12, 0.05); K.rbox(R, CD, s0, y1, -0.3, s1, y1 + 0.45, -0.02); // sill + head/slab edge
   };
@@ -135,13 +135,13 @@ export async function build(ctx) {
   // east face: flush — glass storey (F4, with doors), solid spandrel, glass band (F5); floor 3 shows only down the lightwell
   {
     const dS0 = sE(9), dS1 = sE(5);
-    glassStorey(RE, 0, dS0, F4, 12.6); glassStorey(RE, dS1, RE.L, F4, 12.6);
+    glassStorey(RE, 0, dS0, F4, 12.6, { glass: GLP }); glassStorey(RE, dS1, RE.L, F4, 12.6, { glass: GLP });
     for (let i = 0; i < 4; i++) { const a = dS0 + (dS1 - dS0) * i / 4, b = a + (dS1 - dS0) / 4; K.rbox(RE, GL, a, F4, -0.12, b, F4 + 2.6, -0.06); K.rbox(RE, FR, a, F4, -0.06, a + 0.09, F4 + 2.6, 0.04); K.rbox(RE, FR, (a + b) / 2 - 0.2, F4 + 1.0, -0.02, (a + b) / 2 + 0.2, F4 + 1.05, 0.06, { detail: true }); }
     K.rbox(RE, FR, dS1 - 0.09, F4, -0.06, dS1, F4 + 2.6, 0.04); K.rbox(RE, FR, dS0, F4 + 2.6, -0.1, dS1, F4 + 2.75, 0.05); K.rbox(RE, GL, dS0, F4 + 2.75, -0.12, dS1, 12.6, -0.06);
     K.rbox(RE, FR, dS0 - 1.2, 11.7, 0, dS1 + 1.2, 11.9, 2.4);         // slim steel canopy on thin columns
     for (const s of [dS0 - 0.9, dS1 + 0.9]) K.rbox(RE, FR, s - 0.07, F4, 2.15, s + 0.07, 11.7, 2.29);
     K.rbox(RE, C, 0, 12.6, -0.2, RE.L, 13.9, 0.12);                 // continuous solid spandrel
-    glassStorey(RE, 0, RE.L, 13.9, SOF);
+    glassStorey(RE, 0, RE.L, 13.9, SOF, { glass: GLP });
     glassStorey(RE, 0, RE.L, F3, F4 - 0.3);
   }
   // ---------- roof slab (deep fascia, overhangs most on W/N/S), beams beneath, membrane, penthouse ----------
