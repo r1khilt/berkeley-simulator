@@ -5,7 +5,7 @@ import * as THREE from 'three';
 export const GRADE = { uSat: { value: 1.08 }, uContrast: { value: 1.06 }, uWarm: { value: 0.0 }, uLift: { value: 0.0 } };   // legacy (unused)
 // LOOK: slope/power/sat = ASC-CDL style look inside AgX's log domain (Blender "Punchy" is power 1.35 sat 1.4);
 // flare = veiling glare added in exposed scene-linear units (lifts blacks like a real lens); satOut/warm/tint = display grade.
-export const LOOK = { contrast: 1.42, slope: 1.0, power: 1.05, sat: 1.12, flare: 0.003, satOut: 1.0, satKnee: 0.3, warm: 0.012, shadowCool: 0.02 };
+export const LOOK = { contrast: 1.42, slope: 1.0, power: 1.05, sat: 1.2, flare: 0.003, satOut: 1.0, satKnee: 0.15, warm: 0.012, shadowCool: 0.02 };
 export const AOU = { uCAOMin: { value: 0.5 } };   // contact-AO floor (raised when screen-space AO is on)
 const f = (x) => Number(x).toFixed(5);
 // GLSL: tone map an already-exposed scene-linear colour to display-linear sRGB. `U` = use uniforms (post) instead of constants.
@@ -22,7 +22,9 @@ vec3 bsimTonemap(vec3 color){
   color = max(color, 0.0) + vec3(${v('flare')});
   color = Ins * (S2R * color);
   color = (log2(max(color, 1e-10)) + 12.47393) / 16.5;
-  color = clamp(0.60606 + (color - 0.60606) * ${v('contrast')}, 0.0, 1.0);   // contrast around middle grey in AgX log space
+  // contrast around middle grey in AgX log space, with a protected toe (slope 1 below ~-2.5 EV) so dusk/night stay readable
+  { vec3 hi = 0.60606 + (color - 0.60606) * ${v('contrast')}; float x0 = 0.45; float y0 = 0.60606 + (x0 - 0.60606) * ${v('contrast')};
+    color = clamp(mix(y0 + (color - x0), hi, step(x0, color)), 0.0, 1.0); }
   color = bsAgxContrast(color);
   // look (Blender AgX look: slope -> power -> saturation)
   float l0 = dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -89,13 +91,28 @@ float aoH(vec2 w){ vec2 f=(w-uAOCore.xy)/uAOCore.z; if (f.x < 0.0 || f.y < 0.0 |
  float a=texelFetch(uAOH,i,0).r, b=texelFetch(uAOH,i+ivec2(1,0),0).r, c=texelFetch(uAOH,i+ivec2(0,1),0).r, d=texelFetch(uAOH,i+ivec2(1,1),0).r; return mix(mix(a,b,t.x),mix(c,d,t.x),t.y); }`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  { float hh = vWPAO.y - aoH(vWPAO.xz); float cao = mix(uCAOMin, 1.0, smoothstep(0.0, 2.2, hh)); reflectedLight.indirectDiffuse *= cao; reflectedLight.indirectSpecular *= cao; reflectedLight.directDiffuse *= mix(1.0, cao, 0.35 * (1.0 - uCAOMin) / 0.5); }`)
-      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+      .replace('#include <opaque_fragment>', AMB_ALPHA);
+  };
+  mat.customProgramCacheKey = () => k0 + '|cao2';
+  mat.needsUpdate = true;
+}
+// ambient fraction of the final colour -> alpha in [0, 0.49] (opaque materials only; alpha-to-coverage foliage keeps its
+// coverage alpha, which post.js reads as 'unknown'). post.js darkens only this fraction with GTAO.
+const AMB_ALPHA = `#include <opaque_fragment>
  #ifdef OPAQUE
  { float bsTot = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) + 1e-5;
    float bsAmb = dot(reflectedLight.indirectDiffuse + reflectedLight.indirectSpecular, vec3(0.2126, 0.7152, 0.0722));
-   gl_FragColor.a = clamp(bsAmb / bsTot, 0.0, 0.98); }
- #endif`);
+   gl_FragColor.a = 0.49 * clamp(bsAmb / bsTot, 0.0, 1.0); }
+ #endif`;
+// same alpha encoding for opaque standard materials that skip contactAO (terrain, rings, water)
+export function ambAlpha(mat) {
+  const k0 = mat.customProgramCacheKey ? String(mat.customProgramCacheKey()) : '';
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = function (sh, r) {
+    if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r);
+    if (sh.fragmentShader.includes('bsAmb')) return;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', AMB_ALPHA);
   };
-  mat.customProgramCacheKey = () => k0 + '|cao2';
+  mat.customProgramCacheKey = () => k0 + '|amba';
   mat.needsUpdate = true;
 }
