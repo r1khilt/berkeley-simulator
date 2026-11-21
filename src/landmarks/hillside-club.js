@@ -18,7 +18,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-7.9)); const M = ctx.M; const P = pal(ctx);
-  const SH = shingleMat('hillside', { base: 0x5a4838 }), RF = coopMat('roof', '#5b524a'), TR = coopMat('paint', '#6b6a55'), BG = P.trimBlueGrey; // dark-stained redwood shingle, weathered shingle roofs, dark stained trim
+  const SH = shingleMat('hillside', { base: 0x5e4b3a }), RF = coopMat('roof', '#5b524a'), TR = coopMat('paint', '#6b6a55'), BG = P.trimBlueGrey; // dark-stained redwood shingle, weathered shingle roofs, dark stained trim
   const FASC = M.woodDark.clone(); FASC.color = new THREE.Color(0x5e4a3a);
   const Y0 = -1.5, G = 1.6; // floor level (Cedar St side ground ≈1.5)
   const colliders = [], walk = [];

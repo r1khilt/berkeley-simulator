@@ -5,7 +5,7 @@
 // (Few published photos exist; the façade treatment is a plausible reconstruction of the Northside Craftsman style.)
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
-import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
+import { coopRuns, finishGround, stoop, shingleMat } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'kidd-hall',
@@ -17,7 +17,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.1); const M = ctx.M;
-  const SH = coopMat('cedar', '#5a4535'), WH = coopMat('paint', '#ece6d6'), RF = coopMat('roof', '#4f4a44'), DK = coopMat('paint', '#3b2c22');
+  const SH = shingleMat('kidd', { base: 0x5e4836 }), WH = coopMat('paint', '#ece6d6'), RF = coopMat('roof', '#4f4a44'), DK = coopMat('paint', '#3b2c22');
   const win = { w: 0.8, h: 1.45, sill: 0.85, pattern: [2, 3, 2], gap: 0.1, mull: 0, tran: 0.55, muntins: 1, rev: 0.14, casing: 0.11, frame: WH };
   const H = K.block({ u0: -6.45, u1: 6.46, v0: -8.27, v1: 8.27, floors: [2.4, 5.2, 8.0], wall: SH, trim: WH, win, bay: 3.2, belts: [5.2], beltMat: WH,
     wins: [win, { ...win, pattern: [2, 1, 2] }],

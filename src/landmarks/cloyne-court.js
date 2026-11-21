@@ -5,7 +5,7 @@
 // the ground falls ~3 m toward Le Roy Avenue, exposing a garden level at the west end.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
-import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
+import { coopRuns, finishGround, stoop, shingleMat } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'cloyne-court',
@@ -17,9 +17,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.5); const M = ctx.M;
-  const WALL = coopMat('cedar', '#5b4838');
+  const WALL = shingleMat('cloyne', { base: 0x664a35 }); // split-redwood shingle (reads as shingle, not brick)
   const TRIM = coopMat('paint', '#2e4a36');
-  const ROOF = coopMat('roof', '#7f766b');
+  const ROOF = coopMat('roof', '#5d5149');
   const FASC = coopMat('paint', '#3b2a20');
   const RAIL = coopMat('paint', '#b08a5e', { rough: 0.8 });
   const floors = [-0.2, 3.3, 6.35, 9.4, 12.4];

@@ -37,7 +37,7 @@ export async function build(ctx) {
     for (const s of [sc - 2.1, sc + 1.8]) { K.rbox(R, ST, s, 1.6, 1.75, s + 0.32, 4.2, 2.1); K.rbox(R, VINE, s - 0.05, 1.6, 2.08, s + 0.37, 3.6, 2.2, { detail: true }); }
     K.rbox(R, ST, sc - 2.45, 4.2, -0.02, sc + 2.45, 4.55, 2.3); K.rbox(R, RED, sc - 2.5, 4.55, -0.02, sc + 2.5, 4.65, 2.35);
     const n = Math.max(1, Math.round((1.6 - gy) / 0.17)); for (let k = 0; k < n; k++) { const h = 1.6 - (1.6 - gy) * (k + 1) / n; if (h < gy + 0.02) break; K.rbox(R, M.concrete, sc - 0.9, gy - 0.5, 2.2 + k * 0.3, sc + 0.9, h, 2.5 + k * 0.3); } }
-  K.chimney(4.0, 6.5, 1.0, 0.9, 19.9, ST); K.chimney(3.5, -9.0, 1.0, 0.9, 19.4, ST);
+  K.chimney(4.0, 6.5, 1.0, 0.8, 19.9, M.brick); K.chimney(3.5, -9.0, 1.0, 0.8, 19.4, M.brick);
   // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
   { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { hedge: true, h: 0.9, depth: 1.0 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('kingman-hall');

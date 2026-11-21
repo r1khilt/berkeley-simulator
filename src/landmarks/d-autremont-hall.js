@@ -1,5 +1,6 @@
 // d’Autremont Hall, Pacific School of Religion (Holy Hill): buff stucco wings with red-tile roofs harmonising with PSR’s
 // 1920s buildings. No reliable photo was available; massing from the 2021 LiDAR (frame 6°).
+import * as THREE from 'three';
 import { hallBuild, chimney } from './lib/b08c-halls.js';
 import { rectRuns, finishGround } from './lib/rn-b-ground.js';
 
@@ -13,14 +14,17 @@ export const info = {
 
 export async function build(ctx) {
   const M = ctx.M;
+  const ST = M.stuccoWhite.clone(); ST.color = new THREE.Color(0xd9cdb5); ST.name = 'dautremont:stucco';
+  const TL = M.redTile.clone(); TL.color = new THREE.Color(0xc07a62); TL.name = 'dautremont:tile';
   const blocks = [
     { u0: -12.5, u1: 12.5, v0: -9.5, v1: 3.5, g: 3.4, eave: 10.3, ridge: 13.4, axis: 'u' },
     { u0: -14.5, u1: 3.0, v0: 3.5, v1: 9.5, g: 1.9, eave: 9.2, ridge: 10.6, axis: 'u', faces: { N: false } },
     { u0: 12.5, u1: 27.5, v0: -9.5, v1: -4.5, g: 5.6, eave: 10.2, ridge: 10.4, axis: 'u', roof: 'flat', faces: { W: false } },
     { u0: -17.5, u1: -5.5, v0: 11.0, v1: 15.0, g: 0.3, eave: 3.8, ridge: 4.6, axis: 'u', roof: 'flat' },
-    { u0: -15.5, u1: -12.5, v0: -3.5, v1: 0.5, g: 4.0, eave: 13.0, ridge: 14.3, axis: 'v', faces: { E: false } },
+    { u0: -15.5, u1: -12.5, v0: -3.5, v1: 0.5, g: 4.0, eave: 13.0, ridge: 14.6, axis: 'v', roof: 'hip', faces: { E: false } },
   ];
   let G = { colliders: [], walkables: [] };
+  for (const b of blocks) Object.assign(b, { mat: ST, roofMat: TL, corniceMat: ST, overhang: b.roof === 'flat' ? 0.3 : 0.7 });
   const { object3d, colliders } = hallBuild(ctx, 6, 'seminary', blocks, (K, st) => {
     G = finishGround(K, ctx, rectRuns(K, blocks.map((b) => ({ ...b, floor: b.g + 0.5 }))), { door: 'wood', n: 2, entry: { w: 1.9, h: 2.9, surround: K.M.concreteDark, sw: 0.32 }, bikes: 3, bench: true, plant: { h: 0.9, depth: 1.3 } });
 
