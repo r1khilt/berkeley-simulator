@@ -91,7 +91,7 @@ async function boot() {
   const standinIds = new Set(); for (const l of manifest.landmarks) for (const r of l.replaces || []) standinIds.add(normId(r));
   // also stand in (hide when the landmark loads) any OSM building whose centroid lies inside a landmark footprint
   { const inR = (x, z, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c; } return c; };
-    const lmBoxes = manifest.landmarks.map((l) => { const fps = l.footprints || []; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const fp of fps) for (const [x, z] of fp) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return { l, fps, b: [x0, z0, x1, z1] }; });
+    const lmBoxes = manifest.landmarks.map((l) => { const fps = [...(l.footprints || []), ...(l.clear || [])]; /* new-buildings: + `clear` site polygons */ let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const fp of fps) for (const [x, z] of fp) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return { l, fps, b: [x0, z0, x1, z1] }; });
     let added = 0;
     for (const b of bjson.b) { const f = b[7][0][5]; let cx = 0, cz = 0; for (let i = 0; i < f.length; i += 2) { cx += f[i]; cz += f[i + 1]; } cx /= f.length / 2 * 10; cz /= f.length / 2 * 10;
       for (const L of lmBoxes) { if (cx < L.b[0] || cx > L.b[2] || cz < L.b[1] || cz > L.b[3]) continue; if (L.fps.some((fp) => inR(cx, cz, fp))) { if (!standinIds.has(b[0])) { standinIds.add(b[0]); (L.l.replaces = L.l.replaces || []).push(b[0]); added++; } break; } } }
@@ -113,7 +113,7 @@ async function boot() {
     BS.treeLib = lib;
     // hide trees inside landmark footprints
     const pts = []; for (const fp of lmFootprints) { let x = 0, z = 0; fp.forEach((p) => { x += p[0]; z += p[1]; }); x /= fp.length; z /= fp.length; let r = 0; fp.forEach((p) => { r = Math.max(r, Math.hypot(p[0] - x, p[1] - z)); }); if (r < 60) pts.push([x, z, r * 0.8]); }
-    treeSys.hideInPolys(lmFootprints.filter((fp) => fp.length >= 3));
+    treeSys.hideInPolys([...lmFootprints, ...manifest.landmarks.flatMap((l) => l.clear || [])].filter((fp) => fp.length >= 3)); // new-buildings: `clear` polygons = sites rebuilt since the 2021 LiDAR
     scene.add(treeSys.group);
     for (let i = 0; i < trees.n; i++) { const h = trees.h[i] / 100; if (h > 4.5 && trees.sp[i] !== 13) physics.addCircle(trees.x[i] / 10, trees.z[i] / 10, Math.min(0.9, 0.18 + h * 0.012), trees.y[i] / 100 - 2, trees.y[i] / 100 + 3, 'tree'); }
   } catch (e) { console.warn('trees unavailable', e); }
