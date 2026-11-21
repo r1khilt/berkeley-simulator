@@ -2,4 +2,5 @@
 // ctx = { scene, physics, audio, ui, THREE, camera }. Add one import + one call per plugin below.
 export function installModes(player, ctx) {
   // e.g. import('./scooter.js').then((m) => m.install(player, ctx));
+  import('./grapple.js').then((m) => m.install(player, ctx)); // grappling hook: Q / right mouse (see grapple.js)
 }
