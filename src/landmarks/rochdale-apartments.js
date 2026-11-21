@@ -17,11 +17,11 @@ export const info = {
 export async function build(ctx) {
   const K = new CoopKit(ctx, -8.5); const M = ctx.M;
   const style = {
-    wall: shingleMat(ctx.M, 0x6f6050), trim: coopMat('paint', '#3a302a'), fascia: coopMat('paint', '#3a2e26'),
+    wall: shingleMat(ctx.M, 0x9a8672), trim: coopMat('paint', '#3a302a'), fascia: coopMat('paint', '#3a2e26'),
     rail: coopMat('metal', '#2e2e2e'), roofMat: coopMat('roof', '#5a5a58'), fh: 2.9, overhang: 0.75, bay: 3.4,
     win: { glass: ctx.M.windowNight, w: 1.0, h: 1.25, sill: 0.9, pattern: [2, 1, 4, 1, 2, 3], gap: 0.05, mull: 1, rev: 0.12, casing: 0.07, frame: coopMat('metal', '#4a4a48') },
   };
-  const ALT = shingleMat(ctx.M, 0x857868); // refine-south-west: photos show weathered shingle throughout (no stucco); alt blocks get a silvered tone
+  const ALT = shingleMat(ctx.M, 0xa89a88); // refine-south-west: photos show weathered shingle throughout (no stucco); alt blocks get a silvered tone
   const rects = [
     { u0: -35.99, u1: -30.91, v0: -8.49, v1: -5.49, top: 5.1 },
     { u0: -35.99, u1: -30.91, v0: -5.49, v1: 3.50, top: 9.9, roof: 'gable', rise: 1.9, axis: 'v' },

@@ -160,7 +160,7 @@ export function shingleMat(M, hex = 0x6e5644, { rough = 0.93 } = {}) {
           let sh = f > len ? 0.55 : f > 0.9 ? 0.72 + (len - f) * 2.0 : 0.86 + f * 0.16; // soft butt shadow at the bottom, lighter toward the butt
           if (f < 0.12) sh *= 0.82 + f * 1.5; // overlap shadow under the course above
           const j = joint ? 0.62 : 1.0; const st = 1.0 - streak[xx] * (0.6 + f * 0.4);
-          const v = tone * grain * sh * j * st; const i = (y * S + xx);
+          const v = 1.18 * tone * grain * sh * j * st; const i = (y * S + xx); // normalised so the tile averages ~the requested colour
           ia.data[i * 4] = toS(Math.min(1, br * v * (1 + warm))); ia.data[i * 4 + 1] = toS(Math.min(1, bg * v)); ia.data[i * 4 + 2] = toS(Math.min(1, bb * v * (1 - warm))); ia.data[i * 4 + 3] = 255;
           H[i] = f * 1.1 - (joint ? 0.35 : 0) + (grain - 0.94) * 0.6;
         }

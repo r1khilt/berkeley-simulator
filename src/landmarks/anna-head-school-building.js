@@ -20,7 +20,7 @@ export async function build(ctx) {
   // refine-south-west: unpainted redwood shingle walls (dark brown), green shingle roofs, cream trim and no shutters, a tall
   // rough stone chimney, foundation planting (Commons photo "Anna Head School for Girls (Berkeley, CA)")
   const M = ctx.M; const roof = coopMat('roof', '#566e4c');
-  const walls = shingleMat(ctx.M, 0x4a3c30);
+  const walls = shingleMat(ctx.M, 0x6e5844);
   const style = { seed: 'anna-head-school-building', parapet: 0.05, roofMat: roof, sh: 3.6, win: { w: 0.85, h: 1.55, sill: 0.9, gap: 2.0, pair: true },
     palette: [walls], coping: 0xe8e2d0, frameHex: 0xe8e2d0, glassHex: 0x1e2226, winMat: 'shared', baseHex: 0x9a968c, sill: true,
     site: { entrance: false, plant: true },
