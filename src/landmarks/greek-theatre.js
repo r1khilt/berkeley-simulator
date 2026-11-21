@@ -32,7 +32,7 @@ export async function build(ctx) {
   { const v = []; for (let r = 1; r < rOrch; r += 1.5) for (let d = 0; d < 360; d += 15) { const t = d * Math.PI / 180; v.push(groundAt(C[0] + Math.cos(t) * r, C[1] + Math.sin(t) * r)); } v.sort((a, b) => a - b); yOrch = Math.max(yOrch, v[v.length - 1] + 0.03); }
   const rings = []; // {r0, r1, y}
   // lower terrace (orchestra apron with the 28 carved chairs) then 19 concrete bench rows
-  const lowR = [10.0, 12.5, 15.0, 17.5, 20.0, 23.2];
+  const lowR = []; for (let k = 0; k <= 13; k++) lowR.push(10.0 + 13.2 * k / 13); // refine-east: 13 shallow lower tiers (they carry the folding chairs), not 5 broad rings
   const ringMed = (r) => { const v = []; for (let d = -95; d <= 85; d += 3) { const p = polar(r, d * Math.PI / 180); v.push(lidMed(p[0], p[1])); } v.sort((a, b) => a - b); return v[v.length >> 1]; };
   for (let k = 0; k < lowR.length - 1; k++) rings.push({ r0: lowR[k], r1: lowR[k + 1], y: ringMed((lowR[k] + lowR[k + 1]) / 2) });
   const ROWS = 19, rs0 = 23.2, rs1 = 40.6, dr = (rs1 - rs0) / ROWS;
@@ -85,10 +85,16 @@ export async function build(ctx) {
   // orchestra disc (cut by the stage front)
   const gO = new Geo();
   { const n = 72; for (let q = 0; q < n; q++) { const a0 = q / n * Math.PI * 2, a1 = (q + 1) / n * Math.PI * 2; const p0 = polar(rOrch + 0.02, a0), p1 = polar(rOrch + 0.02, a1); gO.tri([C[0], yOrch, C[1]], [p1[0], yOrch, p1[1]], [p0[0], yOrch, p0[1]]); } }
-  const tierMat = M.concrete;
+  const tierMat = M.concrete.clone(); tierMat.color = new THREE.Color(0xc4c2bb); tierMat.name = 'gtTier'; // cooler grey concrete treads
   root.add(new THREE.Mesh(mergeUV([gT.geometry()], boxUV), tierMat));
+  { // small white painted seat-number squares along the front edge of every bench row (about every 0.55 m)
+    const mk = []; const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (const R of rings) { if (!R.bench) continue; const rr = R.r0 + 0.1; const n = Math.floor(rr * (R.hi - R.lo) * Math.PI / 180 / 0.55);
+      for (let k = 0; k < n; k++) { const a = (R.lo + (R.hi - R.lo) * (k + 0.5) / n) * Math.PI / 180; const p = polar(rr, a); q.setFromAxisAngle(up, -(TA + a)); mk.push(new THREE.Matrix4().compose(new THREE.Vector3(p[0], R.y + 0.004, p[1]), q, one)); } }
+    const sq = new THREE.PlaneGeometry(0.1, 0.12); sq.rotateX(-Math.PI / 2); const im = new THREE.InstancedMesh(sq, M.whitePaint, mk.length); mk.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = false; detail.add(im);
+  }
   root.add(new THREE.Mesh(mergeUV([gR.geometry(), gE.geometry()], boxUV), M.concreteDark));
-  root.add(new THREE.Mesh(mergeUV([gO.geometry()], boxUV), M.paving));
+  { const pv = M.paving.clone(); pv.color = new THREE.Color(0xe2ded5); pv.name = 'gtOrchestra'; root.add(new THREE.Mesh(mergeUV([gO.geometry()], boxUV), pv)); }
 
   // aisles: 11 radial stairs with half-steps; 28 carved stone chairs on the lowest terrace
   {
@@ -250,7 +256,7 @@ export async function build(ctx) {
   {
     const wallG = []; const rW = 23.2, hW = 0.85;
     const aisleDeg = []; for (let k = 0; k < 11; k++) aisleDeg.push(-96.5 + k * 19.3);
-    const R = rings.find((q) => q.bench) || rings[5]; const yb = rings[4] ? rings[4].y : yOrch;
+    const ib = rings.findIndex((q) => q.bench); const R = rings[ib] || rings[rings.length - 1]; const yb = ib > 0 ? rings[ib - 1].y : yOrch;
     for (const [d0r, d1r] of [[R.lo + 1, -1.6], [1.6, R.hi - 1]]) {
       const d0 = d0r, d1 = d1r; if (d1 - d0 < 4) continue;
       const n = Math.max(2, Math.round((d1 - d0) / 2));
@@ -261,7 +267,7 @@ export async function build(ctx) {
         g.rotateY(-Math.atan2(p1[1] - p0[1], p1[0] - p0[0])); g.translate(m[0], yb - 0.6 + (hW + 0.6) / 2, m[1]); wallG.push(g);
       }
     }
-    if (wallG.length) root.add(new THREE.Mesh(mergeUV(wallG, boxUV), M.concreteDark));
+    if (wallG.length) { const pm = M.concrete.clone(); pm.color = new THREE.Color(0x9c978c); pm.name = 'gtParapet'; root.add(new THREE.Mesh(mergeUV(wallG, boxUV), pm)); }
   }
   // backstage (1957 Ernest Born additions) from the OSM parts, roof heights from LiDAR
   {
