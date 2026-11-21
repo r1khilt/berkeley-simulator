@@ -116,16 +116,16 @@ class Parts {
 function axisAt(spec, y) { return V(0, y, -spec.wb / 2 + (y - spec.R) * Math.tan(spec.rake)); }
 
 // ---------------------------------------------------------------- Lime Gen4
-export const LIME = { id: 'lime', name: 'Lime scooter', brand: 'Lime', wb: 0.9, R: 0.1375, tw: 0.066, rake: 0.2, deckTop: 0.172, feet: [-0.1, 0.17], standVec: [-0.1, -0.112, 0.07], grips: 1.075, gripX: 0.255, vmax: 6.94, seated: false };
+export const LIME = { id: 'lime', name: 'Lime scooter', brand: 'Lime', wb: 0.9, R: 0.1375, tw: 0.066, rake: 0.2, deckTop: 0.179, feet: [-0.11, 0.16], standVec: [-0.1, -0.112, 0.07], grips: 1.085, gripX: 0.255, vmax: 6.94, seated: false };
 function buildLime(P) {
-  const S = LIME, R = S.R, W = '#e9ebea', G = '#4db82e', K = '#1b1b1b', MAT = '#38393b';
+  const S = LIME, R = S.R, W = '#eceeed', G = '#4cc22e', K = '#1b1b1b', MAT = '#3a3d40';
   // deck (white shell) + ribbed charcoal mat with the Lime emblem
   P.side('body', roundRect(-0.3, 0.1, 0.205, 0.166, 0.026), 0.172, W, 0.007);
   P.side('body', [[-0.27, 0.166], [-0.335, 0.262], [-0.37, 0.262], [-0.35, 0.16], [-0.3, 0.115]], 0.085, K, 0.006); // rear fender mount
-  P.box('body', 0.152, 0.004, 0.465, MAT, V(0, 0.1695, 0.04)).decal('body', 0.46, 0.15, 'limeMat', V(0, 0.1726, 0.04), V(0, 1, 0), V(0, 0, -1));
+  P.box('body', 0.15, 0.005, 0.47, MAT, V(0, 0.1755, 0.04)).decal('body', 0.46, 0.145, 'limeMat', V(0, 0.1785, 0.04), V(0, 1, 0), V(0, 0, -1)); // shell top is 0.173 (bevel)
   // rear tail arms to the axle + chunky black rear fender (doubles as the foot brake) with the red light
   for (const s of [-1, 1]) P.box('body', 0.022, 0.04, 0.16, W, V(s * 0.047, 0.142, 0.39), [0.05, 0, 0], 0.008);
-  P.arc('body', -0.45, R, R + 0.01, R + 0.034, 0.75, 2.95, 0.08, K);
+  P.arc('body', -0.45, R, R + 0.01, R + 0.046, 0.75, 2.95, 0.092, K);
   // gooseneck down tube: broad flat-sided beam from the deck up to the head collar
   const c0 = [0.06, 0.135], c1 = [0.383, 0.47]; const dx = c1[0] - c0[0], dy = c1[1] - c0[1], L = Math.hypot(dx, dy); const nx = -dy / L, ny = dx / L;
   const beam = [[c0[0] - nx * 0.06, c0[1] - ny * 0.06 - 0.02], [c1[0] - nx * 0.04, c1[1] - ny * 0.04], [c1[0] + nx * 0.045, c1[1] + ny * 0.045], [c0[0] + nx * 0.055 - 0.06, c0[1] + ny * 0.035]];
@@ -136,7 +136,7 @@ function buildLime(P) {
   // swappable battery on the upper/rear face of the down tube
   P.box('body', 0.05, 0.014, 0.25, '#a9adb0', V(0, mid[1] + ny * 0.05, -(mid[0] + nx * 0.05)), [ang, 0, 0], 0.005);
   // head collar on the steering axis, amber side reflectors, Lime badge
-  const hc = axisAt(S, 0.5); P.rod('body', axisAt(S, 0.445), axisAt(S, 0.555), 0.036, W, 14);
+  const hc = axisAt(S, 0.5); P.rod('body', axisAt(S, 0.445), axisAt(S, 0.6), 0.036, W, 14);
   for (const s of [-1, 1]) { P.box('body', 0.004, 0.034, 0.024, '#f08a24', V(s * 0.037, 0.48, hc.z + 0.004)); P.decal('body', 0.034, 0.034, 'limeBadge', V(s * 0.0388, 0.42, -0.34), V(s, 0, 0), V(0, 0, -s)); }
   // kickstand (separate bucket, pivots at its top)
   P.rod('stand', V(0, 0, 0), V(-0.1, -0.112, 0.07), 0.009, K, 6).box('stand', 0.03, 0.008, 0.045, K, V(-0.1, -0.113, 0.07));
@@ -145,44 +145,44 @@ function buildLime(P) {
   for (const s of [-1, 1]) { P.rod('steer', V(s * 0.043, top.y, top.z), V(s * 0.047, R, -S.wb / 2), 0.0135, W, 8); P.rod('steer', V(s * 0.043, top.y - 0.01, top.z - 0.0014), V(s * 0.044, top.y - 0.09, top.z - 0.0126), 0.0155, '#3a3c3e', 8); }
   P.box('steer', 0.11, 0.03, 0.05, W, V(0, top.y + 0.005, top.z), [-S.rake, 0, 0], 0.01);
   P.arc('steer', S.wb / 2, R, R + 0.01, R + 0.026, 1.1, 2.75, 0.06, K);
-  P.rod('steer', axisAt(S, 0.55), axisAt(S, 1.03), 0.0235, G, 14).rod('steer', axisAt(S, 0.552), axisAt(S, 0.562), 0.026, '#202020', 14);
+  P.rod('steer', axisAt(S, 0.6), axisAt(S, 1.04), 0.025, G, 14).rod('steer', axisAt(S, 0.598), axisAt(S, 0.61), 0.0275, '#202020', 14);
   const hu = axisAt(S, 1.065); const H = headFrame(V(0, hu.y, hu.z + 0.005), -0.32);
-  P.box('steer', 0.13, 0.07, 0.1, G, V(0, hu.y, hu.z + 0.005), [-0.32, 0, 0], 0.015);
-  P.box('steer', 0.075, 0.006, 0.05, '#1e2124', H.p(0, 0.036, -0.008), [-0.32, 0, 0], 0.002);
+  P.box('steer', 0.17, 0.075, 0.105, G, V(0, hu.y, hu.z + 0.005), [-0.32, 0, 0], 0.016);
+  P.box('steer', 0.09, 0.006, 0.055, '#1e2124', H.p(0, 0.0385, -0.008), [-0.32, 0, 0], 0.002);
   P.decal('steer', 0.03, 0.03, 'qr', H.p(0, 0, 0.0515), H.n(0, 0, 1), V(1, 0, 0));
-  P.rod('steer', V(-S.gripX + 0.03, S.grips, hu.z + 0.03), V(S.gripX - 0.03, S.grips, hu.z + 0.03), 0.011, '#1a1a1a', 8);
-  for (const s of [-1, 1]) P.rod('steer', V(s * (S.gripX - 0.07), S.grips, hu.z + 0.03), V(s * (S.gripX + 0.055), S.grips, hu.z + 0.03), 0.0165, '#151515', 8);
-  P.box('steer', 0.11, 0.008, 0.016, '#1c1c1c', V(-S.gripX + 0.01, S.grips - 0.008, hu.z - 0.012), [0, 0.12, 0]);
+  P.rod('steer', V(-S.gripX + 0.03, S.grips, hu.z + 0.03), V(S.gripX - 0.03, S.grips, hu.z + 0.03), 0.0145, '#1a1a1a', 8);
+  for (const s of [-1, 1]) P.rod('steer', V(s * (S.gripX - 0.07), S.grips, hu.z + 0.03), V(s * (S.gripX + 0.055), S.grips, hu.z + 0.03), 0.02, '#151515', 8);
+  for (const s of [-1, 1]) P.box('steer', 0.11, 0.01, 0.02, '#1c1c1c', V(s * (S.gripX - 0.01), S.grips - 0.01, hu.z - 0.014), [0, -s * 0.12, 0]);
   P.box('steer', 0.03, 0.012, 0.03, '#1c1c1c', V(S.gripX - 0.085, S.grips + 0.006, hu.z + 0.0), [0.4, 0, 0]);
   P.rod('steer', V(-0.075, S.grips + 0.012, hu.z + 0.02), V(-0.075, S.grips + 0.03, hu.z + 0.02), 0.014, '#b9bdc2', 10);
   // lights (separate buckets: emissive when ridden at night)
   P.rod('lightF', V(0, hu.y - 0.005, hu.z - 0.052), V(0, hu.y - 0.005, hu.z - 0.062), 0.018, '#f2f4f0', 12);
-  P.box('lightR', 0.06, 0.03, 0.022, '#c8102e', V(0, R + 0.168 * Math.sin(2.75), 0.45 - 0.168 * Math.cos(2.75) + 0.008), [0.35, 0, 0], 0.006);
+  P.box('lightR', 0.07, 0.034, 0.024, '#c8102e', V(0, R + 0.18 * Math.sin(2.75), 0.45 - 0.18 * Math.cos(2.75) + 0.012), [0.35, 0, 0], 0.006);
   // wheels: black airless tyres, charcoal 5-spoke rims; rear hub motor
   P.wheel('wheelF', R, S.tw, { rim: '#2a2a2a', spokes: 5, hub: '#a5a9ac' });
   P.wheel('wheelR', R, S.tw, { rim: '#222222', spokes: 5, hub: '#3b3d40', hubR: 0.05, hubW: 1.0 });
 }
 
 // ---------------------------------------------------------------- Veo Astro VS4
-export const ASTRO = { id: 'veo', name: 'Veo scooter', brand: 'Veo', wb: 0.9, R: 0.127, tw: 0.062, rake: 0.23, deckTop: 0.138, feet: [-0.1, 0.17], standVec: [-0.1, -0.085, 0.07], grips: 1.085, gripX: 0.245, vmax: 6.94, seated: false };
+export const ASTRO = { id: 'veo', name: 'Veo scooter', brand: 'Veo', wb: 0.9, R: 0.127, tw: 0.062, rake: 0.23, deckTop: 0.146, feet: [-0.11, 0.16], standVec: [-0.1, -0.085, 0.07], grips: 1.1, gripX: 0.225, vmax: 6.94, seated: false };
 function buildAstro(P) {
-  const S = ASTRO, R = S.R, CH = '#2b2b2d', MATC = '#3a3a3c', T = '#2ee6d6', K = '#1a1a1a';
+  const S = ASTRO, R = S.R, CH = '#262628', MATC = '#2e2e30', T = '#3cdcd2', K = '#1a1a1a';
   // slab deck with a kick-up tail
   P.side('body', [[-0.3, 0.062], [0.25, 0.062], [0.27, 0.085], [0.25, 0.132], [-0.3, 0.132], [-0.395, 0.185], [-0.42, 0.17], [-0.4, 0.13], [-0.33, 0.07]], 0.19, CH, 0.008);
-  P.box('body', 0.168, 0.004, 0.53, MATC, V(0, 0.1345, 0.0));
-  for (let k = 0; k < 9; k++) P.box('body', 0.15, 0.003, 0.012, '#454547', V(0, 0.1375, -0.2 + k * 0.05));
+  P.box('body', 0.17, 0.004, 0.53, MATC, V(0, 0.1415, 0.0)); // slab top is 0.140 (bevel)
+  for (let k = 0; k < 9; k++) P.box('body', 0.15, 0.003, 0.012, '#4a4a4c', V(0, 0.1445, -0.2 + k * 0.05));
   // teal side bands along the deck, continuous with the neck swoop
-  for (const s of [-1, 1]) P.box('body', 0.008, 0.024, 0.55, T, V(s * 0.099, 0.1, 0.005), [0, 0, 0], 0.003);
+  for (const s of [-1, 1]) P.box('body', 0.01, 0.042, 0.6, T, V(s * 0.1, 0.098, -0.01), [0, 0, 0], 0.004);
   const P0 = [0.22, 0.1], P1 = [0.4, 0.1], P2 = [0.355, 0.52]; const pts = [], sw = [];
   for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push([(1 - t) * (1 - t) * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0], (1 - t) * (1 - t) * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1]]); }
-  const off = (i, sgn) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]; const tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty); const w = 0.034 - i * 0.0012; return [pts[i][0] - sgn * ty / l * w, pts[i][1] + sgn * tx / l * w]; };
+  const off = (i, sgn) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]; const tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty); const w = 0.042 - i * 0.0014; return [pts[i][0] - sgn * ty / l * w, pts[i][1] + sgn * tx / l * w]; };
   for (let i = 0; i < pts.length; i++) sw.push(off(i, 1)); for (let i = pts.length - 1; i >= 0; i--) sw.push(off(i, -1));
-  P.side('body', sw, 0.07, T, 0.008);
+  P.side('body', sw, 0.078, T, 0.008);
   P.side('body', [[0.2, 0.065], [0.36, 0.08], [0.36, 0.13], [0.2, 0.13]], 0.11, CH, 0.008);
   // head tube, rear fender, teal rear axle covers, red reflectors
   P.rod('body', axisAt(S, 0.43), axisAt(S, 0.57), 0.033, K, 12);
-  P.arc('body', -0.45, R, R + 0.012, R + 0.032, 0.9, 2.95, 0.075, K);
-  for (const s of [-1, 1]) { P.box('body', 0.012, 0.036, 0.19, T, V(s * 0.05, 0.128, 0.37), [0.12, 0, 0], 0.004); P.box('body', 0.004, 0.018, 0.03, '#d0302e', V(s * 0.0965, 0.1, -0.22)); P.box('body', 0.004, 0.016, 0.026, '#d0302e', V(s * 0.0965, 0.135, 0.33), [0.5, 0, 0]); }
+  P.arc('body', -0.45, R, R + 0.01, R + 0.026, 0.9, 2.95, 0.07, K);
+  for (const s of [-1, 1]) { P.box('body', 0.014, 0.042, 0.2, T, V(s * 0.05, 0.13, 0.37), [0.12, 0, 0], 0.004); P.box('body', 0.004, 0.018, 0.03, '#d0302e', V(s * 0.0965, 0.1, -0.22)); P.box('body', 0.004, 0.016, 0.026, '#d0302e', V(s * 0.0965, 0.135, 0.33), [0.5, 0, 0]); }
   P.box('lightR', 0.06, 0.018, 0.008, '#ff2a2a', V(0, 0.17, 0.418), [0.6, 0, 0]);
   P.box('lightU', 0.09, 0.005, 0.44, '#3a6bff', V(0, 0.058, 0.0));
   P.rod('stand', V(0, 0, 0), V(-0.1, -0.085, 0.07), 0.009, K, 6).box('stand', 0.03, 0.008, 0.045, K, V(-0.1, -0.086, 0.07));
@@ -202,8 +202,8 @@ function buildAstro(P) {
   P.box('steer', 0.13, 0.055, 0.095, K, V(0, hu.y, hu.z + 0.01), [-0.35, 0, 0], 0.01);
   P.box('steer', 0.075, 0.005, 0.05, '#0f1214', H.p(0, 0.0285, -0.006), [-0.35, 0, 0], 0.002);
   P.decal('steer', 0.028, 0.028, 'qr', H.p(0, 0, 0.049), H.n(0, 0, 1), V(1, 0, 0));
-  P.rod('steer', V(-S.gripX + 0.03, S.grips, hu.z + 0.03), V(S.gripX - 0.03, S.grips, hu.z + 0.03), 0.011, K, 8);
-  for (const s of [-1, 1]) P.rod('steer', V(s * (S.gripX - 0.065), S.grips, hu.z + 0.03), V(s * (S.gripX + 0.055), S.grips, hu.z + 0.03), 0.017, '#121212', 8);
+  P.rod('steer', V(-S.gripX + 0.03, S.grips, hu.z + 0.03), V(S.gripX - 0.03, S.grips, hu.z + 0.03), 0.0145, K, 8);
+  for (const s of [-1, 1]) P.rod('steer', V(s * (S.gripX - 0.065), S.grips, hu.z + 0.03), V(s * (S.gripX + 0.055), S.grips, hu.z + 0.03), 0.02, '#121212', 8);
   for (const s of [-1, 1]) P.box('steer', 0.1, 0.008, 0.016, '#1c1c1c', V(s * (S.gripX - 0.012), S.grips - 0.009, hu.z - 0.01), [0, -s * 0.12, 0]);
   P.rod('steer', V(0.07, S.grips + 0.012, hu.z + 0.02), V(0.07, S.grips + 0.03, hu.z + 0.02), 0.014, '#b9bdc2', 10);
   P.rod('lightF', V(0, hu.y - 0.004, hu.z - 0.046), V(0, hu.y - 0.004, hu.z - 0.056), 0.016, '#f2f4f0', 12);

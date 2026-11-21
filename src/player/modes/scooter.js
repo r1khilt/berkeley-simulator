@@ -70,7 +70,7 @@ class Fleet {
   parkIn(g, it) {
     const list = g.members[it.type]; const im = g.meshes[it.type]; if (list.length >= im.instanceMatrix.count) { console.warn('fleet: no capacity for', it.id); return; } // never happens with the spare capacity
     it.group = g; it.idx = list.length; list.push(it); im.count = list.length;
-    this.ground(it); this.writeMatrix(it); g.dirty = true;
+    this.ground(it); this.writeMatrix(it); g.dirty = true; im.computeBoundingSphere(); im.visible = true;
     // colliders: two small circles (deck + stem) so you can't walk through parked scooters
     const S = SPECS[it.type], fx = -Math.sin(it.yaw), fz = -Math.cos(it.yaw);
     if (!it.down) for (const k of [0.12, -0.3]) { this.ph.addCircle(it.x + fx * k * (S.wb / 0.9), it.z + fz * k * (S.wb / 0.9), 0.2, it.y, it.y + 1.1, 'fleet'); it.circles.push(this.ph.circles[this.ph.circles.length - 1]); }
@@ -78,7 +78,7 @@ class Fleet {
   unpark(it) {
     const g = it.group; if (!g) return; const list = g.members[it.type], im = g.meshes[it.type];
     const last = list.pop(); if (last !== it) { list[it.idx] = last; last.idx = it.idx; this.writeMatrix(last); }
-    im.count = list.length; im.instanceMatrix.needsUpdate = true; it.group = null; it.idx = -1; g.dirty = true;
+    im.count = list.length; im.instanceMatrix.needsUpdate = true; it.group = null; it.idx = -1; g.dirty = true; im.computeBoundingSphere();
     for (const c of it.circles) { c.y0 = Infinity; c.y1 = -Infinity; } it.circles.length = 0;
   }
   ground(it) { it.y = this.ph.groundAt(it.x, it.z, (it.y || this.ph.heightAt(it.x, it.z)) + 1.2).y; }
@@ -279,13 +279,13 @@ function poseRider(av, r, dt) {
   root.getWorldQuaternion(_qa);
   // avatar root: vehicle heading + lean (no pitch: riders stay upright on slopes)
   _ea.set(0, r.yaw, r.lean + r.tilt * 0.5, 'YXZ'); av.root.rotation.copy(_ea);
-  const crouch = clamp(-r.bumpY * 2.2, -0.05, 0.1) + (S.seated ? 0 : 0.04 + Math.min(0.05, Math.abs(r.lean) * 0.12));
+  const crouch = clamp(-r.bumpY * 2.2, -0.05, 0.1) + (S.seated ? 0 : 0.01 + Math.min(0.05, Math.abs(r.lean) * 0.14) + clamp(r.speed * 0.004, 0, 0.03));
   if (S.seated) {
     P.hips.position.set(0, 0.94, 0); P.hips.rotation.set(0, 0, 0);
     P.spine.rotation.set(-0.16 - clamp(r.accel * 0.02, -0.06, 0.06), 0, 0); P.neck && (P.neck.rotation.x = 0); P.head.rotation.set(0.12, 0, 0);
   } else {
-    P.hips.position.set(0, 0.94 - crouch, 0); P.hips.rotation.set(0, -0.32, 0);
-    P.spine.rotation.set(-0.2 - clamp(r.accel * 0.025, -0.08, 0.1), 0.26, 0); P.head.rotation.set(0.16, 0.06, 0);
+    P.hips.position.set(0, 0.965 - crouch, 0); P.hips.rotation.set(0, -0.3, 0);
+    P.spine.rotation.set(-0.24 - clamp(r.accel * 0.025, -0.08, 0.1), 0.24, -r.lean * 0.15); P.head.rotation.set(0.2, 0.06, r.lean * 0.3);
   }
   av.root.updateMatrixWorld(true);
   // feet
