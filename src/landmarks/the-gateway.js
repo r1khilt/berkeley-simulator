@@ -78,7 +78,7 @@ export async function build(ctx) {
   const onS = (s) => [P16[0] + sT[0] * s, P16[1] + sT[1] * s];
   const sC = (-27 - P16[0]) / sT[0];                            // passage centre on the south wall
   // stepped "funnel" portal over the passage: slab-edge arcs per storey (chord half-width, sag into the building)
-  const PORT = { 2: [12.5, 10.0], 3: [12.5, 4.2], 4: [9.5, 2.2] };
+  const PORT = { 2: [12.5, 8.0], 3: [12.5, 4.2], 4: [9.5, 2.2] };
   const arcOf = (k, seg = 12) => { const [hw, sag] = PORT[k]; return sagArc(onS(sC - hw), onS(sC + hw), sag, [-sN[0], -sN[1]], seg); };
   // passage (open at grade): flared walls from the portal chord ends to the plaza apex
   const wallW = [onS(sC - 14), [-38.4, 29.6], [-35.9, 23.5], [-35.4, 15], [-35.6, 5], [-36.0, -5.45]];   // south -> north (faces east)
@@ -115,7 +115,7 @@ export async function build(ctx) {
       for (const [a, b] of cutRanges(0, R.L, cut)) {
         // wings read differently in the photos: west wing a warm champagne pier rhythm, east wing dense deep silver fins
         const west = mid[0] < -18;
-        const fo = west ? { module: 1.5, panelW: (i) => (i % 2 ? 0.26 : 0.4), panelD: 0.3, stagger: false, finMat: mats.metal, bandMat: mats.band }
+        const fo = isSouth ? { module: 1.5, panelW: 0.09, panelD: 0.16, stagger: false, finMat: mats.mull, bandMat: mats.band } : west ? { module: 1.5, panelW: (i) => (i % 2 ? 0.26 : 0.4), panelD: 0.3, stagger: false, finMat: mats.metal, bandMat: mats.band }
                         : { module: 0.75, panelW: 0.13, panelD: 0.42, stagger: false, finMat: mats.finSilver, bandMat: mats.silver, mullions: false };
         if (kind === 'out') panelStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, k, mats, { ...fo, sag: { ...SAG, sOff } }); else ribbonStorey(K, R, a, b, Math.max(ya, gLo - 0.5), yb, mats, { sag: { ...SAG, sOff, dip: 0.3 } });
       }
@@ -131,23 +131,19 @@ export async function build(ctx) {
   // ---------- campus-side portal: tall arched opening (L1 + L2) under the L3 sign band, warm uplit vault, stepped glass funnel above ----------
   {
     const arcRuns = (pts) => { const out = []; for (let i = 0; i < pts.length - 1; i++) out.push(K.run(pts[i], pts[i + 1])); return out; };
-    for (let k = 3; k <= 4; k++) for (const R of arcRuns(arcOf(k))) ribbonStorey(K, R, 0, R.L, FL[k], FL[k + 1], mats);
+    for (let k = 2; k <= 4; k++) for (const R of arcRuns(arcOf(k))) ribbonStorey(K, R, 0, R.L, FL[k], FL[k + 1], mats);
+    for (const R of arcRuns(arcOf(2, 24))) K.rbox(R, mats.band, -0.03, FL[2] - 0.62, -0.05, R.L + 0.03, FL[2] + 0.1, 0.3);
     // upper-tier soffits (cool, unlit): lunes between successive arcs
-    for (let k = 3; k <= 4; k++) {
+    for (let k = 2; k <= 4; k++) {
       const upper = k + 1; const lower = arcOf(k);
       const up = upper === 5 ? [onS(sC - PORT[k][0]), onS(sC + PORT[k][0])] : (() => { const a = arcOf(upper); const [hw] = PORT[k]; return [onS(sC - hw), ...a, onS(sC + hw)]; })();
-      flatDown(K, mats.soffit, [...up, ...lower.slice().reverse().slice(1, -1)], FL[upper] - 0.62);
+      flatDown(K, k === 2 ? mats.soffitWarm : mats.spandrel, [...up, ...lower.slice().reverse().slice(1, -1)], FL[upper] - 0.62);
     }
-    // the double-height opening: the L3 slab edge (sign band) is the lip, concave in plan; a warm uplit vault curves up from the
-    // passage ceiling (deep back arc on the L2 slab line) to that lip
+    // the double-height opening: the L3 slab edge (sign band) is the lip, concave in plan and sagging; under it the L2 glass curves
+    // back over the passage, with a warm uplit soffit beneath the L3 slab
     const NA = 40; const A3 = arcOf(3, NA), B2 = arcOf(2, NA);
     const yLip = FL[3] - 0.3, S3 = 1.3; const lipY = (t) => yLip - S3 * (1 - (2 * Math.min(1, Math.max(0, t)) - 1) ** 2);   // the lip sags in a shallow catenary-like smile
-    const yBack = FL[2] - 0.6; const NV = 8;
-    const VP = (ii, jj) => { const v = jj / NV, f = v * v; const a = A3[ii], b = B2[ii]; return [b[0] + (a[0] - b[0]) * v, yBack + (lipY(ii / NA) - yBack) * f, b[1] + (a[1] - b[1]) * v]; };
-    { const vp = [], vi = []; for (let i = 0; i <= NA; i++) for (let j = 0; j <= NV; j++) vp.push(...VP(i, j));
-      for (let i = 0; i < NA; i++) for (let j = 0; j < NV; j++) { const a = i * (NV + 1) + j, b = (i + 1) * (NV + 1) + j; vi.push(a, b, b + 1, a, b + 1, a + 1); }
-      const vg = new THREE.BufferGeometry(); vg.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3)); vg.setIndex(vi); vg.computeVertexNormals(); K.add(mats.soffitWarm, vg); }
-    // downlight dots in the vault (detail)
+    const NV = 8; const VP = (ii, jj) => { const v = jj / NV; const a = A3[ii], b = B2[ii]; return [b[0] + (a[0] - b[0]) * v, FL[3] - 0.6, b[1] + (a[1] - b[1]) * v]; };
     for (let i = 3; i < NA - 2; i += 4) for (const j of [3, 6]) { const p = VP(i, j); const c = new THREE.CircleGeometry(0.14, 8); c.rotateX(Math.PI / 2); c.translate(p[0], p[1] - 0.04, p[2]); K.add(M.lampGlow, c, { uvMode: 'keep', detail: true }); }
     // arched aluminium sign band on the L3 slab edge (face + underside), name following the arch
     const arcK = (k, t) => { const p0 = onS(sC - PORT[k][0]), p1 = onS(sC + PORT[k][0]); const kk = 1 - (2 * t - 1) ** 2; return [p0[0] + (p1[0] - p0[0]) * t - sN[0] * PORT[k][1] * kk, p0[1] + (p1[1] - p0[1]) * t - sN[1] * PORT[k][1] * kk]; };
