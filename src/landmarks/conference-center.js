@@ -28,12 +28,12 @@ export async function build(ctx) {
   K.gable(R.jmRoof, b.u0, b.v0, b.u1, b.v1, b.eave, b.ridge - b.eave, 'v', { overhang: 0.9, wallMat: R.ccSiding });
   K.box(R.jmTrim, -0.18, b.ridge - 0.05, b.v0 - 0.9, 0.18, b.ridge + 0.12, b.v1 + 0.9); // ridge cap
   for (const u of [b.u0 - 0.9, b.u1 + 0.9]) for (let v = b.v0 - 0.6; v <= b.v1 + 0.6; v += 0.8) K.box(R.timber, Math.min(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.62, v - 0.06, Math.max(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.48, v + 0.06, { detail: true });
-  // timber deck on the east side with a simple rail
-  { const g = K.gMin(b.u1, -7.0, b.u1 + 3.0, 7.0); const yD = K.gMax(b.u1, -7.0, b.u1 + 3.0, 7.0) + 0.25;
-    K.box(R.timber, b.u1, g - 0.6, -7.0, b.u1 + 3.0, yD, 7.0);
-    walkables.push(K.walkPoly([[b.u1, -7.0], [b.u1 + 3.0, -7.0], [b.u1 + 3.0, 7.0], [b.u1, 7.0]], yD));
-    for (let v = -7.0; v <= 7.01; v += 1.75) K.box(R.timber, b.u1 + 2.85, yD, v - 0.05, b.u1 + 2.95, yD + 1.0, v + 0.05, { detail: true });
-    K.box(R.timber, b.u1 + 2.82, yD + 0.95, -7.0, b.u1 + 2.98, yD + 1.05, 7.0); }
+  // timber deck on the east side (where the garden falls away) with a simple rail; top just above the hall floor
+  { const v0 = -0.5, v1 = 7.0; const g = K.gMin(b.u1, v0, b.u1 + 3.0, v1); const yD = 0.8;
+    K.box(R.timber, b.u1, g - 0.6, v0, b.u1 + 3.0, yD, v1);
+    walkables.push(K.walkPoly([[b.u1, v0], [b.u1 + 3.0, v0], [b.u1 + 3.0, v1], [b.u1, v1]], yD));
+    for (let v = v0; v <= v1 + 0.01; v += (v1 - v0) / 5) K.box(R.timber, b.u1 + 2.85, yD, v - 0.05, b.u1 + 2.95, yD + 1.0, v + 0.05, { detail: true });
+    K.box(R.timber, b.u1 + 2.82, yD + 0.95, v0, b.u1 + 2.98, yD + 1.05, v1); }
   colliders.push(K.colPoly([[b.u0, b.v0], [b.u1, b.v0], [b.u1, b.v1], [b.u0, b.v1]], -2, b.ridge + 0.5));
   const object3d = K.finish();
   object3d.name = 'conference-center';
