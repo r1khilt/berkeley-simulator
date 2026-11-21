@@ -102,6 +102,8 @@ kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; 
 .hud.off { opacity: 0; visibility: hidden; transition: opacity .35s, visibility 0s .35s; }
 .has-modal .hud { opacity: 0; }
 .loc { position: absolute; left: calc(16px + var(--sl)); top: calc(16px + var(--st)); display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 16px 8px 9px; border-radius: 14px; max-width: min(44vw, 420px); }
+.loc.empty { opacity: 0; }
+.loc { transition: opacity .3s; }
 .loc-ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--blue); color: #fff; flex: none; }
 .loc-ic .i { width: 16px; height: 16px; }
 .loc-t { min-width: 0; }

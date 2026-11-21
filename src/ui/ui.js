@@ -74,7 +74,7 @@ export class UI {
     this.menu = this.title.querySelector('.menu'); this.titleTimeEl = this.title.querySelector('.title-time');
     this.title.addEventListener('click', (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) this.cb[a]?.(); });
   }
-  progress(f) { f = Math.max(0, Math.min(1, f)); this.titleBar.style.transform = `scaleX(${f})`; this.titlePct.textContent = `${Math.round(f * 100)}%`; }
+  progress(f) { f = Math.max(0, Math.min(1, f)); this.titleBar.style.transform = `scaleX(${f})`; this.titlePct.textContent = `${Math.round(f * 100)}%`; if (f >= 1 && !/^Could not/.test(this.titleNote.textContent)) this.titleNote.textContent = 'Starting…'; }
   note(t) { this.titleNote.textContent = t; if (/^Could not/.test(t)) this.title.classList.add('failed'); }
   ready() {
     this.title.querySelector('.loading').classList.add('hidden'); this.menu.classList.remove('hidden');
@@ -140,7 +140,7 @@ export class UI {
   }
   compass(headingDeg) { this._heading = headingDeg; const r = this.mmNorth ? 0 : -headingDeg; if (this._nr !== r) { this._nr = r; this.needle.style.transform = `rotate(${r.toFixed(1)}deg)`; } }
   location(n, s) {
-    if (this._ln !== n) { this.locN.textContent = n || ''; this._ln = n; }
+    if (this._ln !== n) { this.locN.textContent = n || ''; this._ln = n; this.locN.parentElement.parentElement.classList.toggle('empty', !n); }
     if (this._ls !== s) { this.locS.textContent = s || ''; this.locS.classList.toggle('hidden', !s); this._ls = s; }
   }
   count(found, total) { this.found = found; this.total = total; this.countEl.textContent = `${found} / ${total} places discovered`; }
@@ -300,7 +300,7 @@ export class UI {
         if (named.some((o) => o.p.name === v.p.name && Math.hypot(o.sx - v.sx, o.sy - v.sy) < 140)) continue;
         const L = v.p.landmark, strong = v.p === sel || v.p === hover; if (!L && !strong && scale < 0.75) continue;
         const f = `${L || strong ? 600 : 500} ${L ? 12.5 : 12}px Inter, system-ui, sans-serif`, w = tw(v.p.name, f), r = L ? 9 : 5.5;
-        const ok = (bb) => !hit(bb) && bb[0] > side() + 6 && bb[0] + bb[2] < W - 6 && bb[1] > 4 && bb[1] + bb[3] < H - 4;
+        const ok = (bb) => !hit(bb) && bb[0] > side() + 6 && bb[0] + bb[2] < W - 6 && bb[1] > 4 && bb[1] + bb[3] < H - 4 && !(bb[0] + bb[2] > W - 70 && (bb[1] < 70 || bb[1] + bb[3] > H - 190)); // keep clear of close / zoom controls
         let b = [v.sx + r + 4, v.sy - 8, w + 4, 16]; if (!ok(b)) { b = [v.sx - r - 8 - w, v.sy - 8, w + 4, 16]; if (!ok(b) && !strong) continue; }
         boxes.push(b); named.push(v); ctx.font = f; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText(v.p.name, b[0] + 2, v.sy); ctx.fillStyle = L ? '#0b2545' : '#33363b'; ctx.fillText(v.p.name, b[0] + 2, v.sy);
       }
