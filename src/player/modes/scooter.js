@@ -205,7 +205,8 @@ export function install(player, ctx) {
       // ---- ground: sample under both wheels; steps > 22 cm are walls, smaller ones are kerb-like bumps; drops go airborne
       const half = S.wb / 2; const yF0 = r.y + Math.sin(r.pitch) * half, yR0 = r.y - Math.sin(r.pitch) * half;
       let gF = ph.groundAt(nx + fx * half, nz + fz * half, yF0 + 0.3).y, gR = ph.groundAt(nx - fx * half, nz - fz * half, yR0 + 0.3).y;
-      const riseF = gF - yF0, riseR = gR - yR0;
+      // discontinuity vs. the current slope (a steady hill is not a step): expected height after moving `step` along the pitch
+      const ext = Math.tan(r.pitch) * step; const riseF = gF - (yF0 + ext), riseR = gR - (yR0 + ext);
       if ((riseF > 0.22 && r.speed > 0) || (riseR > 0.22 && r.speed < 0)) { // too tall: treat as a wall (stairs riser, planter)
         if (va > 2) { sound.thud(Math.min(1, va / 6)); r.pOffV += 1.6; } r.speed = -r.speed * 0.18; nx = r.x; nz = r.z;
         gF = ph.groundAt(nx + fx * half, nz + fz * half, yF0 + 0.3).y; gR = ph.groundAt(nx - fx * half, nz - fz * half, yR0 + 0.3).y;
