@@ -191,8 +191,8 @@ class ThePlay {
     const frameM = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6, metalness: 0.3, name: 'bg:boardFrame' });
     for (const sgn of [1, -1]) {
       const g = new THREE.PlaneGeometry(16.6, 9.4); g.rotateY(sgn > 0 ? -Math.PI / 2 : Math.PI / 2);
-      const m = new THREE.Mesh(g, bm); m.position.set(sgn * 106.2, 34.1 - yF, -0.6); m.name = 'bigGame:board'; this.root.add(m);
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.5, 10.4, 17.6), frameM); f.position.set(sgn * 106.47, 34.1 - yF, -0.6); f.name = 'bigGame:boardFrame'; f.castShadow = true; this.root.add(f);
+      const m = new THREE.Mesh(g, bm); m.position.set(sgn * 114.5, 34.1 - yF, -0.6); /* integration: stadium boards fixed to face the field; screen face at |u| = 114.69 */ m.name = 'bigGame:board'; this.root.add(m);
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.5, 10.4, 17.6), frameM); f.position.set(sgn * 114.8, 34.1 - yF, -0.6); f.name = 'bigGame:boardFrame'; f.castShadow = true; this.root.add(f);
     }
     this.boardKey = ''; this.drawBoard('pre');
     this.root.updateMatrixWorld(true);

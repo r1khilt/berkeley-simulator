@@ -497,8 +497,8 @@ export async function build(ctx) {
       const [cx, cz] = fromUS(uB, 0.6);
       const legs = [-5.5, 5.5].map((s) => { const [lx, lz] = fromUS(uB + sgn * 0.8, 0.6 + s); return boxGeo(0.9, 39.3 - 10 - rim, 0.9, lx, rim + (39.3 - 10 - rim) / 2, lz, rot); });
       frame.push(...legs);
-      frame.push(boxGeo(17.6, 10.4, 1.6, cx, 39.3 - 5.2, cz, rot + Math.PI / 2));
-      const sg = new THREE.PlaneGeometry(16.6, 9.4); sg.rotateY(sgn > 0 ? -Math.PI / 2 : Math.PI / 2); sg.rotateY(rot); // face the field
+      frame.push(boxGeo(17.6, 10.4, 1.6, cx, 39.3 - 5.2, cz, rot)); // integration fix: rotateY(rot) maps local z to the field axis, so the 17.6 m width must stay on local x (cross-field)
+      const sg = new THREE.PlaneGeometry(16.6, 9.4); sg.rotateY(sgn > 0 ? Math.PI : 0); sg.rotateY(rot); // face the field (integration fix: was rotated 90 deg, buried in the slab)
       const [fx, fz] = fromUS(uB - sgn * 0.81, 0.6); sg.translate(fx, 39.3 - 5.2, fz); screens.push(sg);
       colliders.push({ type: 'cyl', x: cx, z: cz, r: 1.2, y0: rim - 1, y1: 39.3 });
     }
