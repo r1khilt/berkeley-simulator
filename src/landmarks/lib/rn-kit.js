@@ -234,7 +234,7 @@ export function planter(K, R, s, d0, w = 1.6, dep = 1.6, h = 0.55, o = {}) {
 }
 // Row of n inverted-U bike racks along run R (centred at s, d out from the wall), bikes perpendicular to the wall; nb parked bikes.
 export function bikes(K, R, s, d, n = 4, nb = 2, o = {}) {
-  const rot = facing(R) + Math.PI / 2; const cols = []; const pitch = o.pitch ?? 0.95;
+  const rot = facing(R) + Math.PI / 2; const cols = []; const pitch = o.pitch ?? 0.95; nb = Math.min(nb, o.maxBikes ?? 2); // parked bikes are ~2-3k tris each
   for (let i = 0; i < n; i++) {
     const ss = s + (i - (n - 1) / 2) * pitch; const p = R.at(ss, d);
     const c = propAt(K, 'bikeRack', p[0], p[1], rot); if (c) cols.push(c);

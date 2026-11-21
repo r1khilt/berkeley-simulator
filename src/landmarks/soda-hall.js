@@ -7,7 +7,7 @@
 // 16.4 / 12.3 / 8.2 / 4.2 m, penthouse 24.5 m, and the pergola at ~4.2 m over the west walk.
 import * as THREE from 'three';
 import { Kit, mats, punched, bays, roofDeck, rect, gAt, storefront, signText } from './lib/b03-kit.js';
-import { bikes, furniture, planting } from './lib/rn-kit.js';
+import { bikes } from './lib/rn-kit.js';
 
 export const info = {
   id: 'soda-hall',
@@ -212,9 +212,8 @@ export async function build(ctx) {
   }
 
   // street life: bike racks + benches on the pergola walk by the main entrance, bikes on Le Roy, planting along Le Roy (refine-north)
-  colliders.push(...bikes(K, RW, sW(4.0), 3.2, 8, 5), ...bikes(K, RE, 14.0, 2.6, 5, 2));
-  colliders.push(furniture(K, RW, 'bench', sW(23.0), 2.2, 0), furniture(K, RW, 'trashCan', sW(21.2), 2.2));
-  planting(K, RE, 22.0, RE.L - 1.0, { d0: 0.3, depth: 1.2, h: 0.8, seed: 151 });
+  colliders.push(...bikes(K, RW, sW(4.0), 3.2, 8, 2), ...bikes(K, RE, 14.0, 2.6, 5, 0));
+
   // ---------- colliders follow the terraced massing
   for (let k = 1; k <= 4; k++) colliders.push(K.colPoly(rect(u0, vStart[k], u1, vStart[k + 1]), -2, LV[k] - 0.05));
   colliders.push(K.colPoly(rect(u0, vStart[5], u1, v1), -2, PAR_S));
