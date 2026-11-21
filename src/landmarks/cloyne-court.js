@@ -5,6 +5,7 @@
 // the ground falls ~3 m toward Le Roy Avenue, exposing a garden level at the west end.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop, shingleMat } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'cloyne-court',
@@ -16,14 +17,15 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.5); const M = ctx.M;
-  const WALL = coopMat('cedar', '#5b4838');
+  const WALL = shingleMat('cloyne', { base: 0x54483c }); // split-redwood shingle (reads as shingle, not brick)
   const TRIM = coopMat('paint', '#2e4a36');
-  const ROOF = coopMat('roof', '#7f766b');
+  const ROOF = coopMat('roof', '#6c645b');
   const FASC = coopMat('paint', '#3b2a20');
   const RAIL = coopMat('paint', '#b08a5e', { rough: 0.8 });
   const floors = [-0.2, 3.3, 6.35, 9.4, 12.4];
-  const wBase = { w: 0.62, h: 1.0, sill: 1.55, pair: 2, gap: 0.12, tran: 0, muntins: 1, mull: 0, rev: 0.1, casing: 0.09 };
-  const w1 = { w: 0.78, h: 1.65, sill: 0.75, pair: 3, pattern: [3, 3, 1, 3, 2, 3, 1, 2], gap: 0.1, tran: 0.6, muntins: 1, mull: 1, rev: 0.14, casing: 0.1 };
+  const GLW = M.windowNight; // shared window glass (furnished-room shader upgrades apply)
+  const wBase = { glass: GLW, w: 0.62, h: 1.0, sill: 1.55, pair: 2, gap: 0.12, tran: 0, muntins: 1, mull: 0, rev: 0.1, casing: 0.09 };
+  const w1 = { glass: GLW, w: 0.78, h: 1.65, sill: 0.75, pair: 3, pattern: [3, 3, 1, 3, 2, 3, 1, 2], gap: 0.1, tran: 0.6, muntins: 1, mull: 1, rev: 0.14, casing: 0.1 };
   const w2 = { ...w1, pair: 2, pattern: [3, 2, 1, 3, 2, 3, 1, 2, 3] };
   const wins = [wBase, w1, w2, { ...w2, h: 1.45 }];
   const roof = { type: 'hip', slope: 0.34, overhang: 1.1, mat: ROOF, fascia: FASC, tails: true, tailMat: FASC, soffitMat: FASC, fasciaH: 0.16 };
@@ -43,11 +45,11 @@ export async function build(ctx) {
   }
   // one-storey east annex (kitchen/dining wing) dug into the slope, flat roof
   K.block({ u0: 25.36, u1: 38.5, v0: -6.16, v1: 9.89, floors: [3.3, 7.4], wall: WALL, trim: TRIM, bay: 3.2,
-    win: { w: 0.7, h: 1.4, sill: 1.0, pair: 2, gap: 0.12, tran: 0.65, mull: 1, rev: 0.1 },
+    win: { glass: GLW, w: 0.7, h: 1.4, sill: 1.0, pair: 2, gap: 0.12, tran: 0.65, mull: 1, rev: 0.1 },
     roof: { type: 'hip', slope: 0.25, yTop: 8.4, overhang: 0.8, mat: ROOF, fascia: FASC, soffitMat: FASC, tails: true, tailMat: FASC } });
   // one-storey entry porch block toward Le Roy Avenue
   K.block({ u0: -38.08, u1: -35.6, v0: 6.66, v1: 13.14, floors: [0.4, 3.9], wall: WALL, trim: TRIM, bay: 2.2,
-    win: { w: 0.6, h: 1.3, sill: 0.9, pair: 2, gap: 0.1, mull: 0, tran: 0.6 },
+    win: { glass: GLW, w: 0.6, h: 1.3, sill: 0.9, pair: 2, gap: 0.1, mull: 0, tran: 0.6 },
     faces: { W: { doors: [{ s: 3.2, w: 1.0, h: 2.3, door: TRIM }], cs: [1.2, 5.3] } },
     roof: { type: 'hip', slope: 0.4, overhang: 0.6, mat: ROOF, fascia: FASC, soffitMat: FASC } });
   K.buildBlocks();
@@ -70,7 +72,7 @@ export async function build(ctx) {
   }
   // glazed sleeping-porch bays on the top floor of the courtyard wings (boxy, nearly all glass, own shallow hip)
   {
-    const GL = { w: 0.78, h: 1.75, sill: 0.55, pair: 1, mull: 1, tran: 0.55, rev: 0.08, casing: 0.06, frame: coopMat('paint', '#e6dfcc') };
+    const GL = { glass: GLW, w: 0.78, h: 1.75, sill: 0.55, pair: 1, mull: 1, tran: 0.55, rev: 0.08, casing: 0.06, frame: coopMat('paint', '#e6dfcc') };
     for (const [b, f, s0, s1] of [[E, 'W', 3.0, 10.0], [E, 'W', 12.0, 17.5], [W, 'E', 3.0, 9.5], [W, 'E', 11.5, 17.0]]) K.bay(b, f, s0, s1, 0.95, 9.4 + 0.15, 12.1, { win: GL, wall: WALL, roofMat: ROOF });
   }
   // boxed wooden balconies with solid shingled sides on the Ridge Road front, and dark downspouts
@@ -91,5 +93,7 @@ export async function build(ctx) {
     const R = N.runN; const stone = coopMat('cmu', '#7e766a');
     for (let s = 0.5; s < R.L - 0.5; s += 6) { const s1 = Math.min(R.L - 0.5, s + 6); const g0 = Math.min(K.gR(R, s, 3.2), K.gR(R, s1, 3.2)); K.rbox(R, stone, s, g0 - 0.5, 2.9, s1, g0 + 0.55, 3.4); }
   }
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 4, plant: { hedge: true, h: 0.85, depth: 1.1 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('cloyne-court');
 }

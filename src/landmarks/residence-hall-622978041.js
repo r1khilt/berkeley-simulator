@@ -2,6 +2,7 @@
 // parapet roof and exterior walkways with metal railings. No reliable photo was available; massing from the 2021 LiDAR
 // (frame -9°).
 import { hallBuild, chimney } from './lib/b08c-halls.js';
+import { rectRuns, finishGround } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'residence-hall-622978041',
@@ -17,11 +18,13 @@ export async function build(ctx) {
     { u0: -6.0, u1: 6.0, v0: -15.0, v1: 9.0, g: 0.1, eave: 11.0, ridge: 11.7, axis: 'v', roof: 'flat' },
     { u0: -6.0, u1: 6.0, v0: 9.0, v1: 15.5, g: 0.5, eave: 8.0, ridge: 8.4, axis: 'v', roof: 'flat', faces: { N: false } },
   ];
-  const { object3d, colliders } = hallBuild(ctx, -9, 'midcentury', blocks, (K) => {
+  let G = { colliders: [], walkables: [] };
+  const { object3d, colliders } = hallBuild(ctx, -9, 'midcentury', blocks, (K, st) => {
+    G = finishGround(K, ctx, rectRuns(K, blocks.map((b) => ({ ...b, floor: b.g + 0.5 }))), { door: 'glass', n: 1, entry: { w: 2.4, h: 2.8, surround: K.M.concrete, canopy: { d: 2.2, t: 0.2 } }, bikes: 4, plant: { h: 0.8, depth: 1.1 } });
     const g = K.gMin(6, -14, 8, 8);
     for (let y = g + 3.5; y < 10.5; y += 3.0) { K.box(M.concrete, 6.0, y - 0.2, -14.0, 7.6, y, 8.0); for (let v = -14; v <= 8; v += 0.2) K.box(M.iron, 7.5, y, v - 0.015, 7.56, y + 1.0, v + 0.015, { detail: true }); K.box(M.iron, 7.48, y + 1.0, -14.0, 7.6, y + 1.06, 8.0); }
     for (const v of [-13.8, -3.0, 7.8]) K.box(M.iron, 7.45, g, v - 0.06, 7.57, 10.4, v + 0.06);
   });
   object3d.name = 'residence-hall-622978041';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders: [...colliders, ...G.colliders], walkables: G.walkables };
 }

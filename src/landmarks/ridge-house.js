@@ -4,6 +4,7 @@
 // Massing from the 2021 LiDAR: main hip ridge ~14 m, a lower south range ~11.5 m and a flat-roofed two-storey south-east corner.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'ridge-house',
@@ -15,8 +16,8 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.5); const M = ctx.M;
-  const ST = coopMat('stucco', '#e4ddcf'), TR = coopMat('paint', '#2f3a36'), RF = coopMat('roof', '#4a4a48'), WH = M.whitePaint;
-  const win = { w: 1.2, h: 1.05, sill: 0.95, pair: 1, mull: 1, tran: 0, rev: 0.14, casing: 0.12, frame: WH, casingMat: TR };
+  const ST = coopMat('stucco', '#e4ddcf'), TR = coopMat('paint', '#2f3a36'), RF = coopMat('roof', '#5b5550'), WH = M.whitePaint;
+  const win = { glass: M.windowNight, w: 1.2, h: 1.05, sill: 0.95, pair: 1, mull: 1, tran: 0, rev: 0.14, casing: 0.12, frame: WH, casingMat: TR };
   const wins = [{ ...win, w: 0.8, h: 0.6, sill: 1.7, casing: 0.08 }, win, { ...win, pattern: [1, 2, 1] }, win];
   const roof = (sl) => ({ type: 'hip', slope: sl, overhang: 0.45, mat: RF, fascia: WH, soffitMat: WH, fasciaH: 0.22 });
   const main = K.block({ u0: -9.72, u1: 9.48, v0: -9.69, v1: 4.0, floors: [1.2, 4.3, 7.4, 10.5, 11.0], wall: ST, trim: TR, wins, bay: 3.4, roof: roof(0.36), belts: [4.3, 7.4], beltMat: ST,
@@ -36,5 +37,7 @@ export async function build(ctx) {
     for (const [y0, y1, s] of [[4.3, 7.4, sb - 0.8], [7.4, 10.4, sa + 0.8]]) { const L = Math.hypot(y1 - y0, 2.4); const g = new THREE.BoxGeometry(0.7, 0.08, L); g.rotateX(-Math.atan2(y1 - y0, 2.4)); g.rotateY(Math.PI / 2); g.translate(s - (s > 5 ? 1.2 : -1.2), (y0 + y1) / 2, 0.6); K.addRun(R, FE, g, { detail: true }); }
     for (const s of [sa, sb]) K.rbox(R, FE, s - 0.04, 1.0, 1.0, s + 0.04, 11.4, 1.08, { detail: true }); }
   K.chimney(0.0, 1.5, 0.8, 0.8, 15.0, ST);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { h: 0.8, depth: 1.1 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('ridge-house');
 }
