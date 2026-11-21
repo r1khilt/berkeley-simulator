@@ -6,7 +6,7 @@
 // with a canted oriel on stepped corbels above it; a canted, pyramid-roofed bay tower closes the north end.
 // Massing follows the 2021 LiDAR (frame -4°): eaves ~16.5 m, ridges ~21.5–22 m, west annex ~15 m.
 import * as THREE from 'three';
-import { Kit, deg, openWall, hipRoof, gableEnd } from './lib/b05b-kit.js';
+import { Kit, SubKit, deg, openWall, hipRoof } from './lib/b05b-kit.js';
 import { haasMats, archPart, archPortal, discLamp } from './lib/reastc-haas.js';
 
 export const info = {
@@ -74,12 +74,7 @@ export async function build(ctx) {
     } else colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], gm - 1.2, eave + 4));
   }
   // north range + courtyard front: the great arched porch sits in the 3 m notch of the footprint (u 6..9, v -3.2..7.8)
-  { // great arched through-passage (courtyard -> campus side), oriel over the courtyard mouth
-    const gE = Math.min(K.g(9.6, 0.0), K.g(9.6, 2.6), K.g(9.6, 5.2)) + 0.15, gW = Math.min(K.g(-9.2, 0.0), K.g(-9.2, 2.6), K.g(-9.2, 5.2)) + 0.15; const crown = gE + 7.7;
-    { const uTop = 9.0 - 0.45 - Math.min((17.5 - 0.9) * 0.35, 6.0), va = 2.6 - 3.3, vb = 2.6 + 3.3; // passage floor: level, then a flight down to the west
-      const xs = [], zs = []; for (const [u, v] of [[-8.6, va], [9.1, va], [9.1, vb], [-8.6, vb]]) { const [x, z] = K.xz(u, v); xs.push(x); zs.push(z); }
-      walkables.push({ type: 'fn', bounds: [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)], heightAt: (x, z) => { const [u, v] = K.uv(x, z); if (u < -8.6 || u > 9.1 || v < va || v > vb) return null; return u >= uTop ? gE + 0.02 : gW + (gE - gW) * (u + 8.6) / (uTop + 8.6) + 0.02; } }); }
-    block(-8.5, 9.0, -16.7, 7.8, EAVE, 0.5, { S: 0, E: 1, N: 1, W: 1 }, [], { arch: { E: { s: 5.2, w: 6.8, depth: 17.5 - 0.9, through: true, gFar: gW, g: gE, yTop: crown }, W: { s: 19.3, w: 6.8, depth: 0.01, through: true, gFar: gW, g: gW, yTop: crown, noOriel: true } }, doors: { E: [13.0] }, porch: { vA: 2.6 - 3.8, vB: 2.6 + 3.8, uP: -8.5 + 0.45, yP: crown + 0.6 } }); }
+  block(-8.5, 9.0, -16.7, 7.8, EAVE, 0.5, { S: 0, E: 1, N: 1, W: 1 }, [], { doors: { E: [3.2, 7.2, 13.0] } });
   block(-8.4, 12.0, 7.8, 21.9, EAVE, 0.55, { S: 1, E: 1, N: 1, W: 1 }, [], { doors: { E: [7.0] } });
   block(-12.6, -8.5, -16.7, -3.2, 15.5, 0.62, { S: 1, E: 0, N: 1, W: 1 });
   block(-11.1, -8.4, 14.9, 21.6, 15.5, 0.62, { S: 1, E: 0, N: 1, W: 1 });
@@ -94,6 +89,41 @@ export async function build(ctx) {
     const gm = Math.min(K.g(u1 + 1, vC - 2), K.g(u1 + 1, vC + 2)); void gm;
     K.hip(ROOF, u1 - 0.6, vC - hw - 0.5, u1 + pr + 0.5, vC + hw + 0.5, top, 0.55); K.loop(X.fascia, [[u1 - 0.6, vC + hw + 0.5], [u1 + pr + 0.5, vC + hw + 0.5], [u1 + pr + 0.5, vC - hw - 0.5], [u1 - 0.6, vC - hw - 0.5]], [[0.02, top - 0.2], [0.02, top + 0.02]]);
     colliders.push(K.colPoly(P.concat([[u1 - 0.5, vC - hw], [u1 - 0.5, vC + hw]]).slice(0, 6), -1, top)); }
+  // ---- Fisher Gate: a gate building spanning the ~14.6 m gap between Cheit's south-east chamfer and the Student Services
+  // Building's north-west chamfer (no OSM footprint; the 2021 LiDAR shows its roof at ~17-20 m). A great round arch with a
+  // stepped archivolt carries a passage from O'Donnell Courtyard out to the south-west, with a corbelled oriel over the
+  // courtyard mouth. Authored in its own frame (+u from Cheit toward Student Services, +v from the courtyard outward).
+  {
+    const G = new SubKit(K, deg(41));
+    const toG = (u, v) => { const [x, z] = K.xz(u, v); return G.uv(x, z); };
+    const A = toG(13.6, 15.7), B = toG(7.4, 21.9);                    // Cheit chamfer ends (courtyard end A, outer end B)
+    const gu0 = Math.min(A[0], B[0]) + 0.1, gv0 = Math.min(A[1], B[1]), gv1 = Math.max(A[1], B[1]); const gu1 = gu0 + 14.1;
+    const uc = (gu0 + gu1) / 2, W = 6.8; let gg = Infinity; for (const [u, v] of [[uc, gv0 - 1], [uc, gv1 + 1], [uc, (gv0 + gv1) / 2]]) gg = Math.min(gg, G.g(u, v)); const g = gg + 0.15;
+    const crown = g + 8.2, ge = g + 13.0;
+    const Rc = G.run([gu1, gv0], [gu0, gv0]);                         // courtyard face (normal toward the courtyard)
+    const Ro = G.run([gu0, gv1], [gu1, gv1]);                         // outer face
+    for (const [R, sA] of [[Rc, gu1 - uc], [Ro, uc - gu0]]) {
+      const L = R.L; const holes = [[g - 1.5, g + 4.0], [g + 4.0, ge - 0.3]].map(([y0, y1]) => archPart(sA, W, crown, y0, y1)).filter(Boolean);
+      const ops = []; for (const sc of [1.6, L - 1.6]) for (const y0 of [g + 5.2, g + 9.4]) ops.push({ s0: sc - 0.6, s1: sc + 0.6, y0, y1: y0 + 2.4, muntins: 3, mull: 1, frame: TEAL, sillMat: CREAM });
+      openWall(G, R, STU, 0, L, g - 1.5, g + 4.0, holes.filter((h) => h.y1 <= g + 4.01), { depth: 0.45 });
+      openWall(G, R, STU, 0, L, g + 4.0, ge - 0.3, [...ops, ...holes.filter((h) => h.y0 >= g + 3.99)], { depth: 0.45, rev: 0.3, frame: TEAL, sillMat: CREAM });
+      G.rbox(R, CREAM, -0.05, g - 1.5, 0, L + 0.05, g + 0.55, 0.06);
+      for (const [a0, a1] of [[-0.05, sA - W / 2 - 1.25], [sA + W / 2 + 1.25, L + 0.05]]) G.rbox(R, CREAM, a0, g + 4.0, 0, a1, g + 4.3, 0.1);
+      for (const [a0, a1] of (R === Rc ? [[-0.05, sA - 3.5], [sA + 3.5, L + 0.05]] : [[-0.05, L + 0.05]])) G.rbox(R, CREAM, a0, ge - 0.6, 0, a1, ge - 0.3, 0.14);
+      archPortal(G, R, sA, g, W, crown, { depth: R === Rc ? (gv1 - gv0) - 0.9 : 0.01, X, wallD: 0.45, through: true, gFar: g, oriel: R === Rc ? { w: 6.4, h: 3.6, proj: 1.8, gap: 0.12, maxTop: ge - 0.45 } : null });
+    }
+    // solid piers either side of the passage + the mass over it; slate hip roof with copper-brown fascia
+    const pa = uc - W / 2 - 0.3, pb = uc + W / 2 + 0.3;
+    G.box(M.concreteDark, gu0 + 0.45, g - 1.5, gv0 + 0.45, pa, ge, gv1 - 0.45); G.box(M.concreteDark, pb, g - 1.5, gv0 + 0.45, gu1 - 0.45, ge, gv1 - 0.45);
+    G.box(M.concreteDark, pa, crown + 0.6, gv0 + 0.45, pb, ge, gv1 - 0.45);
+    hipRoof(G, ROOF, gu0, gv0, gu1, gv1, ge + 0.05, 0.55, 0.8, { soffit: CREAM });
+    G.loop(X.fascia, [[gu0 - 0.8, gv1 + 0.8], [gu1 + 0.8, gv1 + 0.8], [gu1 + 0.8, gv0 - 0.8], [gu0 - 0.8, gv0 - 0.8]], [[0.02, ge + 0.05 - 0.44 - 0.2], [0.02, ge + 0.05 - 0.44 + 0.02]]);
+    // colliders (local x/z) for the two piers; walkable passage floor
+    const toL = (u, v) => G.xz(u, v).map((q) => +q.toFixed(3));
+    colliders.push({ type: 'poly', pts: [toL(gu0, gv0), toL(pa, gv0), toL(pa, gv1), toL(gu0, gv1)], y0: g - 1.5, y1: ge + 3 });
+    colliders.push({ type: 'poly', pts: [toL(pb, gv0), toL(gu1, gv0), toL(gu1, gv1), toL(pb, gv1)], y0: g - 1.5, y1: ge + 3 });
+    walkables.push({ type: 'poly', pts: [toL(pa, gv0 - 0.5), toL(pb, gv0 - 0.5), toL(pb, gv1 + 0.5), toL(pa, gv1 + 0.5)], y: g + 0.02 });
+  }
   // canted three-sided bay tower at the north end
   {
     const P = [[8.0, -16.7], [8.0, -24.2], [5.2, -27.4], [0.9, -27.4], [-2.0, -24.2], [-2.1, -20.1], [0.6, -17.3]];
