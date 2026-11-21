@@ -65,7 +65,7 @@ function wingSet(ctx, ang, blocks, extra, entries = 1) {
     wings.push({ b, runs: res.runs });
     // thin teal eave slab edge
     const ov = 1.15; K.box(B.teal, b.u0 - ov, b.eave - 0.16, b.v0 - ov, b.u1 + ov, b.eave - 0.02, b.v1 + ov, {});
-    K.box(M.concreteDark, b.u0 - 0.04, Math.min(b.g, K.gMin(b.u0, b.v0, b.u1, b.v1, 5)) - 1.5, b.v0 - 0.04, b.u1 + 0.04, b.g + 0.45, b.v1 + 0.04); // darker base course
+    K.box(M.concrete, b.u0 - 0.04, Math.min(b.g, K.gMin(b.u0, b.v0, b.u1, b.v1, 5)) - 1.5, b.v0 - 0.04, b.u1 + 0.04, b.g + 0.45, b.v1 + 0.04); // pale concrete base course (refine-north A) // darker base course
     colliders.push(K.colPoly([[b.u0, b.v0], [b.u1, b.v0], [b.u1, b.v1], [b.u0, b.v1]], -2, b.ridge + 0.5));
   }
   if (extra) extra(K, B, M, SM, colliders);
