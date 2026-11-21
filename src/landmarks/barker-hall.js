@@ -24,11 +24,12 @@ export async function build(ctx) {
   // lab storeys: pairs of tall windows per 3.2 m bay, deep fins on every bay line; the ground storey is recessed glass (below)
   const runs = massBlock(K, { poly: rect(u0, v0, u1, v1), levels, top: TOP, wall: C, style: 'punched', depth: 0.45, rev: 0.4, glass: GL, frame: FR,
     win: { w: 2.3, h: 2.55, sill: 0.8, bay: 3.2, mull: 1 }, winAt: (k) => (k === 0 ? { w: 2.7, h: 3.4, sill: 0.3, mull: 2 } : null),
-    pier: { w: 0.4, p: 0.6, mat: C, top: TOP + 0.75, ends: true }, roof: B.roofMembrane, parapet: 0.75, pmat: C, coping: C });
+    pier: { w: 0.4, p: 0.6, mat: C, top: TOP, ends: true }, roof: B.roofMembrane });
+  // low hipped standing-seam roof with very deep eaves and a thick fascia (LiDAR: ~30 m at the edges rising toward ~34-35 m)
+  { const ROOFM = new THREE.MeshStandardMaterial({ color: 0x5e6366, roughness: 0.5, metalness: 0.5 }); const SOF = new THREE.MeshStandardMaterial({ color: 0x3a3430, roughness: 0.8 }); const OV = 2.0;
+    K.hip(ROOFM, u0 - OV, v0 - OV, u1 + OV, v1 + OV, TOP + 0.3, 0.3, { yTop: 34.6 }); K.box(SOF, u0 - OV, TOP, v0 - OV, u1 + OV, TOP + 0.3, v1 + OV); K.box(C, u0 - OV - 0.05, TOP - 0.05, v0 - OV - 0.05, u1 + OV + 0.05, TOP + 0.35, v1 + OV + 0.05); }
   // penthouse + louvres + lab exhaust stacks
-  massBlock(K, { poly: rect(-7, -4.5, 5, 4.5), levels: [TOP, 35.0], top: 35.0, wall: C, style: 'blank', depth: 0.35, roof: B.roofMembrane, core: true, parapet: 0.3, pmat: C });
-  for (const [a, b, c, d, h] of [[-16, 7, -3, 12, 33.4], [6, -12, 15, -7, 33.0]]) { K.box(C, a, TOP, b, c, h, d); for (let y = TOP + 0.5; y < h - 0.3; y += 0.3) K.box(M.iron, a - 0.04, y, b - 0.04, c + 0.04, y + 0.06, d + 0.04, { detail: true }); }
-  for (const [u, v] of [[-12, -10], [-9, -10], [-6, -10], [-3, -10], [8, 3], [11, 3], [14, 3], [8, 8], [11, 8]]) K.cyl(B.alum, u, TOP, v, 0.32, 0.3, 3.2, 10);
+  for (const [u, v] of [[-6, -1.5], [-3, -1.5], [0, -1.5], [3, -1.5], [-4.5, 1.5], [1.5, 1.5]]) K.cyl(B.alum, u, 33.5, v, 0.32, 0.3, 3.0, 10); // lab exhaust stacks through the ridge
   // south entrance: storefront, board-formed wall, round concrete columns carrying a timber pergola, planter benches, lettering
   {
     const R = runs.find((r) => r.n[1] > 0.9) || runs[0]; const sc = R.L / 2; const g = Math.max(gAt(K, R, sc, 2), levels[0] + 0.2);
@@ -54,7 +55,7 @@ export async function build(ctx) {
     K.rbox(R, C, s - 2.3, g - 0.5, 0, s + 2.3, g + 3.6, 0.65); storefront(K, R, s - 1.6, s + 1.6, g + 0.03, g + 3.0, { glass: GL, frame: FR, rev: -0.66, transom: g + 2.4, mw: 1.6 });
     K.rbox(R, C, s - 2.8, g + 3.6, 0, s + 2.8, g + 3.85, 1.8);
   }
-  colliders.push(K.colPoly(rect(u0, v0, u1, v1), -2, TOP + 1));
+  colliders.push(K.colPoly(rect(u0, v0, u1, v1), -2, 35));
   const object3d = K.finish(); object3d.name = 'barker-hall';
   return { object3d, colliders: colliders.filter(Boolean), walkables };
 }
