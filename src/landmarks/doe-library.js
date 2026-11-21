@@ -205,7 +205,8 @@ export async function build(ctx) {
     }
   }
   { const pa = -17.06 - 1.55, pb = -17.06 + 1.55;   // north wing shell, open at the north portal
-    for (const pts of [[[NW.u0, NW.v1], [NW.u0, NW.v0], [pa, NW.v0]], [[pb, NW.v0], [NW.u1, NW.v0], [NW.u1, NW.v1]]]) colliders.push({ type: 'poly', pts: k.polyLocal(pts), y0: -3, y1: yRidge });
+    const seg = (a, b, y0, y1) => colliders.push({ type: 'poly', pts: k.polyLocal([a, b]), y0, y1 }); // (rings are closed by the loader: use 2-point segments)
+    seg([NW.u0, NW.v1], [NW.u0, NW.v0], -3, yRidge); seg([NW.u0, NW.v0], [pa, NW.v0], -3, yRidge); seg([pb, NW.v0], [NW.u1, NW.v0], -3, yRidge); seg([NW.u1, NW.v0], [NW.u1, NW.v1], -3, yRidge);
     colliders.push({ type: 'poly', pts: k.polyLocal([[pa, NW.v0], [pb, NW.v0]]), y0: 6.2, y1: yRidge }); }
 
   // ===================== SOUTH BLOCK (1914–17) =====================
@@ -257,7 +258,8 @@ export async function build(ctx) {
   // raised stair-hall roof between the reading room and the Loan Hall
   k.box(stone, -21.5, -12.0, yDeck - 0.5, 22.7, -21.6, -14.5);
   k.box(M.glass, -20.5, -13.0, 22.7, 22.95, -20.8, -15.2);
-  colliders.push({ type: 'poly', pts: k.polyLocal([[SH.u0 + 0.4, SB.v0], [SB.u0, SB.v0], [SB.u0, SB.v1], [SB.u1, SB.v1], [SB.u1, SB.v0], [SH.u1 - 0.4, SB.v0]]), y0: -3, y1: 27 });
+  { const P = [[SH.u0 + 0.4, SB.v0], [SB.u0, SB.v0], [SB.u0, SB.v1], [SB.u1, SB.v1], [SB.u1, SB.v0], [SH.u1 - 0.4, SB.v0]]; // open at the stair hall
+    for (let i = 0; i + 1 < P.length; i++) colliders.push({ type: 'poly', pts: k.polyLocal([P[i], P[i + 1]]), y0: -3, y1: 27 }); }
 
   // ===================== LINK (Doe–Bancroft) =====================
   for (const [u0, u1, v0, v1, h] of [[16.0, 21.2, -19.4, 24.0, 13.3], [16.0, 25.0, 24.0, 35.1, 7.5], [SB.u1 - 0.2, 16.0, -17.8, -12.4, 18.0], [SB.u1 - 0.2, 16.0, 1.85, 35.1, 18.0], [21.0, BA.u0 + 0.3, -14.5, 17.5, 18.7]]) {
@@ -324,7 +326,7 @@ export async function build(ctx) {
   const L = (u, y, v) => { const [x, z] = k.xz(u, v); return [x, y, z]; };
   const inf = ig.info, st = { hands: ig.hands, frames: 0 }, A = ctx.anchor;
   return {
-    object3d, colliders, walkables,
+    object3d, colliders, walkables, replacesColliders: true, // walkable interior: drop the procedural footprint walls
     interactions: [
       { id: 'doe-north-portal', pos: [ex0(k), 3.2, ez0(k)], radius: 4, label: 'Enter the North Reading Room', teleport: L(inf.cs, inf.F2 + 0.02, inf.nrr.vS - 1.6) },
       { id: 'doe-stair-up', pos: L(inf.cs, inf.F1 + 1, -23.2), radius: 2.2, label: 'Climb the stairs to the North Reading Room', teleport: L(inf.cs, inf.F2 + 0.02, inf.nrr.vS - 1.6) },
