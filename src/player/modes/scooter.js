@@ -185,7 +185,9 @@ export function install(player, ctx) {
       // ---- steering: speed-limited bar angle; yaw from the bicycle model; lean from lateral acceleration
       const va = Math.abs(r.speed); const dMax = Math.min(0.62, Math.atan(4.2 * S.wb / Math.max(0.01, va * va)));
       r.steer += clamp(steerIn * dMax - r.steer, -3.2 * dt, 3.2 * dt);
-      const yawRate = r.air ? 0 : r.speed * Math.tan(r.steer) / S.wb; r.yaw += yawRate * dt;
+      let yawRate = r.air ? 0 : r.speed * Math.tan(r.steer) / S.wb;
+      if (!r.air && va < 0.6 && Math.abs(steerIn) > 0.1) yawRate += steerIn * 1.1 * (1 - va / 0.6); // at a standstill the rider walks the scooter around
+      r.yaw += yawRate * dt;
       const leanT = clamp(Math.atan(r.speed * yawRate / 9.81), -0.42, 0.42);
       r.lean += (leanT - r.lean) * damp(7, dt);
       r.tilt += (0 - r.tilt) * damp(r.wasDown ? 4 : 9, dt); if (Math.abs(r.tilt) < 0.002) { r.tilt = 0; r.wasDown = false; }
