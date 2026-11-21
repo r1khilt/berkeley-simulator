@@ -128,7 +128,7 @@ export async function build(ctx) {
     F.window(p0, p1, pt + 3.0, 6.25, { mullions: 3, depth: 0.6, glassMat: M.windowNight, frameMat: M.bronze });   // transom light
     F.box(M.bronze, p0, p1, pt + 2.88, pt + 3.02, -0.68, -0.5);
     for (const [sa, sb] of [[p0 + 0.03, p0 + 0.11], [p1 - 0.11, p1 - 0.03]]) {   // bronze door leaves standing open inward
-      F.box(M.bronze, sa, sb, pt + 0.01, pt + 2.86, -2.05, -0.62);
+      F.box(M.darkBronze, sa, sb, pt + 0.01, pt + 2.86, -2.05, -0.62);
       for (const yy of [pt + 0.9, pt + 1.9]) F.box(M.darkBronze, sa - 0.015, sb + 0.015, yy, yy + 0.06, -1.95, -0.72, { detail: true });
     }
     F.geom(M.bronze, new THREE.SphereGeometry(0.32, 12, 10).scale(1, 1.25, 0.9).translate(cs, 7.75, 0.45), { detail: true });

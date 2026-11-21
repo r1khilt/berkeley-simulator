@@ -68,7 +68,7 @@ function mats() {
     fret: S('fret', { color: 0xffffff, roughness: 0.85 }, 1, TX.fretTex()),
     painting: S('painting', { color: 0xffffff, roughness: 0.7 }, 1, TX.paintingTex(1)),
     lobbyCeil: S('lobbyCeil', { color: 0xf2ece0, roughness: 0.92 }, 1.6, TX.cofferTex()),
-    lino: S('lino', { color: 0xa89482, roughness: 0.1 }, 3, TX.linoTex(), 1.6, [1.0, 0.82, 0.62]),
+    lino: S('lino', { color: 0xa08c7a, roughness: 0.1 }, 3, TX.linoTex(), 1.8, [1.0, 0.82, 0.62]),
     inlay: S('inlay', { color: 0x9a8a72, roughness: 0.25 }),
     darkOak: S('darkOak', { color: 0xb09078, roughness: 0.55 }, 1.2, TX.oakTex()),
     oakFloor: S('oakFloor', { color: 0xc8a47c, roughness: 0.38 }, 1.0, TX.oakTex()),
@@ -101,7 +101,7 @@ function mats() {
     pool2: B('pool2', { map: TX.poolTex(), color: new THREE.Color(0.2, 0.16, 0.11), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     pool: B('pool', { map: TX.poolTex(), color: new THREE.Color(0.3, 0.24, 0.16), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     ember: B('ember', { color: new THREE.Color(2.2, 0.9, 0.3) }),
-    blob: B('blob', { map: TX.poolTex(), color: new THREE.Color(0.38, 0.38, 0.38), transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.ZeroFactor, blendDst: THREE.OneMinusSrcColorFactor }),
+    blob: B('blob', { color: 0x000000, alphaMap: TX.poolTex(), transparent: true, opacity: 0.32, depthWrite: false }), // soft contact shadow
     streak: B('streak', { map: TX.streakTex(), color: new THREE.Color(0.22, 0.23, 0.23), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     sheen: B('sheen', { color: new THREE.Color(0.2, 0.21, 0.21), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
@@ -244,11 +244,11 @@ export function buildDoeInterior(P) {
   const tables = [];
   for (let i = -11; i <= 11; i++) { const u = cs + i * 3.05; if (u < U0 + 2.2 || u > U1 - 2.2) continue; tables.push([u, vc - 1.1 - 2.3]); if (i !== 0) tables.push([u, vc + 1.1 + 2.3]); }
   const TL = 4.6, TW = 1.2;
-  const underTable = (u, v) => { let a = 1; for (const [tu, tv] of tables) { const du = Math.max(0, Math.abs(u - tu) - TW / 2), dv = Math.max(0, Math.abs(v - tv) - TL / 2); const d = Math.hypot(du, dv); if (d < 1.0) a = Math.min(a, 0.45 + 0.55 * sstep(0, 1.0, d)); } return a; };
+  const underTable = (u, v) => { let a = 1; for (const [tu, tv] of tables) { const du = Math.max(0, Math.abs(u - tu) - TW / 2), dv = Math.max(0, Math.abs(v - tv) - TL / 2); const d = Math.hypot(du, dv); if (d < 1.0) a = Math.min(a, 0.82 + 0.18 * sstep(0, 1.0, d)); } return a; };
   const wells = [-37.0, cs, 2.9], EWd = P.endWin;
   const nrrBake = (u, y, v, nu, ny, nv) => {
     const dW = Math.min(v - vN, vS - v, u - U0, U1 - u);
-    if (ny > 0.6 && y < F2 + 0.05) return (1 - 0.45 * Math.exp(-Math.max(0, dW - BK) / 1.0)) * underTable(u, v) * (1.0 + 0.15 * sstep(4, 0, Math.abs(v - vc)));
+    if (ny > 0.6 && y < F2 + 0.05) return (1 - 0.35 * Math.exp(-Math.max(0, dW - BK) / 1.0)) * underTable(u, v) * (1.0 + 0.05 * sstep(4, 0, Math.abs(v - vc)));
     if (y > ySp + 0.05) { // vault: dim, brighter near the laylight wells and the crown
       let w = 0; for (const c of wells) w = Math.max(w, Math.exp(-Math.pow(Math.max(0, Math.abs(u - c) - 6.5) / 4, 2)));
       const crown = sstep(ySp, yCr, y); const ends = 1 - 0.35 * Math.exp(-Math.min(u - U0, U1 - u) / 2.5);
@@ -589,7 +589,7 @@ export function buildDoeInterior(P) {
   // ---------------- vestibule and lobby (floor 1) ----------------
   const yC1 = F2 - 0.45, LU0 = -21.6, LU1 = -12.5, vVes = -37.3, vNW = -41.5, VU0 = -19.6, VU1 = -14.5, pU0 = cs - 1.55, pU1 = cs + 1.55;
   const mDoor = [-34.0, -31.8];
-  const lobBake = (u, y, v, nu, ny, nv) => { if (y > yC1 - 0.05) return 0.85 - 0.15 * Math.exp(-Math.min(u - LU0, LU1 - u) / 1.2); let k = 0.92 - 0.3 * Math.exp(-(y - F1) / 0.6) - 0.12 * Math.exp(-(yC1 - y) / 0.5); if (ny > 0.6) k = 1 - 0.3 * Math.exp(-Math.min(u - LU0, LU1 - u) / 0.8); return k; };
+  const lobBake = (u, y, v, nu, ny, nv) => { const ves = v < vVes + 0.5 ? 0.62 : 1; if (y > yC1 - 0.05) return ves * (0.85 - 0.15 * Math.exp(-Math.min(u - LU0, LU1 - u) / 1.2)); let k = 0.92 - 0.3 * Math.exp(-(y - F1) / 0.6) - 0.12 * Math.exp(-(yC1 - y) / 0.5); if (ny > 0.6) k = 1 - 0.3 * Math.exp(-Math.min(u - LU0, LU1 - u) / 0.8); return k * ves; };
   B.zone = lobBake;
   B.floor(Mt.marble, VU0, VU1, vNW, vVes, F1, 1.0); B.floor(Mt.marble, LU0, LU1, vVes, vTop, F1, 1.0);
   B.box(Mt.marble, pU0, pU1, F1 - 0.4, F1, -42.32, vNW, { bake: 0.9 });
