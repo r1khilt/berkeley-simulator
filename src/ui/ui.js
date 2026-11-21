@@ -205,10 +205,14 @@ export class UI {
       p.querySelector('[data-x=close]').onclick = () => this.closePanel();
     });
   }
+  // [mv-ride] minimal hook: movement plugins add touch buttons (no-op on desktop until touch controls exist)
+  addTouchButton(label, fn) { (this._extraTouch = this._extraTouch || []).push([label, fn]); if (this.touchEl) this._touchBtn(label, fn); }
+  _touchBtn(label, fn) { const b = document.createElement('button'); b.textContent = label; b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(b); }); this.touchEl.querySelector('.tbtns').appendChild(b); }
   // ---------- touch controls
   touchControls(player, actions) {
     const t = $('div', 'touch', `<div class="joy"><b></b></div><div class="tbtns"><button data-a="jump">JUMP</button><button data-a="run">RUN</button><button data-a="bike">BIKE</button><button data-a="use">USE</button><button data-a="map">MAP</button></div>`);
     document.body.appendChild(t); this.touchEl = t;
+    for (const [l, fn] of this._extraTouch || []) this._touchBtn(l, fn); // [mv-ride] plugin buttons queued before touch UI existed
     const joy = t.querySelector('.joy'), knob = joy.querySelector('b');
     let jid = null; const R = 52;
     joy.addEventListener('pointerdown', (e) => { jid = e.pointerId; joy.setPointerCapture(jid); move(e); });
