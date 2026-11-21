@@ -25,7 +25,8 @@ export async function build(ctx) {
   const X = haasMats(M);
   // the faculty building's own finish (Commons photo): warm taupe board-formed concrete with cream precast trim,
   // grey-taupe siding on the top storey, teal frames, copper downspouts
-  const WALL = boardMat(0xfff0d2); WALL.name = 'bakar-boardform';
+  const WALL = boardMat(0xe6dbc7); WALL.name = 'bakar-boardform';
+  { const big = (t) => { const c = t.clone(); c.repeat.set(0.7, 0.7); c.needsUpdate = true; return c; }; WALL.map = big(WALL.map); WALL.normalMap = big(WALL.normalMap); WALL.normalScale.set(0.55, 0.55); } // ~0.22 m formwork boards
   const STONE = WALL, TAUPE = X.siding, CREAM = WALL;
   const ROOF = X.roof, GREEN = X.teal, CHAR = X.teal, HGL = M.windowNight;
   const BRK = X.cast, TANTRIM = X.fascia, CAST = X.cast, PIPE = X.fascia;
