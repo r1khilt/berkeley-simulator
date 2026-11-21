@@ -10,3 +10,11 @@ player.registerMode(name, plugin). Plugin fields, all optional except update:
 - onKey(e, player), onMouse(e, player, down)
 player.camera, player.camDistT, player.view ('third'|'first') are available for camera tweaks.
 Register in src/player/modes/index.js (one import + one install call per plugin).
+
+## HUD and Controls integration (optional plugin fields, read by src/ui/ui.js)
+- label: name shown in the HUD mode bar and the Controls sheet (default: the mode name, capitalised).
+- icon: an icon name from src/ui/icons.js (e.g. 'scooter', 'hoverboard', 'horse', 'hook', 'skate', 'car', 'drone') or a full inline `<svg ...>` string (24x24, stroke="currentColor").
+- hint: one short line for the Controls sheet, also shown as a notice if canEnter() refuses (e.g. 'Walk up to a parked Lime and press G').
+- hidden: true keeps a mode out of the HUD mode bar and the Controls sheet.
+- tool: true for always-on abilities that are not modes (e.g. a grappling hook): listed under Controls, not in the mode bar.
+Plugins with a key, label or icon appear in the mode bar automatically (clicking a segment calls player.setMode); no UI changes needed.
