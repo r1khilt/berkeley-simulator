@@ -16,7 +16,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -3.9); const M = ctx.M;
-  const SH = shingleMat(ctx.M, 0x4d3f33), WH = coopMat('paint', '#ece7da'), RF = coopMat('roof', '#4e4943'), DK = coopMat('paint', '#3a2b21');
+  const SH = shingleMat(ctx.M, 0x705c4a), WH = coopMat('paint', '#ece7da'), RF = coopMat('roof', '#4e4943'), DK = coopMat('paint', '#3a2b21');
   const win = { glass: ctx.M.windowNight, w: 0.85, h: 1.6, sill: 0.85, pattern: [2, 2, 1, 2], gap: 0.1, mull: 0, tran: 0.55, muntins: 1, rev: 0.14, casing: 0.12, frame: WH };
   const floors = [1.4, 4.9, 8.4, 9.9];
   const hip = (sl) => ({ type: 'hip', slope: sl, overhang: 0.9, mat: RF, fascia: DK, soffitMat: DK, tails: true, tailMat: DK });

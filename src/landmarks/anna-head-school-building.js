@@ -20,12 +20,17 @@ export async function build(ctx) {
   // refine-south-west: unpainted redwood shingle walls (dark brown), green shingle roofs, cream trim and no shutters, a tall
   // rough stone chimney, foundation planting (Commons photo "Anna Head School for Girls (Berkeley, CA)")
   const M = ctx.M; const roof = coopMat('roof', '#566e4c');
-  const walls = shingleMat(ctx.M, 0x4a3c30);
+  const walls = shingleMat(ctx.M, 0x6e5844);
   const style = { seed: 'anna-head-school-building', parapet: 0.05, roofMat: roof, sh: 3.6, win: { w: 0.85, h: 1.55, sill: 0.9, gap: 2.0, pair: true },
     palette: [walls], coping: 0xe8e2d0, frameHex: 0xe8e2d0, glassHex: 0x1e2226, winMat: 'shared', baseHex: 0x9a968c, sill: true,
     site: { entrance: false, plant: true },
     extra: (K) => {
       for (const [u0, u1, v0, v1, sl] of S.hips) K.hip(roof, u0 - 0.55, v0 - 0.55, u1 + 0.55, v1 + 0.55, S.lev[0] - 0.05, sl);
+      // pitched roof over the west wing + south-west block (LiDAR: ridge ~10.9 m along u≈-20.7; the raster had it flat)
+      K.hip(roof, -24.6, -0.5, -14.6, 23.0, S.lev[0] - 0.05, 0.85, { yTop: 10.9 });
+      K.hip(roof, -28.6, 15.0, -14.6, 23.0, S.lev[0] - 0.05, 0.85, { yTop: 10.9 });
+      // two steep street-facing cross gables on the Channing Way front with shingled gable ends (photo)
+      for (const [a, b] of [[-15.6, -9.4], [4.2, 10.4]]) K.gable(roof, a, -24.1, b, -15.5, S.lev[0] - 0.05, 4.3, 'v', { overhang: 0.45, wallMat: walls });
       // shingle "skirt" belt course with a slight flare at the upper floor line
       const stone = M.ashlar || paintTint(M, 0xa8a396); // rough stone chimney
       const cu = -2.5, cv = -23.47; const g0 = K.g(cu, cv);
