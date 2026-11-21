@@ -7,6 +7,7 @@
 // 16.4 / 12.3 / 8.2 / 4.2 m, penthouse 24.5 m, and the pergola at ~4.2 m over the west walk.
 import * as THREE from 'three';
 import { Kit, mats, punched, bays, roofDeck, rect, gAt, storefront, signText } from './lib/b03-kit.js';
+import { bikes, furniture, planting } from './lib/rn-kit.js';
 
 export const info = {
   id: 'soda-hall',
@@ -130,8 +131,9 @@ export async function build(ctx) {
     const Rb = K.run([u0, vb], [u1, vb]);
     const bOps = csNS.map((c) => ({ s0: c - 2.2, s1: c + 2.2, y0: y0 + 0.05, y1: y0 + 3.6 }));
     punched(K, Rb, B.darkTile, 0.8, Rb.L - 0.8, y0, BAND_ROOF - 0.3, bOps, { glass: B.glassGrey, frame: FR, mull: 3, depth: 0.3, terrain: false });
-    K.box(M.whitePaint, u0 + 0.6, ATOP + 0.05, vb, u1 - 0.6, ATOP + 0.15, v1 - scrD);
-    for (const c of csNS) { const r = 2.3; const g = new THREE.CylinderGeometry(r, r, AD - scrD, 16, 1, true, Math.PI / 2, Math.PI); g.rotateX(Math.PI / 2); g.translate(u0 + c, ATOP - r, vb + (AD - scrD) / 2); K.add(B.whiteDS, g); }
+    const VAULT = new THREE.MeshStandardMaterial({ color: 0xa3aaa6, roughness: 0.85, side: THREE.DoubleSide }); // shadowed loggia vaults (were glaring white)
+    K.box(VAULT, u0 + 0.6, ATOP + 0.05, vb, u1 - 0.6, ATOP + 0.15, v1 - scrD);
+    for (const c of csNS) { const r = 2.3; const g = new THREE.CylinderGeometry(r, r, AD - scrD, 16, 1, true, Math.PI / 2, Math.PI); g.rotateX(Math.PI / 2); g.translate(u0 + c, ATOP - r, vb + (AD - scrD) / 2); K.add(VAULT, g); }
   }
 
   // ---------- interior cores, terraces, roofs
@@ -156,7 +158,7 @@ export async function build(ctx) {
   // penthouse (LiDAR 24.5 m): dark metal-clad mechanical enclosure set well back from the edges
   {
     const pu0 = -12.3, pu1 = 13.3, pv0 = 9.0, pv1 = 18.5, top = 24.5;
-    K.box(B.greyMetal, pu0, LV[5], pv0, pu1, top - 0.15, pv1);
+    K.box(new THREE.MeshStandardMaterial({ color: 0x3e504d, roughness: 0.55, metalness: 0.3, map: B.greyMetal.map, normalMap: B.greyMetal.normalMap }), pu0, LV[5], pv0, pu1, top - 0.15, pv1); // tile-dark so it recedes from the street
     K.box(PALE, pu0 - 0.05, top - 0.15, pv0 - 0.05, pu1 + 0.05, top, pv1 + 0.05);
     for (let y = LV[5] + 0.6; y < top - 0.6; y += 0.32) { K.box(B.alumDark, pu0 - 0.06, y, pv0 + 1, pu0, y + 0.1, pv1 - 1, { detail: true }); K.box(B.alumDark, pu1, y, pv0 + 1, pu1 + 0.06, y + 0.1, pv1 - 1, { detail: true }); }
     for (const [cu, cv] of [[-6, 0], [-3, 0], [0.5, 0], [13.5, -1], [15.5, 3]]) K.cyl(B.alum, cu, LV[5], cv, 0.35, 0.35, 1.2, 10, { detail: true });
@@ -209,11 +211,15 @@ export async function build(ctx) {
     walkables.push(K.walkPoly(rect(u1, vc - half - 0.6, u1 + 2.6, vc + half + 0.6), fl + 0.05));
   }
 
+  // street life: bike racks + benches on the pergola walk by the main entrance, bikes on Le Roy, planting along Le Roy (refine-north)
+  colliders.push(...bikes(K, RW, sW(4.0), 3.2, 8, 5), ...bikes(K, RE, 14.0, 2.6, 5, 2));
+  colliders.push(furniture(K, RW, 'bench', sW(23.0), 2.2, 0), furniture(K, RW, 'trashCan', sW(21.2), 2.2));
+  planting(K, RE, 22.0, RE.L - 1.0, { d0: 0.3, depth: 1.2, h: 0.8, seed: 151 });
   // ---------- colliders follow the terraced massing
   for (let k = 1; k <= 4; k++) colliders.push(K.colPoly(rect(u0, vStart[k], u1, vStart[k + 1]), -2, LV[k] - 0.05));
   colliders.push(K.colPoly(rect(u0, vStart[5], u1, v1), -2, PAR_S));
 
   const object3d = K.finish();
   object3d.name = 'soda-hall';
-  return { object3d, colliders, walkables };
+  return { object3d, colliders: colliders.filter(Boolean), walkables };
 }

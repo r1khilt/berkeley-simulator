@@ -53,12 +53,21 @@ export const facing = (R) => Math.atan2(R.n[0], R.n[1]); // rotation that turns 
 const _proto = {};
 function proto(name) { return _proto[name] || (_proto[name] = PROPS[name]()); }
 // Street furniture from src/props/props.js at building-frame (u,v), rotated about y (0 = front toward +v). Returns its collider.
+// draw-call economy: fold the props' small dark/metal materials into shared ones (a parked bike otherwise adds ~5 draw calls)
+function remap(K, mat) {
+  const n = mat && mat.name || ''; const X = rnMats(K.M);
+  if (n === 'prop:rubber' || n === 'prop:charcoal') return K.M.blackPaint;
+  if (n === 'prop:stainless') return X.steel;
+  if (n === 'prop:galvanized' || n === 'prop:aluminium') return X.alum;
+  return mat;
+}
 export function propAt(K, name, u, v, rot = 0, { y = null, detail = true } = {}) {
   const Pr = proto(name); const gy = y ?? K.g(u, v);
   for (const part of Pr.parts) {
     if (part.depthMaterial) continue;
+    if (name === 'parkedBike' && part.material === K.M.lampGlow) continue; // tiny headlight
     const g = part.geometry.clone(); g.rotateY(rot); g.translate(u, gy, v);
-    K.add(part.material, g, { uvMode: 'keep', detail });
+    K.add(remap(K, part.material), g, { uvMode: 'keep', detail });
   }
   const c = Pr.collider; if (!c) return null;
   if (c.type === 'cyl') return K.colCyl(u, v, c.r, gy - 0.2, gy + c.h);
@@ -182,7 +191,7 @@ export function entry(K, R, s, o = {}) {
 // o: { d (0.85 clump offset), depth (bed depth 1.4), h (0.9), w (clump width 1.1), gap, skip: [[a,b],...], hedge, seed, mats, curb }
 export function planting(K, R, s0, s1, o = {}) {
   const X = rnMats(K.M); const d = o.d ?? 0.85, bd = o.depth ?? 1.4, h = o.h ?? 0.9; const seed = o.seed ?? 1; const d0 = o.d0 ?? 0; // d0: bed inner edge (from the wall)
-  const mats = o.mats || [X.leafA, X.leafB, X.leafC];
+  const mats = o.mats || [X.leafA, X.leafC];
   const segs = []; let a = s0; const skip = (o.skip || []).slice().sort((x, y) => x[0] - y[0]);
   for (const [k0, k1] of skip) { if (k1 <= a) continue; if (k0 > a) segs.push([a, Math.min(k0, s1)]); a = Math.max(a, k1); if (a >= s1) break; }
   if (a < s1) segs.push([a, s1]);
@@ -193,7 +202,7 @@ export function planting(K, R, s0, s1, o = {}) {
       const b0 = a0 + L * k / n, b1 = a0 + L * (k + 1) / n; const dm = d0 + bd / 2; const gy = Math.min(gRun(K, R, b0, dm), gRun(K, R, b1, dm), gRun(K, R, (b0 + b1) / 2, dm));
       const gx = Math.max(gRun(K, R, b0, dm), gRun(K, R, b1, dm));
       K.rbox(R, X.mulch, b0, gy - 0.4, d0, b1, gx + 0.06, d0 + bd, { detail: true });
-      if (o.curb !== false) K.rbox(R, X.curb, b0, gy - 0.4, d0 + bd, b1, gx + 0.14, d0 + bd + 0.12, { detail: true });
+      if (o.curb !== false) K.rbox(R, K.M.concrete, b0, gy - 0.4, d0 + bd, b1, gx + 0.14, d0 + bd + 0.12, { detail: true });
     }
     if (o.hedge) {
       const m = mats[0]; const nh = Math.max(1, Math.round(L / 1.8));
@@ -219,7 +228,7 @@ export function planter(K, R, s, d0, w = 1.6, dep = 1.6, h = 0.55, o = {}) {
     const th = o.tree.h ?? 4.5; K.cyl(X.bark, p[0], gy + h, p[1], 0.09, 0.06, th * 0.55, 7, { detail: true });
     blob(K, X.leafA, p[0], gy + h + th * 0.68, p[1], th * 0.32, th * 0.3, th * 0.32, Math.round(s * 7));
   } else {
-    for (let k = 0; k < 3; k++) { const q = R.at(s - w * 0.25 + w * 0.25 * k, d0 + dep / 2 + (k % 2 ? 0.2 : -0.15)); blob(K, [X.leafA, X.leafC, X.leafB][k], q[0], gy + h + 0.28, q[1], w * 0.24, 0.42, dep * 0.3, k + Math.round(s * 3)); }
+    for (let k = 0; k < 3; k++) { const q = R.at(s - w * 0.25 + w * 0.25 * k, d0 + dep / 2 + (k % 2 ? 0.2 : -0.15)); blob(K, [X.leafA, X.leafC, X.leafA][k], q[0], gy + h + 0.28, q[1], w * 0.24, 0.42, dep * 0.3, k + Math.round(s * 3)); }
   }
   return K.colPoly([R.at(s - w / 2, d0), R.at(s + w / 2, d0), R.at(s + w / 2, d0 + dep), R.at(s - w / 2, d0 + dep)], gy - 0.4, gy + h);
 }
