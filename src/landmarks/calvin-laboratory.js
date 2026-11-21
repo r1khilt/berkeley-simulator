@@ -23,8 +23,8 @@ export const info = {
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
   // rendered cream drum, slightly whiter canopy/piers, warm terracotta tile
-  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xfffaed); C.name = 'calvin-render';
-  const CW = M.stuccoWhite.clone(); CW.color = new THREE.Color(0xfffdf6); CW.name = 'calvin-trim';
+  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xfff4e2); C.name = 'calvin-render';
+  const CW = M.stuccoWhite.clone(); CW.color = new THREE.Color(0xfffaf0); CW.name = 'calvin-trim';
   const ROOFM = M.concrete.clone(); ROOFM.color = new THREE.Color(0xc9c6bf); ROOFM.name = 'calvin-roof'; // low grey roof membrane behind the tile skirt
   const TILE = M.redTile.clone(); TILE.color = new THREE.Color(0xc0705a); TILE.name = 'calvin-tile';
   const SASH = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.5, metalness: 0.2 }); SASH.name = 'calvin-sash';
