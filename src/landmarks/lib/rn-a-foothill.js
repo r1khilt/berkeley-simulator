@@ -21,22 +21,22 @@ const _fm = new WeakMap();
 export function faMats(M) {
   if (_fm.has(M)) return _fm.get(M);
   // weathered stained cedar shingles: 13 courses per 2 m (0.154 m exposure), 9 shingles per course per tile, random widths
-  const S1 = C3(0x5f4b3d), S2 = C3(0x6d5848), S3 = C3(0x524032), S4 = C3(0x7a6655);
+  const S1 = C3(0x544a42), S2 = C3(0x5e544a), S3 = C3(0x48403a), S4 = C3(0x655b51); // greyed weathered cedar (a redder albedo goes maroon in shade after tone mapping)
   const NC = 10, NW = 7;
-  const shingle = bakeMat('fa:shingle7', (u, v) => {
+  const shingle = bakeMat('fa:shingle9', (u, v) => {
     const cv = v * NC; const row = Math.floor(cv); const fv = cv - row; const r = wrap(row, NC);
     const x = u * NW + Math.floor(hash2(r, 3, 1) * NW) + 0.5 * (r % 2); let k = Math.floor(x);
     const jit = (kk) => (hash2(wrap(kk, NW), r, 2) - 0.5) * 0.7;
     if (x < k + jit(k)) k -= 1;
     const left = k + jit(k), right = k + 1 + jit(k + 1); const dm = Math.min(x - left, right - x) / NW * 2; // metres to nearest keyway
     const km = wrap(k, NW); const h = hash2(km, r, 7);
-    const base = h < 0.9 ? mix(S1, h < 0.45 ? S2 : S3, Math.abs(h - 0.45) * 1.8) : S4;
+    const wz = fbm(u * 3, v * 3, 3, 3, 21); const base = mix(mix(S3, S1, wz * 1.4), S2, (hash2(r, 9, 4) - 0.5) * 0.5 + 0.15 * (h - 0.5));
     const grain = 0.93 + 0.14 * vnoise(u * 256, r * 11 + fv * 1.5, 256, 4);
-    const streak = 0.92 + 0.14 * vnoise(u * 12, 3.5, 12, 12) * (0.6 + 0.4 * fbm(u * 2, v * 2, 2, 2, 5)); // faint weathering streaks
+    const streak = 0.96 + 0.06 * vnoise(u * 12, 3.5, 12, 12); // faint weathering streaks
     let kk = grain * streak * (0.97 + 0.06 * (1 - fv));
     let ht = 0.3 + 0.7 * (1 - fv);
-    if (fv > 0.84) kk *= 0.6 + (1 - fv) * 2.5; // shadow line under the next course butt // soft shadow under the next course butt
-    if (dm < 0.005) { kk *= 0.82; ht = 0.15; } // faint keyway
+    if (fv > 0.8) kk *= 0.5 + (1 - fv) * 2.5; // strong horizontal shadow line under the next course butt // soft shadow under the next course butt
+    if (dm < 0.005) { kk *= 0.96; ht = 0.25; } // keyways only in the relief, so no brick-like vertical joints // faint keyway
     return [base[0] * kk, base[1] * kk, base[2] * kk, ht, 0.93];
   }, { size: 512, span: 2, normal: 3, rough: 0.93 });
   // pale grey-green vertical board-and-batten (0.25 m)

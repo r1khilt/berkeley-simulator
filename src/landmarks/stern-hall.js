@@ -61,11 +61,11 @@ function wingSet(ctx, ang, blocks, extra, entries = 1) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(ang)); const colliders = [], walkables = [], wings = [];
   for (const b0 of blocks) {
     const hs = Math.min(b0.u1 - b0.u0, b0.v1 - b0.v0) / 2 + 1.15; const b = { ...b0, eave: Math.max(b0.eave, b0.ridge - Math.max(0.45, hs * 0.13)) }; // 5-8 degree roofs
-    const res = stuccoBlock(K, { ...b, mat: b.red ? B.sternRed : SM.wall, roofMat: SM.roof, corniceMat: B.teal, corniceP: 0.12, corniceH: 0.2, frame: B.paleBlue, overhang: 1.15, fh: 3.1, base: b.g + 0.4, y0: b.g - 1.5, depth: 0.32, win: { w: 1.5, h: 1.55, mull: 1, tran: 0.62 }, groundWin: { w: 1.9, h: 2.2, mull: 2, tran: 0.8 }, bay: 3.2 });
+    const res = stuccoBlock(K, { ...b, mat: b.red ? B.sternRed : SM.wall, roofMat: SM.roof, corniceMat: B.teal, corniceP: 0.12, corniceH: 0.2, frame: B.paleBlue, overhang: 1.15, fh: 3.1, base: b.g + 0.4, y0: Math.min(b.g, K.gMin(b.u0, b.v0, b.u1, b.v1, 5)) - 1.5, depth: 0.32, win: { w: 1.5, h: 1.55, mull: 1, tran: 0.62 }, groundWin: { w: 1.9, h: 2.2, mull: 2, tran: 0.8 }, bay: 3.2 });
     wings.push({ b, runs: res.runs });
     // thin teal eave slab edge
     const ov = 1.15; K.box(B.teal, b.u0 - ov, b.eave - 0.16, b.v0 - ov, b.u1 + ov, b.eave - 0.02, b.v1 + ov, {});
-    K.box(B.sternRed.clone ? M.concreteDark : M.concreteDark, b.u0 - 0.04, b.g - 1.5, b.v0 - 0.04, b.u1 + 0.04, b.g + 0.45, b.v1 + 0.04); // darker base course
+    K.box(M.concreteDark, b.u0 - 0.04, Math.min(b.g, K.gMin(b.u0, b.v0, b.u1, b.v1, 5)) - 1.5, b.v0 - 0.04, b.u1 + 0.04, b.g + 0.45, b.v1 + 0.04); // darker base course
     colliders.push(K.colPoly([[b.u0, b.v0], [b.u1, b.v0], [b.u1, b.v1], [b.u0, b.v1]], -2, b.ridge + 0.5));
   }
   if (extra) extra(K, B, M, SM, colliders);
@@ -88,10 +88,10 @@ export async function build(ctx) {
     // brick paving, with London plane trees in the court
     {
       const ua = 11.0, ub = 43.0, d = 3.4; const gL = K.gMin(ua, 0, ub, d, 6); const y = gL + 3.35;
-      K.box(SM.soffit, ua - 0.3, y, 0, ub + 0.3, y + 0.2, d + 0.25);
-      K.box(SM.soffit, ua - 0.3, y - 0.1, d + 0.1, ub + 0.3, y + 0.24, d + 0.28, { detail: true });
+      K.box(B.teal, ua - 0.3, y, 0, ub + 0.3, y + 0.22, d + 0.25);
+      K.box(SM.soffit, ua - 0.3, y - 0.06, d + 0.1, ub + 0.3, y + 0.26, d + 0.3);
       K.box(M.brick, ua - 0.4, gL - 0.4, 0.05, ub + 0.4, gL + 0.05, d + 0.6);
-      const nc = 8;
+      const nc = 9;
       for (let i = 0; i < nc; i++) { const u = ua + 0.4 + (ub - ua - 0.8) * i / (nc - 1); K.cyl(SM.red, u, gL, d - 0.2, 0.12, 0.12, y - gL, 10); const [x, z] = K.xz(u, d - 0.2); cols.push({ type: 'cyl', x, z, r: 0.15, y0: gL - 0.5, y1: y }); }
       const X = rnMats(M);
       for (const [u, v] of [[14, 20], [40, 22], [27, 26]]) { const g = K.g(u, v); K.cyl(M.woodDark, u, g, v, 0.22, 0.17, 4.2, 8, { detail: true }); blob(K, X.leafA, u, g + 6.2, v, 3.2, 2.4, 3.2, u * 3 + v); blob(K, X.leafB, u + 1.2, g + 7.4, v - 0.8, 2.2, 1.8, 2.2, u + v * 5); const [x, z] = K.xz(u, v); cols.push({ type: 'cyl', x, z, r: 0.3, y0: g - 0.5, y1: g + 4 }); }
