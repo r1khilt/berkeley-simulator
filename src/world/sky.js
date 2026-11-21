@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { U } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
+import { Atmosphere, makeSkyDome, makeEnvDome, SUN_TOA } from '../render/atmosphere.js';   // gfx-post: physical sky
 
 export const LAT = 37.8721, LON = -122.2578;
 const RAD = Math.PI / 180;
@@ -91,6 +92,8 @@ export class SkySystem {
           float thick = smoothstep(0.4, 1.0, c);
           vec3 col = mix(uSunCol*0.9 + uAmb*0.6, uAmb*0.75, thick*0.6) + uSunCol*sunF*0.6*(1.0-thick);
           gl_FragColor = vec4(col, c*0.92);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }`,
     });
     this.clouds = new THREE.Mesh(cg, cm); this.clouds.position.y = 2400; this.clouds.frustumCulled = false; this.clouds.renderOrder = -7; scene.add(this.clouds);
@@ -122,11 +125,99 @@ export class SkySystem {
           gl_FragColor = vec4(c, 1.0); }`,
     }));
     this.envScene.add(dome);
-    this.envRT = null; this.lastEnvAlt = -999; this.lastEnvAz = -999;
+    // gfx-post: physically based atmosphere replaces the Preetham sky + hand-tuned env dome (?atmo=0 restores the old look)
+    this.atmoOn = new URLSearchParams(location.search).get('atmo') !== '0';
+    if (this.atmoOn) {
+      this.atmo = new Atmosphere(renderer);
+      this.dome = makeSkyDome(this.atmo); scene.add(this.dome); this.sky.visible = false;
+      this.envScene.remove(dome); this.envDome = makeEnvDome(this.atmo); this.envScene.add(this.envDome);
+    }
+    this.postAP = false;   // set by the post pipeline: aerial perspective is done in post, so material fog is switched off
+    this.envRT = null; this.lastEnvAlt = -999; this.lastEnvAz = -999; this.envAge = 0;
     this.night = 0;
   }
   setCloudCover(c) { this.cloudCover = c; this.cloudUniforms.uCover.value = c; }
+  // gfx-post: physically based path (Hillaire atmosphere). Falls back to updateLegacy() with ?atmo=0.
   update(date, dt) {
+    if (!this.atmoOn) return this.updateLegacy(date, dt);
+    const sp = sunPosition(date); const mp = moonPosition(date);
+    dirFromAzAlt(sp.azimuth, sp.altitude, this.sunDir);
+    const alt = sp.altitude / RAD;
+    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    const night = 1 - smooth(-9, 2, alt); this.night = night; U.uNight.value = Math.max(0, Math.min(1, 1 - smooth(-4, 6, alt)));
+    const warm = 1 - smooth(2, 28, alt), dayI = smooth(-2, 12, alt);
+    const cover = this.cloudCover ?? 0.3, wf = this.fogMul(), ovc = smooth(0.45, 0.95, cover);
+    // aerosol load: clear Bay Area air ~ AOD 0.06-0.1 (haze ~ 6-10x Hillaire's clean default); overcast and fog thicken it
+    const haze = (this.hazeBase ?? 5.0) * (1 + 0.8 * ovc) * (wf > 1 ? 1 + (wf - 1) * 1.6 : 1);
+    this.atmo.setHaze(haze);
+    const skyChanged = this.atmo.update(this.sunDir, Math.max(0, this.camera.position.y));
+    const T = this.atmo.sunTrans, lumT = 0.2126 * T.r + 0.7152 * T.g + 0.0722 * T.b;
+    const cloudDim = 1 - 0.82 * smooth(0.55, 0.97, cover);
+    const moonDir = dirFromAzAlt(mp.azimuth, mp.altitude, new THREE.Vector3());
+    const moonUp = mp.altitude > 0.02;
+    if (alt > -3) {
+      this.lightDir.copy(this.sunDir); if (this.lightDir.y < 0.05) this.lightDir.y = 0.05; this.lightDir.normalize();
+      if (lumT > 1e-5) { this.sunColor.setRGB(T.r / lumT, T.g / lumT, T.b / lumT); const mx = Math.max(this.sunColor.r, this.sunColor.g, this.sunColor.b); if (mx > 2.2) this.sunColor.multiplyScalar(2.2 / mx); }
+      this.sunIntensity = SUN_TOA * lumT * cloudDim * (this.sunMul ?? 1);
+    } else { this.lightDir.copy(moonUp ? moonDir : new THREE.Vector3(0.3, 0.8, 0.2).normalize()); this.sunColor.setRGB(0.55, 0.65, 0.95); this.sunIntensity = 0.14 * (moonUp ? (0.3 + 0.7 * mp.phase) : 0.4); }
+    U.uSunDir.value.copy(this.lightDir);
+    // sky light (GPU reduction of the sky-view LUT, relative to SUN_TOA)
+    const K = SUN_TOA, irr = this.atmo.skyIrr, irrL = 0.2126 * irr.r + 0.7152 * irr.g + 0.0722 * irr.b;
+    const sunH = SUN_TOA * lumT * Math.max(0, this.sunDir.y);
+    const skyMul = 1 - 0.65 * ovc;                                 // thick cloud hides the blue sky...
+    const greyL = ovc * 0.30 * (sunH + irrL * K) / Math.PI;         // ...and re-emits a grey diffuse field
+    const zN = new THREE.Color(0.030, 0.034, 0.050), hN = new THREE.Color(0.070, 0.058, 0.052), gN = new THREE.Color(0.026, 0.023, 0.022);
+    const nk = night * 0.68;
+    const zen = this.atmo.zenith.clone().multiplyScalar(K * skyMul).addScalar(greyL).add(zN.clone().multiplyScalar(nk));
+    const hor = this.atmo.horizon.clone().multiplyScalar(K * skyMul).addScalar(greyL).add(hN.clone().multiplyScalar(nk));
+    const low = this.atmo.lowSky.clone().multiplyScalar(K * skyMul).addScalar(greyL).add(hN.clone().multiplyScalar(nk));
+    U.uSkyZen.value.copy(zen); U.uSkyHor.value.copy(hor); this.skyHor = hor; this.skyZen = zen;
+    // ground seen by the environment: albedo x (sun + sky) / pi
+    const Eg = sunH * cloudDim + irrL * K * skyMul + greyL * Math.PI;
+    const ga = this.groundAlbedo || (this.groundAlbedo = new THREE.Color(0.15, 0.14, 0.115));
+    this.envDome.material.uniforms.uGround.value.copy(ga).multiplyScalar(Eg / Math.PI);
+    this.envDome.material.uniforms.uExtra.value.setRGB(greyL, greyL, greyL * 1.04);
+    this.envDome.material.uniforms.uNightZen.value.copy(zN); this.envDome.material.uniforms.uNightHor.value.copy(hN); this.envDome.material.uniforms.uNightGnd.value.copy(gN);
+    this.envDome.material.uniforms.uNightK.value = nk;
+    this.envDome.material.uniforms.uSkyMul.value = skyMul;
+    this.envSkyMul = skyMul;
+    // fog for the direct (low/medium) path: applied before tone mapping in linear scene units (see grading.js)
+    const fogC = hor.clone(); fogC.lerp(new THREE.Color(0.030, 0.030, 0.040), night * 0.6);
+    this.fog.color.copy(fogC);
+    const hKm = Math.max(0, this.camera.position.y) / 1000;
+    this.fog.density = this.postAP ? 0 : 4.4e-6 * haze * Math.exp(-hKm / 1.2) * 0.85;
+    this.fogDensityPhys = 4.4e-6 * haze;
+    // stars, moon, skyglow
+    this.starMat.opacity = 0.28 * smooth(0.35, 0.9, night) * (1 - this.cloudCover * 0.8);
+    this.moon.position.copy(moonDir).multiplyScalar(100000).add(this.camera.position);
+    this.moon.material.opacity = night; this.moon.visible = moonUp && night > 0.05;
+    this.stars.position.copy(this.camera.position); this.glow.position.copy(this.camera.position); this.dome.position.copy(this.camera.position);
+    this.glowU.uNight.value = smooth(-14, -4, -alt); this.glowU.uTwi.value = 0.35 * smooth(-14, -6, alt) * (1 - smooth(-1, 6, alt)); this.glowU.uSun.value.copy(this.sunDir);
+    this.sky.position.copy(this.camera.position);
+    this.clouds.position.x = this.camera.position.x; this.clouds.position.z = this.camera.position.z;
+    this.cloudUniforms.uSun.value.copy(this.sunDir);
+    this.cloudUniforms.uSunCol.value.copy(this.sunColor).multiplyScalar(this.sunIntensity * 0.2 + 0.02);
+    this.cloudUniforms.uAmb.value.copy(low).multiplyScalar(1.1);
+    // exposure: photographic auto-exposure on the horizontal illuminance (partial compensation keeps dusk moody),
+    // blending into the hand-tuned night exposure the lamp/window materials were balanced for
+    const physExp = Math.min(5, Math.max(0.35, (this.expK ?? 1.05) * Math.pow(4.4 / Math.max(Eg, 1e-3), 0.78)));
+    const nightExp = 0.82 + 1.7;
+    this.physExposure = physExp;
+    this.renderer.toneMappingExposure = (physExp + (nightExp - physExp) * smooth(0.2, 0.85, night)) * (this.exposureMul || 1);
+    // environment (PMREM) refresh when the sky changed noticeably
+    const envKey = `${Math.round(alt * 2)}|${Math.round(sp.azimuth * 60)}|${Math.round(cover * 20)}|${Math.round(haze * 4)}|${Math.round(night * 20)}`;
+    this.envAge += dt || 0;
+    if (envKey !== this.envKey && (this.envAge > 0.5 || !this.envRT)) {
+      this.envKey = envKey; this.envAge = 0;
+      if (this.envRT) this.envRT.dispose();
+      this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 1000);
+      this.scene.environment = this.envRT.texture;
+    }
+    this.scene.environmentIntensity = this.envIntensity ?? 0.8;   // ~20% average large-scale sky occlusion (buildings, trees) that screen-space AO cannot see
+    this.hemi.intensity = 0.0;
+    return { alt, night, warm, dayI };
+  }
+  updateLegacy(date, dt) {
     const sp = sunPosition(date); const mp = moonPosition(date);
     dirFromAzAlt(sp.azimuth, sp.altitude, this.sunDir);
     const alt = sp.altitude / RAD;
