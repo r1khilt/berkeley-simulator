@@ -21,7 +21,7 @@ export async function build(ctx) {
   // glass = the shared M.glass (curtain wall) and M.windowNight (punched windows, storefront)
   const ST = M.stuccoWhite.clone(); ST.color = new THREE.Color(0xe6d6bb); ST.name = 'chou-stone';
   const BASE = M.stuccoWhite.clone(); BASE.color = new THREE.Color(0xc4b7a3); BASE.name = 'chou-base';
-  const LOU = new THREE.MeshStandardMaterial({ color: 0xe8eaea, roughness: 0.4, metalness: 0.5 }); LOU.name = 'chou-louvre';
+  const LOU = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.4, metalness: 0.3 }); LOU.name = 'chou-louvre';
   const GL = M.glass;
   const AL = X.alu, DK = X.frameDark;
   const colliders = [], walkables = [];
@@ -69,16 +69,17 @@ export async function build(ctx) {
         const ops = []; for (let f = 0; f < 4; f++) ops.push({ s0: (a0 + a1) / 2 - 0.45, s1: (a0 + a1) / 2 + 0.45, y0: yB + f * FHf + 0.8, y1: yB + f * FHf + 3.2, mull: 0, frame: DK, sill: false });
         openWall(K, R, ST, a0, a1, yB, T5 + 1.1, ops, { depth: 0.5, rev: 0.25, frame: DK, sill: false });
       }
-      // central curtain wall recessed 0.6 m: blue-grey glass, slab-edge covers, white fins, louvre bands over the upper 60%
-      const c0 = PE, c1 = L - PE; const nf = Math.max(3, Math.round((c1 - c0) / 3.6));
-      K.rbox(R, GL, c0, yB - 0.3, -0.65, c1, T5 + 0.9, -0.6);
-      K.rbox(R, ST, c0, T5 + 0.3, -0.6, c1, T5 + 1.1, 0.1);                         // head band under the terrace
+      // central curtain wall recessed 0.65 m, three tall bays split by two deep stone fins; per floor a clear vision strip
+      // below a band of dense bright-white sunshade blades standing in front of the glass; thin dark mullions
+      const c0 = PE, c1 = L - PE; const nbays = 3; const bwc = (c1 - c0) / nbays;
+      K.rbox(R, GL, c0, yB - 0.3, -0.7, c1, T5 + 0.9, -0.65);
+      K.rbox(R, ST, c0, T5 + 0.3, -0.65, c1, T5 + 1.1, 0.1);                        // head band under the terrace
       for (let f = 0; f < 4; f++) { const fy = yB + f * FHf;
-        K.rbox(R, LOU, c0, fy - 0.2, -0.6, c1, fy + 0.25, 0.0);                       // slab-edge cover
-        for (let y = fy + 1.55; y < fy + FHf - 0.25; y += 0.26) K.rbox(R, LOU, c0, y - 0.02, -0.55, c1, y + 0.02, -0.25, { detail: y > fy + 2.6 });
-        const nmu = Math.round((c1 - c0) / 1.2); for (let k = 1; k < nmu; k++) { const ss = c0 + (c1 - c0) * k / nmu; K.rbox(R, AL, ss - 0.03, fy + 0.25, -0.6, ss + 0.03, fy + FHf - 0.2, -0.52, { detail: true }); }
+        K.rbox(R, ST, c0, fy - 0.15, -0.65, c1, fy + 0.15, 0.0);                      // slab-edge band
+        for (let y = fy + FHf * 0.42; y < fy + FHf - 0.2; y += 0.2) K.rbox(R, LOU, c0, y - 0.02, -0.42, c1, y + 0.02, -0.25, { detail: y > fy + FHf * 0.6 });
+        const nmu = Math.round((c1 - c0) / 1.5); for (let k = 1; k < nmu; k++) { const ss = c0 + (c1 - c0) * k / nmu; K.rbox(R, DK, ss - 0.03, fy + 0.15, -0.65, ss + 0.03, fy + FHf - 0.15, -0.58, { detail: true }); }
       }
-      for (let k = 0; k <= nf; k++) { const ss = c0 + (c1 - c0) * k / nf; const w = k === nf / 2 ? 0.45 : 0.3; K.rbox(R, LOU, ss - w / 2, yB - 0.3, -0.6, ss + w / 2, T5 + 0.3, 0.15); }
+      for (let k = 1; k < nbays; k++) { const ss = c0 + bwc * k; K.rbox(R, ST, ss - 0.4, yB - 0.3, -0.65, ss + 0.4, T5 + 1.1, 0.6); }
     } else if (style === 'west') {
       const ns = Math.max(1, Math.round(L / 4.0)); const ops = [];
       for (let k = 0; k < ns; k++) { const c = L * (k + 0.5) / ns + (k % 2 ? -0.7 : 0.7); ops.push({ s0: c - 0.45, s1: c + 0.45, y0: yB + 0.8, y1: T5 - 0.6, noFill: true }); }
