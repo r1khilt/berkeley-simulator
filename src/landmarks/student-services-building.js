@@ -99,7 +99,7 @@ export async function build(ctx) {
   { const ov = 0.85, slope = 0.55, eave = 17.0, u0 = -21.0, v0 = -12.9, u1 = 26.7, v1 = 9.6;
     hipRoof(K, X.roof, u0, v0, u1, v1, eave + 0.05, slope, ov, { soffit: X.cast });
     K.loop(X.fascia, [[u0 - ov, v1 + ov], [u1 + ov, v1 + ov], [u1 + ov, v0 - ov], [u0 - ov, v0 - ov]], [[0.02, eave + 0.05 - ov * slope - 0.3], [0.02, eave + 0.05 - ov * slope + 0.02]]);
-    for (const u of [-15.5, -6.0, 11.0, 20.0]) dormer(u, 4.6, u < 6.2 ? -12.9 : -10.2, eave, slope, -1);
+    void dormer;
     // louvred lantern at mid-roof (LiDAR ~27 m)
     const lu = -6.8, lv = -0.8; K.box(X.stucco, lu - 2.2, 21.0, lv - 2.2, lu + 2.2, 25.2, lv + 2.2);
     for (const [a, b] of [[[lu - 2.2, lv + 2.2], [lu + 2.2, lv + 2.2]], [[lu + 2.2, lv + 2.2], [lu + 2.2, lv - 2.2]], [[lu + 2.2, lv - 2.2], [lu - 2.2, lv - 2.2]], [[lu - 2.2, lv - 2.2], [lu - 2.2, lv + 2.2]]]) {
