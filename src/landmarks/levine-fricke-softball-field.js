@@ -30,9 +30,9 @@ export async function build(ctx) {
   u0 -= 14; const LU = u1 - u0 + 2, LV = v1 - v0 + 2, cu = (u0 + u1) / 2, cv = (v0 + v1) / 2; const toF = (u, v) => [u - cu, v - cv];
   const tex = fieldTexture(LU, LV, (P) => {
     paintGrass(P, { col: '#4d8a3a', alt: '#579643', stripe: 4.5, seed: 41, blotch: 0.6, angle: deg(45) });
-    paintDiamond(P, { home: toF(hu, hv), dir: 0, softball: true, base: 18.29, rubber: 13.11, arcR: 18.29, fence: fenceLine.map(([u, v]) => toF(u, v)), track: 3.0, dirt: '#c0794e', dirtDark: '#b06d45', lineTo: 70, homeR: 3.5 });
+    paintDiamond(P, { home: toF(hu, hv), dir: 0, softball: true, base: 18.29, rubber: 13.11, arcR: 18.29, fence: fenceLine.map(([u, v]) => toF(u, v)), track: 3.0, dirt: '#c9a079', dirtDark: '#bb916b', lineTo: 70, homeR: 3.5 });
     // dirt foul territory behind home and along the lines
-    const c = P.c; c.save(); c.fillStyle = '#c0794e'; const H = toF(hu, hv);
+    const c = P.c; c.save(); c.fillStyle = '#c9a079'; const H = toF(hu, hv);
     c.beginPath(); c.arc(P.X(H[0]), P.Y(H[1]), 9.5 * P.s, Math.PI * 0.5, Math.PI * 1.5); c.fill(); c.restore();
   }, { pxm: 16 });
   const fm = surfaceMat(tex, { rough: 0.95 });
