@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { modBlock, modFacade, paleGlass, campusLamp, drapeStrip, shrubRow, tint, textPanel } from './lib/b05a-kit.js';
+import { castConcreteMat, inscriptionPanel } from './lib/reast-kit.js';
 
 const CARDOZO = 'YOU WILL STUDY THE WISDOM OF THE PAST, FOR IN A WILDERNESS OF CONFLICTING COUNSELS A TRAIL HAS THERE BEEN BLAZED. YOU WILL STUDY THE LIFE OF MANKIND, FOR THIS IS THE LIFE YOU MUST ORDER, AND, TO ORDER WITH WISDOM, MUST KNOW. YOU WILL STUDY THE PRECEPTS OF JUSTICE, FOR THESE ARE THE TRUTHS THAT THROUGH YOU SHALL COME TO THEIR HOUR OF TRIUMPH. HERE IS THE HIGH EMPRISE, THE FINE ENDEAVOR, THE SPLENDID POSSIBILITY OF ACHIEVEMENT, TO WHICH I SUMMON YOU AND BID YOU WELCOME.\nCARDOZO';
 const HOLMES = 'WHEN I THINK THUS OF THE LAW, I SEE A PRINCESS MIGHTIER THAN SHE WHO ONCE WROUGHT AT BAYEUX, ETERNALLY WEAVING INTO HER WEB DIM FIGURES OF THE EVER-LENGTHENING PAST, FIGURES TOO DIM TO BE NOTICED BY THE IDLE, TOO SYMBOLIC TO BE INTERPRETED EXCEPT BY HER PUPILS, BUT TO THE DISCERNING EYE DISCLOSING EVERY PAINFUL STEP AND EVERY WORLD-SHAKING CONTEST BY WHICH MANKIND HAS WORKED AND FOUGHT ITS WAY FROM SAVAGE ISOLATION TO ORGANIC SOCIAL LIFE.\nHOLMES';
@@ -21,9 +22,9 @@ export const info = {
 export async function build(ctx) {
   const M = ctx.M;
   const K = new Kit(ctx, Math.atan2(-50.0 + 40.4, 41.5 + 16.4));
-  const C = tint(K, M.stuccoWhite, 0xd3ccbb, 'lawC');   // warm beige board-smooth concrete
-  const CD = tint(K, M.stuccoWhite, 0xc2baa8, 'lawCD'); // shadowed / older concrete
-  const FR = M.darkBronze; const GL = paleGlass();
+  const C = castConcreteMat(0xf2ede3);   // refine-east: smooth warm-grey cast concrete with pour lines and staining
+  const CD = castConcreteMat(0xd3cbbb);  // shadowed / older concrete
+  const FR = M.darkBronze; const GL = M.windowNight; // refine-east: shared window material
   const SL = new THREE.MeshStandardMaterial({ color: 0x47525c, roughness: 0.35, metalness: 0.1 }); // dark slate panels
   const colliders = [], walkables = [];
   const box = (m, u0, y0, v0, u1, y1, v1, o) => K.box(m, u0, y0, v0, u1, y1, v1, o);
@@ -42,21 +43,26 @@ export async function build(ctx) {
       K.wall(R, C, 0, 1.6, -2, gs, [], 0.5); K.wall(R, C, L - 1.6, L, -2, gs, [], 0.5);
       // recessed storefront between square piers
       const n = 6; const bw = (L - 3.2) / n;
-      K.rbox(R, CD, 1.6, -2, -0.7, L - 1.6, FL, -0.1);
+      K.rbox(R, CD, 1.6, -2, -1.85, L - 1.6, FL, -0.1);
       for (let i = 0; i < n; i++) {
         const s0 = 1.6 + i * bw, s1 = s0 + bw; const mid = i === 2 || i === 3;
         const o = { s0: s0 + 0.45, s1: s1 - 0.45, y0: FL, y1: gs - 0.35 };
-        const R2 = K.run(R.at(0, -0.55), R.at(L, -0.55));
+        const R2 = K.run(R.at(0, -1.65), R.at(L, -1.65));
         if (mid) K.fill(R2, { ...o, doorTop: FL + 2.5, sill: false }, { kind: 'door', rev: 0.02, door: GL, frame: M.bronze });
         else { K.rbox(R2, CD, o.s0, FL, -0.4, o.s1, FL + 0.6, 0.0); K.fill(R2, { ...o, y0: FL + 0.6 }, { glass: GL, frame: FR, mull: 1, tran: [FL + 2.9], rev: 0.02, sill: false }); }
-        if (i > 0) K.rbox(R, C, s0 - 0.4, -1.5, -0.7, s0 + 0.4, gs, 0.12);
+        if (i > 0) K.rbox(R, C, s0 - 0.5, -1.5, -1.8, s0 + 0.5, gs, 0.12);
       }
-      K.rbox(R, C, 1.6, gs - 0.35, -0.7, L - 1.6, gs, 0.0); // head beam over the storefront
-      K.rbox(R, C, -0.25, gs, -0.2, L + 0.25, gs + 0.45, 0.35); // projecting band
+      K.rbox(R, C, 1.6, gs - 0.35, -1.8, L - 1.6, gs, 0.0); // head beam / soffit over the recessed storefront
+      if (f === 'S') { // stainless head band over the entrance bays with the school name
+        const e0 = 1.6 + 2 * bw + 0.3, e1 = 1.6 + 4 * bw - 0.3; const R3 = K.run(R.at(0, -1.62), R.at(L, -1.62));
+        inscriptionPanel(K, R3, e0, e1, gs - 0.95, gs - 0.4, 0.02, 'Berkeley Law', { bg: '#c9ccce', fg: '#1f2a36', px: 300, lineGap: 1.0, pad: 0.04 });
+      }
+      K.rbox(R, CD, 1.6, gs - 0.42, -1.8, L - 1.6, gs - 0.35, -0.05);
+      K.rbox(R, C, -0.25, gs, -0.2, L + 0.25, gs + 0.5, 0.4); // projecting fascia band
       // dark stone inscription panel with raised lines of lettering
       const pw = 8.6, ph = 6.4, py = gs + 1.6;
       K.rbox(R, SL, L / 2 - pw / 2 - 0.12, py - 0.12, 0, L / 2 + pw / 2 + 0.12, py + ph + 0.12, 0.08);
-      textPanel(K, R, L / 2 - pw / 2, L / 2 + pw / 2, py, py + ph, 0.085, f === 'S' ? CARDOZO : HOLMES, { px: 35, lineGap: 1.5, font: 'Helvetica, Arial, sans-serif', weight: '500' });
+      inscriptionPanel(K, R, L / 2 - pw / 2, L / 2 + pw / 2, py, py + ph, 0.085, f === 'S' ? CARDOZO : HOLMES, { px: 66, lineGap: 1.38, sig: f === 'S' ? 'CARDOZO' : 'HOLMES' });
       K.rbox(R, C, -0.1, EAVE, -0.3, L + 0.1, EAVE + 0.15, 0.08); // coping
       // entrance steps
       const gE = K.g(...(f === 'N' ? [-44.8, wv0 - 3] : [-44.8, wv1 + 2]));
@@ -81,10 +87,11 @@ export async function build(ctx) {
       K.rbox(R, CD, 0.3, FL - 0.6, 0, L - 0.3, FL + 0.05, 1.3); // bench plinth along the base
       K.rbox(R, C, -0.2, EAVE - 1.0, -0.2, L + 0.2, EAVE + 0.15, 1.25);  // flat overhanging slab over the piers
     }
-    box(M.concreteDark, wu0 + 0.6, -2, wv0 + 0.8, wu1 - 0.6, EAVE - 0.05, wv1 - 0.8); // core (kept behind the recessed storefronts)
+    box(M.concreteDark, wu0 + 0.6, -2, wv0 + 2.0, wu1 - 0.6, EAVE - 0.05, wv1 - 2.0); // core (kept behind the recessed storefronts)
     box(M.concreteDark, wu0 + 0.6, FL + 4.1, wv0 + 0.6, wu1 - 0.6, EAVE - 0.05, wv1 - 0.6);
     // low hipped roof behind the parapet (LiDAR ridge ~17.5 m)
-    K.hip(tint(K, M.slate, 0x8a8478, 'lawRoof'), wu0 + 1.0, wv0 + 1.0, wu1 - 1.0, wv1 - 1.0, EAVE - 0.25, 0.3); // low roof, hidden behind the parapet
+    K.hip(tint(K, M.concrete, 0x9a958b, 'lawRoof'), wu0 + 1.2, wv0 + 1.2, wu1 - 1.2, wv1 - 1.2, EAVE + 0.1, 0.16); // low roof, hidden behind the parapet
+    for (const [a, b] of [[[wu0, wv0], [wu0, wv1]], [[wu0, wv1], [wu1, wv1]], [[wu1, wv1], [wu1, wv0]], [[wu1, wv0], [wu0, wv0]]]) { const Rp = K.run(a, b); K.rbox(Rp, C, -0.25, EAVE + 0.1, -0.35, Rp.L + 0.25, EAVE + 1.05, 0.05); K.rbox(Rp, M.iron, -0.27, EAVE + 1.05, -0.38, Rp.L + 0.27, EAVE + 1.12, 0.08, { detail: true }); }
     colliders.push(K.colPoly([[wu0, wv0], [wu1, wv0], [wu1, wv1], [wu0, wv1]], -2, 18));
   }
   // ---------- later additions (flat-roofed concrete) ----------

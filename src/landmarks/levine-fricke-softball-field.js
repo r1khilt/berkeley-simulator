@@ -29,7 +29,7 @@ export async function build(ctx) {
   let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [u, v] of fp) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
   u0 -= 14; const LU = u1 - u0 + 2, LV = v1 - v0 + 2, cu = (u0 + u1) / 2, cv = (v0 + v1) / 2; const toF = (u, v) => [u - cu, v - cv];
   const tex = fieldTexture(LU, LV, (P) => {
-    paintGrass(P, { col: '#4d8a3a', alt: '#579643', stripe: 4.5, seed: 41, blotch: 0.6, angle: deg(45) });
+    paintGrass(P, { col: '#3f8f3a', alt: '#45953f', stripe: 4.5, seed: 41, blotch: 0.4, angle: deg(45) });
     paintDiamond(P, { home: toF(hu, hv), dir: 0, softball: true, base: 18.29, rubber: 13.11, arcR: 18.29, fence: fenceLine.map(([u, v]) => toF(u, v)), track: 3.0, dirt: '#c9a079', dirtDark: '#bb916b', lineTo: 70, homeR: 3.5 });
     // dirt foul territory behind home and along the lines
     const c = P.c; c.save(); c.fillStyle = '#c9a079'; const H = toF(hu, hv);

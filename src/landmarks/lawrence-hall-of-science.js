@@ -1,7 +1,7 @@
 // Lawrence Hall of Science (1968), UC Berkeley's public science center on the hills above campus.
 // Massing from the 2021 LiDAR: a broad octagonal plaza deck (~12 m above the downhill west edge) built over lower floors
 // that open to the bay in horizontal window bands; south of it rise the building's signature monolithic, khaki board-formed
-// concrete masses: vertical walls with steep facets to truncated tops (a central mass on the plaza with the main entrance,
+// concrete masses: monolithic battered shells rising off the plaza to small flat tops (a central mass with the main entrance portal,
 // two splayed folded-plate exhibit halls, a flat-roofed spine and the tall polygonal lantern). The plaza carries the
 // fountain, Pheena the life-size fin whale and the climbable DNA double helix, facing the bay.
 import * as THREE from 'three';
@@ -18,9 +18,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
-  const CON = concreteMat(0xcfc39d, 'smooth', { rough: 0.95 });   // khaki-tan cast concrete
-  const CONd = concreteMat(0xaaa186, 'smooth');    // roofs, slab edges, shadowed planes
-  const PAVE = concreteMat(0x8e8f8b, 'smooth', { rough: 0.95, normal: 0.4 }); // weathered grey plaza deck
+  const CON = concreteMat(0xb8aa7e, 'smooth', { rough: 0.88 });   // monolithic weathered cast concrete, khaki buff
+  const CONd = concreteMat(0x9c9277, 'smooth');    // slab edges, shadowed planes
+  const PAVE = (() => { const m = M.concrete.clone(); m.color = new THREE.Color(0xd2cbbd); m.roughness = 0.95; return m; })(); // warm grey plaza concrete
   const FR = M.darkBronze, GL = M.windowNight;
   const PZ = 12.0;                                  // plaza / exhibit-hall floor level
   const colliders = [], walkables = [], interactions = [];
@@ -35,9 +35,12 @@ export async function build(ctx) {
     let gMin = Infinity, gMax = -Infinity; for (let k = 0; k <= 8; k++) { const p = R.at(R.L * k / 8, 0.3); const g = K.g(p[0], p[1]); gMin = Math.min(gMin, g); gMax = Math.max(gMax, g); }
     const zone = mid[1] < 24.5 ? 'deck' : (mid[1] > 60.0 && Math.abs(mid[0]) < 23 ? 'lobe' : 'wing');
     const yt = zone === 'lobe' ? 18.0 : PZ;
-    const bands = R.L > 3 ? BANDS.filter((bd) => bd.y0 > gMax + 0.5) : [];
+    const bands = R.L > 3 && gMax < 6.0 ? BANDS.filter((bd) => bd.y0 > gMax + 0.5) : []; // window bands only where the hillside falls away (west/north)
     bandWall(K, R, CON, gMin - 1.5, yt, bands, { depth: 0.45, rev: 0.32, pitch: 1.55, margin: Math.min(1.2, R.L * 0.15), frame: FR, glass: GL });
     for (const bd of bands) fascia(K, R, CON, bd.y1, bd.y1 + 0.75, 0.5, { s0: 0, s1: R.L, back: 0.45 });
+    // board-formed panel joints: shallow vertical reveals every ~3.6 m and a horizontal lift joint (articulates blank walls)
+    if (R.L > 4) { const nj = Math.max(1, Math.round(R.L / 3.6)); for (let j = 1; j < nj; j++) { const sj = R.L * j / nj; K.rbox(R, CONd, sj - 0.06, gMin - 0.5, -0.02, sj + 0.06, yt - 0.1, 0.03, { detail: true }); } }
+    if (R.L > 2 && yt - gMin > 3) K.rbox(R, CONd, 0, Math.max(gMin + 1.2, yt - 3.2) - 0.05, -0.02, R.L, Math.max(gMin + 1.2, yt - 3.2) + 0.05, 0.03, { detail: true });
     if (zone === 'deck') { // parapet with coping around the plaza
       deckEdges.push(R);
       K.rbox(R, CON, 0, PZ, -0.4, R.L, PZ + 1.0, 0);
@@ -48,15 +51,23 @@ export async function build(ctx) {
   }
   // cubic piers on the parapet every ~16 m
   deckEdges.slice().sort((p, q) => q.L - p.L).slice(0, 4).forEach((R) => { const s = R.L / 2; K.rbox(R, CON, s - 1.0, PZ, -2.0, s + 1.0, PZ + 2.4, 0.05); });
-  // plaza deck + podium collider + painted line grid
+  // plaza deck + podium collider + expansion-joint grid
   K.flat(PAVE, fp, PZ);
+  {
+    const inside = (x, z) => { let c = false; for (let i = 0, j = fp.length - 1; i < fp.length; j = i++) { const [xi, zi] = fp[i], [xj, zj] = fp[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+    const JM = (() => { const m = M.concrete.clone(); m.color = new THREE.Color(0xa9a395); return m; })(); const step = 4.0;
+    for (let x = -42; x <= 42; x += step) for (let z = -66; z < 24; z += step) {
+      if (inside(x, z + step / 2) && inside(x, z) && inside(x, z + step)) K.box(JM, x - 0.04, PZ, z, x + 0.04, PZ + 0.012, z + step, { detail: true });
+      if (inside(x + step / 2, z) && inside(x, z) && inside(x + step, z)) K.box(JM, x, PZ, z - 0.04, x + step, PZ + 0.012, z + 0.04, { detail: true });
+    }
+  }
   colliders.push({ type: 'poly', pts: fp.map((p) => p.map((q) => +q.toFixed(3))), y0: -3, y1: PZ - 0.05 });
   walkables.push({ type: 'poly', pts: fp.map((p) => p.map((q) => +q.toFixed(3))), y: PZ });
   // ---------- monolithic faceted concrete masses: blind board-formed walls rising straight from the plaza, then steep
   // facets up to a truncated top (no eaves; same concrete for walls and facets) ----------
   const ring4 = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
   const oct = (u0, v0, u1, v1, c) => [[u0 + c, v0], [u1 - c, v0], [u1, v0 + c], [u1, v1 - c], [u1 - c, v1], [u0 + c, v1], [u0, v1 - c], [u0, v0 + c]];
-  const FAC = concreteMat(0xd6c290, 'smooth', { rough: 1.0 }); // facets: same concrete, warmer tint offsets the sky light on the slopes
+  const FAC = CON; // walls and roof facets read as one monolithic concrete mass (no eaves, same material)
   const mass = (ring, topInset, y0, yWall, yTop, holes = null) => {
     if (holes) { const r = facadeRing(ring); r.forEach((a, i) => { const b = r[(i + 1) % r.length]; const R = K.run(a, b); if (R.L <= 0.2) return; const ops = holes(a, b, R) || []; K.wall(R, CON, 0, R.L, y0, yWall, ops, 0.6); for (const o of ops) if (!o.door) { K.rbox(R, GL, o.s0, o.y0, -0.42, o.s1, o.y1, -0.38); K.rbox(R, CONd, o.s0 - 0.05, o.y0 - 0.1, -0.42, o.s1 + 0.05, o.y0, 0.05); } }); K.prism(CONd, offsetRing(ring, -0.6), y0, yWall - 0.02, {}); }
     else frustum(K, CON, ring, ring, y0, yWall, { cap: false, uvMode: 'box' });
@@ -67,22 +78,18 @@ export async function build(ctx) {
   // central mass on the plaza (main entrance at x = 0 where the plaza walk arrives)
   {
     const ring = oct(-14.0, -3.8, 16.0, 19.6, 3.4);
-    let RN = null;
-    mass(ring, 3.3, PZ - 0.1, 17.2, 21.2, (a, b, R) => {
-      if (Math.abs(a[1] + 3.8) < 1e-6 && Math.abs(b[1] + 3.8) < 1e-6) { RN = R; const sc = a[0] - 0.0; return [{ s0: sc - 1.7, s1: sc + 1.7, y0: PZ, y1: PZ + 4.4, door: true }]; }
-      if (Math.max(a[1], b[1]) > 19) return [];
-      return R.L > 8 ? slits(R, PZ + 0.6, PZ + 4.2, 7.5) : [];
-    });
+    // one monolithic battered shell (same form as the halls), with a vertical concrete entrance portal on the plaza side
+    frustum(K, CON, ring, offsetRing(ring, -5.6), PZ - 0.1, 21.0, { cap: true, uvMode: 'roof' });
+    K.box(CON, -2.7, PZ - 0.1, -5.2, -1.7, PZ + 5.3, -1.0); K.box(CON, 1.7, PZ - 0.1, -5.2, 2.7, PZ + 5.3, -1.0); // portal jambs
+    K.box(CON, -1.7, PZ + 4.4, -5.2, 1.7, PZ + 5.3, -1.0); K.box(CON, -1.7, PZ - 0.1, -2.6, 1.7, PZ + 4.4, -1.0); // lintel + back infill
+    K.box(CONd, -2.85, PZ + 5.3, -5.35, 2.85, PZ + 5.55, -1.0);         // portal coping
+    const RN = K.run([2.7, -5.2], [-2.7, -5.2]); const s = RN.L / 2;  // north (plaza) face of the portal
     // deep entrance recess lined in rust-orange, glass doors at the back
     const RED = plainMat(0xb5612e, { roughness: 0.8 });
-    const sc = RN.at(0)[0] - 0.0; const s = Math.abs(RN.a[0] - 0); // run starts at the east end: x=0 is s
-    K.rbox(RN, RED, s - 1.7, PZ, -2.6, s - 1.55, PZ + 4.4, -0.6); K.rbox(RN, RED, s + 1.55, PZ, -2.6, s + 1.7, PZ + 4.4, -0.6);
-    K.rbox(RN, RED, s - 1.7, PZ + 4.25, -2.6, s + 1.7, PZ + 4.4, -0.6);
-    K.rbox(RN, CONd, s - 1.7, PZ - 0.02, -2.6, s + 1.7, PZ + 0.03, 0);
+    K.rbox(RN, RED, s - 1.7, PZ, -2.6, s - 1.55, PZ + 4.4, -0.01); K.rbox(RN, RED, s + 1.55, PZ, -2.6, s + 1.7, PZ + 4.4, -0.01);
+    K.rbox(RN, RED, s - 1.7, PZ + 4.25, -2.6, s + 1.7, PZ + 4.4, -0.01);
+    K.rbox(RN, CONd, s - 1.7, PZ - 0.02, -2.6, s + 1.7, PZ + 0.03, 0.02);
     glazing(K, RN, s - 1.55, s + 1.55, PZ + 0.02, PZ + 4.25, { d: -2.5, pitch: 0.78, transoms: [PZ + 2.4], frame: FR, glass: GL });
-    // small square inset panel high on the end face
-    K.rbox(RN, GL, s - 0.7, 18.0, -0.95, s + 0.7, 19.4, -0.75);
-    K.rbox(RN, CON, s - 0.9, 17.8, -1.0, s + 0.9, 18.0, -0.55);
     interactions.push({ id: 'lhs-entrance', pos: [0, PZ + 1, -5.5], radius: 3, label: 'Lawrence Hall of Science: main entrance' });
     colliders.push(K.colPoly(ring, PZ - 1, 21.2));
   }
@@ -105,7 +112,12 @@ export async function build(ctx) {
   ];
   for (const base of wings) {
     K.prism(CONd, offsetRing(base, 0.5), PZ - 0.2, PZ + 0.45); // ledge where the hall meets the podium roof
-    mass(base, 6.8, PZ, 16.4, 21.8, (a, b, R) => (Math.abs((a[0] + b[0]) / 2) < 14 || R.L < 8 ? [] : slits(R, PZ + 0.9, PZ + 3.9, 6.0, 0.5)));
+    // folded-plate exhibit hall: steep battered concrete faces rising straight off the plaza, a lower-pitched upper fold,
+    // then a small vertical-sided crown box on the plateau (LiDAR: edge ~19 m, crown ~21.8–22.5 m)
+    const r1 = offsetRing(base, -2.7), r2 = offsetRing(base, -5.9);
+    frustum(K, CON, base, r2, PZ, 22.4, { cap: true, uvMode: 'roof' }); // one continuous battered plane, small flat top
+    // crisp fold ribs down the hips (detail)
+    for (let i = 0; i < base.length; i++) { const a = base[i], b = r2[i]; const L = Math.hypot(b[0] - a[0], 22.4 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 22.4, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 22.4) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
     colliders.push(K.colPoly(base, PZ - 1, 21.8));
   }
   // south stair/service blocks (flat roofs at the spine height)
@@ -184,7 +196,12 @@ export async function build(ctx) {
     K.cyl(M.blackPaint, x, PZ, z, 0.08, 0.06, 4.2, 8, { detail: true });
     K.box(M.lampGlow, x - 0.18, PZ + 4.2, z - 0.18, x + 0.18, PZ + 4.55, z + 0.18, { detail: true });
   }
-  for (const [x, z] of [[-30, -48], [26, -50], [-36, -22], [35, -26]]) { K.box(CON, x - 1.5, PZ, z - 1.5, x + 1.5, PZ + 1.0, z + 1.5); K.box(M.soil, x - 1.3, PZ + 1.0, z - 1.3, x + 1.3, PZ + 1.03, z + 1.3); colliders.push(K.colPoly(ring4(x - 1.5, z - 1.5, x + 1.5, z + 1.5), PZ - 0.5, PZ + 1.0)); }
+  const SHR = plainMat(0x3c4a2e, { roughness: 0.95 });
+  for (const [x, z] of [[-30, -48], [26, -50], [-36, -22], [35, -26], [-12, -56], [10, -58], [-24, -12], [22, -14]]) {
+    K.box(CON, x - 1.5, PZ, z - 1.5, x + 1.5, PZ + 0.9, z + 1.5); K.box(M.soil, x - 1.3, PZ + 0.9, z - 1.3, x + 1.3, PZ + 0.93, z + 1.3);
+    for (const [dx, dz, r] of [[-0.6, -0.5, 0.75], [0.6, 0.4, 0.85], [0.2, -0.7, 0.6]]) { const g = new THREE.IcosahedronGeometry(r, 1); g.scale(1, 0.75, 1); g.translate(x + dx, PZ + 0.95 + r * 0.5, z + dz); K.add(SHR, g); }
+    colliders.push(K.colPoly(ring4(x - 1.5, z - 1.5, x + 1.5, z + 1.5), PZ - 0.5, PZ + 0.9));
+  }
 
   const object3d = K.finish();
   object3d.name = 'lawrence-hall-of-science';
