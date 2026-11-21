@@ -21,7 +21,7 @@ export async function build(ctx) {
   const { object3d, colliders, walkables } = faBuild(ctx, -9, blocks, (K, F) => {
     faGableBay(K, F, K.run([-12.5, 18.5], [-3.0, 18.5]), 4.8, 4.4, 0.0, 9.8, { d: 1.0 });
     faBoxBay(K, F, K.run([-3.0, -3.0], [-3.0, -19.0]), 8.0, 3.0, 1.5 + 3.95, 2);
-  }, { entries: 2 });
+  }, { entries: 2, twoAll: true, twoN: 2, ent: [{ block: 1, face: 'S', s: 5.0 }, { block: 0, face: 'N', s: 5.0 }] });
   object3d.name = 'foothill-la-loma-3';
   return { object3d, colliders, walkables };
 }

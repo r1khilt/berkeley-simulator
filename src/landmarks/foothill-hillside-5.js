@@ -16,7 +16,7 @@ export async function build(ctx) {
   ];
   const { object3d, colliders, walkables } = faBuild(ctx, 8, blocks, (K, F) => {
     faGableBay(K, F, K.run([-10.5, 6.0], [10.5, 6.0]), 10.5, 4.0, 0.0, 6.3, { d: 1.0 });
-  }, { entries: 1 });
+  }, { entries: 1, ent: [{ block: 0, face: 'W', s: 6.0 }] });
   object3d.name = 'foothill-hillside-5';
   return { object3d, colliders, walkables };
 }

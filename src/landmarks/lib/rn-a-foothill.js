@@ -40,9 +40,9 @@ export function faMats(M) {
     return [base[0] * kk, base[1] * kk, base[2] * kk, ht, 0.93];
   }, { size: 512, span: 2, normal: 3, rough: 0.93 });
   // pale grey-green vertical board-and-batten (0.25 m)
-  const B0 = C3(0x9eaa9d);
-  const board = bakeMat('fa:board', (u, v) => {
-    const x = u * 8; const i = Math.floor(x); const f = x - i; const bat = f < 0.18; const edge = Math.abs(f - 0.18) < 0.025 || f > 0.975;
+  const B0 = C3(0xbcc4b8);
+  const board = bakeMat('fa:board2', (u, v) => {
+    const x = u * 14; const i = Math.floor(x); const f = x - i; const bat = f < 0.22; const edge = Math.abs(f - 0.22) < 0.04 || f > 0.96;
     const kk = (0.96 + 0.06 * hash2(i, 1, 3)) * (0.95 + 0.08 * fbm(u * 6, v * 6, 6, 3, 2)) * (bat ? 1.05 : 1) * (edge ? 0.7 : 1);
     return [B0[0] * kk, B0[1] * kk, B0[2] * kk, bat ? 0.9 : 0.4, 0.75];
   }, { size: 256, span: 2, normal: 3, rough: 0.75 });
@@ -120,13 +120,13 @@ export function faWing(K, b, F) {
   if (b.roof !== 'flat') { const lo = span * 0.75, hi = span * 1.1; if (ridge - eave < lo) eave = ridge - lo; if (ridge - eave > hi) eave = ridge - hi; }
   eave = Math.max(eave, b.g + 3.9);
   if (b.roof !== 'flat' && ridge - eave < span * 0.6) ridge = eave + span * 0.75;
-  const base = b.g + 0.5, y0 = b.g - 1.6, floor1 = base + 0.55;
+  const base = b.g + 0.5, y0 = Math.min(b.g, K.gMin(b.u0, b.v0, b.u1, b.v1, 6)) - 1.6, floor1 = base + 0.55;
   const top = eave - 0.35; const n = Math.max(1, Math.round((top - floor1) / FA_FH)); const h = (top - floor1) / n;
-  const two = !!b.two;
+  const two = !!b.two; const twoN = b.twoN ?? 1;
   const stories = [{ y0, y1: floor1, mat: F.plinth }]; let y = floor1;
   for (let i = 0; i < n; i++) {
     const wh = Math.min(1.95, h - 0.7);
-    stories.push({ y0: y, y1: y + h, mat: two && n > 1 && i === n - 1 ? F.board : F.shingle, win: { sill: Math.max(0.45, (h - wh) * 0.58), h: wh, w: FA_UW, mull: 1, tran: 0.66, noSill: true } });
+    stories.push({ y0: y, y1: y + h, mat: two && n > 1 && i >= Math.max(1, n - twoN) ? F.board : F.shingle, win: { sill: Math.max(0.45, (h - wh) * 0.58), h: wh, w: FA_UW, mull: 1, tran: 0.66, noSill: true } });
     y += h;
   }
   if (y < eave - 0.01) stories.push({ y0: y, y1: eave, mat: two ? F.board : F.shingle });
@@ -156,7 +156,7 @@ export function faWing(K, b, F) {
     K.rbox(R, F.trim, -0.12, eave - 0.24, -0.02, R.L + 0.12, eave, 0.12); // eave fascia
     K.rbox(R, F.trim, -0.02, floor1 - 0.1, -0.02, 0.17, eave, 0.05); K.rbox(R, F.trim, R.L - 0.17, floor1 - 0.1, -0.02, R.L + 0.02, eave, 0.05); // corner boards
     K.rbox(R, F.trim, 0, floor1 - 0.12, 0, R.L, floor1 + 0.06, 0.06); // water table over the plinth
-    if (two && n > 1) K.rbox(R, F.trim, -0.05, floor1 + h * (n - 1) - 0.1, -0.02, R.L + 0.05, floor1 + h * (n - 1) + 0.12, 0.11); // belt where shingle meets board
+    if (two && n > 1) { const yb = floor1 + h * Math.max(1, n - twoN); K.rbox(R, F.trim, -0.05, yb - 0.1, -0.02, R.L + 0.05, yb + 0.12, 0.11); } // belt where shingle meets board
   }
   K.box(K.M.concreteDark, b.u0 + 0.5, y0, b.v0 + 0.5, b.u1 - 0.5, eave - 0.3, b.v1 - 0.5); // core behind the glass
   if (b.roof === 'flat') {
@@ -266,7 +266,7 @@ export function faBuild(ctx, angDeg, blocks, extras, o = {}) {
       const odd = n > 1 && i % 2 === 1; const e = odd ? 0.35 : 0; const dy = odd ? 0.9 : 0;
       const seg = b.axis === 'u' ? { ...b, u0: a0, u1: a1, v0: b.v0 - e, v1: b.v1 + e } : { ...b, v0: a0, v1: a1, u0: b.u0 - e, u1: b.u1 + e };
       seg.eave = b.eave + dy; seg.ridge = b.ridge + dy; seg.chimney = b === longest && i === Math.floor(n / 2) && b.roof !== 'flat';
-      seg.two = b.two ?? ((bi + i) % 3 === 1); seg.faces = { ...(b.faces || {}) }; seg.blank = {}; seg.bi = bi;
+      seg.two = b.two ?? (o.twoAll ? (bi + i) % 3 !== 0 : (bi + i) % 3 === 1); seg.twoN = b.twoN ?? o.twoN ?? 1; seg.faces = { ...(b.faces || {}) }; seg.blank = {}; seg.bi = bi;
       if (n > 1 && !odd) { if (b.axis === 'u') { if (i > 0) seg.faces.W = false; if (i < n - 1) seg.faces.E = false; } else { if (i > 0) seg.faces.N = false; if (i < n - 1) seg.faces.S = false; } }
       segs.push(seg);
     }

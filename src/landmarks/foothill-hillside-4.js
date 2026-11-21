@@ -25,6 +25,10 @@ export async function build(ctx) {
     faGableBay(K, F, K.run([-19.0, 28.0], [-6.0, 28.0]), 6.5, 4.6, 0.5, 10.4, { d: 1.0 });
     faGableBay(K, F, K.run([37.0, -14.0], [-22.5, -14.0]), 14.0, 4.6, 5.7, 16.0, { d: 1.0 });
     faBoxBay(K, F, K.run([37.0, -14.0], [-22.5, -14.0]), 30.0, 3.0, 2.7 + 3.95, 2);
+    // more cross-gabled bay towers along the Hearst Avenue (north) frontage
+    faGableBay(K, F, K.run([37.0, -14.0], [-22.5, -14.0]), 3.5, 4.2, 5.7, 16.0, { d: 1.0 });
+    faGableBay(K, F, K.run([37.0, -14.0], [-22.5, -14.0]), 40.0, 4.4, 2.7, 14.8, { d: 1.0 });
+    faGableBay(K, F, K.run([-6.0, -17.5], [-22.0, -17.5]), 8.0, 4.4, 0.9, 12.3, { d: 1.0 });
     faBoxBay(K, F, K.run([-6.0, 4.5], [6.5, 4.5]), 6.2, 3.0, 3.9 + 3.95, 2);
   }, { entries: 2 });
   object3d.name = 'foothill-hillside-4';

@@ -29,7 +29,7 @@ export async function build(ctx) {
     faGableBay(K, F, RW, 7.5, 4.6, 0.2, 12.9, { d: 1.1 });
     faGableBay(K, F, RW, 31.5, 5.0, 0.2, 12.9, { d: 1.1 });
     faBoxBay(K, F, RW, 19.5, 3.4, 0.2 + 3.95, 2);
-  }, { entries: 3 });
+  }, { entries: 3, twoAll: true, twoN: 2 });
   object3d.name = 'foothill-la-loma-1';
   return { object3d, colliders, walkables };
 }
