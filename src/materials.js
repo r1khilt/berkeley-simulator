@@ -165,7 +165,7 @@ export function textures() {
   // (normalised to the same mean colour so authored tints still hold). asphalt/soil get their own sets.
   if (PBR_ENABLED) {
     _tex.asphalt = bake(recipes.concrete, 64, 2); _tex.soil = bake(recipes.concrete, 64, 2);
-    const up = { granite: ['granite', [196, 191, 183]], ashlar: ['granite', [214, 209, 199]], concrete: ['concrete', [190, 187, 180]], stucco: ['stucco', [222, 210, 186]],
+    const up = { granite: ['granite', [204, 199, 189]], ashlar: ['granite', [208, 203, 193]], concrete: ['concrete', [190, 187, 180]], stucco: ['stucco', [222, 210, 186]],
       brick: ['brick', [142, 74, 57]], tile: ['rooftile', [162, 82, 55]], asphalt: ['asphalt', [92, 92, 94]], soil: ['dirt', [110, 94, 74]] };
     for (const [k, [src, col]] of Object.entries(up)) adoptPBR(k, _tex[k], col, TEX_M, src);
   }

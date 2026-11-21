@@ -9,9 +9,9 @@ import * as THREE from 'three';
 // Layer order == array index. size = real-world metres covered by one texture repeat.
 // mean = linear albedo average of the baked set (manifest.json), used for the far-distance LOD
 export const LAYERS = [
-  ['asphalt', 3.0, [0.1007, 0.1002, 0.0963]], ['sidewalk', 4.04, [0.388, 0.3776, 0.3613]], ['granite', 1.0, [0.3685, 0.3591, 0.3435]],
+  ['asphalt', 3.0, [0.1344, 0.1298, 0.1186]], ['sidewalk', 4.04, [0.3966, 0.3784, 0.3473]], ['granite', 0.45, [0.4109, 0.3993, 0.3752]],
   ['brick', 3.0, [0.3903, 0.1774, 0.0981]], ['lawn', 2.0, [0.0743, 0.1139, 0.0376]], ['drygrass', 2.0, [0.2171, 0.1509, 0.0823]],
-  ['litter', 3.0, [0.1086, 0.0813, 0.0521]], ['dirt', 3.0, [0.1829, 0.1455, 0.0972]], ['stucco', 2.0, [0.5817, 0.5468, 0.4886]],
+  ['litter', 3.0, [0.1086, 0.0813, 0.0521]], ['dirt', 3.0, [0.1829, 0.1455, 0.0972]], ['stucco', 1.2, [0.5817, 0.5468, 0.4886]],
   ['boardconc', 1.8, [0.2781, 0.2688, 0.2576]], ['concrete', 2.0, [0.307, 0.3003, 0.2759]], ['siding', 1.0, [0.3371, 0.2913, 0.2773]],
   ['rooftile', 4.0, [0.2539, 0.1274, 0.0681]],
 ];
@@ -149,7 +149,7 @@ function bakeAshlar(ga, gn, S, outS) {
     const dx = Math.min(fu, 1 - fu) * 1.0, dy = Math.min(fv, 1 - fv) * CH; const d = Math.min(dx, dy) * N / 2; // px to nearest joint
     // per-block texture offset so neighbouring blocks never show the same grain
     const ox = Math.floor(h(col, row) * S), oy = Math.floor(h(row, col + 7) * S);
-    const sx = (Math.floor(x * S * 2 / N) + ox) % S, sy = (Math.floor(y * S * 2 / N) + oy) % S; const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
+    const sx = (Math.floor(x * S * 4 / N) + ox) % S, sy = (Math.floor(y * S * 4 / N) + oy) % S; // granite set = 0.45 m -> ~0.5 m grain period const si = (sy * S + sx) * 4, i = (y * N + x) * 4;
     const tone = 1.0;
     const j = Math.max(0, Math.min(1, (jw + 1.2 - d) / 2.4)); // 1 in the joint
     const bev = Math.max(0, Math.min(1, (d - jw) / (jw * 2.5)));
@@ -223,7 +223,7 @@ export function pbrWeather(mat) {
    #ifdef PBR_ASHLAR
    { vec2 bu = vMapUv * vec2(2.0, 3.0); float rw = floor(bu.y); vec2 cell = vec2(floor(bu.x + mod(rw, 2.0) * 0.5), rw);
      vec3 p3 = fract(vec3(cell.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); float hb = fract((p3.x + p3.y) * p3.z);
-     diffuseColor.rgb *= 0.93 + 0.12 * hb; }
+     diffuseColor.rgb *= 0.965 + 0.06 * hb; }
    #endif
  }`);
   };

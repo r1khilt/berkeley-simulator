@@ -82,7 +82,7 @@ void groundShadePBR(vec2 w, float dist) {
       p.r = mix(p.r, 0.9, 0.3);
     } else if (sp > 4.5 && sp < 5.5) { // granite pavers: 0.9 m squares, each with its own crop of the stone and tone
       vec2 cq = gq / 0.9; vec2 ci = floor(cq), cf = fract(cq);
-      p = gTapS(gq / 1.0 + vec2(hq12(ci), hq12(ci + 5.3)) * 3.0, L_GRANITE, near);
+      p = gTapS(gq / 0.45 + vec2(hq12(ci), hq12(ci + 5.3)) * 3.0, L_GRANITE, near);
       p.g = vec2(0.98776 * p.g.x - 0.15600 * p.g.y, 0.15600 * p.g.x + 0.98776 * p.g.y);
       p.c *= 0.88 + 0.2 * hq12(ci + 9.1);
       float jd = min(min(cf.x, 1.0 - cf.x), min(cf.y, 1.0 - cf.y)) * 0.9;  // metres to the joint
@@ -124,7 +124,7 @@ void groundShadePBR(vec2 w, float dist) {
   if (wA > 0.001) {
     PS a = gTap(w, 3.0, L_ASPHALT, kIso, near);
     float age = smoothstep(0.25, 0.8, n0.r);                     // weathered grey (old) vs dark (recent overlay)
-    a.c *= mix(0.82, 1.25, age) * (0.92 + 0.16 * n1.g);
+    a.c *= mix(0.85, 1.2, age) * (0.92 + 0.16 * n1.g);
     // utility-cut patches: rectangles on the city grid, darker & smoother with a tar seam
     vec2 pc = gq / vec2(11.0, 7.0); vec2 pi = floor(pc), pf = fract(pc);
     if (hq12(pi + 17.0) > 0.7) {

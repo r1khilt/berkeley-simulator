@@ -13,11 +13,11 @@ void wallPBR(int s, vec3 wallC, float u, float v, float seed, float topH, float 
   vec2 uvm = vec2(u, v);
   float Lr; float size; float tintK = 1.0;  // tintK: 1 = texture is pure detail on wallC, 0 = texture colour as-is
   if (s == 1) { Lr = L_BRICK; size = 3.0; tintK = 0.35; }
-  else if (s == 0 || s == 9) { Lr = L_GRANITE; size = 1.0; }
+  else if (s == 0 || s == 9) { Lr = L_GRANITE; size = 0.45; }
   else if (s == 10) { Lr = L_BOARDCONC; size = 1.8; }
   else if (s == 3 || s == 4 || s == 8) { Lr = L_CONCRETE; size = 2.0; }
   else if (s == 5 || s == 11) { Lr = L_SIDING; size = 1.0; }
-  else { Lr = L_STUCCO; size = 2.0; }
+  else { Lr = L_STUCCO; size = 1.2; }
   vec3 mean = PBR_MEAN[int(Lr + 0.5)];
   PS t;
   if (s == 0 || s == 9) {
@@ -29,7 +29,7 @@ void wallPBR(int s, vec3 wallC, float u, float v, float seed, float topH, float 
     vec2 dj = min(bf, 1.0 - bf) * vec2(cw, ch); float jd = min(dj.x, dj.y);
     float jw = v < groundH ? 0.012 : 0.004;
     float fwj = max(fwidth(jd), 1e-5); float wwj = max(jw, fwj * 0.75); float jt = (1.0 - smoothstep(wwj - fwj * 0.5, wwj + fwj * 0.5, jd)) * (jw / wwj) * det;
-    t.c *= (0.94 + 0.1 * h21(vec2(col0 + 5.0, row + seed))) * (1.0 - 0.28 * jt);
+    t.c *= (0.97 + 0.05 * h21(vec2(col0 + 5.0, row + seed))) * (1.0 - 0.18 * jt);
     vec2 gn = vec2(bf.x < 0.5 ? -1.0 : 1.0, bf.y < 0.5 ? -1.0 : 1.0) * vec2(step(dj.x, dj.y), step(dj.y, dj.x));
     float bv = (1.0 - smoothstep(jw, jw + (v < groundH ? 0.05 : 0.015), jd)) * det;
     t.g += vec2(gn.x, -gn.y) * bv * (v < groundH ? 0.9 : 0.5);   // g is in texture space (+v_tex = down)
@@ -88,7 +88,8 @@ void wallPBR(int s, vec3 wallC, float u, float v, float seed, float topH, float 
   rough = clamp(mix(t.r, 0.97, grime * 0.5), 0.4, 1.0);
   // normal detail (fades with distance)
   vec2 uvT = vec2(uvm.x, -uvm.y);
-  fNrm = (pbrPerturb(N, vWPosF, uvT, t.g, 0.9 * (1.0 - smoothstep(30.0, 140.0, dist))) - N);
+  float nK = (s == 2 || s == 6 || s == 7) ? 0.45 : 0.9;  // stucco: gentle relief
+  fNrm = (pbrPerturb(N, vWPosF, uvT, t.g, nK * (1.0 - smoothstep(30.0, 140.0, dist))) - N);
 }
 `;
 // roof surfaces: t 0 flat membrane, 1 clay tile, 2 asphalt shingle, 3 metal/slate. Writes c (inout), fNrmR.
