@@ -77,6 +77,6 @@ function skyRGB(alt) {
 }
 export function dayGradient(day) {
   const stops = [];
-  for (let i = 0; i <= 48; i++) { const h = i / 2, c = skyRGB(sunAltDeg(Math.min(h, 23.99), day)); stops.push(`rgb(${c.join(',')}) ${(h / 24 * 100).toFixed(2)}%`); }
+  for (let i = 0; i <= 96; i++) { const h = i / 4, c = skyRGB(sunAltDeg(Math.min(h, 23.99), day)); stops.push(`rgb(${c.join(',')}) ${(h / 24 * 100).toFixed(2)}%`); }
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 }
