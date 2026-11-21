@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Kit, classicBlock, corniceProfile, ionicColumn } from './lib/classic-kit.js';
 import { mats, gAt, signText, storefront } from './lib/b03-kit.js';
+import { planting, bikes } from './lib/rn-kit.js';
 
 export const info = {
   id: 'mclaughlin-hall',
@@ -64,7 +65,13 @@ export async function build(ctx) {
     walkables.push(st);
   }
   // flat pilaster strips between the bays of the long faces
-  for (const R of [runsW.S, runsW.N]) { if (!R) continue; const nb = Math.max(1, Math.round(R.L / 5.0)); for (let j = 0; j <= nb; j++) { const s = (R.L / nb) * j; K.rbox(R, CS, s - 0.35, 1.2, -0.05, s + 0.35, 20.9, 0.18); } }
+  const SPAN = new THREE.MeshStandardMaterial({ color: 0x3b3a36, roughness: 0.6, metalness: 0.3 });
+  for (const R of [runsW.S, runsW.N]) { if (!R) continue; const nb = Math.max(1, Math.round(R.L / 5.0));
+    for (let j = 0; j <= nb; j++) { const s = (R.L / nb) * j; K.rbox(R, CS, s - 0.6, 1.2, -0.05, s + 0.6, 20.9, 0.4); K.rbox(R, CS, s - 0.75, 20.5, -0.05, s + 0.75, 21.0, 0.5); } // giant pilasters with simple caps
+    for (let j = 0; j < nb; j++) { const c = (R.L / nb) * (j + 0.5); // dark spandrels tie each bay's windows into one tall vertical strip
+      for (const [y0, y1, w] of [[8.25, 9.5, 2.3], [11.75, 13.7, 1.6], [15.25, 17.8, 1.6]]) K.rbox(R, SPAN, c - w / 2, y0, -0.42, c + w / 2, y1, -0.38); } }
+  for (const R of [runsW.S, runsW.N]) if (R) planting(K, R, 1.0, R.L - 1.0, { d0: 0.45, depth: 1.3, h: 0.9, seed: 111 });
+  { const R = K.run([PU1, v1], [PU1, v0]); colliders.push(...bikes(K, R, 2.2, 4.2, 4, 2)); }
   // (the old south-face entrance placeholder is replaced by the east pavilion's temple front)
   if (false)
   { const R = runsW.S; const s = R.L * 0.55; const gy = Math.max(gAt(K, R, s, 1.5), -0.5);
@@ -74,5 +81,5 @@ export async function build(ctx) {
     signText(K, R, 'ENGINEERING', s, 18.6, 0.75, { color: '#6e6a62', metal: 0.0, rough: 0.9, d: 0.2, spacing: 0.25 }); }
   colliders.push(K.colPoly([[-23.7, v0], [23.65, v0], [23.65, v1], [-23.7, v1]], -2, 26));
   const object3d = K.finish(); object3d.name = 'mclaughlin-hall';
-  return { object3d, colliders, walkables };
+  return { object3d, colliders: colliders.filter(Boolean), walkables };
 }

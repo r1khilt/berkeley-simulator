@@ -5,6 +5,7 @@
 // lot climbs ~5 m from the street to the east.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'kingman-hall',
@@ -17,7 +18,7 @@ export const info = {
 export async function build(ctx) {
   const K = new CoopKit(ctx, -7.9); const M = ctx.M;
   const ST = coopMat('stucco', '#efe8d6'), RF = coopMat('roof', '#86493c'), RED = coopMat('paint', '#8e3029'), WH = coopMat('paint', '#f2eee4');
-  const win = { w: 1.05, h: 1.7, sill: 0.95, pair: 1, mull: 0, tran: 0.45, muntins: 0, rev: 0.13, casing: 0.11, frame: WH };
+  const win = { glass: M.windowNight, w: 1.05, h: 1.7, sill: 0.95, pair: 1, mull: 0, tran: 0.45, muntins: 0, rev: 0.13, casing: 0.11, frame: WH };
   const wins = [{ ...win, pattern: [3, 0, 1, 3], h: 2.0, sill: 0.7, mull: 1, w: 0.8, gap: 0.08 }, { ...win, pattern: [1, 1, 0, 1] }, { ...win, pattern: [1, 0, 1, 1], h: 1.5 }];
   const floors = [1.6, 5.6, 9.6, 13.6];
   const gab = (rise, axis, ov = 0.75) => ({ type: 'gable', rise, axis, overhang: ov, overhangGable: 0.6, mat: RF, fascia: RED });
@@ -36,6 +37,8 @@ export async function build(ctx) {
     for (const s of [sc - 2.1, sc + 1.8]) { K.rbox(R, ST, s, 1.6, 1.75, s + 0.32, 4.2, 2.1); K.rbox(R, VINE, s - 0.05, 1.6, 2.08, s + 0.37, 3.6, 2.2, { detail: true }); }
     K.rbox(R, ST, sc - 2.45, 4.2, -0.02, sc + 2.45, 4.55, 2.3); K.rbox(R, RED, sc - 2.5, 4.55, -0.02, sc + 2.5, 4.65, 2.35);
     const n = Math.max(1, Math.round((1.6 - gy) / 0.17)); for (let k = 0; k < n; k++) { const h = 1.6 - (1.6 - gy) * (k + 1) / n; if (h < gy + 0.02) break; K.rbox(R, M.concrete, sc - 0.9, gy - 0.5, 2.2 + k * 0.3, sc + 0.9, h, 2.5 + k * 0.3); } }
-  K.chimney(4.0, 6.5, 1.0, 0.9, 19.9, ST); K.chimney(3.5, -9.0, 1.0, 0.9, 19.4, ST);
+  K.chimney(4.0, 6.5, 1.0, 0.8, 19.9, M.brick); K.chimney(3.5, -9.0, 1.0, 0.8, 19.4, M.brick);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { hedge: true, h: 0.9, depth: 1.0 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('kingman-hall');
 }

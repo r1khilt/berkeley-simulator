@@ -4,6 +4,7 @@
 // (Few published photos exist; the façade treatment is a plausible reconstruction consistent with the LiDAR massing.)
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'stebbins-hall',
@@ -15,15 +16,15 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -10.1); const M = ctx.M;
-  const ST = coopMat('stucco', '#e8e4da'), AC = coopMat('stucco', '#8f9a8c'), FR = coopMat('metal', '#9ea3a6'), DK = coopMat('paint', '#3c4146');
-  const win = { w: 1.1, h: 1.25, sill: 0.95, pattern: [3, 2, 3, 2], gap: 0.06, mull: 1, tran: 0, rev: 0.16, casing: 0, frame: FR };
+  const ST = coopMat('stucco', '#e6dfd0'), AC = coopMat('stucco', '#8f9a8c'), BB = coopMat('batten', '#6f5440'), FR = coopMat('metal', '#9ea3a6'), DK = coopMat('paint', '#3c4146');
+  const win = { glass: M.windowNight, w: 1.1, h: 1.25, sill: 0.95, pattern: [3, 2, 3, 2], gap: 0.06, mull: 1, tran: 0, rev: 0.16, casing: 0, frame: FR };
   const floors = [0.6, 3.6, 6.6, 9.6, 12.4];
-  const N = K.block({ u0: -9.83, u1: 9.69, v0: -12.41, v1: -1.2, floors, wall: ST, wallMats: [M.concreteDark, M.concreteDark], trim: FR, win, bay: 3.3, depth: 0.3,
+  const N = K.block({ u0: -9.83, u1: 9.69, v0: -12.41, v1: -1.2, floors, wall: ST, wallMats: [BB, BB], trim: FR, win, bay: 3.3, depth: 0.3,
     roof: { type: 'flat', parapet: 0, overhang: 0.6, eaveMat: DK, eaveH: 0.3 } });
-  const S = K.block({ u0: -1.6, u1: 9.69, v0: -1.2, v1: 12.59, floors, wall: ST, wallMats: [M.concreteDark, M.concreteDark], trim: FR, win, bay: 3.3, depth: 0.3,
+  const S = K.block({ u0: -1.6, u1: 9.69, v0: -1.2, v1: 12.59, floors, wall: ST, wallMats: [BB, BB], trim: FR, win, bay: 3.3, depth: 0.3,
     roof: { type: 'flat', parapet: 0, overhang: 0.6, eaveMat: DK, eaveH: 0.3 },
     faces: { S: { doors: [{ s: 5.6, w: 2.2, h: 2.6, door: FR, leaf: 2.5, frame: FR, landing: 1.8 }] } } });
-  const L = K.block({ u0: -9.83, u1: -1.6, v0: -1.2, v1: 12.59, floors: [0.4, 4.0], wall: ST, wallMats: [M.concreteDark, M.concreteDark], trim: FR, bay: 2.8, depth: 0.3,
+  const L = K.block({ u0: -9.83, u1: -1.6, v0: -1.2, v1: 12.59, floors: [0.4, 4.0], wall: ST, wallMats: [BB, BB], trim: FR, bay: 2.8, depth: 0.3,
     win: { w: 1.6, h: 1.9, sill: 0.6, pattern: [2, 2, 2], gap: 0.08, mull: 1, rev: 0.16, casing: 0, frame: FR },
     roof: { type: 'flat', parapet: 0.9, coping: DK, parapetMat: ST } });
   K.buildBlocks();
@@ -37,5 +38,7 @@ export async function build(ctx) {
   K._rail(L.runS, 0.3, L.runS.L - 0.3, -0.2, 4.9, M.iron, 0.9);
   // rooftop mechanical penthouse
   K.box(ST, -3, 12.7, -4, 2, 14.6, 1); K.box(DK, -3.2, 14.6, -4.2, 2.2, 14.8, 1.2);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { h: 0.9, depth: 1.2 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('stebbins-hall');
 }

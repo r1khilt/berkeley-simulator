@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Kit, corniceProfile, balustrade } from './lib/classic-kit.js';
 import { campusLamp, drapeStrip, shrubRow, tint, paleGlass, surround } from './lib/b05a-kit.js';
+import { ashlarMat, planting } from './lib/rn-kit.js';
 
 export const info = {
   id: 'university-house',
@@ -16,8 +17,8 @@ export const info = {
 
 export async function build(ctx) {
   const M = ctx.M; const K = new Kit(ctx, Math.atan2(-1.9, 12.1));
-  const W = tint(K, M.ashlar, 0xe6dabf, 'uhWall'), Q = tint(K, M.ashlar, 0xc9b997, 'uhQuoin'), T = tint(K, M.granite, 0xe9dfc6, 'uhTrim');
-  const FR = M.darkBronze, GL = paleGlass();
+  const W = ashlarMat('uhStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xdcd6c9, joint: 0xc9c2b4, jw: 0.006, vary: 0.012, grain: 0.01 }), Q = tint(K, M.ashlar, 0xd2cab9, 'uhQuoin'), T = tint(K, M.granite, 0xebe6db, 'uhTrim'); // smooth pale grey-cream stone (refine-north)
+  const FR = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.5 }), GL = M.windowNight; // white six-over-six sash frames; shared window glass
   const colliders = [], walkables = [];
   const BASE = 0.9, F2 = 5.1, TOP = 9.6, EAVE = 11.5;
   const blocks = [
@@ -121,6 +122,8 @@ export async function build(ctx) {
   shrubRow(K, [-12.45, 11.1], [-1.0, 11.1], 0.6, { h: 1.1 }); shrubRow(K, [5.5, 11.1], [10.1, 11.1], 0.6, { h: 1.1 });
   shrubRow(K, [10.1, 11.1], [10.1, -14.2], 0.6, { h: 1.0 });
   campusLamp(K, -16.5, -5.5, { h: 3.6 });
+  // garden-villa foundation planting along the main block (refine-north); the south bow/loggia keep their own steps
+  for (const [a2, b2, sk] of [[[-12.45, -5.2], [-12.45, 11.1], []], [[10.1, 11.1], [10.1, -5.2], []], [[10.03, -5.2], [10.03, -14.22], []]]) { const R = K.run(a2, b2); planting(K, R, 0.8, R.L - 0.8, { d0: 0.2, depth: 1.3, h: 1.0, w: 1.3, skip: sk, seed: 161 }); }
   const object3d = K.finish(); object3d.name = 'university-house';
   return { object3d, colliders, walkables };
 }

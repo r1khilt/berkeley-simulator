@@ -21,8 +21,8 @@ export async function build(ctx) {
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
   // refine-north: warm taupe-brown striated rainscreen (0.4 m courses, joints every 3 m), metal standing-seam roof, dark bronze frames
   const TC = bakeMat('sdhClad', (x, y) => { const row = Math.floor(y * 15), col = Math.floor(x * 2 + (row % 2) * 0.5); const fv = y * 15 - row, fu = x * 2 + (row % 2) * 0.5 - col;
-    if (fv < 0.035 || fu < 0.004) return [92, 78, 64, 0.2, 0.9];
-    const t = hash2(row, 3, 17); const base = t < 0.35 ? [138, 115, 94] : t < 0.6 ? [107, 88, 70] : t < 0.85 ? [164, 142, 118] : [150, 128, 104];
+    if (fv < 0.02 || fu < 0.003) return [96, 86, 76, 0.25, 0.9];
+    const t = hash2(row, 3, 17); const base = t < 0.35 ? [128, 114, 100] : t < 0.6 ? [114, 101, 88] : t < 0.85 ? [140, 126, 110] : [121, 108, 95];
     const k = 0.94 + fbm(x * 30, y * 6, 30, 3, 5) * 0.12 + Math.sin((y * 15 + x * 0.4) * Math.PI * 6) * 0.015; return [base[0] * k, base[1] * k, base[2] * k, 0.5 + fv * 0.2, 0.8]; }, { span: 6, rough: 0.8, normal: 3 });
   const ROOFM = panelMat('sdhRoof', { pw: 0.5, ph: 6.0, span: 6.0, base: 0x8e8f8c, joint: 0x666766, jw: 0.03, vary: 0.01, grain: 0.01, stagger: false, rough: 0.45, metal: 0.6 });
   const GL = M.windowNight, FR = new THREE.MeshStandardMaterial({ color: 0x3a3631, roughness: 0.45, metalness: 0.6 }), LV = B.louvre;
@@ -32,13 +32,16 @@ export async function build(ctx) {
   // ---- main bar: terracotta up to level 6, recessed glass storeys above
   const u0 = -33.8, u1 = 22.0, v0 = -2.0, v1 = 20.0;
   const winS = { w: 1.25, h: 2.0, sill: 0.9, bay: 2.6, mull: 0 };
-  const mainRuns = massBlock(K, { poly: rect(u0, v0, u1, v1), levels: levels.slice(0, 6), top: 20.6, wall: TC, style: 'punched', depth: 0.4, rev: 0.28, glass: GL, frame: FR, win: winS, roof: M.concreteDark });
+  // long faces: glass curtain wall with thin mullions and cladding spandrels; narrow ends: solid cladding (refine-north, per photos)
+  const mainRuns = massBlock(K, { poly: rect(u0, v0, u1, v1), levels: levels.slice(0, 6), top: 20.6, wall: TC, style: 'punched', depth: 0.4, rev: 0.28, glass: GL, frame: FR, win: winS, roof: M.concreteDark,
+    edgeOpts: { 0: { style: 'curtain', win: { mw: 1.5, spandrel: 1.0 } }, 2: { style: 'curtain', win: { mw: 1.5, spandrel: 1.0 } }, 1: { style: 'blank' }, 3: { style: 'blank' } } });
+  // one wide two-storey ribbon window group high on each narrow end
+  for (const R of mainRuns) if (R.L < 30) { const c = R.L / 2; K.rbox(R, M.concreteDark, c - 5.2, levels[3] + 0.6, -0.42, c + 5.2, levels[5] - 0.4, -0.38); curtain(K, R, c - 5.0, c + 5.0, levels[3] + 0.8, levels[5] - 0.6, { glass: GL, frame: FR, mw: 1.0, depth: 0.1, rows: [levels[4]] }); }
   massBlock(K, { poly: rect(u0 + 0.6, v0 + 0.6, u1 - 0.6, v1 - 0.6), levels: [20.6, 24.6, EAVE], top: EAVE, wall: TC, style: 'curtain', glass: GL, frame: FR, win: { mw: 1.5, spandrel: 0.25, tran: 1.2, bay: 2.6, w: 0.95, h: 1.6, sill: 1.1 }, core: true, roof: M.concreteDark,
     edgeOpts: { 1: { style: 'punched' }, 3: { style: 'punched' } }, depth: 0.4, rev: 0.28 });
   // grey louvred strips between window columns
   for (const R of mainRuns) {
-    const n = Math.round(R.L / 4.8);
-    for (let j = 1; j < n; j++) { const s = (R.L / n) * j; K.rbox(R, LV, s - 0.45, Math.max(0.6, gAt(K, R, s, 1)), -0.05, s + 0.45, 20.4, 0.08); for (let y = 1.5; y < 20.3; y += 0.22) K.rbox(R, M.iron, s - 0.42, y, 0.08, s + 0.42, y + 0.04, 0.11, { detail: true }); }
+    if (R.L < 30) { const s = R.L - 2.2; K.rbox(R, LV, s - 0.75, Math.max(0.6, gAt(K, R, s, 1)), -0.05, s + 0.75, 20.4, 0.08); for (let y = 1.5; y < 20.3; y += 0.22) K.rbox(R, M.iron, s - 0.72, y, 0.08, s + 0.72, y + 0.04, 0.11, { detail: true }); } // full-height louvre strip near one corner
     K.rbox(R, FR, -0.05, 20.45, -0.05, R.L + 0.05, 20.75, 0.12); // slab edge between cladding and glass
     if (R.L > 40) for (const y of levels.slice(1, 6)) { if (y < gAt(K, R, R.L / 2, 1) + 2) continue; K.rbox(R, FR, 0.3, y - 0.95, 0.0, R.L - 0.3, y - 0.88, 0.65, { detail: true }); for (let x = 1.0; x < R.L - 0.5; x += 3.0) K.rbox(R, FR, x - 0.03, y - 1.0, 0.0, x + 0.03, y - 0.88, 0.65, { detail: true }); }
   }

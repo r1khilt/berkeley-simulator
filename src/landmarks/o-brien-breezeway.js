@@ -14,7 +14,7 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.3);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
-  const CON = B.offWhite, GL = B.glassBlue, FR = B.alum;
+  const CON = new THREE.MeshStandardMaterial({ color: 0xcdbfb2, roughness: 0.92, map: B.precast.map, normalMap: B.precast.normalMap, roughnessMap: B.precast.roughnessMap }); const GL = M.windowNight, FR = new THREE.MeshStandardMaterial({ color: 0x5e6e66, roughness: 0.5, metalness: 0.4 });
   const colliders = [], walkables = [];
   const u0 = -1.0, u1 = 2.55, v0 = -12.8, v1 = 12.85, TOP = 11.0; // LiDAR: the covered part is ~3.5 m of the 5 m footprint
   const F1 = 4.2, F2 = 7.6;

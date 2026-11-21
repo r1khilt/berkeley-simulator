@@ -48,7 +48,7 @@ export async function build(ctx) {
   const PLINTH = tint(M.concrete, 0xd8d1c0); const DARK = tint(M.granite, 0x5e5f60, 0.6);
   const ROOF = flatTileMat('ealRoof', { base: 0x8a5442, tw: 0.33, rh: 0.3, vary: 0.08 }); 
   const FR = new THREE.MeshStandardMaterial({ color: 0x34302b, roughness: 0.45, metalness: 0.6 }); const FASCIA = FR; const TERRA = new THREE.MeshStandardMaterial({ color: 0xb4523a, roughness: 0.7 });
-  const STEP = tint(M.graniteDark, 0xc4c2bc); const CANOPY = X.alum;
+  const STEP = tint(M.graniteDark, 0xc4c2bc); const CANOPY = new THREE.MeshStandardMaterial({ color: 0xa3ada6, roughness: 0.55, metalness: 0.2 }); // pale green-grey canopy (non-metallic so it doesn't read black in-game)
   const colliders = [], walkables = [];
   const u0 = -29.6, u1 = 29.6, v0 = -13.6, v1 = 13.6, EAVE = 19.0, CROWN = 24.0, PL = 5.4;
   const poly = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];

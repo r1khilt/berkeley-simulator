@@ -1,6 +1,6 @@
 // Foothill · La Loma 3 (William Turnbull Jr. & Associates, 1990–91), part of the Foothill hillside village of linked, shingled residence
-// halls. Massing from the 2021 LiDAR; Bay Region shingle style per the shared Foothill kit (lib/b08c-foothill.js).
-import { foothillBuild, fhBalconyBay, fhBoxBay } from './lib/b08c-foothill.js';
+// halls. Massing from the 2021 LiDAR; Bay Region shingle style per lib/rn-a-foothill.js (refine-north: shingle + board, grouped windows, cross-gables, entries).
+import { faBuild, faGableBay, faBoxBay } from './lib/rn-a-foothill.js';
 
 export const info = {
   id: 'foothill-la-loma-3',
@@ -18,10 +18,10 @@ export async function build(ctx) {
     { u0: -13.0, u1: -3.0, v0: -17.0, v1: -11.0, g: 0.9, eave: 12.2, ridge: 14.6, axis: 'u', faces: { E: false } },
     { u0: 7.0, u1: 10.5, v0: 11.5, v1: 19.0, g: 3.2, eave: 10.0, ridge: 11.8, axis: 'v', roof: 'flat', faces: { W: false } },
   ];
-  const { object3d, colliders } = foothillBuild(ctx, -9, blocks, (K, F) => {
-    fhBalconyBay(K, F, K.run([-12.5, 18.5], [-3.0, 18.5]), 4.8, 4.4, 0.0, 9.8, { d: 1.8 });
-    fhBoxBay(K, F, K.run([-3.0, -19.0], [-3.0, -3.0]).constructor ? K.run([-3.0, -3.0], [-3.0, -19.0]) : null, 8.0, 3.2, 1.5 + 3.85, 2);
-  });
+  const { object3d, colliders, walkables } = faBuild(ctx, -9, blocks, (K, F) => {
+    faGableBay(K, F, K.run([-12.5, 18.5], [-3.0, 18.5]), 4.8, 4.4, 0.0, 9.8, { d: 1.0 });
+    faBoxBay(K, F, K.run([-3.0, -3.0], [-3.0, -19.0]), 8.0, 3.0, 1.5 + 3.95, 2);
+  }, { entries: 2, twoAll: true, twoN: 2, ent: [{ block: 1, face: 'S', s: 5.0 }, { block: 0, face: 'N', s: 5.0 }] });
   object3d.name = 'foothill-la-loma-3';
-  return { object3d, colliders, walkables: [] };
+  return { object3d, colliders, walkables };
 }
