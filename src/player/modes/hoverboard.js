@@ -27,7 +27,8 @@ export function install(player, ctx) {
     return { g, gc };
   };
   const plugin = {
-    key: KEY, label: 'Hoverboard', icon: '🛹',
+    key: KEY, label: 'Hoverboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 13c2 1.5 16 1.5 18 0"/><path d="M6 17h2M11 18h2M16 17h2" opacity=".6"/></svg>', // ui: SVG icon (no emoji in UI)
+   
     iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 13c2 1.5 16 1.5 18 0"/><path d="M6 17h2M11 18h2M16 17h2" opacity=".6"/></svg>',
     hint: 'W/S speed · A/D carve · Space ollie · Shift boost · X off',
     canEnter() { return true; },

@@ -132,7 +132,8 @@ export function install(player, ctx) {
   const ride = { it: null }; let lastPos = new THREE.Vector3(), justMounted = false, frame = 0, toastT = 0;
 
   const plugin = {
-    key: KEY, icon: '🛴', iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M5 18h9l3-12h3M15 6h-2"/></svg>',
+    key: KEY, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M5 18h9l3-12h3M15 6h-2"/></svg>', // ui: SVG icon (no emoji in UI)
+    iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M5 18h9l3-12h3M15 6h-2"/></svg>',
     get label() { return ride.it ? NAMES[ride.it.type] : 'E-scooter'; },
     hint: 'W throttle · S brake · A/D steer · E park',
     fleet, pending: null,
