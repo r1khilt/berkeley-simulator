@@ -52,7 +52,7 @@ export async function build(ctx) {
     K.rbox(R, CREAM, -0.05, gs - 1.2, 0, L + 0.05, gs + 0.55, 0.06);                         // low cast plinth
     const segs = A ? [[-0.05, A.s - A.w / 2 - 0.95], [A.s + A.w / 2 + 0.95, L + 0.05]] : [[-0.05, L + 0.05]];
     for (const [a0, a1] of segs) K.rbox(R, CREAM, a0, y2 - 0.2, 0, a1, y2 + 0.1, 0.1); // belt course
-    if (A) archPortal(K, R, A.s, A.g, A.w, A.yTop, { depth: A.depth ?? 5.0, X, wallD: 0.45, through: !!A.through, gFar: A.gFar, oriel: A.noOriel ? null : { w: 6.0, h: 3.8, proj: 1.4, gap: 0.12, maxTop: eave - 0.45 } });
+    if (A) archPortal(K, R, A.s, A.g, A.w, A.yTop, { depth: A.depth ?? 5.0, X, wallD: 0.45, through: !!A.through, gFar: A.gFar, oriel: A.noOriel ? null : { w: 6.4, h: 3.8, proj: 1.8, gap: 0.12, maxTop: eave - 0.45 } });
     return gs;
   }
   function block(u0, u1, v0, v1, eave, slope, faces = { S: 1, E: 1, N: 1, W: 1 }, cupolas = [], opts = {}) {

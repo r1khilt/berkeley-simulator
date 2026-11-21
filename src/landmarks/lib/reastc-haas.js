@@ -17,7 +17,7 @@ export function haasMats(M) {
     stucco: clone('stuccoWhite', 0xebdabd, 'stucco'),       // smooth sand-beige render (~#D8C9AE)
     cast: clone('stuccoWhite', 0xf8eedb, 'cast'),          // lighter cast-stone trim, plinths, voussoirs (~#E3D5BC)
     siding,                                                  // grey-taupe horizontal siding (~#7B766E)
-    roof: clone('slate', 0x8f8d8a, 'roof', { roughness: 0.8 }),  // near-black charcoal slate/concrete tile (~#2E3034)
+    roof: clone('slate', 0xb9a596, 'roof', { roughness: 0.8 }),  // dark charcoal-brown slate/concrete tile (~#3B3633)
     fascia: new THREE.MeshStandardMaterial({ color: 0x8a4a32, roughness: 0.55, metalness: 0.25, name: 'haas-fascia' }), // copper-brown eave band
     teal: new THREE.MeshStandardMaterial({ color: 0x4f7a63, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
     steel: new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.45, metalness: 0.55, name: 'haas-steel' }),   // pergola / trellis
@@ -85,7 +85,7 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
   // oriel bay over the crown on stepped corbels
   if (oriel) {
     const { w: ow, proj: op, gap } = oriel; const y0 = yTop + 1.05 + gap; const y1 = y0 + Math.min(oriel.h, (oriel.maxTop ?? Infinity) - y0);
-    for (const c of [s - ow / 2 + 0.45, s, s + ow / 2 - 0.45]) for (let k = 0; k < 3; k++) K.rbox(R, X.cast, c - 0.3, y0 - 0.4 * (k + 1), 0, c + 0.3, y0 - 0.4 * k, op * (1 - k * 0.3));
+    for (const c of [s - ow / 2 + 0.45, s, s + ow / 2 - 0.45]) for (let k = 0; k < 4; k++) K.rbox(R, X.cast, c - 0.34, y0 - 0.38 * (k + 1), 0, c + 0.34, y0 - 0.38 * k, op * (1 - k * 0.22));
     K.rbox(R, X.cast, s - ow / 2 - 0.1, y0 - 0.25, 0, s + ow / 2 + 0.1, y0, op + 0.12); // sill slab
     const ch = 0.7; // canted corners
     const A = R.at(s - ow / 2, 0), B = R.at(s - ow / 2 + ch, op), C = R.at(s + ow / 2 - ch, op), D = R.at(s + ow / 2, 0);

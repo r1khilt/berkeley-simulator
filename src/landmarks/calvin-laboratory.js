@@ -37,7 +37,7 @@ export async function build(ctx) {
   const yC0 = 4.45, yC1 = 4.75;       // canopy slab underside / top (thin cantilevered ring)
   const eave = 13.6;                  // top of the drum wall (cornice above)
   const rCan = rG + 3.1, rPier = rG + 2.6;
-  const yRing = 18.0, rIn = 9.8;      // light-well ring
+  const yRing = 16.6, rIn = 9.8;      // light-well ring (kept low so the roof stays hidden behind the eave from the ground)
   const ang = (k) => (k / N) * Math.PI * 2 + Math.PI / N * 0.5;
   const P = (r, k) => { const a = ang(k); return [cx + Math.cos(a) * r, cz + Math.sin(a) * r]; };
   const ring = (r, n = N, off = 0) => { const out = []; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + off; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; };
