@@ -264,9 +264,10 @@ export async function build(ctx) {
     const slabs = [[u0, v0, u1, W0], [u0, W1, u1, v1], [L1, W0, u1, W1]];
     for (const [a, b, c, d] of slabs) { K.box(C, a, 2.5, b, c, yF - 0.04, d); K.box(M.paving, a, yF - 0.04, b, c, yF, d); walkables.push(K.walkPoly([[a, b], [c, b], [c, d], [a, d]], yF)); colliders.push(rectCol(a, b, c, d, -2, yF - 0.05)); }
     // lightwell against the façade: walls, floor at floor 3, stair along its south side, railings
-    K.box(M.paving, L0, F3 - 0.3, W0, L1, F3 + 0.02, W1); walkables.push(K.walkPoly([[L0, W0], [L1, W0], [L1, W1 - 1.9], [L0, W1 - 1.9]], F3 + 0.02));
+    const LW = Math.max(F3, K.gMax(L0, W0, L1, W1, 8)) + 0.04;          // well floor sits just above the bare-earth terrain
+    K.box(M.paving, L0, LW - 0.35, W0, L1, LW, W1); walkables.push(K.walkPoly([[L0, W0], [L1, W0], [L1, W1 - 1.9], [L0, W1 - 1.9]], LW));
     for (const [a, b] of [[[L0, W0], [L1, W0]], [[L1, W0], [L1, W1]], [[L1, W1], [L0, W1]]]) { const R = K.run(a, b); K.rbox(R, CD, 0, F3 - 0.3, 0, R.L, yF - 0.05, 0.25); }
-    walkables.push(K.stairs(C, L0 + 0.6, W1 - 1.9, L1, W1 - 0.25, F3 + 0.02, yF, '+u', Math.round((yF - F3) / 0.165)));
+    walkables.push(K.stairs(C, L0 + 0.6, W1 - 1.9, L1, W1 - 0.25, LW, yF, '+u', Math.round((yF - LW) / 0.165)));
     for (const [a, b] of [[[L0, W0], [L1, W0]], [[L1, W0], [L1, W1 - 2.0]], [[L1 - 0.1, W1], [L0, W1]]]) { const R = K.run(a, b); K.rbox(R, C, 0, yF - 0.02, -0.25, R.L, yF + 0.18, 0.05); rail(R, 0.1, R.L - 0.1, yF + 0.18, -0.12, 0.9); }
     // deck edges: concrete fascia + railing where the ground falls away
     const RSd = K.run([u0 + 7, v1], [u1, v1]); K.rbox(RSd, C, 0, 2.5, -0.3, RSd.L, yF + 0.15, 0.02); rail(RSd, 0, RSd.L, yF + 0.15, -0.15);
