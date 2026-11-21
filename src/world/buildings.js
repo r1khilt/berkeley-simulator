@@ -5,12 +5,9 @@ let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
 import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
-<<<<<<< HEAD
 import { INTERIOR_GLSL, buildingUse } from './interiors.js'; // furnished window interiors
-=======
 import { PBR_GLSL, GH_GLSL, pbrUniforms, ghUniforms } from './pbr.js'; // gfx-materials: PBR wall/roof surfaces
 import { FACADE_PBR_GLSL, ROOF_PBR_GLSL } from './pbrFacade.js';
->>>>>>> w/gfx-materials
 
 const CH = 512;
 export const STYLE = { classical: 0, brick: 1, stucco: 2, concrete: 3, glass: 4, house: 5, apartment: 6, commercial: 7, industrial: 8, church: 9, brutal: 10, shingle: 11 };
@@ -410,13 +407,8 @@ void facade(vec3 wallC){
 function makeWallMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
-<<<<<<< HEAD
-    sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
-=======
     sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
->>>>>>> w/gfx-materials
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFac = aFac; vUvF = uv; vWPosF = (modelMatrix*vec4(transformed,1.0)).xyz; vWNF = normalize(mat3(modelMatrix)*normal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + PBR_GLSL + GH_GLSL + FACADE_GLSL.replace('vec3 fCol; float fRough;', FACADE_PBR_GLSL + 'vec3 fCol; float fRough;')) // gfx-materials
       .replace('#include <color_fragment>', '#include <color_fragment>\n facade(diffuseColor.rgb);\n diffuseColor.rgb = fCol;')
@@ -425,11 +417,7 @@ function makeWallMaterial() {
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * step(0.5, fRough), 0.0)).xyz);'); // gfx-materials: wall relief (not on glass)
   };
-<<<<<<< HEAD
-  mat.customProgramCacheKey = () => 'facade-v5-interiors';
-=======
-  mat.customProgramCacheKey = () => 'facade-v4-pbr1';
->>>>>>> w/gfx-materials
+  mat.customProgramCacheKey = () => 'facade-v5-interiors-pbr1';
   return mat;
 }
 function makeRoofMaterial() {
