@@ -18,3 +18,5 @@ All CC0 (public domain). Downloaded at 1K, then de-tiled, colour-calibrated and 
 | concrete | concrete_wall_004 | Poly Haven — https://polyhaven.com/a/concrete_wall_004 |
 | siding | wood_plank_wall | Poly Haven — https://polyhaven.com/a/wood_plank_wall |
 | rooftile (terracotta) | roof_09 | Poly Haven — https://polyhaven.com/a/roof_09 |
+- `fonts/inter-latin-wght.woff2`: Inter (variable, Latin subset) by Rasmus Andersson, SIL Open Font License 1.1. https://github.com/rsms/inter (via @fontsource-variable/inter)
+- UI icons in `src/ui/icons.js`: mostly derived from Lucide (ISC licence, https://lucide.dev); movement glyphs drawn for this project.

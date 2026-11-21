@@ -29,6 +29,7 @@ import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './tim
 import { installGrading, contactAO, GRADE } from './world/grading.js';
 import { initPBR, PBR } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
+import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
 
 let canvas = document.getElementById('c'); // [gfx-webgpu] let: the WebGPU fallback may swap in a fresh canvas
@@ -39,7 +40,7 @@ const store = { get(k, d) { try { const v = localStorage.getItem('bsim.' + k); r
 const settings = Object.assign({ quality: isTouch ? 'low' : 'high', sens: 1, invertY: false, fov: 62, volume: 0.7, north: false }, store.get('settings', {}));
 if (qs.get('q')) settings.quality = qs.get('q');
 const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.6, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
-const ui = new UI(document.getElementById('ui'));
+const ui = new UI(document.getElementById('ui')); ui.applySettings(settings); // ui-pro: theme + units
 onProgress((f) => ui.progress(f * 0.75));
 
 async function boot() {
@@ -181,7 +182,7 @@ async function boot() {
     onLoaded: (l) => { player.interactions.push(...(l.inter || [])); },
     onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); } });
   BS.lm = lm;
-  ui.note('Raising the Campanile…');
+  ui.note('Loading landmarks…');
   await lm.loadNow(manifest.landmarks.filter((l) => l.always).map((l) => l.id));
   const landmarks = lm.placed; BS.landmarks = landmarks; phase('landmarks');
   const audio = new Audio(); audio.setVolume(settings.volume); BS.audio = audio;
@@ -201,10 +202,18 @@ async function boot() {
   ui.count(found.size, places.length);
   // named buildings & roads for location labels
   const namedB = bres.named; const roads = vectors.roads.filter((r) => r.name);
-  // ---- time & weather
-  const timeSt = { live: !qs.get('t'), hour: 12, weather: 'live', wx: null };
-  if (qs.get('t')) timeSt.hour = pacificHour(new Date(qs.get('t')));
-  const now = () => (timeSt.live ? new Date() : dateAtPacificHour(timeSt.hour));
+  // ---- time & weather (ui-pro: remembered choice + date; a visit never opens in the dark)
+  // Saved choice: {live, hour, date, weather}. If that would open before 7:30 am or after sunset in Berkeley, start at
+  // 1:30 pm instead and say so. ?t=... and a time picked earlier in this tab session are honoured as-is.
+  const savedT = store.get('time', null);
+  const timeSt = { live: true, hour: 12, date: null, weather: 'live', wx: null, autoDay: null };
+  if (savedT) Object.assign(timeSt, { live: savedT.live !== false, hour: Number.isFinite(+savedT.hour) ? +savedT.hour : 12, date: savedT.date || null, weather: savedT.weather || 'live' });
+  if (qs.get('t')) { const td = new Date(qs.get('t')); if (!isNaN(td)) { timeSt.live = false; timeSt.hour = pacificHour(td); timeSt.date = pacificDay(td); } }
+  const now = () => (timeSt.live ? new Date() : dateAtPacificHour(timeSt.hour, dayBase(timeSt.date)));
+  let timePicked = false; try { timePicked = sessionStorage.getItem('bsim.timePicked') === '1'; } catch (e) {}
+  if (!qs.get('t') && !timePicked && isDark(now())) { timeSt.autoDay = now(); timeSt.live = false; timeSt.hour = DAY_DEFAULT; if (!savedT || savedT.live !== false) timeSt.date = null; }
+  const saveTime = () => { store.set('time', { live: timeSt.live, hour: timeSt.hour, date: timeSt.date, weather: timeSt.weather }); try { sessionStorage.setItem('bsim.timePicked', '1'); } catch (e) {} };
+  ui.titleTime(timeSt);
   const applyWeather = () => {
     const w = timeSt.weather === 'live' ? timeSt.wx : null; let cover = 0.3, fogMul = 1, label = '';
     if (timeSt.weather === 'clear') cover = 0.05; else if (timeSt.weather === 'cloudy') cover = 0.45; else if (timeSt.weather === 'overcast') cover = 0.9; else if (timeSt.weather === 'fog') { cover = 0.8; fogMul = 9; }
@@ -217,30 +226,43 @@ async function boot() {
   const spawn = () => { const x = -156, z = 246; const yaw = Math.atan2(-(-147 - x), -(204 - z)); player.teleport(x, null, z, yaw); player.camYaw = yaw; player.camPitch = 0.04; }; // Sproul Plaza, framing Sather Gate
   spawn();
   // ---- UI wiring
-  const startPlay = () => { ui.showTitle(false); state = 'play'; player.enabled = true; audio.start(); if (!isTouch) canvas.requestPointerLock?.(); if (!store.get('helped', false)) { store.set('helped', true); } BS.flyover = false; };
+  const lockPointer = () => { try { const r = canvas.requestPointerLock?.(); r && r.catch && r.catch(() => {}); } catch (e) {} }; // ui-pro: no unhandled rejections
+  const startPlay = () => { ui.showTitle(false); state = 'play'; player.enabled = true; audio.start(); if (!isTouch) lockPointer(); if (!store.get('helped', false)) { store.set('helped', true); } BS.flyover = false;
+    if (timeSt.autoDay) ui.notify(`Daylight view · Berkeley time is ${fmtHour(pacificHour(new Date()))}`, { icon: 'sun', ms: 6000 }); }; // ui-pro
   let state = 'title';
   ui.on('play', startPlay);
-  ui.on('look', () => ui.customize(player.avatar.look, (k, v) => { player.avatar.setLook({ [k]: v }); setupMaterials(player.avatar.root); store.set('look', player.avatar.look); }));
+  ui.on('look', () => {
+    ui.customize(player.avatar.look, (k, v) => { player.avatar.setLook({ [k]: v }); setupMaterials(player.avatar.root); store.set('look', player.avatar.look); });
+    // ui-pro: on the landing, pause the flyover and frame the avatar left of the side-docked sheet; resume on close
+    if (state !== 'play') { BS.flyover = false; player.update(0.001); const f = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)), r = new THREE.Vector3(-f.z, 0, f.x);
+      camera.position.copy(player.pos).addScaledVector(f, 3.4).addScaledVector(r, -0.9).add(new THREE.Vector3(0, 1.5, 0)); camera.lookAt(player.pos.x - r.x * 0.9, player.pos.y + 0.95, player.pos.z - r.z * 0.9);
+      const prev = ui.cb.panelClosed; ui.cb.panelClosed = () => { ui.cb.panelClosed = prev; if (state !== 'play') BS.flyover = true; prev && prev(); }; }
+  });
   ui.on('settings', () => ui.settings(settings, onSetting));
   ui.on('map', () => openMap()); ui.on('time', () => openTime());
-  ui.on('panelClosed', () => { if (state === 'play' && !isTouch) canvas.requestPointerLock?.(); });
-  ui.on('mapClosed', () => { if (state === 'play' && !isTouch) canvas.requestPointerLock?.(); });
+  ui.on('panelClosed', () => { if (state === 'play' && !isTouch) lockPointer(); });
+  ui.on('mapClosed', () => { if (state === 'play' && !isTouch) lockPointer(); });
+  ui.on('toggleNorth', () => { settings.north = !settings.north; store.set('settings', settings); ui.notify(settings.north ? 'Minimap: north up' : 'Minimap: heading up', { icon: 'navigate', ms: 1800 }); }); // ui-pro
   const onSetting = (k, v) => {
     settings[k] = v; store.set('settings', settings);
     if (k === 'sens') player.sens = v; if (k === 'invertY') player.invertY = v; if (k === 'volume') audio.setVolume(v);
     if (k === 'fov') { camera.fov = v; camera.updateProjectionMatrix(); csm.updateFrustums(); }
-    if (k === 'quality') { ui.toast({ kind: 'Graphics', name: 'Reloading…', sub: v }, 1500); setTimeout(() => location.reload(), 600); }
+    if (k === 'quality') { ui.notify(`Switching to ${v} quality…`, { icon: 'gear', ms: 1500 }); setTimeout(() => location.reload(), 600); }
   };
-  const openMap = () => ui.openMap({ px: player.pos.x, pz: player.pos.z, heading: -player.camYaw, places, onTravel: (x, z, p) => ui.fade(() => { const g = physics.groundAt(x, z); player.teleport(x, g.y, z); player.setMode(player.mode === 'fly' ? 'fly' : player.mode); }) });
-  const openTime = () => ui.timePanel(timeSt, (k, v) => {
+  const openMap = () => ui.openMap({ px: player.pos.x, pz: player.pos.z, heading: -player.camYaw, places, search: namedB.map((b, i) => ({ id: 'bld-' + i, name: b.name, p: b.c })), onTravel: (x, z, p) => ui.fade(() => { const g = physics.groundAt(x, z); player.teleport(x, g.y, z); player.setMode(player.mode === 'fly' ? 'fly' : player.mode); }) });
+  // ui-pro: time & weather popover. Any explicit time choice is remembered (and counts for this tab session).
+  const setTime = (k, v) => {
     if (k === 'hour') { timeSt.hour = v; timeSt.live = false; }
-    if (k === 'live') { timeSt.live = v; if (!v) timeSt.hour = pacificHour(new Date()); }
-    if (k === 'weather') { timeSt.weather = v; applyWeather(); }
-    if (k === 'preset') { timeSt.live = false; timeSt.hour = v === 'sunset' ? sunsetHour() - 0.35 : 21.5; }
-  });
-  const sunsetHour = () => { const base = new Date(); for (let h = 15; h < 21; h += 0.05) { const d = dateAtPacificHour(h, base); if (sky && sunAlt(d) < 0) return h; } return 17; };
-  canvas.addEventListener('click', () => { if (state === 'play' && !isTouch && !document.pointerLockElement && !ui.panelEl && !ui.bigmap) canvas.requestPointerLock?.(); });
-  document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && state === 'play' && !ui.panelEl && !ui.bigmap && !isTouch) ui.settings(settings, onSetting); });
+    if (k === 'live') { timeSt.live = v; if (!v) { timeSt.hour = pacificHour(new Date()); timeSt.date = null; } }
+    if (k === 'date') { if (timeSt.live) { timeSt.live = false; timeSt.hour = pacificHour(new Date()); } timeSt.date = v; }
+    if (k === 'preset') { timeSt.live = false; timeSt.hour = presetHour(v, timeSt.date); }
+    if (k === 'weather') { timeSt.weather = v; applyWeather(); } else { timeSt.autoDay = null; ui.titleTime(timeSt); }
+    saveTime();
+  };
+  const openTime = () => ui.timePanel(timeSt, setTime);
+  canvas.addEventListener('click', () => { if (state === 'play' && !isTouch && !document.pointerLockElement && !ui.panelEl && !ui.bigmap) lockPointer(); });
+  // ui-pro: releasing the mouse no longer pops a pause menu; the HUD stays usable and a hint explains how to look again
+  document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && state === 'play' && !ui.panelEl && !ui.bigmap && !isTouch) ui.hint('Click the view to look around · drag also works', 3500); });
   addEventListener('keydown', (e) => {
     if (state !== 'play' || (e.target && e.target.tagName === 'INPUT')) return;
     if (e.code === 'KeyM' && !e.repeat) { if (ui.bigmap) ui.closeMap(); else openMap(); }
@@ -248,11 +270,13 @@ async function boot() {
     if (e.code === 'KeyH' && !e.repeat) ui.help();
     if (e.code === 'KeyP' && !e.repeat) { BS.photo = !BS.photo; ui.hudOn(!BS.photo); }
     if (e.code === 'KeyR' && !e.repeat && e.shiftKey) ui.fade(spawn);
+    if (e.code === 'BracketLeft' || e.code === 'BracketRight') { const h = timeSt.live ? pacificHour(new Date()) : timeSt.hour; setTime('hour', (h + (e.code === 'BracketRight' ? 0.25 : -0.25) + 24) % 24); ui._timeRefresh?.(); } // ui-pro: nudge time
   });
-  if (isTouch) ui.touchControls(player, { jump: () => { player.jumpReq = true; }, run: (b) => { player.touch.run = !player.touch.run; b.style.background = player.touch.run ? 'rgba(253,181,21,.5)' : ''; }, bike: () => player.setMode(player.mode === 'bike' ? 'walk' : 'bike'), use: () => { if (player.activeInteraction) player.onInteract(player.activeInteraction); }, map: () => openMap() });
+  if (isTouch) ui.touchControls(player, { jump: () => { player.jumpReq = true; }, run: (b) => { player.touch.run = !player.touch.run; b.classList.toggle('on', player.touch.run); }, bike: () => player.setMode(player.mode === 'bike' ? 'walk' : 'bike'), use: () => { if (player.activeInteraction) player.onInteract(player.activeInteraction); }, map: () => openMap() });
   player.onInteract = (it) => { if (it.teleport) ui.fade(() => { player.teleport(it.teleport[0], it.teleport[1] + 0.02, it.teleport[2]); player.setMode('walk'); }); };
   player.onModeChange = (m) => { ui.reticleOn(false); setupMaterials(player.bike.root); };
   installModes(player, { scene, physics, audio, ui, THREE, camera, setupMaterials });
+  ui.bindPlayer(player); // ui-pro: HUD mode bar + controls list are driven by player.mode / player.plugins
   // ---- title flyover shots
   const shots = [
     { t: [0, 60, 0], r: 150, h: 70, sp: 0.05, name: 'Sather Tower' },
@@ -314,7 +338,7 @@ async function boot() {
     else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
   }
   function hud(date) {
-    ui.clock(clockString(date), timeSt.label);
+    ui.clock(clockString(date), timeSt.label, timeSt); ui.modes(); ui.setNight(U.uNight.value); // ui-pro
     // discovery
     for (const p of places) {
       const d = Math.hypot(p.p[0] - player.pos.x, p.p[1] - player.pos.z);
@@ -347,22 +371,24 @@ async function boot() {
   BS.composer = composer;
   // dynamic resolution: keep frame time near 16-20 ms by scaling the pixel ratio
   let ftAvg = 16, dprNow = renderer.getPixelRatio(), dprMax = Math.min(devicePixelRatio, Q.dpr), dprCheck = 0;
-  renderer.setAnimationLoop(() => {
+  const loop = () => {
     const nowT = performance.now(); const raw = nowT - last; const dt = Math.min(0.1, raw / 1000); last = nowT; frame(dt);
     ftAvg += (Math.min(raw, 100) - ftAvg) * 0.05; dprCheck += raw;
     if (dprCheck > 1500 && !BS.fixedDpr) { dprCheck = 0;
       if (ftAvg > 24 && dprNow > 0.6) { dprNow = Math.max(0.6, dprNow - 0.15); renderer.setPixelRatio(dprNow); composer && composer.setPixelRatio(dprNow); }
       else if (ftAvg < 13 && dprNow < dprMax) { dprNow = Math.min(dprMax, dprNow + 0.1); renderer.setPixelRatio(dprNow); composer && composer.setPixelRatio(dprNow); } }
-  });
+  };
+  renderer.setAnimationLoop(loop);
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); csm.updateFrustums(); });
   // debug hooks for automated checks
   BS.pause = () => renderer.setAnimationLoop(null);
+  BS.resume = () => { last = performance.now(); renderer.setAnimationLoop(loop); }; // ui-pro: for UI screenshots
   BS.renderOnce = () => frame(0.016);
   BS.setView = (px, py, pz, tx, ty, tz, rel) => { BS.flyover = false; if (rel) { py += heightAt(px, pz); ty += heightAt(tx, tz); } camera.position.set(px, py, pz); camera.lookAt(tx, ty, tz); camera.updateMatrixWorld(); };
   BS.snapshot = (w = 64, h = 36) => { frame(0.016); const url = renderer.domElement.toDataURL('image/jpeg', 0.85); const g = document.createElement('canvas'); g.width = w; g.height = h; const x = g.getContext('2d'); x.drawImage(renderer.domElement, 0, 0, w, h); return { url, px: Array.from(x.getImageData(0, 0, w, h).data) }; };
   BS.sim = (sec, dt = 1 / 30) => { for (let t = 0; t < sec; t += dt) { U.uTime.value += dt; player.update(dt); } };
   BS.play = startPlay; BS.ui = ui; BS.timeSt = timeSt;
-  BS.setTime = (h) => { timeSt.live = false; timeSt.hour = h; };
+  BS.setTime = (h) => { timeSt.live = false; timeSt.hour = h; timeSt.autoDay = null; };
   BS.debug = () => ({ terrain: terrain.stats, trees: treeSys && treeSys.counts, landmarks: lm.placed.map((l) => l.id), player: player.pos.toArray().map((v) => +v.toFixed(1)), mode: player.mode, render: renderer.info.render });
   phase('rest'); BS.timing = { phases: PH, load: Math.round(tLoad - t0), build: Math.round(performance.now() - tLoad), buildings: bres.stats, reversed: renderer.capabilities.reversedDepthBuffer, landmarks: lm.placed.length + '/' + lm.items.length, trees: trees.n };
   console.log('BSIM timing', JSON.stringify(BS.timing));
