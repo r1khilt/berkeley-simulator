@@ -21,14 +21,15 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const b = { u0: -4.6, u1: 4.6, v0: -9.6, v1: 9.6, eave: 3.6, ridge: 6.0, axis: 'v' };
   // walls: tall glazed door groups on the long (deck) side, smaller casement groups elsewhere
-  gothRange(K, { mat: R.jmShingle, trim: R.jmTrim, sash: R.jmSash, plinth: M.graniteDark, hood: false, string: false, cornice: false, noTransom: true,
+  gothRange(K, { mat: R.ccSiding, trim: R.jmTrim, sash: R.jmSash, plinth: M.graniteDark, hood: false, string: false, cornice: false, noTransom: true,
     panes: 2, mullW: 0.1, lightW: 0.55, winH: 2.1, topH: 2.1, fh: 3.0, depth: 0.28, ...b, ridge: 0, bay: 3.2,
     lights: (i, k, f) => (f === 'E' ? 4 : 3) });
   // gable roof with deep eaves, exposed rafter tails, dark fascia
-  K.gable(R.jmRoof, b.u0, b.v0, b.u1, b.v1, b.eave, b.ridge - b.eave, 'v', { overhang: 0.9, wallMat: R.jmShingle });
+  K.gable(R.jmRoof, b.u0, b.v0, b.u1, b.v1, b.eave, b.ridge - b.eave, 'v', { overhang: 0.9, wallMat: R.ccSiding });
+  K.box(R.jmTrim, -0.18, b.ridge - 0.05, b.v0 - 0.9, 0.18, b.ridge + 0.12, b.v1 + 0.9); // ridge cap
   for (const u of [b.u0 - 0.9, b.u1 + 0.9]) for (let v = b.v0 - 0.6; v <= b.v1 + 0.6; v += 0.8) K.box(R.timber, Math.min(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.62, v - 0.06, Math.max(u, u + (u < 0 ? 0.9 : -0.9)), b.eave - 0.48, v + 0.06, { detail: true });
   // timber deck on the east side with a simple rail
-  { const g = K.gMin(b.u1, -7.0, b.u1 + 3.0, 7.0); const yD = Math.max(g + 0.35, K.g(b.u1 + 0.3, 0) + 0.3);
+  { const g = K.gMin(b.u1, -7.0, b.u1 + 3.0, 7.0); const yD = K.gMax(b.u1, -7.0, b.u1 + 3.0, 7.0) + 0.25;
     K.box(R.timber, b.u1, g - 0.6, -7.0, b.u1 + 3.0, yD, 7.0);
     walkables.push(K.walkPoly([[b.u1, -7.0], [b.u1 + 3.0, -7.0], [b.u1 + 3.0, 7.0], [b.u1, 7.0]], yD));
     for (let v = -7.0; v <= 7.01; v += 1.75) K.box(R.timber, b.u1 + 2.85, yD, v - 0.05, b.u1 + 2.95, yD + 1.0, v + 0.05, { detail: true });

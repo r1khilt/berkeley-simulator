@@ -38,6 +38,9 @@ export async function build(ctx) {
     const bands = R.L > 3 && gMax < 6.0 ? BANDS.filter((bd) => bd.y0 > gMax + 0.5) : []; // window bands only where the hillside falls away (west/north)
     bandWall(K, R, CON, gMin - 1.5, yt, bands, { depth: 0.45, rev: 0.32, pitch: 1.55, margin: Math.min(1.2, R.L * 0.15), frame: FR, glass: GL });
     for (const bd of bands) fascia(K, R, CON, bd.y1, bd.y1 + 0.75, 0.5, { s0: 0, s1: R.L, back: 0.45 });
+    // board-formed panel joints: shallow vertical reveals every ~3.6 m and a horizontal lift joint (articulates blank walls)
+    if (R.L > 4) { const nj = Math.max(1, Math.round(R.L / 3.6)); for (let j = 1; j < nj; j++) { const sj = R.L * j / nj; K.rbox(R, CONd, sj - 0.06, gMin - 0.5, -0.02, sj + 0.06, yt - 0.1, 0.03, { detail: true }); } }
+    if (R.L > 2 && yt - gMin > 3) K.rbox(R, CONd, 0, Math.max(gMin + 1.2, yt - 3.2) - 0.05, -0.02, R.L, Math.max(gMin + 1.2, yt - 3.2) + 0.05, 0.03, { detail: true });
     if (zone === 'deck') { // parapet with coping around the plaza
       deckEdges.push(R);
       K.rbox(R, CON, 0, PZ, -0.4, R.L, PZ + 1.0, 0);
@@ -193,7 +196,12 @@ export async function build(ctx) {
     K.cyl(M.blackPaint, x, PZ, z, 0.08, 0.06, 4.2, 8, { detail: true });
     K.box(M.lampGlow, x - 0.18, PZ + 4.2, z - 0.18, x + 0.18, PZ + 4.55, z + 0.18, { detail: true });
   }
-  for (const [x, z] of [[-30, -48], [26, -50], [-36, -22], [35, -26]]) { K.box(CON, x - 1.5, PZ, z - 1.5, x + 1.5, PZ + 1.0, z + 1.5); K.box(M.soil, x - 1.3, PZ + 1.0, z - 1.3, x + 1.3, PZ + 1.03, z + 1.3); colliders.push(K.colPoly(ring4(x - 1.5, z - 1.5, x + 1.5, z + 1.5), PZ - 0.5, PZ + 1.0)); }
+  const SHR = plainMat(0x3c4a2e, { roughness: 0.95 });
+  for (const [x, z] of [[-30, -48], [26, -50], [-36, -22], [35, -26], [-12, -56], [10, -58], [-24, -12], [22, -14]]) {
+    K.box(CON, x - 1.5, PZ, z - 1.5, x + 1.5, PZ + 0.9, z + 1.5); K.box(M.soil, x - 1.3, PZ + 0.9, z - 1.3, x + 1.3, PZ + 0.93, z + 1.3);
+    for (const [dx, dz, r] of [[-0.6, -0.5, 0.75], [0.6, 0.4, 0.85], [0.2, -0.7, 0.6]]) { const g = new THREE.IcosahedronGeometry(r, 1); g.scale(1, 0.75, 1); g.translate(x + dx, PZ + 0.95 + r * 0.5, z + dz); K.add(SHR, g); }
+    colliders.push(K.colPoly(ring4(x - 1.5, z - 1.5, x + 1.5, z + 1.5), PZ - 0.5, PZ + 0.9));
+  }
 
   const object3d = K.finish();
   object3d.name = 'lawrence-hall-of-science';

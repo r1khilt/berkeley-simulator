@@ -121,6 +121,7 @@ export function rmats(M) {
     // Julia Morgan Hall / Botanical Garden halls: dark grey-brown stained redwood shingle, light grey composition roof
     jmShingle: std({ map: lapTex([74, 68, 62]), roughness: 0.88 }),
     jmRoof: tinted(M.shingle, 0xb8b9b6, 0.9),
+    ccSiding: std({ map: lapTex([118, 88, 66]), roughness: 0.85 }), // lighter weathered redwood siding
     jmTrim: std({ color: 0x2f2c29, roughness: 0.7 }),
     jmSash: std({ color: 0x3a3632, roughness: 0.6 }),
     timber: std({ color: 0x4a3a2c, roughness: 0.8 }),
