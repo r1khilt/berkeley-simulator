@@ -180,7 +180,7 @@ export function tower(ctx, P) {
           : [{ s0: c1 - ww / 2, s1: c1 + ww / 2, y0: y + 0.95, y1: y + 2.45, sill: false }, { s0: c2 - ww / 2, s1: c2 + ww / 2, y0: y + 0.95, y1: y + 2.45, sill: false }];
         K.wall(R, mSpan, sA, sB, y, y2, ops, 0.3);
         for (const o of ops) {
-          K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false });
+          K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF || u3 ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false }); // Unit 3: paired sashes
           const r = rnd();
           if (r < 0.26) { // roller / venetian blind lowered from the head to a random height
             const bh = (o.y1 - o.y0) * (0.12 + 0.48 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
