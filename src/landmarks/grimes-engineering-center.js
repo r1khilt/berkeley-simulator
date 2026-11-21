@@ -7,8 +7,8 @@
 //  3. the wraparound terrace (white picket rails) and a two-storey glass-and-steel pavilion (floor-to-ceiling glass on slim
 //     white mullions, a white floor band, warm wood ceilings), under
 //  4. a thin white louvred roof canopy that oversails the glass, most dramatically at the west end.
-// Slender white round columns stand outside the glass on a ~8 m grid with the signature zig-zag of thin shape-memory-alloy
-// rods hanging from the column heads (18 bays, 36 rods). A white steel stair and a white sign box sit on the west
+// Slender white round columns stand outside the glass on a ~8-9 m grid, each with the signature V of two tension rods rising
+// from its foot to the canopy beams, a shape-memory-alloy cable sleeve near the top of every rod (18 columns, 36 rods). A white steel stair and a white sign box sit on the west
 // (Glade-facing) front, a red-brick stair drops toward the Glade, and a sloped walk climbs the east side.
 // Plan from 2025-26 aerial imagery (canopy ~61 x 34 m, rotated like the old Bechtel outline) plus SOM / Berkeley sources and
 // Dave Burk / SOM photos. The packet's 2021 LiDAR shows the old Bechtel and is NOT used for massing.
@@ -22,7 +22,7 @@ export const info = {
   id: 'grimes-engineering-center',
   name: 'Grimes Engineering Center',
   subtitle: 'SOM · 2025',
-  blurb: 'SOM transformed the 1980 Bechtel Engineering Center into this student hub by setting a glass-and-steel pavilion on the old concrete base. The zig-zag rods around its perimeter carry shape-memory-alloy cables that pull the building back into shape after an earthquake.',
+  blurb: 'SOM transformed the 1980 Bechtel Engineering Center into this student hub by setting a glass-and-steel pavilion on the old concrete base. The V-shaped tension rods around its perimeter carry shape-memory-alloy cables that pull the building back to plumb after an earthquake.',
   replaces: ['w/25079275'],
   // New outline (2025 aerial imagery; landmark-local x,z) replacing the old Bechtel OSM outline for tree hiding and the map,
   // and areas where the 2021 LiDAR trees no longer stand: inside the new base, and the open paving west of it (the two
@@ -45,9 +45,9 @@ export async function build(ctx) {
   const CT = 18.6;   // canopy top (~61 ft)
   // ---- plan (building frame: u along the long axis ~ESE, v ~SSW-wards, metres)
   const bN = -16.3, bS = 24.0, bW = -29.4, bE = 30.8;   // podium (old Bechtel lower level + south infill)
-  const sS = 20.5, sW = -26.4;                          // set-back level-2 faces (south, west); east and north are flush
-  const pW = -19.0, pE = 24.3, pN = -6.0, pS = 17.0;    // glass pavilion
-  const cW = -20.8, cE = 26.1, cN = -7.8, cS = 18.8;    // perimeter column lines (1.8 m outside the glass)
+  const sS = 21.0, sW = -26.4;                          // set-back level-1 faces (south, west); east and north are flush
+  const pW = -22.8, pE = 24.3, pN = -6.0, pS = 19.2;    // glass pavilion (south glass ~1.8 m behind the level-1 face, per the SOM south photo)
+  const cW = -23.75, cE = 26.1, cN = -7.8, cS = 20.15;  // perimeter column lines (~1-1.8 m outside the glass, ~8.3 m bays)
   const kW = -29.6, kE = 31.4, kN = -10.0, kS = 23.6;   // roof canopy outline
   const gMin = (u0, v0, u1, v1) => K.gMin(u0, v0, u1, v1, 8);
   const quad = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
@@ -142,11 +142,11 @@ export async function build(ctx) {
   walkables.push(K.walkPoly(terPoly, TER));
   const terRail = [[[sW + 0.12, sS - 0.12], [bE - 0.12, sS - 0.12]], [[bE - 0.12, sS - 0.12], [bE - 0.12, bN + 0.5]], [[sW + 0.12, bN + 0.5], [sW + 0.12, sS - 0.12]]];
   for (const [a, b] of terRail) { pickets(K, G.steel, a, b, TER + 0.18, 1.07, 0.11); railCol(a, b, TER - 0.2, TER + 1.3); }
-  for (const [u0, v0, u1, v1] of [[-13.0, -14.8, -3.0, -12.8], [4.0, -14.8, 14.0, -12.8], [-25.4, 6.0, -23.0, 14.0], [27.6, -2.0, 29.8, 8.0]]) {
+  for (const [u0, v0, u1, v1] of [[-13.0, -14.8, -3.0, -12.8], [4.0, -14.8, 14.0, -12.8], [-26.1, 4.0, -24.5, 9.0], [27.6, -2.0, 29.8, 8.0]]) {
     K.box(G.panel, u0, TER, v0, u1, TER + 0.55, v1); K.box(G.planting, u0 + 0.15, TER + 0.55, v0 + 0.15, u1 - 0.15, TER + 0.95, v1 - 0.15, { detail: true });
     colliders.push(K.colPoly(quad(u0, v0, u1, v1), TER, TER + 0.6));
   }
-  for (const [u, v] of [[-23.5, -3], [-23.5, 1.5], [-21.5, -0.8], [27.8, -10], [27.8, -6], [-9, -10.5], [-3, -10.5], [9, -10.5], [17, -10.5], [0, 19.2], [6, 19.2], [12, 19.2]]) {
+  for (const [u, v] of [[-25.3, -4.5], [-25.3, -1.0], [27.8, -10], [27.8, -6], [-9, -10.5], [-3, -10.5], [9, -10.5], [17, -10.5]]) {
     K.cyl(G.darkFrame, u, TER, v, 0.05, 0.05, 0.72, 6, { detail: true }); K.cyl(G.metalPanel, u, TER + 0.72, v, 0.45, 0.45, 0.04, 12, { detail: true });
   }
   const pRuns = [K.run([pW, pS], [pE, pS]), K.run([pE, pS], [pE, pN]), K.run([pE, pN], [pW, pN]), K.run([pW, pN], [pW, pS])];
@@ -180,7 +180,7 @@ export async function build(ctx) {
     for (let k = 6; k >= 0; k--) ring.push([cW + (cE - cW) * k / 6, cN]);
     for (let j = 1; j <= 2; j++) ring.push([cW, cN + (cS - cN) * j / 3]);
     for (const [u, v] of ring) {
-      { const cg = new THREE.CylinderGeometry(0.23, 0.23, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
+      { const cg = new THREE.CylinderGeometry(0.25, 0.25, CU - TER, 20, 1, true); cg.translate(u, TER + (CU - TER) / 2, v); K.add(G.steel, cg, { uvMode: 'keep' }); }
       K.box(G.steel, u - 0.34, TER, v - 0.34, u + 0.34, TER + 0.06, v + 0.34, { detail: true });
       K.box(G.steel, u - 0.3, CU - 0.4, v - 0.3, u + 0.3, CU, v + 0.3, { detail: true });
       colliders.push(K.colCyl(u, v, 0.25, TER - 0.2, CU));
@@ -194,7 +194,7 @@ export async function build(ctx) {
       for (const nb of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
         const t = [c[0] + (nb[0] - c[0]) * 0.32, c[1] + (nb[1] - c[1]) * 0.32];
         const p0 = [c[0] + (nb[0] - c[0]) * 0.03, yFoot, c[1] + (nb[1] - c[1]) * 0.03], p1 = [t[0], yTop, t[1]];
-        strut(K, G.rod, p0, p1, 0.065, 6);
+        strut(K, G.rod, p0, p1, 0.07, 6);
         const f0 = 0.78, f1 = 0.9; const q = (f) => [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f, p0[2] + (p1[2] - p0[2]) * f];
         strut(K, G.sleeve, q(f0), q(f1), 0.11, 8);
       }
@@ -217,6 +217,8 @@ export async function build(ctx) {
     for (let k = 0; k < 6; k++) for (const f of [1 / 3, 2 / 3]) { const u = cW + (cE - cW) * (k + f) / 6; beam(u, kN, u, kS, 0.38, 0.1); }
     for (const u of [kW + (cW - kW) / 3, kW + 2 * (cW - kW) / 3, cE + (kE - cE) / 2]) beam(u, kN, u, kS, 0.38, 0.1);
     // louvre blades running perpendicular to the long facades (sky reads through them from the plaza)
+    // translucent white soffit veil just under the blades: from the plaza the louvre field reads as one pale, light plane
+    K.flat(G.veil, quad(kW + 0.24, kN + 0.24, kE - 0.24, kS - 0.24), CT - 0.23);
     const n = Math.round((kE - kW) / 0.6);
     for (let i = 1; i < n; i++) { const u = kW + (kE - kW) * i / n; K.box(G.louvre, u - 0.02, CT - 0.22, kN + 0.24, u + 0.02, CT - 0.04, kS - 0.24); }
   }
