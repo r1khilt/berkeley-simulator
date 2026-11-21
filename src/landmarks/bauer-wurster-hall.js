@@ -84,7 +84,27 @@ export async function build(ctx) {
     const faces = [[[tu1, tv1], [tu0, tv1].map((x, i) => i ? x : tu0)], [[tu0, tv0], [tu1, tv0]]];
     // long faces (refine-east): the same deep egg-crate as the studio wings, wide recessed window bays under heavy
     // concrete hoods at every floor, carried on fins at the bay pitch; courtyard arcade at the foot of the south face
-    eggFace(K.run([tu1, tv0], [tu0, tv0]), 0, tu1 - tu0, tTop, { startY: yBase, bay: 3.6, corbels: false, pylons: false });
+    // north face: mostly blank board-formed wall; a central bay of stacked recessed balcony slots with railings, two small
+    // square windows over each, and a few scattered small windows on the flanking volumes (per photos; the egg-crate is
+    // only on the low wings and the courtyard face)
+    {
+      const R = K.run([tu1, tv0], [tu0, tv0]); const L = R.L, mid = L * 0.42; const ops = [], slots = [];
+      for (let f = 0; f < 7; f++) {
+        const fy = yBase + 0.4 + f * 3.55; if (fy + 3.0 > tTop) break;
+        slots.push({ s0: mid - 3.6, s1: mid + 3.6, y0: fy + 0.2, y1: fy + 1.75, noFill: true });
+        for (const dx of [-1.5, 1.5]) ops.push({ s0: mid + dx - 0.42, s1: mid + dx + 0.42, y0: fy + 2.15, y1: fy + 3.0, mull: 0, frame: FR, sill: false });
+        for (const sx of [5.0 + (f % 3) * 1.7, L - 6.5 - ((f + 1) % 3) * 2.1, L * 0.72 + ((f * 7) % 5) - 2]) ops.push({ s0: sx - 0.4, s1: sx + 0.4, y0: fy + 1.5, y1: fy + 2.4, mull: 0, frame: FR, sill: false });
+      }
+      openWall(K, R, C, 0, L, yBase, tTop + 1.3, [...ops, ...slots], { depth: 1.3, rev: 0.25, frame: FR, glass: GL, sill: false });
+      for (const o of slots) {
+        K.rbox(R, GL, o.s0, o.y0, -1.25, o.s1, o.y1, -1.2);
+        K.rbox(R, M.iron, o.s0, o.y0 + 1.0, -0.25, o.s1, o.y0 + 1.06, -0.15, { detail: true });
+        for (let k = 0; k <= 12; k++) { const x = o.s0 + (o.s1 - o.s0) * k / 12; K.rbox(R, M.iron, x - 0.02, o.y0, -0.24, x + 0.02, o.y0 + 1.0, -0.2, { detail: true }); }
+      }
+      K.rbox(R, C, -0.1, tTop + 0.3, -0.45, L + 0.1, tTop + 1.3, 0.25); // blunt parapet
+      // stub fins (small cantilevered ledges) stacked up the west edge
+      for (let f = 0; f < 7; f++) { const fy = yBase + 0.4 + f * 3.55 + 3.2; if (fy > tTop) break; K.rbox(R, C, L - 2.6, fy, 0, L - 0.4, fy + 0.25, 1.2); }
+    }
     { const r = eggFace(K.run([tu0, tv1], [tu1, tv1]), 0, tu1 - tu0, tTop, { arcade: true, bay: 3.6, corbels: false, pylons: true }); void r; }
     // east end: blank board-formed wall with scattered small windows, stacked recessed balcony slots in the middle
     {

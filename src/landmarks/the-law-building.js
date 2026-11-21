@@ -53,6 +53,10 @@ export async function build(ctx) {
         if (i > 0) K.rbox(R, C, s0 - 0.5, -1.5, -1.8, s0 + 0.5, gs, 0.12);
       }
       K.rbox(R, C, 1.6, gs - 0.35, -1.8, L - 1.6, gs, 0.0); // head beam / soffit over the recessed storefront
+      if (f === 'S') { // stainless head band over the entrance bays with the school name
+        const e0 = 1.6 + 2 * bw + 0.3, e1 = 1.6 + 4 * bw - 0.3; const R3 = K.run(R.at(0, -1.62), R.at(L, -1.62));
+        inscriptionPanel(K, R3, e0, e1, gs - 0.95, gs - 0.4, 0.02, 'Berkeley Law', { bg: '#c9ccce', fg: '#1f2a36', px: 300, lineGap: 1.0, pad: 0.04 });
+      }
       K.rbox(R, CD, 1.6, gs - 0.42, -1.8, L - 1.6, gs - 0.35, -0.05);
       K.rbox(R, C, -0.25, gs, -0.2, L + 0.25, gs + 0.5, 0.4); // projecting fascia band
       // dark stone inscription panel with raised lines of lettering
