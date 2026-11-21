@@ -107,7 +107,8 @@ async function boot() {
   const trees = decodeTrees(treeBin);
   let treeSys = null;
   try {
-    const { createTreeLibrary, TREE_REF_TINT } = await import('./vegetation/trees.js');
+    // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
+    const { createTreeLibrary, TREE_REF_TINT } = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js');
     const lib = createTreeLibrary({ season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024 }); phase('treeLib');
     treeSys = new TreeSystem({ lib, trees, refTint: TREE_REF_TINT, lodDistances: Q.trees, maxDist: Q.treeMax });
     BS.treeLib = lib;
