@@ -65,10 +65,10 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
     const gf = gFar ?? g; const d0 = Math.min(depth * 0.35, 6.0); const len = depth + wallD - d0; const n = Math.max(1, Math.round(Math.abs(g - gf) / 0.16));
     K.rbox(R, M.paving, s - r, Math.min(g, gf) - 0.6, -d0, s + r, g + 0.02, 0.0);
     for (let k = 0; k < n; k++) { const ya = g - (g - gf) * (k + 1) / n; K.rbox(R, M.paving, s - r, Math.min(g, gf) - 0.6, -d0 - len * (k + 1) / n, s + r, ya + 0.02, -d0 - len * k / n); }
-    for (const sg of [-1, 1]) { const Rs = sg < 0 ? K.run(R.at(s - r, -wallD - 0.6), R.at(s - r, -wallD - 3.6)) : K.run(R.at(s + r, -wallD - 3.6), R.at(s + r, -wallD - 0.6));
+    if (depth > 4) for (const sg of [-1, 1]) { const Rs = sg < 0 ? K.run(R.at(s - r, -wallD - 0.6), R.at(s - r, -wallD - 3.6)) : K.run(R.at(s + r, -wallD - 3.6), R.at(s + r, -wallD - 0.6));
       K.rbox(Rs, M.windowNight, 0.2, g + 0.05, 0.02, 2.8, g + 2.7, 0.04); for (const x of [0.2, 1.5, 2.8]) K.rbox(Rs, X.teal, x - 0.05, g + 0.05, 0.04, x + 0.05, g + 2.7, 0.1); K.rbox(Rs, X.teal, 0.2, g + 2.65, 0.04, 2.8, g + 2.75, 0.1); }
-    K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.12, -wallD - 3.0, s + 0.25, spring + r - 0.02, -wallD - 2.5, { detail: true });
-    K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.12, -wallD - depth + 3.0, s + 0.25, spring + r - 0.02, -wallD - depth + 3.5, { detail: true });
+    if (depth > 6) { K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.3, -wallD - 3.0, s + 0.25, spring + r - 0.2, -wallD - 2.5, { detail: true });
+      K.rbox(R, M.lampGlow, s - 0.25, spring + r - 0.3, -wallD - depth + 3.0, s + 0.25, spring + r - 0.2, -wallD - depth + 3.5, { detail: true }); }
     K.rbox(R, M.bronze, s + r + 0.25, g + 1.5, 0.3, s + r + 0.85, g + 2.1, 0.33, { detail: true });
   } else K.rbox(R, M.paving, s - r, g - 0.3, -depth - wallD, s + r, g + 0.02, 0.0);
   const back = through ? null : K.run(R.at(s - r, -depth - wallD), R.at(s + r, -depth - wallD));
