@@ -191,7 +191,7 @@ export function patchBark(mat, uni) {
   mat.onBeforeCompile = (sh) => {
     withUniforms(sh, uni, false);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\n')
+      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\nvarying float vBarkTone;\n')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = treeWind(transformed);\n')
       .replace('#include <uv_vertex>', `#include <uv_vertex>
       {
@@ -199,11 +199,14 @@ export function patchBark(mat, uni) {
         mat4 bm = treeObjM();
         float bsx = length(bm[0].xyz), bsy = length(bm[1].xyz), bsz = length(bm[2].xyz);
         vec2 k = vec2(0.5 * (bsx + bsz), pow(bsx * bsy * bsz, 1.0 / 3.0)) / uTypH;
+        // gfx-trees: per-tree pattern offset + tone so neighbouring trunks don't look like clones
+        vec2 bo = vec2(treeHash(bm[3].xz * 0.71 + 5.3), treeHash(bm[3].xz * 0.37 + 9.1));
+        vBarkTone = 0.86 + 0.28 * treeHash(bm[3].xz * 1.13 + 2.7);
         #ifdef USE_MAP
-          vMapUv *= k;
+          vMapUv = vMapUv * k + bo;
         #endif
         #ifdef USE_NORMALMAP
-          vNormalMapUv *= k;
+          vNormalMapUv = vNormalMapUv * k + bo;
         #endif
       }`)
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -213,11 +216,11 @@ export function patchBark(mat, uni) {
         vPx = 2.0 * aRad * su * projectionMatrix[1][1] * 0.5 * uViewH / max(-mvPosition.z, 0.05);
       }`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vPx;\n')
+      .replace('#include <common>', '#include <common>\nvarying float vPx;\nvarying float vBarkTone;\n')
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vPx < 0.75) discard; // sub-pixel twig')
-      .replace('#include <color_fragment>', ''); // bark ignores the foliage tint
+      .replace('#include <color_fragment>', 'diffuseColor.rgb *= vBarkTone;'); // bark ignores the foliage tint (per-tree tone only)
   };
-  mat.customProgramCacheKey = () => 'tree-bark-5';
+  mat.customProgramCacheKey = () => 'tree-bark-6';
   return mat;
 }
 
