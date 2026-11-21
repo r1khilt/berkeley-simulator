@@ -7,7 +7,8 @@
 // pavilion; two long wings climb the hill eastward toward Memorial Stadium.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
-import { bmats, stuccoBlock, shedRoof, chimney, letterPanel, steps } from './lib/b08c-kit.js';
+import { bmats, stuccoBlock as stuccoBlock0, shedRoof, chimney, letterPanel, steps } from './lib/b08c-kit.js';
+import { rmats } from './lib/reastb-kit.js';
 
 export const info = {
   id: 'international-house',
@@ -18,28 +19,31 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const M = ctx.M; const B = bmats(M);
+  const M = ctx.M; const B = bmats(M); const RM = rmats(M);
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-8.8));
   const colliders = [], walkables = [];
-  const S = B.stuccoWarm;
+  const S = RM.ihStucco; // bright smooth off-white stucco
+  const SASH = RM.sash;   // white-painted double-hung sash
+  // every stucco block: off-white walls, white sash, deeper eaves
+  const stuccoBlock = (K, sp) => stuccoBlock0(K, { mat: S, frame: SASH, overhang: 0.85, ...sp });
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
-  const win = { w: 1.15, h: 1.6, mull: 0, tran: 0.55 };
-  const gwin = { w: 1.25, h: 2.0, mull: 1, tran: 0.72 };
+  const win = { w: 1.2, h: 1.55, mull: 1, muntins: 1 };
+  const gwin = { w: 1.3, h: 2.0, mull: 1, muntins: 1, tran: 0.72 };
 
   // ================= west courtyard block (4 storeys toward Piedmont) =================
   const blocks = [
     // u0, u1, v0, v1, eave, ridge, faces
     { u0: -26.0, u1: 5.3, v0: -35.2, v1: -19.2, eave: 12.0, ridge: 14.4, faces: { E: false, W: false } },  // north range
     { u0: -31.0, u1: -26.0, v0: -35.2, v1: -19.2, eave: 7.4, ridge: 9.0, faces: { E: false } },           // its low west end
-    { u0: -34.9, u1: -26.6, v0: -13.5, v1: -0.3, eave: 12.6, ridge: 15.0, faces: { E: false } },          // NW wing (forecourt arm)
+    { u0: -34.9, u1: -26.6, v0: -13.5, v1: -0.3, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u' },          // NW wing (forecourt arm)
     { u0: -34.9, u1: -26.6, v0: -19.2, v1: -13.5, eave: 7.0, ridge: 8.4, faces: { E: false, S: false } },   // low NW corner
     { u0: -26.6, u1: 5.3, v0: -15.0, v1: -2.6, eave: 15.8, ridge: 18.4, faces: { E: false } },            // central range
     { u0: -26.6, u1: -13.1, v0: -2.6, v1: 20.6, eave: 15.8, ridge: 18.4, faces: { N: false, S: false }, gal: true }, // range behind the pavilion
-    { u0: -35.2, u1: -26.6, v0: 20.2, v1: 32.9, eave: 12.6, ridge: 15.0, faces: { E: false } },          // SW wing (forecourt arm)
+    { u0: -35.2, u1: -26.6, v0: 20.2, v1: 32.9, eave: 12.6, ridge: 15.0, faces: { E: false }, roof: 'gable', axis: 'u' },          // SW wing (forecourt arm)
     { u0: -26.6, u1: 5.3, v0: 20.6, v1: 33.6, eave: 15.8, ridge: 18.4, faces: { E: false } },             // south range
   ];
   for (const b of blocks) {
-    stuccoBlock(K, { ...b, win, groundWin: gwin, bay: 3.7 });
+    stuccoBlock(K, { ...b, win, groundWin: gwin, bay: 4.0 });
     col(b.u0, b.v0, b.u1, b.v1, b.ridge + 0.5);
   }
   // one-storey link between the north and central ranges
@@ -71,8 +75,8 @@ export async function build(ctx) {
       { s0: L - 4.9, s1: L - 1.3, y0: yF + 0.5, y1: 5.0, muntins: 3 },
     ];
     K.wall(R, S, 0, L, -1.0, 6.4, ops, 0.45);
-    K.fill(R, ops[0], { frame: B.frameDark, mull: 3, rev: 0.3 });
-    K.fill(R, ops[2], { frame: B.frameDark, mull: 3, rev: 0.3 });
+    K.fill(R, ops[0], { frame: SASH, mull: 3, rev: 0.3 });
+    K.fill(R, ops[2], { frame: SASH, mull: 3, rev: 0.3 });
     K.fill(R, ops[1], { frame: B.frameDark, mull: 2, rev: 0.35, tran: [4.0] });
     // lettered frieze
     K.rbox(R, S, 0, 5.25, 0, L, 5.3, 0.04);
@@ -92,7 +96,14 @@ export async function build(ctx) {
     K.box(M.paving, lu0, -1.0, 2.6, u0, yF, 16.6);
     walkables.push(K.walkPoly([[lu0, 2.6], [u0, 2.6], [u0, 16.6], [lu0, 16.6]], yF));
     const gS = K.g(-43.0, 9.6);
-    walkables.push(steps(K, B.brickPave, -43.0, 4.6, lu0, 14.6, gS, yF, '+u'));
+    // two brick flights with a mid landing, iron handrails
+    { const yM = (gS + yF) / 2;
+      walkables.push(steps(K, M.brick, -43.0, 4.6, -40.6, 14.6, gS, yM, '+u'));
+      K.box(M.brick, -40.6, gS - 1.0, 4.6, -39.4, yM, 14.6);
+      walkables.push(K.walkPoly([[-40.6, 4.6], [-39.4, 4.6], [-39.4, 14.6], [-40.6, 14.6]], yM));
+      walkables.push(steps(K, M.brick, -39.4, 4.6, lu0, 14.6, yM, yF, '+u'));
+      for (const v of [7.6, 11.6]) { const g = new THREE.CylinderGeometry(0.03, 0.03, Math.hypot(6.0, yF - gS), 6); g.rotateZ(-Math.atan2(6.0, yF - gS)); g.translate(-40.0, (gS + yF) / 2 + 0.95, v); K.add(M.iron, g, { detail: true });
+        for (const u of [-42.6, -40.0, -37.4]) { const yy = gS + (yF - gS) * (u + 43.0) / 6.0; K.box(M.iron, u - 0.025, yy, v - 0.025, u + 0.025, yy + 0.95, v + 0.025, { detail: true }); } } }
     // planter cheek walls
     for (const [a, b] of [[2.0, 4.6], [14.6, 17.2]]) { const gg = K.g(-40, (a + b) / 2); K.box(S, -41.0, gg - 1.0, a, lu0, yF + 0.55, b); colliders.push(K.colPoly([[-41, a], [lu0, a], [lu0, b], [-41, b]], -1, yF + 0.6)); }
     // black lamp posts on the stair flanks
@@ -104,7 +115,7 @@ export async function build(ctx) {
   // ================= Monterey-style wooden gallery (top storey, behind the pavilion) =================
   {
     const u = -27.0, v0 = 3.4, v1 = 15.4, yG = 12.35, yB = 15.25, P = 1.25;
-    const W = B.woodMauve;
+    const W = new THREE.MeshStandardMaterial({ color: 0x5a4636, roughness: 0.75 }); // dark-stained timber gallery
     K.box(W, u - P, yG - 0.18, v0, u, yG, v1);                         // floor
     for (let v = v0 + 0.35; v < v1; v += 0.86) K.box(W, u - P - 0.25, yG - 0.42, v - 0.08, u, yG - 0.18, v + 0.08, { detail: true }); // beam ends
     for (const v of [v0 + 0.3, v1 - 0.3]) K.box(W, u - 0.9, yG - 1.0, v - 0.12, u, yG - 0.2, v + 0.12); // end brackets
@@ -112,7 +123,7 @@ export async function build(ctx) {
     K.box(W, u - P - 0.08, yB, v0, u - P + 0.32, yB + 0.25, v1);         // beam
     K.box(W, u - P + 0.02, yG + 0.92, v0, u - P + 0.26, yG + 1.02, v1); // handrail
     for (let v = v0 + 0.25; v < v1 - 0.1; v += 0.2) K.box(W, u - P + 0.1, yG, v - 0.025, u - P + 0.17, yG + 0.92, v + 0.025, { detail: true });
-    shedRoof(K, M.redTile, u - P - 0.6, v0 - 0.4, u, v1 + 0.4, yB + 0.3, yB + 1.0, 'u1', { thick: 0.3, rafters: 0.5, rafterMat: B.woodMauve });
+    shedRoof(K, M.redTile, u - P - 0.6, v0 - 0.4, u, v1 + 0.4, yB + 0.3, yB + 1.0, 'u1', { thick: 0.3, rafters: 0.5, rafterMat: W });
   }
 
   // ================= north–south spine (6–8 storeys) =================
@@ -151,7 +162,7 @@ export async function build(ctx) {
       const R = K.run(a, b); const L = R.L, c = L / 2;
       const ops = []; for (let y = 17.6; y < ySh - 2.4; y += 3.1) ops.push({ s0: c - 0.5, s1: c + 0.5, y0: y, y1: y + 1.4 });
       K.wall(R, S, 0, L, yG, ySh, ops, 0.4);
-      for (const o of ops) K.fill(R, o, { frame: B.frameDark, mull: 0, rev: 0.3 });
+      for (const o of ops) K.fill(R, o, { frame: SASH, mull: 1, muntins: 1, rev: 0.3 });
       K.mould(R, S, 0, L, [[0, ySh - 0.5], [0.15, ySh - 0.42], [0.32, ySh - 0.18], [0.38, ySh], [0, ySh]]);
     }
     K.box(M.concreteDark, u0 + 0.2, ySh - 0.3, v0 + 0.2, u1 - 0.2, ySh + 0.05, v1 - 0.2);
@@ -190,7 +201,7 @@ export async function build(ctx) {
     K.cyl(S, cu, yB1 + 1.0, cv, 4.78, 4.85, 0.3, 36);
     const prof = []; const R0 = 4.7, st = 0.92, yD = yB1 + 1.3;
     for (let i = 0; i <= 14; i++) { const t = (i / 14) * Math.PI / 2; prof.push([R0 * Math.cos(t), R0 * st * Math.sin(t)]); }
-    K.lathe(B.stuccoDome, prof, cu, yD, cv, 36);
+    K.lathe(S, prof, cu, yD, cv, 36);
     K.lathe(S, [[0.3, 0], [0.3, 0.1], [0.2, 0.22], [0.24, 0.42], [0.001, 0.62]], cu, yD + R0 * st - 0.06, cv, 10);
     col(u0, v0, u1, v1, 45);
   }

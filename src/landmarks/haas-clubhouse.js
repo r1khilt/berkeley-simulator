@@ -3,8 +3,11 @@
 // shingles with board-sided gablets, a lower pent roof wrapping the base of the upper floor, banks of large-paned upper
 // windows, and a timber deck on posts along the pool side with timber stairs at both ends.
 // Massing follows the 2021 LiDAR (frame -24.5°): eaves ~6.5 m, ridge ~9.5 m.
+// fields-east refinement: wall/roof colours re-matched to photos (sage stucco #c9c79a, dark brown-grey shingle), deck café
+// tables with umbrellas, planters and the clubhouse sign.
 import * as THREE from 'three';
 import { Kit, deg, mats, openWall, lamp } from './lib/b05b-kit.js';
+import { fieldsMats, umbrella, signTex, signPanel } from './lib/fields-kit.js'; // fields-east refinement: deck furniture + sign
 
 export const info = {
   id: 'haas-clubhouse',
@@ -16,9 +19,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, deg(-24.5)); const M = ctx.M; const X = mats(M);
-  const ST = new THREE.MeshStandardMaterial({ color: 0xcfc8a0, roughness: 0.92, map: M.stucco.map });
+  const ST = new THREE.MeshStandardMaterial({ color: 0xc9c79a, roughness: 0.92, map: M.stucco.map });
   const TR = new THREE.MeshStandardMaterial({ color: 0x5a3e2b, roughness: 0.8, map: M.wood.map });
-  const ROOF = new THREE.MeshStandardMaterial({ color: 0x8a8079, roughness: 0.95, map: M.shingle.map, normalMap: M.shingle.normalMap });
+  const ROOF = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.95, map: M.shingle.map, normalMap: M.shingle.normalMap });
   const FR = new THREE.MeshStandardMaterial({ color: 0x3e2c20, roughness: 0.6 });
   const colliders = [], walkables = [];
   const F1 = 0.3, F2 = 3.4, EAVE = 6.6;
@@ -67,6 +70,12 @@ export async function build(ctx) {
     colliders.push(K.colPoly([[d0 - 0.05, v0], [d0 + 0.1, v0], [d0 + 0.1, v1], [d0 - 0.05, v1]], F2, F2 + 1.05));
   }
   lamp(K, -26, K.g(-26, 0), 0, 3.6);
+  // fields-east refinement: café tables with umbrellas on the pool-side deck, timber planter boxes, and the clubhouse sign
+  { const FM = fieldsMats(M); const ub = [FM.canvasNavy, FM.canvasGold, FM.canvasWhite];
+    for (let i = 0; i < 5; i++) { const v = -6.5 + i * 5.2; const u = -21.4; K.cyl(FM.trimWhite, u, F2, v, 0.45, 0.45, 0.05, 12, { detail: true }); K.box(FM.trimWhite, u - 0.45, F2 + 0.72, v - 0.45, u + 0.45, F2 + 0.76, v + 0.45); K.cyl(FM.postBlack, u, F2, v, 0.04, 0.04, 0.74, 6, { detail: true }); for (const s of [-1, 1]) K.box(FM.chairWhite, u - 0.22, F2 + 0.44, v + s * 0.8 - 0.22, u + 0.22, F2 + 0.48, v + s * 0.8 + 0.22, { detail: true }); umbrella(K, FM, u, v, F2, ub[i % 3], { r: 1.25, h: 2.4 }); }
+    for (const v of [-11.5, 21.0]) { const g = K.g(-24.5, v); K.box(TR, -25.4, g - 0.3, v - 0.8, -23.6, g + 0.55, v + 0.8); K.box(M.soil, -25.25, g + 0.4, v - 0.65, -23.75, g + 0.57, v + 0.65); }
+    const st = signTex('HAAS CLUBHOUSE', { w: 1024, h: 160, bg: '#3e2c20', fg: '#efe6cf', size: 0.55, family: 'Georgia, serif' });
+    signPanel(K, st, 5, F2 - 0.42, 3.7 + 0.34, 5.2, 0.62, Math.PI / 2, { emissive: 0.04 }); }
   const object3d = K.finish();
   object3d.name = 'haas-clubhouse';
   return { object3d, colliders, walkables };
