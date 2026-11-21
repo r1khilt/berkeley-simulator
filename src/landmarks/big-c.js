@@ -1,6 +1,7 @@
 // The Big C on Charter Hill (1905). A gold-painted concrete block letter laid flush on the steep west-facing
 // grass slope above Memorial Stadium: a squared C with chamfered outer corners, an angled end on the upper arm and a
-// small upturned spur on the lower one, about 22 m tall on the slope. No terrace or wall: just the slab in open grass
+// small upturned spur on the lower one, about 21 m tall on the slope. The slab stands ~0.5 m proud so distant terrain
+// LOD never swallows it. No terrace or wall: just the slab in open grass
 // (the LiDAR trees frame the clearing in game), a worn path climbing to it and the class-rush plaque on the lower arm.
 // refine-east: rebuilt letterform (was a narrow 3-rectangle bracket) aligned to the measured fall line; removed the
 // invented concrete terrace; textured, edge-worn gold paint; slab follows the terrain with real thickness.
@@ -16,7 +17,7 @@ export const info = {
   replaces: [],
 };
 
-const H = 18.5, WD = 14.5, S = 3.1, CO = 2.9, CI = 1.0, THICK = 0.25, SHIFT = -3.0; // SHIFT: centre sits a few metres downhill of the OSM node, in the clearing below the tree line
+const H = 21.0, WD = 16.0, S = 3.4, CO = 3.1, CI = 1.0, THICK = 0.55, SHIFT = -4.0; // SHIFT: centre sits a few metres downhill of the OSM node, in the clearing below the tree line
 
 export async function build(ctx) {
   const { M, groundAt } = ctx;
