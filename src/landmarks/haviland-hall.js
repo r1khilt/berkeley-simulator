@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Kit, tint, solid, stoneBlock, hipPoly, rect, dentils, inscription, orient } from './lib/b02-kit.js';
 import { ionicColumn, corniceProfile } from './lib/classic-kit.js';
+import { ashlarMat, planting, rnMats } from './lib/rn-kit.js';
 
 export const info = {
   id: 'haviland-hall',
@@ -16,11 +17,11 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-17.2)); const M = ctx.M;
-  const ST = tint(M.stuccoWhite, 0xece6d6), ORN = tint(M.stucco, 0xd3ccbb), BASE = tint(M.granite, 0xcdc6b6), CU = tint(M.copper, 0x5f8f7e), FR = solid(0x2b2a26, 0.5, 0.3);
+  const ST = ashlarMat('havilandStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xe2dac8, joint: 0xc2b9a5, vary: 0.02, grain: 0.012 }), ORN = tint(M.stucco, 0xd8d0be), BASE = tint(M.granite, 0xb3a893), CU = tint(M.copper, 0x5f8f7e), FR = solid(0xede8dc, 0.5, 0.05);
   const BRICK = tint(M.brick, 0xb0604c);
   const colliders = [], walkables = [];
   const FL = 2.0;
-  const win = (k) => ({ w: 1.5, h: 2.6, sill: 0.8, mull: 1, muntins: 3 });
+  const win = (k) => ({ w: 1.5, h: 2.6, sill: 0.8, mull: 2, muntins: 3 });
   const atticWin = { w: 1.0, h: 0.95, sill: 0.9, mull: 1, muntins: 1 };
   // one continuous block: raised basement, two storeys, dentilled cornice, attic with garland panels
   const P = rect(-11.0, -26.6, 11.0, 26.6); const EAVE = 16.0;
@@ -34,6 +35,8 @@ export async function build(ctx) {
   K.loop(M.redTile, orient(P), [[0.5, EAVE], [-0.6, EAVE + 0.45], [-0.9, EAVE + 0.45]], { uvMode: 'roof' });
   K.flat(tint(M.concrete, 0xb9b4aa), rect(-10.6, -26.2, 10.6, 26.2), 15.5);
   hipPoly(K, rect(-10.2, -14.3, 10.2, 14.5), 16.0, 0.47, { ov: 0, soffit: false });
+  // low tile hips over both end wings too (LiDAR ~13.5 m at the eaves rising to ~16-17 m), so no flat grey deck shows
+  for (const [a, b] of [[-26.2, -13.6], [13.8, 26.2]]) hipPoly(K, rect(-10.6, a, 10.6, b), 15.6, 0.24, { ov: 0, soffit: false });
   colliders.push(K.colPoly(P, -2, 21));
   // ---- west portico: two fluted Ionic columns between responds, entablature, iron balcony ----
   {
@@ -50,11 +53,13 @@ export async function build(ctx) {
     const R = K.run([uF, v0], [uF, v1]); const o = { s0: 2.2, s1: 4.2, y0: FL, y1: FL + 4.3, arch: true, doorTop: FL + 2.9 };
     K.wall(R, ST, 0.3, 6.1, FL, yT, [o], 0.2); K.fill(R, o, { kind: 'door', door: tint(M.woodDark, 0x6b3a22), rev: 0.15 });
     // balcony railing on the portico roof
-    for (const [a, b] of [[[uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]]]) { const RB = K.run(a, b); K.rbox(RB, M.iron, 0, yT + 2.1, -0.05, RB.L, yT + 2.17, 0.05); for (let s = 0.15; s < RB.L; s += 0.16) K.rbox(RB, M.iron, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); const g = new THREE.TorusGeometry(0.32, 0.03, 4, 16); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.67, 0); K.add(M.iron, g, { detail: true }); }
+    for (const [a, b] of [[[uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]]]) { const RB = K.run(a, b); K.rbox(RB, CU, 0, yT + 2.1, -0.05, RB.L, yT + 2.17, 0.05); for (let s = 0.15; s < RB.L; s += 0.16) K.rbox(RB, CU, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); const g = new THREE.TorusGeometry(0.32, 0.03, 4, 16); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.67, 0); K.add(CU, g, { detail: true }); }
     // long brick stair down to the path
-    const gL = K.g(-21, 0); const n = Math.max(3, Math.round((FL - gL) / 0.16));
-    walkables.push(K.stairs(BRICK, uP - 0.3 - n * 0.36, -2.6, uP - 0.3, 2.6, gL, FL, '+u', n));
-    for (const v of [-3.1, 2.6]) K.box(ST, uP - 0.3 - n * 0.36, gL - 1, v, uP - 0.3, FL + 0.55, v + 0.5);
+    const gL = K.g(-21, 0); const n = Math.max(3, Math.round((FL - gL) / 0.16)); const STEP = tint(M.granite, 0xd4ccbb);
+    walkables.push(K.stairs(STEP, uP - 0.3 - n * 0.36, -2.8, uP - 0.3, 2.8, gL, FL, '+u', n));
+    // low stepped cheek walls that follow the flight (no trench), capped, with planting beside the stair
+    for (const v of [-3.3, 2.8]) for (let i = 0; i < n; i++) { const u1s = uP - 0.3 - i * 0.36, yt = FL - (FL - gL) * i / n; K.box(BASE, u1s - 0.36, gL - 1, v, u1s, yt + 0.75, v + 0.5); }
+    { const X = rnMats(M); const RW = K.run([-11.0, -26.6], [-11.0, 26.6]); planting(K, RW, 1.0, RW.L - 1.0, { d0: 0.1, depth: 1.3, h: 0.9, skip: [[RW.L / 2 - 4.2, RW.L / 2 + 4.2]], seed: 61 }); }
     // pendant lantern
     K.cyl(M.iron, uP + 1.2, yT - 0.9, 0, 0.01, 0.01, 0.9, 4, { detail: true }); K.lathe(M.lampGlow, [[0.05, 0], [0.18, 0.1], [0.2, 0.45], [0.08, 0.6]], uP + 1.2, yT - 1.5, 0, 8, { detail: true });
   }
