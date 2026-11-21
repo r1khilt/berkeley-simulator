@@ -50,6 +50,20 @@ export class Instancer {
   // chair facing a point (tu, tv) in the building frame
   addFacing(name, u, y, v, tu, tv) { this.add(name, u, y, v, Math.atan2(-(tu - u), -(tv - v))); }
   count() { let n = 0; for (const l of this.inst.values()) n += l.length; return n; }
+  // one InstancedMesh per piece type: parts merged with baked vertex colours (colors[piece]?.[key] ?? colors[key]) under one material
+  buildVC(parent, mat, colors) {
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(); let tris = 0;
+    for (const [name, list] of this.inst) {
+      const def = this.lib[name]; if (!def) continue; const parts = [];
+      for (const key of Object.keys(def)) { const hex = (colors[name] && colors[name][key]) ?? colors[key]; if (hex == null) continue; const c = new THREE.Color(hex);
+        for (const g0 of def[key]) { let g = clean(g0.clone()); const n = g.attributes.position.count, col = new Float32Array(n * 3); for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(col, 3)); parts.push(g); } }
+      let g = mergeGeometries(parts, false); if (this.boxUV) { const c = g.attributes.color; g = this.boxUV(g); if (!g.attributes.color) g.setAttribute('color', c); }
+      const im = new THREE.InstancedMesh(g, mat, list.length); im.name = 'furn:' + name;
+      list.forEach(([u, y, v, yaw], i) => { q.setFromEuler(e.set(0, yaw, 0)); m4.compose(p.set(u, y, v), q, s); im.setMatrixAt(i, m4); });
+      im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.castShadow = false; im.receiveShadow = true; im.userData.keep = true; parent.add(im); tris += (g.attributes.position.count / 3) * list.length;
+    }
+    return tris;
+  }
   build(parent, mats) { // mats: {key: material} with optional per-piece overrides mats[piece] = {key: material}
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
     let tris = 0;
@@ -118,6 +132,7 @@ export function lightPools(pools, { color = 0xffc98a, opacity = 0.32 } = {}) {
   return im;
 }
 // warm emissive fixture material (always on — these are indoor lights in business hours)
+export function furnMat() { const m = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.55, metalness: 0.1, emissive: 0x2e2620 }); m.userData.fill = 1; return m; }
 export function glowMat(color = 0xfff1d8, emissive = 0xffd29a, intensity = 2.2) { return new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: intensity, roughness: 0.4 }); }
 // interior surface: clone of a (tinted) shared material with a faint self-lit warm fill, so rooms under a deep roof read lit
 export function warmFill(mat, k = 0.18, warm = 0xffe2bf) {
@@ -127,12 +142,12 @@ export function warmFill(mat, k = 0.18, warm = 0xffe2bf) {
 
 // ---------- distance gate ----------
 // group: interior Group (in the landmark root); centre: [x, z] world; mats: emissive mats to scale; pools: lightPools meshes
-export function gate({ group, centre, showR = 150, glow = [], fills = [], pools = [] }) {
+export function gate({ group, centre, showR = 150, glow = [], fills = [], pools = [], side = null }) {
   const base = glow.map((m) => m.emissiveIntensity);
   let lastN = -1, lastVis = null;
   return (dt, env) => {
     const c = env.camera.position; const d = Math.hypot(c.x - centre[0], c.z - centre[1]);
-    const vis = d < showR; if (vis !== lastVis) { group.visible = vis; lastVis = vis; }
+    const vis = d < showR && (!side || side(c.x, c.z)); if (vis !== lastVis) { group.visible = vis; lastVis = vis; }
     if (!vis) return;
     const n = Math.round((env.night || 0) * 20) / 20; if (n === lastN) return; lastN = n;
     glow.forEach((m, i) => { m.emissiveIntensity = base[i] * (0.75 + 0.35 * n); });
@@ -140,3 +155,6 @@ export function gate({ group, centre, showR = 150, glow = [], fills = [], pools 
     pools.forEach((p) => { p.material.opacity = p.userData.baseOpacity * (0.7 + 0.9 * n); });
   };
 }
+
+// camera-side predicate in a Kit building frame: fn(u, v) -> bool
+export function sidePred(anchor, ang, fn) { const ca = Math.cos(ang), sa = Math.sin(ang); return (x, z) => { const dx = x - anchor.x, dz = z - anchor.z; return fn(dx * ca + dz * sa, -dx * sa + dz * ca); }; }

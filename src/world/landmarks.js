@@ -66,6 +66,7 @@ export class LandmarkManager {
     this.scene.remove(l.obj);
     l.obj.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.geometry && o.geometry.dispose(); } });
     this.physics.removeTag('lm:' + l.id);
+    if (l.res && l.res.ownsCollision && this.physics.muteTag) for (const id of l.replaces) this.physics.muteTag(id, false); // interiors-cafe
     this.standins && this.standins.setHidden(l.replaces, false);
     if (this.physics.suspendTag) for (const id of l.replaces) this.physics.suspendTag(id, false);
     this.placed = this.placed.filter((x) => x !== l);

@@ -26,6 +26,8 @@ export class Physics {
   // new-buildings: switch a tag's wall/cylinder colliders off and back on (used to drop a procedural stand-in's walls while the
   // hand-built landmark that replaces it is loaded; removeTag() is permanent, this is reversible)
   suspendTag(tag, off) { for (const s of [...this.segs, ...this.circles]) { if (s.tag !== tag) continue; if (off && !s._sus) { s._sus = [s.y0, s.y1]; s.y0 = Infinity; s.y1 = -Infinity; } else if (!off && s._sus) { s.y0 = s._sus[0]; s.y1 = s._sus[1]; s._sus = null; } } }
+  // interiors-cafe: mute / restore every wall with a tag (a loaded landmark with `ownsCollision` replaces the procedural footprint walls)
+  muteTag(tag, on) { for (const s of this.segs) if (s.tag === tag) { if (on && !s._m) { s._m = [s.y0, s.y1]; s.y0 = Infinity; s.y1 = -Infinity; } else if (!on && s._m) { s.y0 = s._m[0]; s.y1 = s._m[1]; s._m = null; } } }
   addBox(minx, miny, minz, maxx, maxy, maxz, tag) { this.addRing([[minx, minz], [maxx, minz], [maxx, maxz], [minx, maxz]], miny, maxy, tag); }
   // walkable: {type:'poly', pts, y} or {type:'fn', bounds:[x0,z0,x1,z1], heightAt}
   addWalkable(w) {

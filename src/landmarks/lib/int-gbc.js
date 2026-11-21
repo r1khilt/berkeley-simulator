@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Kit } from './classic-kit.js';
 import { ribbon, tinted, tone, TEXAVG } from './b01-kit.js';
-import { furnitureLib, Instancer, Atlas, signQuad, menuBoard, fitText, lightPools, glowMat, warmFill, gate, bx } from './int-kit.js';
+import { furnitureLib, Instancer, Atlas, signQuad, menuBoard, fitText, lightPools, glowMat, warmFill, gate, furnMat, sidePred } from './int-kit.js';
 
 function tileTexture() { // white subway tile, 7.5 x 15 cm, for the service-line backsplash (box UVs: 1 repeat = 2 m)
   const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
@@ -20,8 +20,8 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
   const colliders = [], walkables = []; const fillsExtra = [];
   const F0 = FL + 0.02; // finished floor
   // ---- materials ----
-  const floorM = warmFill(tone(M.concrete, 0x8d877d, TEXAVG.concrete, { roughness: 0.55 }), 0.22);
-  const plaster = warmFill(tone(M.stucco, 0xf1ebdf, TEXAVG.stucco), 0.3);
+  const floorM = warmFill(tone(M.concrete, 0x9a948a, TEXAVG.concrete, { roughness: 0.55 }), 0.32);
+  const plaster = warmFill(tone(M.stucco, 0xf1ebdf, TEXAVG.stucco), 0.42);
   const tile = warmFill(new THREE.MeshStandardMaterial({ map: tileTexture(), roughness: 0.25, metalness: 0.0 }), 0.28);
   const navy = warmFill(tinted(M.calBlue, 0x1d2a3c, { roughness: 0.6 }), 0.2);
   const oak = warmFill(tone(M.wood, 0xb27c4c, TEXAVG.wood), 0.3);
@@ -29,11 +29,11 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
   const quartz = warmFill(tinted(M.whitePaint, 0xf2f0eb, { roughness: 0.3 }), 0.28);
   const steel = tinted(M.iron, 0xc4c8cb, { metalness: 0.85, roughness: 0.3 });
   const black = tinted(M.blackPaint, 0x1c1c1d, { roughness: 0.5 });
-  const colW = warmFill(tinted(M.whitePaint, 0xf4f2ee), 0.3);
+  const colW = quartz;
   const caseGlass = tinted(M.glassLight, 0xc9dadd, { opacity: 0.22, depthWrite: false });
-  const glow = glowMat(0xfff4e0, 0xffd7a0, 2.4), glowCool = glowMat(0xffffff, 0xfff4e6, 1.6);
-  const pastry = warmFill(tone(M.wood, 0xc98a45, TEXAVG.wood), 0.25);
-  const leaf = warmFill(new THREE.MeshStandardMaterial({ color: 0x4f8a3e, roughness: 0.75, flatShading: true }), 0.25); const pot = tinted(M.blackPaint, 0x2a2a2a);
+  const glow = glowMat(0xfff4e0, 0xffd7a0, 2.4), glowCool = glow;
+  const pastry = oak;
+  const leaf = warmFill(new THREE.MeshStandardMaterial({ color: 0x4f8a3e, roughness: 0.75, flatShading: true }), 0.25); const pot = black;
   // ---- room geometry ----
   const room = [[uK, -5.83], [41.3, -5.83], [41.3, -9.15], [42.0, -9.15], [42.0, 10.15], [38.1, 10.15], [38.1, 12.5], [uK, 12.5]];
   K.flat(floorM, room, F0); walkables.push(K.walkPoly(room, F0));
@@ -53,7 +53,7 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
     ribbon(K, caseGlass, pts, (u, v) => soffit(u, v), () => 11.15, [0, 0, -1]);
     const p2 = []; for (let v = 7.8; v <= 10.15 + 1e-6; v += 0.6) p2.push([39.7, Math.min(v, 10.15)]);
     ribbon(K, caseGlass, p2, (u, v) => soffit(u, v), () => 11.15, [1, 0, 0]); }
-  K.box(M.whitePaint, uK, 9.85, 7.8, 39.7, 10.05, 10.42); // aisle roof between the high room and the south wing roof
+  K.box(plaster, uK, 9.85, 7.8, 39.7, 10.05, 10.42); // aisle roof between the high room and the south wing roof
   // inner faces of the precast south walls (hide the slot backing) — and close the band up to the clerestory sill
   K.box(plaster, uK, FL, 12.13, 38.1 - 0.31, 9.85, 12.19);
   K.box(plaster, 38.1 + 0.31, FL, 9.78, 42.0 - 0.2, 10.45, 9.84);
@@ -72,14 +72,14 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
       [[NW, NE], [NE, Em], [Em, SE], [SE, SW], [SW, Wm], [Wm, NW]].forEach(([p1, p2], k) => (k % 3 ? pB : pA).push([p1, p2, O])); // unitTris winding faces down; folded E/W facets darker
     }
     for (const [mat, polys] of [[soffA, pA], [soffB, pB]]) { const geo = new THREE.BufferGeometry(); const pos = []; for (const P of polys) pos.push(...P[0], ...P[1], ...P[2]); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals(); K.add(mat, geo); }
-    fillsExtra.push(soffA, soffB); if (typeof location !== 'undefined' && /dbgsoff/.test(location.search)) { soffA.color.set(0xff0000); soffB.color.set(0x00ff00); } }
+    fillsExtra.push(soffA, soffB); }
   // aisle ceiling downlights
   for (let u = 32.6; u < 38; u += 1.8) for (const v of [9.0, 11.3]) K.cyl(glowCool, u, 9.82, v, 0.09, 0.09, 0.03, 10);
 
   // ---- service line ----
   const cv0 = -5.6, cv1 = 7.4, cu0 = 33.5, cu1 = 34.2; // counter (customers on +u side)
   K.box(oakDark, cu0, FL, cv0, cu1 - 0.06, FL + 0.9, cv1);
-  for (let v = cv0 + 0.06; v < cv1 - 0.02; v += 0.11) K.box(oak, cu1 - 0.06, FL + 0.12, v, cu1, FL + 0.9, v + 0.07, { detail: true }); // vertical oak battens
+  for (let v = cv0 + 0.06; v < cv1 - 0.02; v += 0.11) K.box(oak, cu1 - 0.06, FL + 0.12, v, cu1, FL + 0.9, v + 0.07); // vertical oak battens
   K.box(black, cu1 - 0.12, FL, cv0, cu1 - 0.05, FL + 0.12, cv1); // recessed toe kick
   K.box(quartz, cu0 - 0.08, FL + 0.9, cv0 - 0.05, cu1 + 0.1, FL + 0.95, cv1 + 0.05);
   K.box(oakDark, cu0 - 0.6, FL, cv1 - 0.05, cu1, FL + 0.95, cv1 + 0.05); // end return
@@ -94,7 +94,7 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
   K.box(caseGlass, cu0 + 0.2, FL + 1.3, -2.6, cu0 + 0.62, FL + 1.33, 1.0); K.box(steel, cu0 + 0.18, FL + 0.95, -2.6, cu0 + 0.22, FL + 1.33, -2.56); K.box(steel, cu0 + 0.18, FL + 0.95, 0.96, cu0 + 0.22, FL + 1.33, 1.0);
   for (let v = -2.4; v < 0.9; v += 0.55) K.box(steel, cu0 + 0.05, FL + 0.93, v, cu0 + 0.55, FL + 1.0, v + 0.45); // hotel pans
   K.box(caseGlass, cu0 + 0.02, FL + 0.95, -5.4, cu1 + 0.05, FL + 1.55, -3.0); K.box(black, cu0, FL + 1.53, -5.42, cu1 + 0.07, FL + 1.58, -2.98);
-  for (const y of [FL + 1.05, FL + 1.3]) { K.box(glow, cu0 + 0.1, y, -5.3, cu1 - 0.05, y + 0.012, -3.1); for (let v = -5.2; v < -3.2; v += 0.24) K.box(pastry, cu0 + 0.25 + ((v * 7) % 0.2), y + 0.012, v, cu0 + 0.43 + ((v * 7) % 0.2), y + 0.07, v + 0.16, { detail: true }); }
+  for (const y of [FL + 1.05, FL + 1.3]) { K.box(glow, cu0 + 0.1, y, -5.3, cu1 - 0.05, y + 0.012, -3.1); for (let v = -5.2; v < -3.2; v += 0.24) K.box(pastry, cu0 + 0.25 + ((v * 7) % 0.2), y + 0.012, v, cu0 + 0.43 + ((v * 7) % 0.2), y + 0.07, v + 0.16); }
   for (const v of [-1.2, 3.9]) { K.box(black, cu0 + 0.3, FL + 0.95, v, cu0 + 0.55, FL + 1.0, v + 0.35); K.obox(black, cu0 + 0.52, FL + 1.15, v + 0.175, 0.03, 0.26, 0.34, 0); }
 
   // ---- grab & go cooler on the aisle wall ----
@@ -149,16 +149,17 @@ export function cafeInterior(ctx, { ANG, F, FL, uK, TH, frame }) {
   for (const [u, v] of patio.concat(terrace)) { const y = (v > 12.4 ? FL - 0.02 : FL - 0.03) + 0.0; I.add('patioTable', u, y, v, 0); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; I.addFacing('patioChair', u + Math.cos(a) * 0.68, y, v + Math.sin(a) * 0.68, u, v); } colliders.push(K.colCyl(u, v, 0.45, FL - 1, FL + 1)); }
   // ---- pendant lights + pools ----
   const lampG = new THREE.Group();
-  for (const [u, v] of pendants) { K.lathe(glow, [[0.001, -0.16], [0.12, -0.12], [0.165, 0], [0.12, 0.12], [0.03, 0.17]], u, FL + 2.75, v, 12); const top = soffit(u, v); K.box(black, u - 0.006, FL + 2.9, v - 0.006, u + 0.006, top, v + 0.006, { detail: true }); pools.push([u, F0 + 0.75, v, 0.75], [u, F0, v, 1.7]); }
-  for (const v of [-3.6, -0.3, 3.0, 6.2]) { K.box(black, 33.73, FL + 2.3, v - 1.12, 33.92, FL + 2.36, v + 1.12); K.box(glow, 33.75, FL + 2.285, v - 1.1, 33.9, FL + 2.3, v + 1.1); for (const dv of [-0.9, 0.9]) K.box(black, 33.82, FL + 2.36, v + dv - 0.004, 33.83, soffit(33.8, v + dv), v + dv + 0.004, { detail: true }); pools.push([33.85, FL + 0.95, v, 1.15], [35.0, F0, v, 1.6]); }
+  for (const [u, v] of pendants) { K.lathe(glow, [[0.001, -0.16], [0.12, -0.12], [0.165, 0], [0.12, 0.12], [0.03, 0.17]], u, FL + 2.75, v, 12); const top = soffit(u, v); K.box(black, u - 0.006, FL + 2.9, v - 0.006, u + 0.006, top, v + 0.006); pools.push([u, F0 + 0.75, v, 0.75], [u, F0, v, 1.7]); }
+  for (const v of [-3.6, -0.3, 3.0, 6.2]) { K.box(black, 33.73, FL + 2.3, v - 1.12, 33.92, FL + 2.36, v + 1.12); K.box(glow, 33.75, FL + 2.285, v - 1.1, 33.9, FL + 2.3, v + 1.1); for (const dv of [-0.9, 0.9]) K.box(black, 33.82, FL + 2.36, v + dv - 0.004, 33.83, soffit(33.8, v + dv), v + dv + 0.004); pools.push([33.85, FL + 0.95, v, 1.15], [35.0, F0, v, 1.6]); }
   for (let u = 32.6; u < 38; u += 1.8) for (const v of [9.0, 11.3]) pools.push([u, F0, v, 1.1]);
   for (const v of [-4.5, -2.2, 0.0, 6.0, 8.2]) pools.push([41.45, FL + 1.05, v, 0.7]);
   // ---- assemble ----
   const fit = K.finish(); fit.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
-  const furn = new THREE.Group(); furn.rotation.y = -ANG; const tris = I.build(furn, { seat: oak, metal: black, top: oak, white: quartz, dark: black, patioChair: { seat: black, metal: black }, patioTable: { top: black, metal: black } });
-  const pm = lightPools(pools, { color: 0xffc88a, opacity: 0.42 }); furn.add(pm);
+  const furn = new THREE.Group(); furn.rotation.y = -ANG; const fm = furnMat();
+  const tris = I.buildVC(furn, fm, { seat: 0xb07a48, metal: 0x1e1e1f, top: 0xa8743f, white: 0xeeeeea, dark: 0x262626, patioChair: { seat: 0x24272a, metal: 0x24272a }, patioTable: { top: 0x24272a, metal: 0x24272a } });
+  const pm = lightPools(pools, { color: 0xffc88a, opacity: 0.5 }); furn.add(pm);
   const root = new THREE.Group(); root.name = 'gbc-interior'; root.add(fit, furn);
   const [cx, cz] = K.xz(37, 2);
-  const update = gate({ group: root, centre: [ctx.anchor.x + cx, ctx.anchor.z + cz], showR: 170, glow: [glow, glowCool, atlasM], fills: [floorM, plaster, tile, navy, oak, oakDark, quartz, colW, ...fillsExtra], pools: [pm] });
+  const update = gate({ group: root, centre: [ctx.anchor.x + cx, ctx.anchor.z + cz], showR: 170, side: sidePred(ctx.anchor, ANG, (u, v) => u > 29 || v < -7 || v > 13), glow: [glow, glowCool, atlasM], fills: [floorM, plaster, tile, navy, oak, oakDark, quartz, ...fillsExtra], pools: [pm] });
   return { object3d: root, colliders, walkables, update, stats: { furniture: I.count(), furnTris: tris } };
 }

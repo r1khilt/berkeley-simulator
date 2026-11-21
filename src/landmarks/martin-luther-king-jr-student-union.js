@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { glassBand, slotBand, pipeRail, tinted, tone, TEXAVG } from './lib/b01-kit.js';
+import { mlkInterior, fitFloor, MLK_IN } from './lib/int-mlk.js'; // interiors-cafe: enterable Lower Sproul dining room + Cal Student Store frontage
 
 export const info = {
   id: 'martin-luther-king-jr-student-union',
@@ -47,10 +48,15 @@ export async function build(ctx) {
   const warm = tinted(M.stucco, 0xe9d2a8);
   const U0 = -14.2, U1 = 25.3, V0 = -31.0, V1 = 28.8, TOP = 21.3, PF = 4.4; // main block; arcade floor (Upper Sproul podium)
   // ---- core ----
-  K.box(M.concreteDark, U0 + 0.4, -1.5, V0 + 0.4, U1 - 6.95, 18.7, V1 - 0.4);
+  const FLR = fitFloor(K); const NI = MLK_IN; // interiors-cafe: Cal Student Store niche (u U0..nU, v nV0..nV1, below the ceiling)
+  K.box(M.concreteDark, NI.nU, -1.5, V0 + 0.4, U1 - 6.95, 18.7, V1 - 0.4);
+  K.box(M.concreteDark, U0 + 0.4, -1.5, V0 + 0.4, NI.nU, 18.7, NI.nV0); K.box(M.concreteDark, U0 + 0.4, -1.5, NI.nV1, NI.nU, 18.7, V1 - 0.4);
+  K.box(M.concreteDark, U0 + 0.4, NI.ceil + 0.02, NI.nV0, NI.nU, 18.7, NI.nV1); K.box(M.concreteDark, U0 + 0.4, -1.5, NI.nV0, NI.nU, FLR.at(U0) - 0.05, NI.nV1);
   K.box(M.concreteDark, U1 - 7.0, 9.6, V0 + 0.4, U1 - 0.8, 18.7, V1 - 0.4);
   for (const [a0, b0, a1, b1] of [[U0 + 0.4, V0 + 0.4, U1 - 0.4, 15.0], [U0 + 0.4, 23.5, U1 - 0.4, V1 - 0.4], [U0 + 0.4, 15.0, -10.5, 23.5], [-4.5, 15.0, 15.0, 23.5], [21.5, 15.0, U1 - 0.4, 23.5]]) K.box(M.concreteDark, a0, 18.6, b0, a1, TOP - 0.3, b1);
-  colliders.push(K.colPoly([[U0, V0], [U1, V0], [U1, V1], [U0, V1]], -2, TOP + 1));
+  { const ring = [[U0, NI.nV1], [U0, V1], [U1, V1], [U1, V0], [U0, V0], [U0, NI.nV0]]; // main block walls, open at the store niche (interiors-cafe)
+    for (let i = 0; i < ring.length - 1; i++) colliders.push(K.colPoly([ring[i], ring[i + 1]], -2, TOP + 1));
+    colliders.push(K.colPoly([[U0, NI.nV0], [U0, NI.nV1]], NI.ceil, TOP + 1)); }
   // roof slab + parapet
   const wells = [[-10.5, 15.0, -4.5, 23.5], [15.0, 15.0, 21.5, 23.5]]; // recessed roof courts (LiDAR 19 m)
   K.box(conc, U0 - 0.1, TOP - 0.35, V0 - 0.1, U1 + 0.1, TOP, 15.0); K.box(conc, U0 - 0.1, TOP - 0.35, 23.5, U1 + 0.1, TOP, V1 + 0.1);
@@ -149,16 +155,32 @@ export async function build(ctx) {
     for (let k = 0; k < 6; k++) { const s0 = 3 + k * 9.4; glassBand(K, R, s0, s0 + 3.0, 13.6, 17.0, { glass: blueGlass, frame, pitch: 1.5, rec: -0.12 }); }
     // west wing: north part 13.5 m, south part 9.5 m with roof terrace
     const w0 = -25.4, wN = -26.0, wM = -4.0, wS = 22.0;
+    // interiors-cafe: the wing's Lower Sproul level is a hollow, furnished dining room (lib/int-mlk.js) behind clear glass;
+    // doors: west face at v -12.5 and 5.5, south face at u -19.8. Upper floors stay solid.
+    const glassIn = tinted(M.glassLight, 0x8a9ba3, { opacity: 0.28 });
+    const doorAt = { [wN + '|w']: [-12.5], [wM + '|w']: [5.5], [wM + '|s']: [-19.8] };
     for (const [v0, v1, h] of [[wN, wM, 13.5], [wM, wS, 9.5]]) {
-      K.box(M.concreteDark, w0 + 0.3, -1.5, v0 + 0.3, U0, h - 0.3, v1 - 0.3);
+      K.box(M.concreteDark, w0 + 0.3, NI.ceil + 0.02, v0 + 0.3, U0, h - 0.3, v1 - 0.3);
+      K.box(M.concreteDark, w0 + 0.3, -1.5, v0 + 0.3, U0, FLR.at(w0) - 0.06, v1 - 0.3);
       K.box(conc, w0 - 0.1, h - 0.35, v0 - 0.1, U0, h, v1 + 0.1);
-      for (const [a, b] of [[[w0, v0], [w0, v1]], [[w0, v1], [U0, v1]], [[U0, v0], [w0, v0]]]) {
+      for (const [a, b, side] of [[[w0, v0], [w0, v1], 'w'], [[w0, v1], [U0, v1], 's'], [[U0, v0], [w0, v0], 'n']]) {
         const Rw = K.run(a, b); if (Rw.L < 0.5) continue; const gw = Math.min(g(...a), g(...b)) - 0.5;
-        glassBand(K, Rw, 0, Rw.L, gw, 4.6, { glass: blueGlass, frame: alu, pitch: 1.5, transoms: [2.6] });
-        K.rbox(Rw, M.whitePaint, -0.1, 4.6, -0.3, Rw.L + 0.1, 5.8, 0.05);
-        glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: blueGlass, frame, pitch: 1.5, rec: 0.6, transoms: h > 10 ? [9.4] : [] });
+        const internal = (side === 's' && v1 === wM) || (side === 'n' && v0 === wM);
+        const doors = (doorAt[v0 + '|' + side] || []).map((x) => (side === 'w' ? x - v0 : x - w0));
+        if (!internal) {
+          if (side === 'n') glassBand(K, Rw, 0, Rw.L, gw, 4.6, { glass: blueGlass, frame: alu, pitch: 1.5, transoms: [2.6] });
+          else { let s0 = 0; for (const d of doors) { glassBand(K, Rw, s0, d - 1.3, gw, 4.6, { glass: glassIn, frame: alu, pitch: 1.5, transoms: [2.6] }); glassBand(K, Rw, d - 1.3, d + 1.3, 2.62, 4.6, { glass: glassIn, frame: alu, pitch: 1.3 }); s0 = d + 1.3;
+              const fyD = FLR.at(side === 'w' ? w0 : Rw.at(d)[0]); K.rbox(Rw, alu, d - 1.32, fyD - 0.04, -0.2, d + 1.32, fyD, 0.05);
+              for (const [p0, q0] of [[d - 2.6, d - 1.3], [d + 1.3, d + 2.6]]) { for (const [x0, x1, y0, y1] of [[p0, p0 + 0.06, fyD, 2.6], [q0 - 0.06, q0, fyD, 2.6], [p0, q0, fyD, fyD + 0.12], [p0, q0, 2.52, 2.6]]) K.rbox(Rw, alu, x0, y0, -0.3, x1, y1, -0.25); K.rbox(Rw, glassIn, p0 + 0.06, fyD + 0.12, -0.29, q0 - 0.06, 2.52, -0.26); } }
+            glassBand(K, Rw, s0, Rw.L, gw, 4.6, { glass: glassIn, frame: alu, pitch: 1.5, transoms: [2.6] }); }
+          K.rbox(Rw, M.whitePaint, -0.1, 4.6, -0.3, Rw.L + 0.1, 5.8, 0.05);
+        }
+        if (!internal || h > 10) glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: blueGlass, frame, pitch: 1.5, rec: 0.6, transoms: h > 10 ? [9.4] : [] });
+        // colliders: outer walls with door gaps (lintel above), the taller north block's face above the south roof
+        if (internal) { if (h > 10) colliders.push(K.colPoly([a, b], NI.ceil + 0.1, h)); continue; }
+        let s0 = 0; for (const d of doors) { colliders.push(K.colPoly([Rw.at(s0), Rw.at(d - 1.3)], -2, h), K.colPoly([Rw.at(d - 1.3), Rw.at(d + 1.3)], 2.65, h)); s0 = d + 1.3; }
+        colliders.push(K.colPoly([Rw.at(s0), Rw.at(Rw.L)], -2, h));
       }
-      colliders.push(K.colPoly([[w0, v0], [U0, v0], [U0, v1], [w0, v1]], -2, h));
     }
     pipeRail(K, alu, [[w0 + 0.15, wM], [w0 + 0.15, wS - 0.15], [U0, wS - 0.15]], 9.5);
     walkables.push(K.walkPoly([[w0, wM], [U0, wM], [U0, wS], [w0, wS]], 9.5));
@@ -187,5 +209,8 @@ export async function build(ctx) {
   }
   const object3d = K.finish();
   object3d.name = 'martin-luther-king-jr-student-union';
-  return { object3d, colliders, walkables };
+  // interiors-cafe: furnished, walkable Lower Sproul dining room / food court + Cal Student Store frontage (distance-gated)
+  const IN = mlkInterior(ctx, { ANG, floor: FLR, sGlass, frame, alu });
+  object3d.add(IN.object3d); colliders.push(...IN.colliders); walkables.push(...IN.walkables);
+  return { object3d, colliders, walkables, update: IN.update, ownsCollision: true };
 }
