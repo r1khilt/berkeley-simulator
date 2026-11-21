@@ -259,5 +259,5 @@ export async function build(ctx) {
   // interiors-cafe: furnished, walkable dining room + patio furniture (distance-gated; see lib/int-gbc.js)
   const IN = cafeInterior(ctx, { ANG, F, FL, uK: UK, TH, frame });
   object3d.add(IN.object3d); colliders.push(...IN.colliders); walkables.push(...IN.walkables);
-  return { object3d, colliders, walkables, update: IN.update };
+  return { object3d, colliders, walkables, update: IN.update, ownsCollision: true };
 }

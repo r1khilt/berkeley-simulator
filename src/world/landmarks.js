@@ -55,6 +55,7 @@ export class LandmarkManager {
       l.anchors = {}; for (const [k, v] of Object.entries(res.anchors || {})) if (Array.isArray(v)) l.anchors[k] = [v[0] + a.x, v[1] + a.y, v[2] + a.z];
       Object.assign(l, { obj, res, details, packetAnchor: a, info: mod.info || {} });
       this.standins && this.standins.setHidden(l.replaces, true);
+      if (res.ownsCollision && ph.muteTag) for (const id of l.replaces) ph.muteTag(id, true); // interiors-cafe: enterable landmark — drop the stand-in footprint walls
       l.state = 'ready'; this.placed.push(l);
       this.onLoaded && this.onLoaded(l);
     } catch (e) { console.warn('landmark failed', l.id, e); l.state = 'failed'; }
@@ -63,6 +64,7 @@ export class LandmarkManager {
     this.scene.remove(l.obj);
     l.obj.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.geometry && o.geometry.dispose(); } });
     this.physics.removeTag('lm:' + l.id);
+    if (l.res && l.res.ownsCollision && this.physics.muteTag) for (const id of l.replaces) this.physics.muteTag(id, false); // interiors-cafe
     this.standins && this.standins.setHidden(l.replaces, false);
     this.placed = this.placed.filter((x) => x !== l);
     l.state = 'idle'; l.obj = null; l.res = null; l.details = [];

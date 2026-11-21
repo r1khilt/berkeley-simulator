@@ -23,6 +23,8 @@ export class Physics {
   addHole(pts, tag) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const p of pts) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); } this.holes.push({ pts, b: [x0, z0, x1, z1], tag }); }
   inHole(x, z) { for (const h of this.holes) { if (h.dead || x < h.b[0] || x > h.b[2] || z < h.b[1] || z > h.b[3]) continue; if (inRing(x, z, h.pts)) return true; } return false; }
   removeTag(tag) { for (const h of this.holes) if (h.tag === tag) h.dead = true; for (const s of this.segs) if (s.tag === tag) { s.y0 = Infinity; s.y1 = -Infinity; } for (const c of this.circles) if (c.tag === tag) { c.y0 = Infinity; c.y1 = -Infinity; } for (const w of this.walk) if (w.tag === tag) w.dead = true; }
+  // interiors-cafe: mute / restore every wall with a tag (a loaded landmark with `ownsCollision` replaces the procedural footprint walls)
+  muteTag(tag, on) { for (const s of this.segs) if (s.tag === tag) { if (on && !s._m) { s._m = [s.y0, s.y1]; s.y0 = Infinity; s.y1 = -Infinity; } else if (!on && s._m) { s.y0 = s._m[0]; s.y1 = s._m[1]; s._m = null; } } }
   addBox(minx, miny, minz, maxx, maxy, maxz, tag) { this.addRing([[minx, minz], [maxx, minz], [maxx, maxz], [minx, maxz]], miny, maxy, tag); }
   // walkable: {type:'poly', pts, y} or {type:'fn', bounds:[x0,z0,x1,z1], heightAt}
   addWalkable(w) {
