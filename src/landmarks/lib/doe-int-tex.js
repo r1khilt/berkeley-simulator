@@ -59,21 +59,21 @@ export function cofferTex() {
 }
 export function cofferTex2() {
   if (cache.coffer2) return cache.coffer2;
-  const S = 256, rib = [226, 216, 190], rec = [201, 188, 152], ros = [138, 117, 80], gilt = [178, 156, 108];
+  const S = 256, rib = [234, 226, 207], rec = [212, 202, 180], ros = [176, 152, 104], gilt = [206, 176, 112];
   cache.coffer2 = pix(S, S, (x, y) => {
     const u = (x + 0.5) / S - 0.5, v = (y + 0.5) / S - 0.5, d = Math.max(Math.abs(u), Math.abs(v));
     let c, h;
-    if (d > 0.335) { c = d > 0.47 ? [212, 205, 190] : rib; h = 1; }
-    else if (d > 0.3) { c = [234, 228, 214]; h = 0.8; }
-    else if (d > 0.265) { c = [186, 178, 160]; h = 0.65; }
-    else if (d > 0.23) { c = [220, 212, 196]; h = 0.55; }
-    else if (d > 0.2) { c = [180, 172, 154]; h = 0.45; }
+    if (d > 0.335) { c = d > 0.47 ? [222, 214, 196] : rib; h = 1; }
+    else if (d > 0.3) { c = [240, 234, 220]; h = 0.8; }
+    else if (d > 0.265) { c = [200, 192, 172]; h = 0.65; }
+    else if (d > 0.23) { c = [228, 220, 204]; h = 0.55; }
+    else if (d > 0.2) { c = [196, 188, 168]; h = 0.45; }
     else { c = rec; h = 0.35; }
     const r = Math.hypot(u, v), a = Math.atan2(v, u);
     if (r < 0.175) {
       const pet = 0.5 + 0.5 * Math.cos(a * 16), edge = 0.11 + 0.06 * pet;
-      if (r < 0.04) { c = [214, 196, 150]; h = 0.75; }
-      else if (r < 0.06) { c = [150, 130, 96]; h = 0.55; }
+      if (r < 0.04) { c = [226, 208, 160]; h = 0.75; }
+      else if (r < 0.06) { c = [180, 158, 116]; h = 0.55; }
       else if (r < edge) { const t = (r - 0.06) / (edge - 0.06); c = mixc(ros, gilt, t * t * pet); h = 0.5 + 0.2 * (1 - t); }
     }
     return [c[0], c[1], c[2], h];
@@ -103,7 +103,7 @@ export function paintingTex(seed = 1) {
 export function streakTex() {
   if (cache.streak) return cache.streak;
   const W = 64, H = 256, c = cv(W, H), g = c.getContext('2d'), id = g.createImageData(W, H);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const across = Math.exp(-Math.pow((x / (W - 1) - 0.5) / 0.22, 2)), along = Math.pow(1 - y / (H - 1), 2.2); const v = 255 * across * along; const i = (y * W + x) * 4; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const across = Math.exp(-Math.pow((x / (W - 1) - 0.5) / 0.26, 2)), t = y / (H - 1), along = Math.pow(1 - t, 1.4) * Math.min(1, t * 6 + 0.25); const v = 255 * across * along; const i = (y * W + x) * 4; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
   g.putImageData(id, 0, 0); cache.streak = tex(c, { repeat: false, srgb: false }); return cache.streak;
 }
 // Laylight glazing: 5x4 big squares (each 2x2 frosted panes) separated by narrow strips, dark bronze muntins.
@@ -161,7 +161,7 @@ export function booksTex() {
 // Quarter-sawn oak (grain along u), for tables / chairs / desks.
 export function oakTex() {
   if (cache.oak) return cache.oak;
-  const S = 256, nA = noiseP(3, 8), nB = noiseP(4, 32), nC = noiseP(5, 64), base = [140, 108, 78];
+  const S = 256, nA = noiseP(3, 8), nB = noiseP(4, 32), nC = noiseP(5, 64), base = [165, 128, 92];
   cache.oak = pix(S, S, (x, y) => {
     // grain runs along u (x): stretch the lattice in x
     const w = nA(x * 8 / S, y * 64 / S) * 0.6 + nB(x * 32 / S, y * 128 / S) * 0.4, fleck = nC(x * 64 / S, y * 64 / S) > 0.8 ? 0.1 : 0;

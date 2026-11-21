@@ -18,19 +18,37 @@ export const IU = {
   uInGnd: { value: new THREE.Color(0.36, 0.3, 0.24) },    // indoor light from below (warm floor bounce)
   uInSpec: { value: 0.35 },                               // scales sky reflections indoors
 };
-function patch(mat, key) {
+function patch(mat, key, specK = 1) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uInAmb = IU.uInAmb; sh.uniforms.uInSky = IU.uInSky; sh.uniforms.uInGnd = IU.uInGnd; sh.uniforms.uInSpec = IU.uInSpec;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aBake;\nvarying float vBake;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vBake = aBake;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBake;\nuniform vec3 uInAmb; uniform vec3 uInSky; uniform vec3 uInGnd; uniform float uInSpec;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying float vBake;
+uniform vec3 uInAmb; uniform vec3 uInSky; uniform vec3 uInGnd; uniform float uInSpec;
+#if defined( TONE_MAPPING )
+vec3 doeTone( vec3 color ) { // Khronos PBR Neutral with a much gentler toe (keeps dim warm interiors from going pure red)
+  color *= toneMappingExposure;
+  float x = min( color.r, min( color.g, color.b ) );
+  color -= ( x < 0.08 ? x - 6.25 * x * x : 0.04 ) * 0.3;
+  float peak = max( color.r, max( color.g, color.b ) ); const float SC = 0.76;
+  if ( peak >= SC ) { float d = 1. - SC; float np = 1. - d * d / ( peak + d - SC ); color *= np / peak; float g = 1. - 1. / ( 0.15 * ( peak - np ) + 1. ); color = mix( color, vec3( np ), g ); }
+  return color;
+}
+#endif`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  { float bk = vBake;
    vec3 nwI = inverseTransformDirection( normal, viewMatrix );
    vec3 hemiI = mix( uInGnd, uInSky, nwI.y * 0.5 + 0.5 );
    reflectedLight.indirectDiffuse = reflectedLight.indirectDiffuse * uInAmb * bk + hemiI * material.diffuseColor * bk;
-   reflectedLight.indirectSpecular *= uInSpec * min(bk, 1.0);
-   reflectedLight.directDiffuse *= mix(1.0, min(bk, 1.0), 0.3); }`);
+   reflectedLight.indirectSpecular *= uInSpec * ${specK.toFixed(2)} * min(bk, 1.0);
+   reflectedLight.directDiffuse *= mix(1.0, min(bk, 1.0), 0.3); }`)
+      // interiors are dim: the global grade's contrast step (c-0.5)*1.05+0.5 crushes dark linear values to 0 and turns
+      // warm darks pure red, so interior surfaces use the same neutral curve and saturation without that toe crush
+      .replace('#include <tonemapping_fragment>', `#if defined( TONE_MAPPING )
+ { vec3 cI = doeTone( gl_FragColor.rgb ); float lI = dot( cI, vec3( 0.2126, 0.7152, 0.0722 ) );
+   cI = mix( vec3( lI ), cI, 1.04 ); cI = mix( cI, ( cI - 0.5 ) * 1.05 + 0.5, smoothstep( 0.18, 0.5, lI ) ); gl_FragColor.rgb = clamp( cI, 0.0, 1.0 ); }
+#endif`);
   };
   mat.customProgramCacheKey = () => 'doeInt:' + key;
   return mat;
@@ -38,7 +56,7 @@ function patch(mat, key) {
 let MATS = null;
 function mats() {
   if (MATS) return MATS;
-  const S = (key, o, texM = 1, t = null) => { const m = new THREE.MeshStandardMaterial(o); if (t) { m.map = t.map || t; if (t.normalMap) { m.normalMap = t.normalMap; m.normalScale = new THREE.Vector2(0.5, 0.5); } } m.userData.texM = texM; m.name = 'doeInt_' + key; return patch(m, key); };
+  const S = (key, o, texM = 1, t = null, specK = 1) => { const m = new THREE.MeshStandardMaterial(o); if (t) { m.map = t.map || t; if (t.normalMap) { m.normalMap = t.normalMap; m.normalScale = new THREE.Vector2(0.5, 0.5); } } m.userData.texM = texM; m.name = 'doeInt_' + key; return patch(m, key, specK); };
   const B = (key, o) => { const m = new THREE.MeshBasicMaterial(o); m.name = 'doeInt_' + key; return m; };
   const marble = TX.marbleTex(5), marbleG = TX.marbleTex(8, [176, 172, 164]), marbleW = TX.marbleTex(13, [242, 240, 234]);
   MATS = {
@@ -46,21 +64,21 @@ function mats() {
     plasterLt: S('plasterLt', { color: 0xe6dcc6, roughness: 0.9 }),
     trim: S('trim', { color: 0x8c7a60, roughness: 0.8 }),
     vault: S('vault', { color: 0xffffff, roughness: 0.92 }, 1, TX.cofferTex2()),
-    frieze: S('frieze', { color: 0x5a4a3c, roughness: 0.75 }),
+    frieze: S('frieze', { color: 0x7a6650, roughness: 0.7 }),
     fret: S('fret', { color: 0xffffff, roughness: 0.85 }, 1, TX.fretTex()),
     painting: S('painting', { color: 0xffffff, roughness: 0.7 }, 1, TX.paintingTex(1)),
     lobbyCeil: S('lobbyCeil', { color: 0xf2ece0, roughness: 0.92 }, 1.6, TX.cofferTex()),
-    lino: S('lino', { color: 0x9a8a76, roughness: 0.12 }, 3, TX.linoTex()),
+    lino: S('lino', { color: 0x9a8a76, roughness: 0.1 }, 3, TX.linoTex(), 2.4),
     inlay: S('inlay', { color: 0x9a8a72, roughness: 0.25 }),
-    darkOak: S('darkOak', { color: 0x806450, roughness: 0.55 }, 1.2, TX.oakTex()),
+    darkOak: S('darkOak', { color: 0xb09078, roughness: 0.55 }, 1.2, TX.oakTex()),
     oakFloor: S('oakFloor', { color: 0xc8a47c, roughness: 0.38 }, 1.0, TX.oakTex()),
     books: S('books', { color: 0xffffff, roughness: 0.85 }, 1),
-    oak: S('oak', { color: 0x8c8070, roughness: 0.45 }, 1.4, TX.oakTex()),
+    oak: S('oak', { color: 0xe8dcd0, roughness: 0.48 }, 1.4, TX.oakTex()),
     bronze: S('bronze', { color: 0x7a6044, roughness: 0.45, metalness: 0.35 }),
     shade: S('shade', { color: 0x6f5d3c, roughness: 0.4, metalness: 0.45 }),
     brass: S('brass', { color: 0xb08a40, roughness: 0.35, metalness: 0.55 }),
     leather: S('leather', { color: 0x4a3a2c, roughness: 0.6 }),
-    marble: S('marble', { color: 0xffffff, roughness: 0.32 }, 1.4, marble),
+    marble: S('marble', { color: 0xffffff, roughness: 0.25 }, 1.4, marble, 1.6),
     marbleG: S('marbleG', { color: 0xffffff, roughness: 0.3 }, 1.4, marbleG),
     marbleW: S('marbleW', { color: 0xffffff, roughness: 0.4 }, 1.4, marbleW),
     verde: S('verde', { color: 0x2f3a33, roughness: 0.25 }),
@@ -74,6 +92,7 @@ function mats() {
     canvas: S('canvas', { color: 0x5b4a32, roughness: 0.8 }),
     soot: S('soot', { color: 0x121010, roughness: 1 }),
     glow: B('glow', { color: new THREE.Color(2.4, 1.85, 1.15) }),
+    globe: B('globe', { color: new THREE.Color(1.5, 1.38, 1.15) }),
     shadeGlow: B('shadeGlow', { color: new THREE.Color(1.7, 1.35, 0.95), side: THREE.DoubleSide }),
     laylight: B('laylight', { color: new THREE.Color(0.85, 0.82, 0.74), map: TX.laylightTex() }),
     globes: B('globes', { map: TX.globesTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5 }),
@@ -214,7 +233,7 @@ export function buildDoeInterior(P) {
     if (y > ySp + 0.05) { // vault: dim, brighter near the laylight wells and the crown
       let w = 0; for (const c of wells) w = Math.max(w, Math.exp(-Math.pow(Math.max(0, Math.abs(u - c) - 6.5) / 4, 2)));
       const crown = sstep(ySp, yCr, y); const ends = 1 - 0.35 * Math.exp(-Math.min(u - U0, U1 - u) / 2.5);
-      return (0.5 + 0.3 * crown + 0.4 * w * crown) * ends;
+      return (0.95 + 0.25 * crown + 0.3 * w * crown) * ends;
     }
     let k = 1.05 - 0.4 * Math.exp(-(y - F2) / 1.2) - 0.18 * Math.exp(-(ySp - y) / 0.6);
     if (nv > 0.6) k *= 0.82;              // north (window) wall: back-lit
@@ -332,7 +351,7 @@ export function buildDoeInterior(P) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
     B.add(Mt.vault, g, { uv: 'keep' });
   }
-  const yL = yCr + 0.45; // laylight plane
+  const yL = yCr + 0.3; // laylight plane (kept under the roof)
   const globeM = [];
   for (const [j0, j1] of wellJ) {
     const ua = U0 + j0 * du, ub = U0 + j1 * du, tha = -TH + 6 * dth, thb = -TH + 10 * dth;
@@ -345,6 +364,11 @@ export function buildDoeInterior(P) {
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); g.computeVertexNormals(); B.add(Mt.plasterLt, g, { bake: 0.95 });
       }
     }
+    for (const [th0, sgn] of [[tha, -1], [thb, 1]]) { // fret border band just outside the opening
+      for (let j = j0 - 1; j <= j1; j++) { const uA = U0 + j * du, uB = uA + du, t1 = th0 + sgn * 0.045;
+        const q = [[uA, th0], [uB, th0], [uB, t1], [uA, t1]].map(([uu, tt]) => [uu, yc0 + (R - 0.03) * Math.cos(tt), vc + (R - 0.03) * Math.sin(tt)]);
+        const g = new THREE.BufferGeometry(); const tri = sgn < 0 ? [q[0], q[2], q[1], q[0], q[3], q[2]] : [q[0], q[1], q[2], q[0], q[2], q[3]]; g.setAttribute('position', new THREE.Float32BufferAttribute(tri.flat(), 3)); g.computeVertexNormals(); B.add(Mt.trim, g, { bake: 0.85 }); }
+    }
     // laylight ceiling: plaster frame + three glazed panels with globe fixtures
     const va = pa[2], vb = pb[2], bw = 0.42, band = 0.55, pl = (ub - ua - 2 * bw - 2 * band) / 3;
     B.ceil(Mt.plasterLt, ua, ub, va, vb, yL, 1.5, { bake: 1.05 });
@@ -353,13 +377,17 @@ export function buildDoeInterior(P) {
       const g = new THREE.PlaneGeometry(u1 - u0, vb - va - 2 * bw).rotateX(Math.PI / 2).translate((u0 + u1) / 2, yL - 0.02, (va + vb) / 2);
       extra.push(new THREE.Mesh(g, Mt.laylight));
       const g2 = g.clone().translate(0, -0.03, 0); const gm = new THREE.Mesh(g2, Mt.globes); gm.renderOrder = 2; extra.push(gm);
-      for (let a = 0; a <= 5; a++) for (let b = 0; b <= 4; b++) globeM.push(TRS(u0 + (a / 5) * (u1 - u0), yL - 0.42, va + bw + (b / 4) * (vb - va - 2 * bw), 0));
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) globeM.push(TRS(u0 + ((a + 0.5) / 4) * (u1 - u0), yL - 0.75, va + bw + ((b + 0.5) / 3) * (vb - va - 2 * bw), 0));
       for (const [x0, x1, z0, z1] of [[u0 - 0.06, u1 + 0.06, va + bw - 0.06, va + bw], [u0 - 0.06, u1 + 0.06, vb - bw, vb - bw + 0.06], [u0 - 0.06, u0, va + bw, vb - bw], [u1, u1 + 0.06, va + bw, vb - bw]]) B.box(Mt.trim, x0, x1, yL - 0.12, yL, z0, z1, { bake: 1 });
     }
 
   }
-  { const gg = new THREE.SphereGeometry(0.09, 8, 5); const gl = inst(gg, Mt.glow, globeM); extra.push(gl);
-    const st = bakeAttr(uvs(new THREE.CylinderGeometry(0.008, 0.008, 0.36, 4).translate(0, 0.25, 0)), () => 1); extra.push(inst(st, Mt.bronze, globeM)); }
+  { const gg = new THREE.SphereGeometry(0.15, 10, 6); const gl = inst(gg, Mt.globe, globeM); extra.push(gl);
+    const st = bakeAttr(uvs(geomOf([new THREE.CylinderGeometry(0.01, 0.01, 0.62, 4).translate(0, 0.45, 0), new THREE.CylinderGeometry(0.07, 0.11, 0.08, 8).translate(0, 0.16, 0)])), () => 1); extra.push(inst(st, Mt.bronze, globeM));
+    // transverse ribs across the vault at the bay divisions (well ends and midway)
+    const ribs = new Set(); for (const [a, b] of wellJ) { ribs.add(a); ribs.add(b); } const wj = wellJ.map(([a, b]) => (a + b) / 2); for (let k = 0; k < wj.length - 1; k++) ribs.add(Math.round((wj[k] + wj[k + 1]) / 2)); ribs.add(Math.max(1, wellJ[0][0] - 5)); ribs.add(Math.min(nL - 1, wellJ[wellJ.length - 1][1] + 5));
+    for (const j of ribs) { const u = U0 + j * du; for (let i = 0; i < nA; i++) { if (inWell(i, j) && inWell(i, j - 1)) continue; const ta = -TH + i * dth, tb = ta + dth; const a1 = [u - 0.22, yc0 + (R - 0.05) * Math.cos(ta), vc + (R - 0.05) * Math.sin(ta)], a2 = [u + 0.22, a1[1], a1[2]], b1 = [u - 0.22, yc0 + (R - 0.05) * Math.cos(tb), vc + (R - 0.05) * Math.sin(tb)], b2 = [u + 0.22, b1[1], b1[2]]; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...a1, ...a2, ...b2, ...a1, ...b2, ...b1], 3)); g.computeVertexNormals(); B.add(Mt.plasterLt, g); } }
+  }
   // ---- bookcases on all four walls ----
   const bookcase = (axis, a, b, at, dir) => { // axis 'u': run along u at v=at, front toward v+dir*BK ; axis 'v': along v at u=at
     const d = BK, y0 = F2, y1 = F2 + BKH;
@@ -382,7 +410,7 @@ export function buildDoeInterior(P) {
     const dv0 = EWd.vc - 0.75, dv1 = EWd.vc + 0.75; bookcase('v', vN + 0.05, dv0 - 0.12, u, dir); bookcase('v', dv1 + 0.12, vS - 0.01, u, dir);
     const t = (x) => [Math.min(u, u + dir * x), Math.max(u, u + dir * x)];
     B.box(Mt.darkOak, ...t(0.08), F2, F2 + 2.6, dv0, dv1); B.box(Mt.darkOak, ...t(0.2), F2, F2 + 2.75, dv0 - 0.12, dv0); B.box(Mt.darkOak, ...t(0.2), F2, F2 + 2.75, dv1, dv1 + 0.12); B.box(Mt.darkOak, ...t(0.24), F2 + 2.6, F2 + 2.75, dv0 - 0.15, dv1 + 0.15);
-    for (const vv of [EWd.vc - 0.36, EWd.vc + 0.36]) { B.box(Mt.leather, ...t(0.1), F2 + 0.3, F2 + 2.3, vv - 0.28, vv + 0.28); B.box(Mt.brass, ...t(0.12), F2 + 1.0, F2 + 1.08, vv + (vv > EWd.vc ? -0.26 : 0.2), vv + (vv > EWd.vc ? -0.2 : 0.26)); }
+    for (const vv of [EWd.vc - 0.36, EWd.vc + 0.36]) { B.box(Mt.oak, ...t(0.1), F2 + 0.3, F2 + 2.3, vv - 0.28, vv + 0.28); B.box(Mt.brass, ...t(0.12), F2 + 1.0, F2 + 1.08, vv + (vv > EWd.vc ? -0.26 : 0.2), vv + (vv > EWd.vc ? -0.2 : 0.26)); }
   }
   // ---- the doorway from the stair landing: aedicule, clock in an arched hood, open leather doors ----
   { const t = vS - 0.01, d = { detail: true };
@@ -415,7 +443,7 @@ export function buildDoeInterior(P) {
     const tM = [], cM = [], lM = [], pM = [];
     for (const [u, v] of tables) {
       tM.push(TRS(u, F2, v, 0));
-      for (const dv of [-1.15, 1.15]) { lM.push(TRS(u, F2 + 0.76, v + dv, 0, 1.2)); pM.push(TRS(u, F2 + 0.766, v + dv, 0)); }
+      for (const dv of [-1.15, 1.15]) { lM.push(TRS(u, F2 + 0.76, v + dv, 0, 1.08)); pM.push(TRS(u, F2 + 0.766, v + dv, 0)); }
       for (const side of [-1, 1]) for (const dv of [-1.72, -0.58, 0.58, 1.72]) {
         const out = rnd() < 0.25 ? 0.22 + rnd() * 0.25 : rnd() * 0.06, rot = (rnd() - 0.5) * 0.3;
         cM.push(TRS(u + side * (0.86 + out), F2, v + dv + (rnd() - 0.5) * 0.12, (side < 0 ? 0 : Math.PI) + rot));
@@ -686,14 +714,14 @@ export function updateDoeInterior(st, env) {
   const night = env.night ?? 0, day = 1 - night;
   IU.uInAmb.value.setScalar(0.25);
   IU.uInSky.value.setRGB(0.46, 0.455, 0.43).multiplyScalar(day).add(new THREE.Color(0.3, 0.24, 0.16).multiplyScalar(night));
-  IU.uInGnd.value.setRGB(0.21, 0.19, 0.16).multiplyScalar(day).add(new THREE.Color(0.15, 0.115, 0.075).multiplyScalar(night));
+  IU.uInGnd.value.setRGB(0.32, 0.29, 0.24).multiplyScalar(day).add(new THREE.Color(0.15, 0.115, 0.075).multiplyScalar(night));
   IU.uInSpec.value = 0.35;
   const M = MATS;
   if (M) {
     const k = 0.12 + 0.8 * day; M.laylight.color.setRGB(1.0 * k, 1.02 * k, 1.0 * k);
     M.globes.opacity = 0.25 + 0.75 * night;
     M.pool.color.setRGB(0.3, 0.24, 0.16).multiplyScalar(0.25 + 1.1 * night);
-    M.shadeGlow.color.setRGB(1.7, 1.35, 0.95).multiplyScalar(0.45 + 0.55 * night);
+    M.shadeGlow.color.setRGB(1.6, 1.32, 0.98).multiplyScalar(0.28 + 0.72 * night);
     M.sheen.color.setRGB(0.2, 0.21, 0.21).multiplyScalar(day);
     M.streak.color.setRGB(0.22, 0.23, 0.23).multiplyScalar(0.08 + 0.92 * day);
   }
