@@ -10,3 +10,10 @@ player.registerMode(name, plugin). Plugin fields, all optional except update:
 - onKey(e, player), onMouse(e, player, down)
 player.camera, player.camDistT, player.view ('third'|'first') are available for camera tweaks.
 Register in src/player/modes/index.js (one import + one install call per plugin).
+
+## Plugins in this folder (mv-ride)
+- `scooter.js` registers `scooter`: Lime Gen4 / Veo Astro (stand-up) and Veo Cosmo (seated) shared scooters parked in clusters around the campus edge (Bancroft & Telegraph, Sproul Plaza / Lower Sproul on Bancroft, Downtown Berkeley BART, Northside at Euclid, Units 1 and 3, Crossroads, Blackwell, Foothill, Telegraph & Durant). Walk up and press **E** (or **U**, its toggle key) to ride; **E** parks it. Parked spots persist in localStorage (`bsim.fleet.v1`). W throttle, S brake/back up, Space hand brake, A/D steer.
+- `hoverboard.js` registers `hoverboard` on **X**: spring-damper hover over a look-ahead of ground samples (handles stairs and slopes), carving with drift, lean, bob, Space ollie, air control, Shift boost.
+- `ride-models.js`: procedural models (one shared vertex-colour + decal-atlas material; parked fleets are one InstancedMesh per type per cluster). `ride-common.js`: limb IK, WebAudio ride sounds, road/sidewalk sampler.
+- Extra plugin fields read by the HUD: `label` (a getter on `scooter`: it names the brand you are riding), `key`, `icon` (emoji), `iconSvg` (inline SVG), `hint` (one-line controls).
+- Minimal touch hook: `ui.addTouchButton(label, fn)` (src/ui/ui.js). Debug: `?noride` skips these plugins; `BSIM.scooters` / `BSIM.hoverboard` expose state for scripted sims.
