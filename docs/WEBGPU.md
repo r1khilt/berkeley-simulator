@@ -42,7 +42,7 @@ Shared files touched: `src/main.js` only, with 7 small commented `[gfx-webgpu]` 
 A vision-model diff of WebGL vs WebGPU at spawn, aerial, Memorial Glade and wide hills found terrain, buildings, landmarks, shadows, fog, haze, water and exposure **match**. Mean frame colour differs by ≤ 3/255 in most views. Remaining differences:
 1. **Twilight/night sky is brighter** in WebGPU. r187's `SkyMesh` is not a literal port of `Sky.js`: its cloud shading differs (beer/powder + aerial composite), so dusk skies read lavender instead of near-black. Fix: port `Sky.js`'s fragment to TSL verbatim, or set `cloudCoverage = 0` on both.
 2. **Clouds differ** between runs because `uTime` depends on how long the title loop ran. This is not a renderer difference.
-3. **Night lamp light on foliage** was missing before the translucency lighting model was added (fixed in this branch). Re-check after any lighting changes.
+3. **Night lamp light on trees and facades looks missing** in WebGPU night shots: lamp-lit foliage reads as black silhouettes. This is **not yet verified as a renderer bug**. The 6 lamp `PointLight`s only re-position every 10th frame (`updateLampLights`), and the two captures rendered different frame counts before the night view, so the lights may simply have been elsewhere. The leaf translucency/wrap lighting model (which made lamp-lit leaves glow in WebGL) is ported. Next step: re-capture both renderers with an identical frame sequence, then check point lights on a plain landmark material.
 4. Leaf alpha-test edges can look slightly harder. MSAA plus alpha-to-coverage behaves differently from WebGL.
 5. Items in "Not ported" above (hedges, road dashes, flags, signal lenses).
 
