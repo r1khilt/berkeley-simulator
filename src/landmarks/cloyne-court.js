@@ -17,7 +17,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.5); const M = ctx.M;
-  const WALL = shingleMat('cloyne', { base: 0x5b4a3d }); // split-redwood shingle (reads as shingle, not brick)
+  const WALL = shingleMat('cloyne', { base: 0x54483c }); // split-redwood shingle (reads as shingle, not brick)
   const TRIM = coopMat('paint', '#2e4a36');
   const ROOF = coopMat('roof', '#6c645b');
   const FASC = coopMat('paint', '#3b2a20');

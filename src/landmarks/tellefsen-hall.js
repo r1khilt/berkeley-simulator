@@ -14,7 +14,7 @@ export const info = {
 
 export async function build(ctx) {
   const M = ctx.M;
-  const SH = shingleMat('tellefsen', { base: 0x5f4a38 });
+  const SH = shingleMat('tellefsen', { base: 0x54473a });
   const blocks = [
     { u0: -11.0, u1: 10.0, v0: -6.6, v1: 5.6, g: 1.1, eave: 12.6, ridge: 15.9, axis: 'u', roof: 'gable' },
     { u0: 4.0, u1: 10.0, v0: 5.6, v1: 9.0, g: 0.1, eave: 11.6, ridge: 13.8, axis: 'v', roof: 'gable', faces: { N: false } },
