@@ -64,7 +64,7 @@ export async function build(ctx) {
   }
 
   // north-south wing (five storeys on the downhill side; runs the full length of the west side)
-  wing({ u0: -25.3, v0: -36.0, u1: -4.3, v1: 13.8, eave: 19.3, slope: 0.53, faces: 'NWES' });
+  wing({ u0: -25.3, v0: -36.0, u1: -4.3, v1: 13.8, eave: 19.3, slope: 0.46, faces: 'NWES' });
   // east-west wing (ridge ~25.5)
   wing({ u0: -4.3, v0: -6.0, u1: 30.6, v1: 14.4, eave: 19.0, slope: 0.58, faces: 'NSE' });
   // lower three-storey strip along the south (flat roof with cast-stone coping, ~11.6 m)
