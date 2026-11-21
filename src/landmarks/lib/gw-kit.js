@@ -241,3 +241,22 @@ export function dayNightGlow(mat, day = 0.15, night = 1.0) {
   mat.customProgramCacheKey = () => 'gwDayNight' + day + '_' + night;
   return mat;
 }
+
+// Round the convex corners of a polygon with radius r (clamped to a third of the adjacent edges); concave corners kept.
+export function roundPoly(poly, r, seg = 5) {
+  const n = poly.length; const sgn = signedArea(poly) > 0 ? 1 : -1; const out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = poly[(i - 1 + n) % n], p = poly[i], p1 = poly[(i + 1) % n];
+    const a = [p0[0] - p[0], p0[1] - p[1]], b = [p1[0] - p[0], p1[1] - p[1]]; const la = Math.hypot(...a), lb = Math.hypot(...b);
+    const cross = (p[0] - p0[0]) * (p1[1] - p[1]) - (p[1] - p0[1]) * (p1[0] - p[0]);
+    if (la < 0.5 || lb < 0.5 || cross * sgn <= 0) { out.push(p); continue; }
+    const ua = [a[0] / la, a[1] / la], ub = [b[0] / lb, b[1] / lb]; const cosT = ua[0] * ub[0] + ua[1] * ub[1]; const th = Math.acos(Math.max(-1, Math.min(1, cosT)));
+    if (th > Math.PI * 0.94) { out.push(p); continue; }
+    let t = r / Math.tan(th / 2); t = Math.min(t, la / 3, lb / 3); const rr = t * Math.tan(th / 2);
+    const A = [p[0] + ua[0] * t, p[1] + ua[1] * t], B = [p[0] + ub[0] * t, p[1] + ub[1] * t];
+    const bis = [ua[0] + ub[0], ua[1] + ub[1]]; const bl = Math.hypot(...bis); const dC = rr / Math.sin(th / 2); const C = [p[0] + bis[0] / bl * dC, p[1] + bis[1] / bl * dC];
+    const a0 = Math.atan2(A[1] - C[1], A[0] - C[0]); let a1 = Math.atan2(B[1] - C[1], B[0] - C[0]); let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    for (let k = 0; k <= seg; k++) { const aa = a0 + da * k / seg; out.push([C[0] + Math.cos(aa) * rr, C[1] + Math.sin(aa) * rr]); }
+  }
+  return out;
+}

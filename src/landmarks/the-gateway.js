@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { polyRuns, inset, std, tint } from './lib/b06-modern.js';
 import { nightGlow } from '../materials.js';
-import { inRing, distToRing, ringHits, nearestHit, ringPath, sagArc, drape, cutRanges, panelStorey, ribbonStorey, storefront, youngTree2, signMaterial, offsetPoly, flatDown, groundMat, engineTrees, interiorMap, dayNightGlow } from './lib/gw-kit.js';
+import { inRing, distToRing, ringHits, nearestHit, ringPath, sagArc, drape, cutRanges, panelStorey, ribbonStorey, storefront, youngTree2, signMaterial, offsetPoly, flatDown, groundMat, engineTrees, interiorMap, dayNightGlow, roundPoly } from './lib/gw-kit.js';
 
 export const info = {
   id: 'the-gateway',
@@ -40,7 +40,7 @@ export async function build(ctx) {
     spandrel: std(0x8d9aa4, 'gwSpandrel', { rough: 0.25, metal: 0.5 }),
     band: std(0x6d7276, 'gwBand', { rough: 0.4, metal: 0.5 }),
     mull: std(0x3b3835, 'gwMull', { rough: 0.5, metal: 0.45 }),
-    metal: std(0xd8d1c4, 'gwPanel', { rough: 0.3, metal: 0.6 }),
+    metal: std(0xd2bd98, 'gwPanel', { rough: 0.3, metal: 0.6 }),
     silver: std(0xc6cbcf, 'gwSilver', { rough: 0.35, metal: 0.55 }),
     soffit: std(0xe6dccb, 'gwSoffit', { rough: 0.6, metal: 0.1, emissive: 0x4a4236 }),
     roofPlane: tint(M.concrete, 0xe4e4e0, 'gwRoofPlane'),
@@ -177,12 +177,12 @@ export async function build(ctx) {
   const ring5 = offsetPoly(fp, 2.5, 2.2);
   const Q1 = nearestHit(ringHits(ring5, 'x', 47.5), [47.5, 10]);      // SE court, east side
   const Q2 = nearestHit(ringHits(ring5, 'z', 7.5), [16.5, 7.5]);      // SE court, west side
-  const Qa = nearestHit(ringHits(ring5, 'x', -24), [-24, -1]);        // north court apex, east side
+  const Qa = nearestHit(ringHits(ring5, 'z', -6), [-39.5, -6]);        // north court, west flank (terrace wraps the apex)
   const Qh = nearestHit(ringHits(ring5, 'x', -12), [-12, -31]);       // Hearst edge east of the court (imagery: court's east flank is low)
   const T_n = [[-12, -13], [12, -13], [14, -19.5], [50, -19.5]];
-  const L5W = [...ringPath(ring5, Qa, Q2), [-12, 7.5], [-24, 7.5]];
+  const L5W = [...ringPath(ring5, Qa, Q2), [-12, 7.5], [-31, 7.5]];
   const L5N = [...ringPath(ring5, Q1, Qh), ...T_n];
-  const TER = [...ringPath(ring5, Qh, Qa), [-24, 7.5], [-12, 7.5], ...ringPath(ring5, Q2, Q1), ...T_n.slice().reverse()];
+  const TER = [...ringPath(ring5, Qh, Qa), [-31, 7.5], [-12, 7.5], ...ringPath(ring5, Q2, Q1), ...T_n.slice().reverse()];
   const L5 = L5W; void L5N;
   K.prism(apronM, fp, FL[5] - 0.6, FL[5]);
   K.prism(mats.deck, TER, FL[5], FL[5] + 0.12);
@@ -191,7 +191,7 @@ export async function build(ctx) {
     for (const poly of [L5W, L5N]) {
       for (const { R } of polyRuns(K, poly)) ribbonStorey(K, R, 0, R.L, FL[5] + 0.55, ROOF - 0.45, mats5, { module: 1.5 });
       K.prism(mats.core, offsetPoly(poly, 0.3), FL[5], ROOF - 0.5);
-      const roofP = offsetPoly(poly, -1.25, 1.6);
+      const roofP = roundPoly(offsetPoly(poly, -1.25, 1.6), 4.5);
       K.prism(mats.roofPlane, roofP, ROOF - 0.38, ROOF);
       K.prism(mats.silver, offsetPoly(roofP, 0.02), ROOF - 0.02, ROOF + 0.04);
       flatDown(K, mats.roofSoffit, roofP, ROOF - 0.39);
@@ -201,6 +201,20 @@ export async function build(ctx) {
     for (const [x, z, w, d, h] of [[-40, 10, 6, 4, 1.6], [-30, 22, 3, 3, 1.2], [-52, 0, 4, 2.5, 1.4], [62, -8, 7, 4, 1.8], [72, 2, 3, 2.4, 1.2], [5, 16, 5, 3, 1.4]]) { K.box(mats.silver, x - w / 2, ROOF, z - d / 2, x + w / 2, ROOF + h, z + d / 2); }
     for (let i = 0; i < 14; i++) { const x = -60 + (i * 37) % 130, z = -20 + (i * 23) % 45; if (!(inRing(x, z, L5W) || inRing(x, z, L5N)) || inRing(x, z, TER)) continue; K.cyl(mats.band, x, ROOF, z, 0.25, 0.25, 0.8, 8, { detail: true }); }
     for (let i = 0; i < 9; i++) { const l = new THREE.BoxGeometry(21.2, 0.05, 6.7); l.rotateY(0.157); l.translate(20, ROOF + 0.3 + i * 0.22, -29.5); K.add(mats.band, l, { detail: true }); }
+  }
+  // signature white roof blade sweeping down over the north court (dips over the apex, rises to the wing roofs)
+  {
+    const sc = [[-43.8, -24.4], [-41.1, -15.8], [-37.9, -8.2], [-34.3, -3.0], [-30.8, -0.6], [-28.0, -0.8], [-27.1, -0.9], [-24.3, -3.1], [-22.0, -7.2], [-19.8, -14.1], [-18.7, -20.1], [-18.1, -32.2]];
+    const L = []; let acc = 0; L.push(0); for (let i = 1; i < sc.length; i++) { acc += Math.hypot(sc[i][0] - sc[i - 1][0], sc[i][1] - sc[i - 1][1]); L.push(acc); }
+    const hAt = (t) => { const lo = FL[5] + 2.4; const prof = t < 0.5 ? Math.pow(Math.cos(t / 0.5 * Math.PI / 2), 1.6) : 0.25 * Math.pow(Math.sin((t - 0.5) / 0.5 * Math.PI / 2), 1.4); return lo + (ROOF - lo) * prof; };
+    for (let i = 0; i < sc.length - 1; i++) {
+      // walk west -> east with the building on the left? the court is outside: outward normal must point into the court
+      const R = K.run(sc[i + 1], sc[i]); const t0 = L[i] / acc, t1 = L[i + 1] / acc; const h0 = hAt(t0), h1 = hAt(t1);
+      const g = new THREE.BoxGeometry(R.L + 0.06, 0.32, 2.4); g.translate(R.L / 2, 0, -0.4);
+      const pos = g.attributes.position; for (let k = 0; k < pos.count; k++) { const u = pos.getX(k) / R.L; pos.setY(k, pos.getY(k) + (h1 + (h0 - h1) * Math.min(1, Math.max(0, u)))); }
+      g.computeVertexNormals(); K.addRun(R, mats.white, g);
+      if (t0 > 0.35) { const s = R.L / 2; const [x, z] = R.at(s, -1.2); const hm = (h0 + h1) / 2; K.cyl(mats.white, x, FL[5] + 0.12, z, 0.1, 0.1, hm - 0.16 - FL[5] - 0.12, 8); }
+    }
   }
   // terrace furniture: elliptical atrium skylight ringed by planting, planters, louvred canopy, glass guard to the courtyard
   {
