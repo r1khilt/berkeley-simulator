@@ -153,3 +153,19 @@ export function shingleMat(key, { base = 0x574739, vary = 0.1, rows = 10, rough 
     return [Math.min(255, B[0] * kk), Math.min(255, B[1] * kk), Math.min(255, B[2] * kk), gap ? 0.05 : (fv < 0.16 ? 0.1 + fv : 0.3 + (1 - fv) * 0.6), rough];
   }, { span: 2, rough, normal: 6 });
 }
+
+// Small gabled porch hood over a door at run station s (ridge running out from the wall): two roof slopes + boarded soffit,
+// a filled gable triangle, timber or stone brackets/posts. y = underside at the wall, d = projection, w = width.
+export function gabledHood(K, R, s, w, y, d, { roofMat, gableMat, postMat, rise = 0.8, posts = false, floor = null, ov = 0.25 } = {}) {
+  const M = K.M; const RM = roofMat || M.slate, GM = gableMat || M.stucco, PM = postMat || M.woodDark;
+  const s0 = s - w / 2, s1 = s + w / 2;
+  const g = new THREE.BufferGeometry();
+  const P = [[s0 - ov, y, 0], [s0 - ov, y, d + ov], [s, y + rise, d + ov], [s, y + rise, 0], [s1 + ov, y, 0], [s1 + ov, y, d + ov]];
+  const pos = []; for (const i of [0, 1, 2, 0, 2, 3, 3, 2, 5, 3, 5, 4]) pos.push(...P[i]); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  K.addRun(R, RM, g, { uvMode: 'box' });
+  K.rbox(R, PM, s0 - ov, y - 0.05, 0, s1 + ov, y + 0.02, d + ov);                              // soffit board
+  const gt = new THREE.BufferGeometry(); gt.setAttribute('position', new THREE.Float32BufferAttribute([s0, y, d, s1, y, d, s, y + rise * 0.92, d], 3)); gt.computeVertexNormals(); K.addRun(R, GM, gt);
+  K.rbox(R, PM, s0 - 0.05, y - 0.22, d - 0.12, s1 + 0.05, y, d + 0.02);                        // tie beam
+  if (posts && floor != null) for (const ss of [s0 + 0.1, s1 - 0.1]) K.rbox(R, PM, ss - 0.1, floor, d - 0.2, ss + 0.1, y, d);
+  else for (const ss of [s0 + 0.1, s1 - 0.1]) K.rbox(R, PM, ss - 0.09, y - 0.7, 0, ss + 0.09, y - 0.05, d * 0.8); // brackets
+}
