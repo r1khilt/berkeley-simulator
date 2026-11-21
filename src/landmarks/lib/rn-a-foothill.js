@@ -23,20 +23,20 @@ export function faMats(M) {
   // weathered stained cedar shingles: 13 courses per 2 m (0.154 m exposure), 9 shingles per course per tile, random widths
   const S1 = C3(0x433d39), S2 = C3(0x4f4741), S3 = C3(0x38322f), S4 = C3(0x615850);
   const NC = 10, NW = 7;
-  const shingle = bakeMat('fa:shingle5', (u, v) => {
+  const shingle = bakeMat('fa:shingle6', (u, v) => {
     const cv = v * NC; const row = Math.floor(cv); const fv = cv - row; const r = wrap(row, NC);
     const x = u * NW + Math.floor(hash2(r, 3, 1) * NW) + 0.5 * (r % 2); let k = Math.floor(x);
     const jit = (kk) => (hash2(wrap(kk, NW), r, 2) - 0.5) * 0.7;
     if (x < k + jit(k)) k -= 1;
     const left = k + jit(k), right = k + 1 + jit(k + 1); const dm = Math.min(x - left, right - x) / NW * 2; // metres to nearest keyway
     const km = wrap(k, NW); const h = hash2(km, r, 7);
-    const base = h < 0.45 ? mix(S1, S2, h / 0.45) : h < 0.85 ? mix(S1, S3, (h - 0.45) / 0.4) : mix(S2, S4, (h - 0.85) / 0.15);
+    const base = mix(S1, h < 0.5 ? S2 : S3, Math.abs(h - 0.5) * 0.6);
     const grain = 0.93 + 0.14 * vnoise(u * 256, r * 11 + fv * 1.5, 256, 4);
-    const streak = 0.86 + 0.28 * vnoise(u * 20, 3.5, 20, 12) * (0.7 + 0.3 * fbm(u * 2, v * 2, 2, 2, 5)); // vertical weathering streaks
+    const streak = 0.8 + 0.38 * vnoise(u * 28, 3.5, 28, 12) * (0.6 + 0.4 * fbm(u * 2, v * 2, 2, 2, 5)); // vertical weathering streaks
     let kk = grain * streak * (0.97 + 0.06 * (1 - fv));
     let ht = 0.3 + 0.7 * (1 - fv);
-    if (fv > 0.8) kk *= 0.4 + (1 - fv) * 2.6; // strong shadow line under the next course butt // soft shadow under the next course butt
-    if (dm < 0.005) { kk *= 0.88; ht = 0.15; } // faint keyway
+    if (fv > 0.86) kk *= 0.78 + (1 - fv) * 1.5; // soft shadow line under the next course butt // soft shadow under the next course butt
+    if (dm < 0.004) { kk *= 0.94; ht = 0.2; } // faint keyway
     return [base[0] * kk, base[1] * kk, base[2] * kk, ht, 0.93];
   }, { size: 512, span: 2, normal: 3, rough: 0.93 });
   // pale grey-green vertical board-and-batten (0.25 m)
@@ -126,7 +126,7 @@ export function faWing(K, b, F) {
   const stories = [{ y0, y1: floor1, mat: F.plinth }]; let y = floor1;
   for (let i = 0; i < n; i++) {
     const wh = Math.min(1.95, h - 0.7);
-    stories.push({ y0: y, y1: y + h, mat: two && n > 1 && i >= 1 ? F.board : F.shingle, win: { sill: Math.max(0.45, (h - wh) * 0.58), h: wh, w: FA_UW, mull: 1, tran: 0.66, noSill: true } });
+    stories.push({ y0: y, y1: y + h, mat: two && n > 1 && i === n - 1 ? F.board : F.shingle, win: { sill: Math.max(0.45, (h - wh) * 0.58), h: wh, w: FA_UW, mull: 1, tran: 0.66, noSill: true } });
     y += h;
   }
   if (y < eave - 0.01) stories.push({ y0: y, y1: eave, mat: two ? F.board : F.shingle });
@@ -156,7 +156,7 @@ export function faWing(K, b, F) {
     K.rbox(R, F.trim, -0.12, eave - 0.24, -0.02, R.L + 0.12, eave, 0.12); // eave fascia
     K.rbox(R, F.trim, -0.02, floor1 - 0.1, -0.02, 0.17, eave, 0.05); K.rbox(R, F.trim, R.L - 0.17, floor1 - 0.1, -0.02, R.L + 0.02, eave, 0.05); // corner boards
     K.rbox(R, F.trim, 0, floor1 - 0.12, 0, R.L, floor1 + 0.06, 0.06); // water table over the plinth
-    if (two && n > 1) K.rbox(R, F.trim, -0.05, floor1 + h - 0.1, -0.02, R.L + 0.05, floor1 + h + 0.12, 0.11); // belt where shingle meets board
+    if (two && n > 1) K.rbox(R, F.trim, -0.05, floor1 + h * (n - 1) - 0.1, -0.02, R.L + 0.05, floor1 + h * (n - 1) + 0.12, 0.11); // belt where shingle meets board
   }
   K.box(K.M.concreteDark, b.u0 + 0.5, y0, b.v0 + 0.5, b.u1 - 0.5, eave - 0.3, b.v1 - 0.5); // core behind the glass
   if (b.roof === 'flat') {
@@ -266,7 +266,7 @@ export function faBuild(ctx, angDeg, blocks, extras, o = {}) {
       const odd = n > 1 && i % 2 === 1; const e = odd ? 0.35 : 0; const dy = odd ? 0.9 : 0;
       const seg = b.axis === 'u' ? { ...b, u0: a0, u1: a1, v0: b.v0 - e, v1: b.v1 + e } : { ...b, v0: a0, v1: a1, u0: b.u0 - e, u1: b.u1 + e };
       seg.eave = b.eave + dy; seg.ridge = b.ridge + dy; seg.chimney = b === longest && i === Math.floor(n / 2) && b.roof !== 'flat';
-      seg.two = b.two ?? ((bi + i) % 3 !== 0); seg.faces = { ...(b.faces || {}) }; seg.blank = {}; seg.bi = bi;
+      seg.two = b.two ?? ((bi + i) % 3 === 1); seg.faces = { ...(b.faces || {}) }; seg.blank = {}; seg.bi = bi;
       if (n > 1 && !odd) { if (b.axis === 'u') { if (i > 0) seg.faces.W = false; if (i < n - 1) seg.faces.E = false; } else { if (i > 0) seg.faces.N = false; if (i < n - 1) seg.faces.S = false; } }
       segs.push(seg);
     }

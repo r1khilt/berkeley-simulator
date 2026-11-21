@@ -11,15 +11,15 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const blocks = [
-    { u0: -22.5, u1: -10.5, v0: -14.0, v1: 0.0, g: 1.7, eave: 13.2, ridge: 16.6, axis: 'u' },
-    { u0: -10.5, u1: 15.5, v0: -14.0, v1: 0.0, g: 2.7, eave: 14.8, ridge: 18.6, axis: 'u' },
-    { u0: 15.5, u1: 37.0, v0: -14.0, v1: 0.0, g: 5.7, eave: 16.0, ridge: 19.5, axis: 'u' },
-    { u0: -19.0, u1: -6.0, v0: 0.0, v1: 12.0, g: 2.8, eave: 12.6, ridge: 15.0, axis: 'v', faces: { N: false } },
-    { u0: -19.0, u1: -6.0, v0: 12.0, v1: 28.0, g: 0.5, eave: 10.4, ridge: 13.0, axis: 'v', faces: { N: false } },
-    { u0: -6.0, u1: 6.5, v0: 0.0, v1: 4.5, g: 3.9, eave: 13.6, ridge: 15.1, axis: 'u', roof: 'flat', faces: { N: false } },
-    { u0: -22.0, u1: -6.0, v0: -17.5, v1: -14.0, g: 0.9, eave: 12.3, ridge: 13.2, axis: 'u', roof: 'flat', faces: { S: false } },
-    { u0: -22.5, u1: -19.0, v0: 0.0, v1: 13.5, g: 2.5, eave: 12.1, ridge: 12.9, axis: 'v', roof: 'flat', faces: { E: false } },
+  const blocks = [ // all shingle: the photo shows dark stained shingle on every face
+    { u0: -22.5, u1: -10.5, v0: -14.0, v1: 0.0, g: 1.7, eave: 13.2, ridge: 16.6, axis: 'u', two: false },
+    { u0: -10.5, u1: 15.5, v0: -14.0, v1: 0.0, g: 2.7, eave: 14.8, ridge: 18.6, axis: 'u', two: false },
+    { u0: 15.5, u1: 37.0, v0: -14.0, v1: 0.0, g: 5.7, eave: 16.0, ridge: 19.5, axis: 'u', two: false },
+    { u0: -19.0, u1: -6.0, v0: 0.0, v1: 12.0, g: 2.8, eave: 12.6, ridge: 15.0, axis: 'v', two: false, faces: { N: false } },
+    { u0: -19.0, u1: -6.0, v0: 12.0, v1: 28.0, g: 0.5, eave: 10.4, ridge: 13.0, axis: 'v', two: false, faces: { N: false } },
+    { u0: -6.0, u1: 6.5, v0: 0.0, v1: 4.5, g: 3.9, eave: 13.6, ridge: 15.1, axis: 'u', two: false, roof: 'flat', faces: { N: false } },
+    { u0: -22.0, u1: -6.0, v0: -17.5, v1: -14.0, g: 0.9, eave: 12.3, ridge: 13.2, axis: 'u', two: false, roof: 'flat', faces: { S: false } },
+    { u0: -22.5, u1: -19.0, v0: 0.0, v1: 13.5, g: 2.5, eave: 12.1, ridge: 12.9, axis: 'v', two: false, roof: 'flat', faces: { E: false } },
   ];
   const { object3d, colliders, walkables } = faBuild(ctx, -10, blocks, (K, F) => {
     faGableBay(K, F, K.run([-19.0, 28.0], [-6.0, 28.0]), 6.5, 4.6, 0.5, 10.4, { d: 1.0 });
