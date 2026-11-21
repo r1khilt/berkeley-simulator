@@ -2,6 +2,7 @@
 // board-and-batten with pale stucco stair blocks, wrapped around landscaped courtyards, with open walkway-balconies.
 // Heights from the 2021 LiDAR (flat roofs ~10 m above datum).
 import * as THREE from 'three';
+import { shingleMat } from './lib/rsw-site.js';
 import { CoopKit, coopMat, gardenApartments } from './lib/coop-kit.js';
 import { doorBays, coopFinish } from './lib/rsw-coop.js';
 
@@ -16,11 +17,11 @@ export const info = {
 export async function build(ctx) {
   const K = new CoopKit(ctx, -9.1); const M = ctx.M;
   const style = {
-    wall: coopMat('cedar', '#5c4636'), trim: coopMat('paint', '#e8e4d8'), fascia: coopMat('paint', '#3a2e26'),
+    wall: shingleMat(ctx.M, 0x4e3b2e), trim: coopMat('paint', '#e8e4d8'), fascia: coopMat('paint', '#3a2e26'),
     rail: coopMat('paint', '#5a4a3c', { rough: 0.85 }), roofMat: coopMat('roof', '#5a5a58'), fh: 2.9, overhang: 0.75, bay: 3.4,
     win: { w: 1.0, h: 1.25, sill: 0.9, pattern: [2, 1, 3, 2, 1], gap: 0.06, mull: 1, rev: 0.12, casing: 0.07, frame: coopMat('paint', '#e8e4d8') },
   };
-  const ALT = coopMat('cedar', '#6b5644'); // refine-south-west: photos show weathered shingle throughout (no stucco); alt blocks get a silvered tone
+  const ALT = shingleMat(ctx.M, 0x5a4838); // refine-south-west: photos show weathered shingle throughout (no stucco); alt blocks get a silvered tone
   const rects = [
     { u0: -19.60, u1: 2.81, v0: -37.25, v1: -23.44, top: 10.6, walk: 'S' },
     { u0: 2.81, u1: 4.94, v0: -32.71, v1: -23.44, top: 9.6, alt: true },

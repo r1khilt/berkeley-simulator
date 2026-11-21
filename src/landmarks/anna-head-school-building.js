@@ -1,6 +1,7 @@
 // Anna Head School. Shingle-style school: natural cedar shingle walls, steep dark gables, small-pane windows.
 // Massing: outline raster + hip roofs over the main wings, eave and pitch fitted to the 2021 LiDAR (lib/units-blocks.js).
 import * as THREE from 'three';
+import { shingleMat } from './lib/rsw-site.js';
 import { blocks } from './lib/units-blocks.js';
 import { paintTint } from './lib/units-kit.js';
 import { coopMat } from './lib/coop-kit.js';
@@ -19,14 +20,14 @@ export async function build(ctx) {
   // refine-south-west: unpainted redwood shingle walls (dark brown), green shingle roofs, cream trim and no shutters, a tall
   // rough stone chimney, foundation planting (Commons photo "Anna Head School for Girls (Berkeley, CA)")
   const M = ctx.M; const roof = coopMat('roof', '#566e4c');
-  const walls = coopMat('cedar', '#4a3c30');
+  const walls = shingleMat(ctx.M, 0x4a3c30);
   const style = { seed: 'anna-head-school-building', parapet: 0.05, roofMat: roof, sh: 3.6, win: { w: 0.85, h: 1.55, sill: 0.9, gap: 2.0, pair: true },
     palette: [walls], coping: 0xe8e2d0, frameHex: 0xe8e2d0, glassHex: 0x1e2226, winMat: 'shared', baseHex: 0x9a968c, sill: true,
     site: { entrance: false, plant: true },
     extra: (K) => {
       for (const [u0, u1, v0, v1, sl] of S.hips) K.hip(roof, u0 - 0.55, v0 - 0.55, u1 + 0.55, v1 + 0.55, S.lev[0] - 0.05, sl);
       // shingle "skirt" belt course with a slight flare at the upper floor line
-      const stone = paintTint(M, 0xa8a396);
+      const stone = M.ashlar || paintTint(M, 0xa8a396); // rough stone chimney
       const cu = -2.5, cv = -23.47; const g0 = K.g(cu, cv);
       K.box(stone, cu - 0.65, g0 - 0.5, cv - 0.55, cu + 0.65, S.lev[0] + 5.6, cv + 0.45);
       K.box(stone, cu - 0.8, S.lev[0] + 5.4, cv - 0.7, cu + 0.8, S.lev[0] + 5.75, cv + 0.6);

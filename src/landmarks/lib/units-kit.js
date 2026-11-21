@@ -182,10 +182,10 @@ export function tower(ctx, P) {
         for (const o of ops) {
           K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false });
           const r = rnd();
-          if (r < 0.34) { // roller / venetian blind lowered from the head to a random height
-            const bh = (o.y1 - o.y0) * (0.15 + 0.8 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
-          } else if (r < 0.56) { // curtain drawn to one side
-            const cw = (o.s1 - o.s0) * (0.25 + 0.5 * rnd()); const left = rnd() < 0.5;
+          if (r < 0.26) { // roller / venetian blind lowered from the head to a random height
+            const bh = (o.y1 - o.y0) * (0.12 + 0.48 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
+          } else if (r < 0.42) { // curtain drawn to one side
+            const cw = (o.s1 - o.s0) * (0.2 + 0.3 * rnd()); const left = rnd() < 0.5;
             K.rbox(R, mCurt, left ? o.s0 + 0.04 : o.s1 - 0.04 - cw, o.y0 + 0.05, -0.235, left ? o.s0 + 0.04 + cw : o.s1 - 0.04, o.y1 - 0.06, -0.228);
           }
           if (!balcF) K.rbox(R, mFrame, o.s0 - 0.03, o.y0 - 0.05, -0.25, o.s1 + 0.03, o.y0 + 0.01, 0.05, { detail: true }); // aluminium sill flashing

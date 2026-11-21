@@ -132,3 +132,48 @@ export function roofRail(K, rect, y, { h = 1.07, post = 2.0 } = {}) {
     for (const yy of [y + h, y + h * 0.5]) { const g = new THREE.BoxGeometry(L, 0.04, 0.04); g.rotateY(-Math.atan2(d - b, c - a)); g.translate((a + c) / 2, yy, (b + d) / 2); K.add(m, g, { detail: true }); }
     for (let i = 0; i <= n; i++) { const u = a + (c - a) * i / n, v = b + (d - b) * i / n; K.box(m, u - 0.025, y, v - 0.025, u + 0.025, y + h, v + 0.025, { detail: true }); } }
 }
+
+// ---------- weathered wood shingle siding (Bay Area brown-shingle) ----------
+// Canvas texture, one tile = 2 m (matches boxUV): 11 courses (~0.18 m exposure), random widths 0.08-0.30 m, staggered joints,
+// per-shingle tone and grain, a soft butt shadow, vertical weathering streaks; normal map from a height field.
+const shingleCache = new Map();
+export function shingleMat(M, hex = 0x6e5644, { rough = 0.93 } = {}) {
+  const key = hex + ':' + rough; if (shingleCache.has(key)) return shingleCache.get(key);
+  const S = 512, NR = 11, rh = S / NR; const base = new THREE.Color(hex); const br = base.r, bg = base.g, bb = base.b; // linear
+  const ca = document.createElement('canvas'), cn = document.createElement('canvas'); ca.width = ca.height = cn.width = cn.height = S;
+  const xa = ca.getContext('2d'), xn = cn.getContext('2d'); const ia = xa.createImageData(S, S), inn = xn.createImageData(S, S); const H = new Float32Array(S * S);
+  let sd = (hex * 9301 + 49297) % 233280 || 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  const streak = new Float32Array(S); for (let x = 0; x < S; x++) streak[x] = 0;
+  for (let k = 0; k < 18; k++) { const c = Math.floor(rnd() * S), w = 4 + rnd() * 18, a = 0.04 + rnd() * 0.1; for (let x = -40; x < 40; x++) { const xx = (c + x + S) % S; streak[xx] += a * Math.exp(-(x * x) / (w * w)); } }
+  const toS = (v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+  for (let r = 0; r < NR; r++) {
+    // shingle boundaries for this course (wrap-around)
+    const edges = []; let x = Math.floor(rnd() * 40); while (x < S + 200) { edges.push(x); x += Math.round((0.08 + rnd() * 0.22) / 2 * S); }
+    const y0 = Math.round(r * rh), y1 = Math.round((r + 1) * rh);
+    for (let e = 0; e < edges.length - 1; e++) {
+      const tone = 0.82 + rnd() * 0.32, warm = (rnd() - 0.5) * 0.08, sdx = rnd() * 100, len = 0.96 + rnd() * 0.04;
+      for (let px = edges[e]; px < edges[e + 1]; px++) {
+        const xx = ((px % S) + S) % S; const joint = px - edges[e] < 2;
+        for (let y = y0; y < y1; y++) {
+          const f = (y - y0) / (y1 - y0); // 0 top of course .. 1 butt
+          const grain = 0.94 + 0.05 * Math.sin(px * 1.7 + sdx) + 0.03 * Math.sin(px * 0.41 + sdx * 3) + (rnd() - 0.5) * 0.05;
+          let sh = f > len ? 0.55 : f > 0.9 ? 0.72 + (len - f) * 2.0 : 0.86 + f * 0.16; // soft butt shadow at the bottom, lighter toward the butt
+          if (f < 0.12) sh *= 0.82 + f * 1.5; // overlap shadow under the course above
+          const j = joint ? 0.62 : 1.0; const st = 1.0 - streak[xx] * (0.6 + f * 0.4);
+          const v = tone * grain * sh * j * st; const i = (y * S + xx);
+          ia.data[i * 4] = toS(Math.min(1, br * v * (1 + warm))); ia.data[i * 4 + 1] = toS(Math.min(1, bg * v)); ia.data[i * 4 + 2] = toS(Math.min(1, bb * v * (1 - warm))); ia.data[i * 4 + 3] = 255;
+          H[i] = f * 1.1 - (joint ? 0.35 : 0) + (grain - 0.94) * 0.6;
+        }
+      }
+    }
+  }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const hx = H[y * S + ((x + 1) % S)] - H[y * S + ((x - 1 + S) % S)], hy = H[((y + 1) % S) * S + x] - H[((y - 1 + S) % S) * S + x];
+    let nx = -hx * 2.2, ny = hy * 2.2, nz = 1; const l = Math.hypot(nx, ny, nz); const i = (y * S + x) * 4;
+    inn.data[i] = (nx / l * 0.5 + 0.5) * 255; inn.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; inn.data[i + 2] = (nz / l * 0.5 + 0.5) * 255; inn.data[i + 3] = 255;
+  }
+  xa.putImageData(ia, 0, 0); xn.putImageData(inn, 0, 0);
+  const tx = (c, srgb) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t; };
+  const m = new THREE.MeshStandardMaterial({ map: tx(ca, true), normalMap: tx(cn, false), roughness: rough, metalness: 0 }); m.name = 'rsw-shingle';
+  shingleCache.set(key, m); return m;
+}
