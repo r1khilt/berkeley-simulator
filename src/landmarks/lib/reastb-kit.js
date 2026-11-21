@@ -43,7 +43,29 @@ function castConcreteTex(base) {
     for (let i = 0; i < 9000; i++) { const x = hash(i, 1, 2) * W, y = hash(i, 2, 3) * H; c.fillStyle = `rgba(${hash(i, 4, 5) > 0.5 ? '255,255,255' : '0,0,0'},${0.03 + hash(i, 5, 6) * 0.04})`; c.fillRect(x, y, 1.5, 1.5); }
     for (let k = 0; k < 40; k++) { const y = (k / 40) * H; c.fillStyle = `rgba(0,0,0,${0.015 + hash(k, 7, 8) * 0.02})`; c.fillRect(0, y, W, 2); }
     for (let k = 0; k < 3; k++) { const y = (k / 3) * H; c.fillStyle = 'rgba(60,55,48,0.22)'; c.fillRect(0, y, W, 3); c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(0, y + 3, W, 2); }
-    for (let k = 0; k < 14; k++) { const x = hash(k, 9, 1) * W, w = 6 + hash(k, 9, 2) * 18; const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(70,64,56,0.10)'); g.addColorStop(1, 'rgba(70,64,56,0.0)'); c.fillStyle = g; c.fillRect(x, 0, w, H * (0.4 + hash(k, 9, 3) * 0.6)); }
+    for (let k = 0; k < 6; k++) { const x = hash(k, 9, 1) * W, w = 3 + hash(k, 9, 2) * 8, y0 = hash(k, 9, 4) * H; const g = c.createLinearGradient(0, y0, 0, y0 + H * 0.3); g.addColorStop(0, 'rgba(70,64,56,0.07)'); g.addColorStop(1, 'rgba(70,64,56,0.0)'); c.fillStyle = g; c.fillRect(x, y0, w, H * 0.3); }
+  }, { repeat: true });
+}
+
+// Weathered cedar shingles (Foothill v2): irregular widths, 0.18 m exposure, soft shadow lines, per-shingle tone variation.
+function cedarTex(base = [112, 80, 56], warmth = [22, 12, 6]) {
+  return canvasTex(512, 512, (c, W, H) => {
+    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const rows = 11, rh = H / rows;
+    for (let r = 0; r < rows; r++) {
+      let x = -rnd() * 40;
+      while (x < W) {
+        const w = 22 + rnd() * 48; const k = 0.82 + rnd() * 0.3; const warm = rnd();
+        c.fillStyle = `rgb(${Math.round((base[0] + warm * warmth[0]) * k)},${Math.round((base[1] + warm * warmth[1]) * k)},${Math.round((base[2] + warm * warmth[2]) * k)})`;
+        c.fillRect(x, r * rh, w, rh);
+        c.fillStyle = 'rgba(30,20,14,0.22)'; c.fillRect(x + w - 1.2, r * rh + rh * 0.35, 1.2, rh * 0.65);
+        for (let g = 0; g < 3; g++) { c.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.04})`; c.fillRect(x + rnd() * w, r * rh, 1, rh); }
+        x += w;
+      }
+      const gr = c.createLinearGradient(0, r * rh + rh * 0.7, 0, (r + 1) * rh);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(20,12,8,0.45)');
+      c.fillStyle = gr; c.fillRect(0, r * rh + rh * 0.7, W, rh * 0.3);
+    }
   }, { repeat: true });
 }
 
@@ -53,15 +75,16 @@ export function rmats(M) {
   const tinted = (base, color, rough) => { const m = base.clone(); m.color = new THREE.Color(color); if (rough != null) m.roughness = rough; return m; };
   const o = {
     // Bowles Hall: board-formed concrete scored like ashlar, warm light grey-beige; smooth cast trim; variegated clay tile
-    bowWall: std({ map: castConcreteTex('#aba395'), roughness: 0.88 }),
-    bowTrim: tinted(M.stuccoWhite, 0xd8d1c2, 0.9),
+    bowWall: std({ map: castConcreteTex('#a6a39b'), roughness: 0.88 }),
+    bowTrim: tinted(M.stuccoWhite, 0xbdb9b0, 0.9),
+    bowSash: std({ color: 0x9a968e, roughness: 0.6 }),
     bowShade: tinted(M.concrete, 0xc9c2b4, 0.95),
     clayTile: std({ map: clayTileTex(['#86402f', '#9a5136', '#6c3327', '#8c4934', '#7a3c2c', '#97573f', '#804532', '#904d37']), roughness: 0.86 }),
     sash: std({ color: 0xe8e6df, roughness: 0.5 }),
     sashDark: std({ color: 0x2f2c29, roughness: 0.55 }),
     loggia: std({ color: 0x2a2724, roughness: 0.95 }),
     // I-House: bright smooth off-white stucco
-    ihStucco: tinted(M.stuccoWhite, 0xf4efe3, 0.93),
+    ihStucco: std({ color: 0xece4d3, roughness: 0.9 }), // smooth warm-cream stucco, near-white in sun
     ihTrim: tinted(M.stuccoWhite, 0xe9e2d2, 0.9),
     rafter: std({ color: 0x4a3a2e, roughness: 0.8 }),
     ihSash: std({ color: 0x6a4e3a, roughness: 0.6 }),
@@ -72,6 +95,15 @@ export function rmats(M) {
     bronze: std({ color: 0x2f2b27, roughness: 0.45, metalness: 0.5 }),
     coping: std({ color: 0x6e5c50, roughness: 0.5, metalness: 0.4 }),
     concreteLight: tinted(M.concrete, 0xe3ded2, 0.95),
+    // Foothill v2: weathered cedar shingle walls, warm dark composition-shingle roofs
+    fhCedar: std({ map: cedarTex(), roughness: 0.93 }),
+    fhRoof: tinted(M.shingle, 0x5e544c, 0.92),
+    // Julia Morgan Hall / Botanical Garden halls: dark grey-brown stained redwood shingle, light grey composition roof
+    jmShingle: std({ map: cedarTex([74, 66, 60], [10, 6, 4]), roughness: 0.9 }),
+    jmRoof: tinted(M.shingle, 0xb8b9b6, 0.9),
+    jmTrim: std({ color: 0x2f2c29, roughness: 0.7 }),
+    jmSash: std({ color: 0x3a3632, roughness: 0.6 }),
+    timber: std({ color: 0x4a3a2c, roughness: 0.8 }),
   };
   _mats.set(M, o);
   return o;
@@ -113,7 +145,7 @@ export function gothRange(K, sp) {
   for (const f of ['S', 'E', 'N', 'W']) {
     const fo = sp.faces?.[f]; if (fo === false) continue;
     const R = K.run(defs[f][0], defs[f][1]); runs[f] = R;
-    const gableEnd = (axis === 'u' && (f === 'E' || f === 'W')) || (axis === 'v' && (f === 'N' || f === 'S'));
+    const gableEnd = sp.hipped ? false : (axis === 'u' && (f === 'E' || f === 'W')) || (axis === 'v' && (f === 'N' || f === 'S'));
     const bay = fo?.bay ?? sp.bay ?? 3.4;
     const nb = gableEnd ? Math.max(1, Math.round((R.L - 1.5) / 4.6)) : Math.max(1, Math.round(R.L / bay));
     const bw = R.L / nb;
@@ -136,12 +168,16 @@ export function gothRange(K, sp) {
       }
     }
     K.wall(R, W, 0, R.L, y0, eave, ops.filter((o) => !o.noWallCut), depth);
-    for (const { o, n, tran } of groups) mullGroup(K, R, o, { n, stone: T, sash: sp.sash, tranAt: tran, panes: 1, depth });
+    for (const { o, n, tran } of groups) mullGroup(K, R, o, { n, stone: T, sash: sp.sash, tranAt: sp.noTransom ? null : tran, panes: sp.panes ?? 1, depth, hood: sp.hood ?? true, mw: sp.mullW ?? 0.14 });
     if (sp.after) sp.after(f, R, ops, levels);
     // plinth (where exposed) + string course over the ground floor
-    K.rbox(R, T, -0.08, y0, 0, R.L + 0.08, base + 0.15, 0.1);
-    if (nSt > 1) K.rbox(R, T, -0.05, levels[1] - 0.12, 0, R.L + 0.05, levels[1] + 0.06, 0.09, { detail: false });
-    if (!gableEnd) K.mould(R, T, 0, R.L, [[0, eave - 0.42], [0.1, eave - 0.36], [0.2, eave - 0.18], [0.28, eave - 0.04], [0.28, eave], [0, eave]], { ret0: false, ret1: false });
+    K.rbox(R, sp.plinth || T, -0.08, y0, 0, R.L + 0.08, base + 0.15, 0.1);
+    if (nSt > 1 && sp.string !== false) K.rbox(R, T, -0.05, levels[1] - 0.12, 0, R.L + 0.05, levels[1] + 0.06, 0.09, { detail: false });
+    if (!gableEnd && sp.cornice !== false) {
+      const gaps = (sp.corniceGaps && sp.corniceGaps[f]) || []; let segs = [[0, R.L]];
+      for (const [g0, g1] of gaps) segs = segs.flatMap(([a0, a1]) => (g1 <= a0 || g0 >= a1 ? [[a0, a1]] : [[a0, g0], [g1, a1]].filter(([x0, x1]) => x1 - x0 > 0.2)));
+      for (const [a0, a1] of segs) K.mould(R, T, a0, a1, [[0, eave - 0.42], [0.1, eave - 0.36], [0.2, eave - 0.18], [0.28, eave - 0.04], [0.28, eave], [0, eave]], { ret0: false, ret1: false });
+    }
   }
   if (sp.core !== false) K.box(M.concreteDark, u0 + 0.6, y0, v0 + 0.6, u1 - 0.6, eave - 0.2, v1 - 0.6);
   if (sp.ridge) K.gable(sp.roofMat, u0, v0, u1, v1, eave, sp.ridge - eave, axis, { overhang: sp.overhang ?? 0.32, wallMat: W });
@@ -149,11 +185,12 @@ export function gothRange(K, sp) {
 }
 
 // Parapet gable end coping on run R (the gable wall spans 0..w along R): sloped copings, kneelers at the eaves, apex finial.
-export function rakeCope(K, R, mat, yE, rise, w, { d0 = -0.55, d1 = 0.12, kneel = true } = {}) {
+export function rakeCope(K, R, mat, yE, rise, w, { d0 = -0.55, d1 = 0.12, kneel = true, lift = 0, wallMat = null } = {}) {
   const L = Math.hypot(w / 2, rise), a = Math.atan2(rise, w / 2);
   for (const sg of [-1, 1]) {
-    const g = new THREE.BoxGeometry(L + 0.25, 0.32, d1 - d0); g.rotateZ(sg * -a); g.translate(w / 2 + sg * w / 4, yE + rise / 2 + 0.22, (d0 + d1) / 2); K.addRun(R, mat, g);
+    const g = new THREE.BoxGeometry(L + 0.25, 0.32, d1 - d0); g.rotateZ(sg * -a); g.translate(w / 2 + sg * w / 4, yE + rise / 2 + 0.22 + lift, (d0 + d1) / 2); K.addRun(R, mat, g);
+    if (lift > 0) { const pw = new THREE.BoxGeometry(L, lift + 0.1, 0.5); pw.rotateZ(sg * -a); pw.translate(w / 2 + sg * w / 4, yE + rise / 2 + lift / 2 + 0.05, -0.25); K.addRun(R, wallMat || mat, pw); }
     if (kneel) { const s = sg < 0 ? -0.15 : w - 0.55; K.rbox(R, mat, s, yE - 0.55, d0, s + 0.7, yE + 0.25, d1 + 0.05); }
   }
-  K.rbox(R, mat, w / 2 - 0.24, yE + rise, d0 + 0.05, w / 2 + 0.24, yE + rise + 0.75, d1);
+  K.rbox(R, mat, w / 2 - 0.24, yE + rise + lift, d0 + 0.05, w / 2 + 0.24, yE + rise + lift + 0.75, d1);
 }

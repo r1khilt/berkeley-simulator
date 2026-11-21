@@ -22,7 +22,7 @@ export async function build(ctx) {
   const M = ctx.M; const B = rmats(M);
   const K = new Kit(ctx, THREE.MathUtils.degToRad(23.5));
   const colliders = [], walkables = [];
-  const W = B.bowWall, T = B.bowTrim, RT = B.clayTile, SA = B.sash;
+  const W = B.bowWall, T = B.bowTrim, RT = B.clayTile, SA = B.bowSash; // stone-coloured sash: reads as stone-mullioned lights
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
   const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.14, lightW: 0.58, winH: 1.8, topH: 1.5,
     lights: (i, k, f) => (k === 0 ? 3 : (i % 2 === 0 ? 3 : 2)) };
@@ -39,7 +39,8 @@ export async function build(ctx) {
   const AC = 13.2, AP = 3.65, AW = 3.0, AH = 3.95, LD = 2.8; // centre u, pitch, arch width, height, loggia depth
   const arcS = (i) => AC - A.u0 + (i - 1.5) * AP;
   let base = 0;
-  const rA = gothRange(K, { ...common, ...A, core: false,
+  const GW = [[3.8, 6.8], [AC, 6.6], [22.6, 6.8]]; // court-face wall gables (u centre, width)
+  const rA = gothRange(K, { ...common, ...A, core: false, corniceGaps: { S: GW.map(([u, w]) => [u - A.u0 - w / 2, u - A.u0 + w / 2]) },
     ops: (f, R, k, ly) => (f === 'S' && k === 0 ? [0, 1, 2, 3].map((i) => ({ s0: arcS(i) - AW / 2, s1: arcS(i) + AW / 2, y0: ly - 0.05, y1: ly + AH, arch: 'gothic', rise: 1.45 })) : null),
     skip: (f, s, k) => f === 'S' && k <= 2 && Math.abs(s - (AC - A.u0)) < 2.2 && k >= 1, // oriel bays
   });
@@ -56,10 +57,10 @@ export async function build(ctx) {
     // loggia: dark back wall with three entrance doors, paved floor, ceiling
     const RB = K.run([lu0, A.v1 - LD], [lu1, A.v1 - LD]);
     const doors = [-1, 0, 1].map((j) => ({ s0: RB.L / 2 + j * AP - 0.8, s1: RB.L / 2 + j * AP + 0.8, y0: base, y1: base + 2.9, doorTop: base + 2.25, sill: false }));
-    K.wall(RB, W, 0, RB.L, base - 0.2, ct, doors, 0.3);
+    K.wall(RB, B.loggia, 0, RB.L, base - 0.2, ct, doors, 0.3);
     for (const o of doors) K.fill(RB, o, { kind: 'door', rev: 0.2, door: M.woodDark, frame: T });
     K.box(M.paving, lu0, base - 0.6, A.v1 - LD, lu1, base - 0.02, A.v1 - 0.3);
-    K.box(B.bowShade, lu0, ct - 0.45, A.v1 - LD, lu1, ct, A.v1 - 0.4);
+    K.box(B.loggia, lu0, ct - 0.45, A.v1 - LD, lu1, ct, A.v1 - 0.4);
     for (let i = 0; i < 4; i++) { // chamfered stone surrounds on the arches (jambs + label)
       const R = rA.runs.S; const s = arcS(i);
       K.rbox(R, T, s - AW / 2 - 0.3, base - 0.05, 0, s - AW / 2, base + AH - 1.45, 0.08);
@@ -70,12 +71,12 @@ export async function build(ctx) {
   }
 
   // ---------- parapet gable copings on the exposed range ends ----------
-  rakeCope(K, K.run([A.u0, A.v0], [A.u0, A.v1]), T, A.eave, A.ridge - A.eave, A.v1 - A.v0);
-  rakeCope(K, K.run([A.u1, A.v1], [A.u1, A.v0]), T, A.eave, A.ridge - A.eave, A.v1 - A.v0);
-  rakeCope(K, K.run([Bs.u0, Bs.v1], [Bs.u1, Bs.v1]), T, Bs.eave, Bs.ridge - Bs.eave, Bs.u1 - Bs.u0);
-  rakeCope(K, K.run([P.u0, P.v1], [P.u1, P.v1]), T, P.eave, P.ridge - P.eave, P.u1 - P.u0);
-  rakeCope(K, K.run([P0.u0, P0.v1], [P0.u1, P0.v1]), T, P0.eave, P0.ridge - P0.eave, P0.u1 - P0.u0, { kneel: false });
-  rakeCope(K, K.run([Aw.u0, Aw.v0], [Aw.u0, Aw.v1]), T, Aw.eave, Aw.ridge - Aw.eave, Aw.v1 - Aw.v0);
+  rakeCope(K, K.run([A.u0, A.v0], [A.u0, A.v1]), T, A.eave, A.ridge - A.eave, A.v1 - A.v0, { lift: 0.45, wallMat: W });
+  rakeCope(K, K.run([A.u1, A.v1], [A.u1, A.v0]), T, A.eave, A.ridge - A.eave, A.v1 - A.v0, { lift: 0.45, wallMat: W });
+  rakeCope(K, K.run([Bs.u0, Bs.v1], [Bs.u1, Bs.v1]), T, Bs.eave, Bs.ridge - Bs.eave, Bs.u1 - Bs.u0, { lift: 0.45, wallMat: W });
+  rakeCope(K, K.run([P.u0, P.v1], [P.u1, P.v1]), T, P.eave, P.ridge - P.eave, P.u1 - P.u0, { lift: 0.45, wallMat: W });
+  rakeCope(K, K.run([P0.u0, P0.v1], [P0.u1, P0.v1]), T, P0.eave, P0.ridge - P0.eave, P0.u1 - P0.u0, { kneel: false, lift: 0.45, wallMat: W });
+  rakeCope(K, K.run([Aw.u0, Aw.v0], [Aw.u0, Aw.v1]), T, Aw.eave, Aw.ridge - Aw.eave, Aw.v1 - Aw.v0, { lift: 0.45, wallMat: W });
   // attic lights in the big gable ends facing the court and the lawn
   for (const [a, b, yE, rise] of [[[P.u0, P.v1], [P.u1, P.v1], P.eave, P.ridge - P.eave], [[Bs.u0, Bs.v1], [Bs.u1, Bs.v1], Bs.eave, Bs.ridge - Bs.eave]]) {
     const R = K.run(a, b); const c = R.L / 2; const o = { s0: c - 0.75, s1: c + 0.75, y0: yE + 0.5, y1: yE + Math.min(2.2, rise * 0.5) };
@@ -86,7 +87,7 @@ export async function build(ctx) {
   // ---------- coped wall gables breaking the eaves, small gabled dormers between ----------
   {
     const RS = K.run([A.u0, A.v1], [A.u1, A.v1]); // main range, court face
-    for (const [u, w, r] of [[3.8, 6.8, 4.9], [AC, 6.6, 4.8], [22.6, 6.8, 4.9]]) crossGable(K, RS, u - A.u0, w, A.eave, r, 5.5, RT, W, T, { proud: 0.12, frame: SA });
+    for (const [u, w] of GW) crossGable(K, RS, u - A.u0, w, A.eave, w * 0.72, 5.5, RT, W, T, { proud: 0.12, frame: SA });
     for (const u of [8.5, 17.9]) crossGable(K, RS, u - A.u0, 2.8, A.eave + 0.1, 2.3, 3.0, RT, W, T, { proud: -0.2, frame: SA });
     const RN = K.run([A.u1, A.v0], [A.u0, A.v0]);
     for (const u of [20.0, 5.0]) crossGable(K, RN, A.u1 - u, 5.6, A.eave, 5.0, 4.5, RT, W, T, { proud: 0.08, frame: SA });

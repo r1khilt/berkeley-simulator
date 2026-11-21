@@ -84,7 +84,7 @@ export async function build(ctx) {
     letterPanel(K, R, 'INTERNATIONAL  HOUSE', c, 5.3, 12.5, 0.85, 0.05, { color: '#8a8070', shadow: '#d8d0bf', spacing: 0.3 });
     // projecting glass vestibule
     const vu0 = u0 - 2.0, vv0 = v0 + c - 1.9, vv1 = v0 + c + 1.9;
-    K.box(M.glass, vu0 + 0.05, yF, vv0 + 0.05, u0, yF + 2.75, vv1 - 0.05);
+    K.box(M.glassLight || M.glass, vu0 + 0.05, yF, vv0 + 0.05, u0, yF + 2.75, vv1 - 0.05);
     const VF = new THREE.MeshStandardMaterial({ color: 0x5a5f5c, roughness: 0.45, metalness: 0.5 }); // grey metal vestibule frame
     for (const v of [vv0, vv0 + 1.27, vv1 - 1.27, vv1]) K.box(VF, vu0, yF, v - 0.05, vu0 + 0.1, yF + 2.8, v + 0.05);
     K.box(VF, vu0 - 0.05, yF + 2.75, vv0 - 0.05, u0, yF + 2.95, vv1 + 0.05);
@@ -117,14 +117,15 @@ export async function build(ctx) {
   // ================= Monterey-style wooden gallery (top storey, behind the pavilion) =================
   {
     const u = -27.0, v0 = 3.4, v1 = 15.4, yG = 12.35, yB = 15.25, P = 1.25;
-    const W = new THREE.MeshStandardMaterial({ color: 0x5a4636, roughness: 0.75 }); // dark-stained timber gallery
+    const W = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.75 }); // brown brackets / joist ends
+    const WC = new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.7 }); // cream-painted posts, rail and beam
     K.box(W, u - P, yG - 0.18, v0, u, yG, v1);                         // floor
     for (let v = v0 + 0.35; v < v1; v += 0.86) K.box(W, u - P - 0.25, yG - 0.42, v - 0.08, u, yG - 0.18, v + 0.08, { detail: true }); // beam ends
     for (const v of [v0 + 0.3, v1 - 0.3]) K.box(W, u - 0.9, yG - 1.0, v - 0.12, u, yG - 0.2, v + 0.12); // end brackets
-    const n = 9; for (let i = 0; i < n; i++) { const v = v0 + 0.15 + (v1 - v0 - 0.3) * i / (n - 1); K.box(W, u - P + 0.05, yG, v - 0.09, u - P + 0.23, yB, v + 0.09); K.box(W, u - P - 0.05, yB - 0.32, v - 0.38, u - P + 0.33, yB - 0.12, v + 0.38, { detail: true }); }
-    K.box(W, u - P - 0.08, yB, v0, u - P + 0.32, yB + 0.25, v1);         // beam
-    K.box(W, u - P + 0.02, yG + 0.92, v0, u - P + 0.26, yG + 1.02, v1); // handrail
-    for (let v = v0 + 0.25; v < v1 - 0.1; v += 0.2) K.box(W, u - P + 0.1, yG, v - 0.025, u - P + 0.17, yG + 0.92, v + 0.025, { detail: true });
+    const n = 9; for (let i = 0; i < n; i++) { const v = v0 + 0.15 + (v1 - v0 - 0.3) * i / (n - 1); K.box(WC, u - P + 0.05, yG, v - 0.09, u - P + 0.23, yB, v + 0.09); K.box(W, u - P - 0.05, yB - 0.32, v - 0.38, u - P + 0.33, yB - 0.12, v + 0.38, { detail: true }); }
+    K.box(WC, u - P - 0.08, yB, v0, u - P + 0.32, yB + 0.25, v1);         // beam
+    K.box(WC, u - P + 0.02, yG + 0.92, v0, u - P + 0.26, yG + 1.02, v1); // handrail
+    for (let v = v0 + 0.25; v < v1 - 0.1; v += 0.2) K.box(WC, u - P + 0.1, yG, v - 0.025, u - P + 0.17, yG + 0.92, v + 0.025, { detail: true });
     shedRoof(K, TM, u - P - 0.6, v0 - 0.4, u, v1 + 0.4, yB + 0.3, yB + 1.0, 'u1', { thick: 0.3, rafters: 0.5, rafterMat: W });
   }
 

@@ -18,9 +18,9 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
-  const CON = concreteMat(0xc2b48e, 'board', { rough: 0.9 });   // monolithic board-formed concrete, warm buff
+  const CON = concreteMat(0xb1a47b, 'board', { rough: 0.9 });   // monolithic board-formed concrete, khaki buff
   const CONd = concreteMat(0x9c9277, 'smooth');    // slab edges, shadowed planes
-  const PAVE = concreteMat(0xb4b3ad, 'smooth', { rough: 0.95, normal: 0.15 }); // light grey plaza concrete
+  const PAVE = (() => { const m = M.concrete.clone(); m.color = new THREE.Color(0xd2cbbd); m.roughness = 0.95; return m; })(); // warm grey plaza concrete
   const FR = M.darkBronze, GL = M.windowNight;
   const PZ = 12.0;                                  // plaza / exhibit-hall floor level
   const colliders = [], walkables = [], interactions = [];
@@ -52,7 +52,7 @@ export async function build(ctx) {
   K.flat(PAVE, fp, PZ);
   {
     const inside = (x, z) => { let c = false; for (let i = 0, j = fp.length - 1; i < fp.length; j = i++) { const [xi, zi] = fp[i], [xj, zj] = fp[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
-    const JM = concreteMat(0x8a877f, 'smooth', { rough: 0.95, normal: 0.2 }); const step = 4.5;
+    const JM = (() => { const m = M.concrete.clone(); m.color = new THREE.Color(0xa9a395); return m; })(); const step = 4.0;
     for (let x = -42; x <= 42; x += step) for (let z = -66; z < 24; z += step) {
       if (inside(x, z + step / 2) && inside(x, z) && inside(x, z + step)) K.box(JM, x - 0.04, PZ, z, x + 0.04, PZ + 0.012, z + step, { detail: true });
       if (inside(x + step / 2, z) && inside(x, z) && inside(x + step, z)) K.box(JM, x, PZ, z - 0.04, x + step, PZ + 0.012, z + 0.04, { detail: true });
@@ -114,11 +114,11 @@ export async function build(ctx) {
     K.prism(CONd, offsetRing(base, 0.5), PZ - 0.2, PZ + 0.45); // ledge where the hall meets the podium roof
     // folded-plate exhibit hall: steep battered concrete faces rising straight off the plaza, a lower-pitched upper fold,
     // then a small vertical-sided crown box on the plateau (LiDAR: edge ~19 m, crown ~21.8–22.5 m)
-    const r1 = offsetRing(base, -3.0), r2 = offsetRing(base, -6.2);
-    frustum(K, CON, base, r1, PZ, 19.2, { cap: false, uvMode: "roof" });
-    frustum(K, CON, r1, r2, 19.2, 21.6, { cap: true, uvMode: 'roof' });
+    const r1 = offsetRing(base, -2.7), r2 = offsetRing(base, -5.9);
+    frustum(K, CON, base, r1, PZ, 19.8, { cap: false, uvMode: "roof" });
+    frustum(K, CON, r1, r2, 19.8, 22.4, { cap: true, uvMode: 'roof' });
     // crisp fold ribs down the hips (detail)
-    for (let i = 0; i < base.length; i++) { const a = base[i], b = r1[i]; const L = Math.hypot(b[0] - a[0], 19.2 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 19.2, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 19.2) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
+    for (let i = 0; i < base.length; i++) { const a = base[i], b = r1[i]; const L = Math.hypot(b[0] - a[0], 19.8 - PZ, b[1] - a[1]); const g = new THREE.BoxGeometry(0.28, 0.18, L); const m = new THREE.Matrix4().lookAt(new THREE.Vector3(a[0], PZ, a[1]), new THREE.Vector3(b[0], 19.8, b[1]), new THREE.Vector3(0, 1, 0)); g.applyMatrix4(m); g.translate((a[0] + b[0]) / 2, (PZ + 19.8) / 2, (a[1] + b[1]) / 2); K.add(CONd, g, { detail: true }); }
     colliders.push(K.colPoly(base, PZ - 1, 21.8));
   }
   // south stair/service blocks (flat roofs at the spine height)
