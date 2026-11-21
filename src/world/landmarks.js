@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { materials, U, boxUV } from '../materials.js';
 import { loadJSON } from '../data.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { applyInteriorGlass } from './interiors.js'; // furnished rooms behind landmark window glass
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
@@ -36,6 +37,7 @@ export class LandmarkManager {
       const res = await mod.build({ THREE, M: this.M, U, boxUV, groundAt, footprints: packet.footprints, anchor: a, packet });
       const obj = res.object3d; obj.position.set(a.x, a.y, a.z); obj.name = 'landmark:' + l.id;
       if (!res.update) mergeStatic(obj);
+      try { applyInteriorGlass(obj, { id: l.id, name: (mod.info && mod.info.name) || l.name, tag: packet.footprints && packet.footprints[0] && packet.footprints[0].tags && packet.footprints[0].tags.building, M: this.M }); } catch (e) { console.warn('interiors', l.id, e); } // window interiors
       obj.traverse((o) => { if (o.isMesh) { if (o.castShadow !== false) o.castShadow = true; o.receiveShadow = true; } });
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
       this.setupMaterials && this.setupMaterials(obj);

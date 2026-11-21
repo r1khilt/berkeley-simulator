@@ -5,6 +5,7 @@ let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
 import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
+import { INTERIOR_GLSL, buildingUse } from './interiors.js'; // furnished window interiors
 
 const CH = 512;
 export const STYLE = { classical: 0, brick: 1, stucco: 2, concrete: 3, glass: 4, house: 5, apartment: 6, commercial: 7, industrial: 8, church: 9, brutal: 10, shingle: 11 };
@@ -102,6 +103,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
     let ch = getChunk(cx, cz);
     if (standinIds.has(osm)) { const k = Math.floor(cx / CH) + ',' + Math.floor(cz / CH); ch = { walls: new Buf(), roofs: new Buf() }; standins.set(osm, { key: k, walls: ch.walls, roofs: ch.roofs }); }
     const isRed = roofCol.r > roofCol.g + 0.06 && roofCol.r > roofCol.b + 0.1;
+    const bUse = buildingUse({ name: ni >= 0 ? data.names[ni] : '', style, h: Math.max(...parts.map((q) => q[0])), x: cx, z: cz, seed }); // window interiors
     let maxTop = 0;
     parts.forEach((part, pi) => {
       const [h, rt, ridge, pitch, ang, flat, holesFlat] = part;
@@ -115,7 +117,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
       let top = base + Math.max(1.0, h);
       maxTop = Math.max(maxTop, base + Math.max(h, ridge || 0));
       const area = Math.abs(signedArea(outer));
-      const fac = [style, seed + pi * 0.137, 0, Math.max(1.0, h)];
+      const fac = [style + 16 * bUse, seed + pi * 0.137, 0, Math.max(1.0, h)]; // use packed for interiors.js
       if (pi === 0) colliders.push({ outer, holes, y0: yb, y1: base + Math.max(h, ridge || h), id: osm });
       // ---- roof decisions
       let roofType = rt;
@@ -262,7 +264,8 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
 
 const FACADE_GLSL = /* glsl */`
 uniform sampler2D uNoise; uniform float uNight; uniform vec3 uSkyZen, uSkyHor;
-varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;
+flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF; // flat: per-wall constants are hashed, interpolation noise would scramble rooms
+${INTERIOR_GLSL}
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
 // style table: floorH, bayW, winW, winH | sill, groundH, frameW, kind
 void styleParams(int s, out vec4 A, out vec4 B){
@@ -281,7 +284,8 @@ void styleParams(int s, out vec4 A, out vec4 B){
 }
 vec3 fCol; float fRough; float fMetal; vec3 fEmis; float fBump;
 void facade(vec3 wallC){
-  int s = int(vFac.x+0.5); float seed = vFac.y; float edgeLen = vFac.z; float topH = vFac.w;
+  // vFac.x packs style + 16*use (use drives the furnished interiors in interiors.js)
+  int sAll = int(vFac.x+0.5); int s = sAll - (sAll/16)*16; int bUse = sAll/16; float seed = vFac.y; float edgeLen = vFac.z; float topH = vFac.w;
   vec4 A, B; styleParams(s, A, B);
   float floorH=A.x, bayW=A.y, winW=A.z, winH=A.w, sill=B.x, groundH=B.y, frameW=B.z;
   float u = vUvF.x, v = vUvF.y;
@@ -342,48 +346,38 @@ void facade(vec3 wallC){
     float inXf = 1.0 - smoothstep(hwx+fw-ax, hwx+fw+ax, hx), inYf = smoothstep(y0-fw-ay, y0-fw+ay, y)*(1.0-smoothstep(y1+fw-ay, y1+fw+ay, y));
     float frame = clamp(inXf*inYf - win, 0.0, 1.0);
     vec3 frameC = (s==3||s==4||s==10||s==8) ? vec3(0.16,0.17,0.18) : (s==1||s==5||s==11||s==0||s==2) ? vec3(0.86,0.85,0.8) : vec3(0.3);
-    // glass: dark, slight blue, reflective; blinds variation; recess shadow at top
-    float blind = h21(vec2(bi*3.1 + seed, fi*7.3));
-    vec3 glass = mix(vec3(0.05,0.06,0.07), vec3(0.14,0.15,0.15), step(0.86, blind)*0.7);
+    // glass: dark, slight blue, reflective; recess shadow at top
+    vec3 glass = vec3(0.05,0.06,0.07);
     float rec = smoothstep(y1 - 0.35*fh*wh, y1, y);
     glass *= 1.0 - 0.35*rec;
-    // interior mapping: a virtual room behind each window gives depth and parallax
+    // furnished interiors (interiors.js): floors share a room type; rooms span 1-4 bays; lights per room
+    int rType = irFloorType(bUse, fi, h21(vec2(fi + 0.5, seed * 17.0)), fract(seed * 7.13));
+    float span = min(irSpanOf(rType, h21(vec2(fi + 1.5, seed * 5.0))), nb);
+    float ri = floor(bi / span);
+    float rseed = floor(h21(vec2(ri + seed * 31.0, fi * 1.7 + seed * 7.0)) * 997.0) + fi * 13.0;
+    float lit = irLitOf(rType, fract(rseed * 0.618 + 0.11));
+    vec3 litC = irLampColor(rType, fract(rseed * 0.618));
     vec3 interior = vec3(0.0);
-    if (lodW < 0.95 && abs(vWNF.y) < 0.5) {
-      vec3 N = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tg = normalize(cross(vec3(0.0,1.0,0.0), N));
-      vec3 V = normalize(vWPosF - cameraPosition);
-      float vt = dot(V, Tg), vu = V.y, vn = max(1e-3, -dot(V, N));
-      float px = fract(u / bw) * bw, py = fv * fh, depth = 3.2 + 1.5*h21(vec2(bi+3.0, fi+seed*5.0));
-      float tx = vt > 0.0 ? (bw - px)/vt : -px/max(-vt,1e-4);
-      float ty = vu > 0.0 ? (fh - py)/vu : -py/max(-vu,1e-4);
-      float tz = depth / vn;
-      float t = min(tx, min(ty, tz));
-      vec3 roomTint = mix(vec3(0.85,0.78,0.66), vec3(0.72,0.78,0.82), step(0.5, h21(vec2(bi*7.0+seed, fi*3.0))));
-      if (s==7 && fi < 0.5) roomTint = mix(vec3(0.95,0.9,0.8), vec3(0.85,0.88,0.9), h21(vec2(bi, seed)));   // bright shop interiors
-      vec3 wallC;
-      if (t == tz) wallC = roomTint * 0.9;                    // back wall
-      else if (t == tx) wallC = roomTint * 0.65;              // side walls
-      else wallC = vu > 0.0 ? vec3(0.92) : vec3(0.28,0.22,0.18); // ceiling / floor
-      float hx2 = px + vt*t, hy2 = py + vu*t;
-      // furniture-ish silhouettes near the floor of the back wall
-
-      float blindCover = step(0.7, blind) * smoothstep(0.0, 0.02, (y1 - y) - (0.35 + 0.5*h21(vec2(bi, fi*1.3)))*(y1-y0));
-      interior = mix(wallC, vec3(0.78,0.74,0.66), blindCover);
-      interior = mix(interior, vec3(0.45,0.42,0.38), smoothstep(0.15, 0.6, pxu / bw * 8.0));   // filter tiny windows to their average
+    if (lodW < 0.95 && abs(vWNF.y) < 0.5 && win > 0.001) {
+      vec3 N = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tu = vec3(-N.z, 0.0, N.x);   // Tu: direction of increasing u
+      vec3 Vd = vWPosF - cameraPosition; float camD = length(Vd); vec3 V = Vd / max(camD, 1e-4);
+      float Wr = min(span, nb - ri * span) * bw, Hr = fh - 0.3;
+      float bx = (bi - ri * span) * bw + bw * 0.5;
+      vec3 ro = vec3(u - ri * span * bw, min(fv * fh, Hr - 0.01), 0.0);
+      interior = irRoom(ro, vec3(dot(V, Tu), V.y, -dot(V, N)), vec3(Wr, Hr, irDepthOf(rType, fract(rseed * 0.31))), rType, rseed,
+                        h21(vec2(bi * 3.1 + seed, fi * 7.3)) * 911.0, lit, vec4(bx - hwx, y0, bx + hwx, y1), max(pxu, pxv), camD);
+      interior = mix(interior, irAverage(rType, rseed, lit, litC), smoothstep(0.15, 0.6, pxu / bw * 8.0));   // tiny windows: average
     }
     // mullions
     float mul = 0.0;
     if (s==4) { mul = 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04); }
     else if (ww*bw > 1.2) { float mu = abs(fract((hx/(hwx))*1.0 + 0.0)-0.0); mul = 1.0 - smoothstep(0.02, 0.02+ax, abs(hx - 0.0)); }
-    float lit = (s==7 && fi < 0.5) ? 0.0 : step(s==3||s==4||s==10 ? 0.68 : 0.62, h21(vec2(bi*1.7 + seed*13.0, fi*2.3 + seed)));
-    vec3 litC = mix(vec3(1.0,0.78,0.48), vec3(0.85,0.9,1.0), step(0.85, h21(vec2(bi, fi+3.0))));
     float wmask = win * (1.0 - lodW);
     col = mix(col, frameC, frame*(1.0-lodW));
     col = mix(col, glass, wmask);
     col = mix(col, frameC*0.6, mul*wmask);
     rough = mix(rough, 0.06, wmask); fMetal = mix(0.0, 0.35, wmask);
     // daytime: dim room seen through glass; night: lit rooms glow (with their interior detail)
-    float dayInt = (s==7 && fi < 0.5 ? 0.32 : 0.16) * (1.0 - uNight) + (s==7 && fi < 0.5 ? 0.35 : 0.0) * uNight;
     // fake reflection of sky / street in the glass with Fresnel
     vec3 Nw = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Vw = normalize(vWPosF - cameraPosition);
     vec3 Rf = reflect(Vw, Nw); float cosT = clamp(dot(-Vw, Nw), 0.0, 1.0);
@@ -395,13 +389,13 @@ void facade(vec3 wallC){
     vec3 refl = Rf.y > skyline ? skyR : streetR;
     float wobble = (texture(uNoise, vec2(bi * 0.37 + seed, fi * 0.21)).b - 0.5) * 0.15;
     refl *= 1.0 + wobble;
-    float kRefl = mix(0.25, 0.95, F);
-    fEmis = interior * wmask * (dayInt + lit * uNight * 0.75) * vec3(1.0, 0.86, 0.66) * (1.0 - kRefl * 0.6) * (1.0 - rec*0.4) + refl * kRefl * wmask * 0.85 + litC * lit * wmask * uNight * 0.12;
+    float kRefl = mix(mix(0.1, 0.9, F), mix(0.25, 0.95, F), lodW);
+    fEmis = interior * wmask * (1.0 - kRefl * 0.8) * (1.0 - rec*0.3) + refl * kRefl * wmask * 0.85;
     col = mix(col, vec3(0.02, 0.025, 0.03), wmask); rough = mix(rough, 0.4, wmask); fMetal = mix(fMetal, 0.0, wmask);
     // far LOD: average window coverage
     float cover = ww*wh;
     col = mix(col, mix(col, vec3(0.1,0.11,0.12), cover*0.8), lodW);
-    fEmis += litC * lit * cover * 0.45 * uNight * lodW;
+    fEmis += litC * lit * cover * 0.45 * uNight * lodW;   // far LOD: lit rooms as a soft glow
   }
   fCol = col; fRough = rough;
 }`;
@@ -410,7 +404,7 @@ function makeWallMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFac = aFac; vUvF = uv; vWPosF = (modelMatrix*vec4(transformed,1.0)).xyz; vWNF = normalize(mat3(modelMatrix)*normal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + FACADE_GLSL)
       .replace('#include <color_fragment>', '#include <color_fragment>\n facade(diffuseColor.rgb);\n diffuseColor.rgb = fCol;')
@@ -418,7 +412,7 @@ function makeWallMaterial() {
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = fMetal;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;');
   };
-  mat.customProgramCacheKey = () => 'facade-v4';
+  mat.customProgramCacheKey = () => 'facade-v5-interiors';
   return mat;
 }
 function makeRoofMaterial() {
