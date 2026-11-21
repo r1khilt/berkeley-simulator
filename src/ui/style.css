@@ -10,7 +10,7 @@
 :root, [data-theme=light] {
   color-scheme: light;
   --mat: rgba(249, 249, 251, .80); --mat-strong: rgba(252, 252, 253, .96); --mat-border: rgba(0, 0, 0, .08);
-  --sheet: rgba(242, 242, 246, .94); --group: #ffffff;
+  --sheet: rgba(242, 242, 246, .97); --group: #ffffff;
   --ink: #1c1c1e; --ink2: #63666c; --ink3: #8e9096; --sep: rgba(60, 60, 67, .13); --fill: rgba(118, 118, 128, .12); --fill2: rgba(118, 118, 128, .22);
   --shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 6px 24px rgba(0, 0, 0, .12);
   --seg-on: #ffffff; --seg-on-shadow: 0 1px 3px rgba(0, 0, 0, .14), 0 0 0 .5px rgba(0, 0, 0, .05);
@@ -20,7 +20,7 @@
 [data-theme=dark] {
   color-scheme: dark;
   --mat: rgba(28, 29, 34, .74); --mat-strong: rgba(36, 37, 43, .96); --mat-border: rgba(255, 255, 255, .09);
-  --sheet: rgba(26, 27, 32, .94); --group: rgba(255, 255, 255, .065);
+  --sheet: rgba(26, 27, 32, .96); --group: rgba(255, 255, 255, .065);
   --ink: #f4f4f6; --ink2: #a3a5ad; --ink3: #74767e; --sep: rgba(255, 255, 255, .10); --fill: rgba(255, 255, 255, .08); --fill2: rgba(255, 255, 255, .16);
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .34);
   --seg-on: rgba(255, 255, 255, .17); --seg-on-shadow: 0 1px 2px rgba(0, 0, 0, .3);
@@ -38,6 +38,8 @@ button { font-family: var(--font); }
 button:focus { outline: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .material { background: var(--mat); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); border: .5px solid var(--mat-border); box-shadow: var(--shadow); color: var(--ink); }
+/* large, nearly opaque surfaces don't need backdrop blur (keeps compositing cheap over the WebGL canvas) */
+.panel .sheet.material, .mside.material, .mcard.material { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* low quality / touch: skip backdrop blur (cheaper compositing) */
 .lowfx .material, .lowfx .prompt, .lowfx .notice, .lowfx .hint, .lowfx .joy, .lowfx .tb { -webkit-backdrop-filter: none; backdrop-filter: none; }
 .lowfx .material { background: var(--mat-strong); }
@@ -86,7 +88,7 @@ kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; 
 .title .btn.primary:hover { filter: none; background: #f1f3f6; }
 .title .btn.primary .i { transition: transform .2s var(--ease); }
 .title .btn.primary:hover .i { transform: translateX(3px); }
-.title .btn.secondary { background: rgba(255, 255, 255, .13); color: #fff; border: 1px solid rgba(255, 255, 255, .16); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.title .btn.secondary { background: rgba(255, 255, 255, .16); color: #fff; border: 1px solid rgba(255, 255, 255, .22); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .title .btn.secondary:hover { background: rgba(255, 255, 255, .22); }
 .title-time { margin-top: 18px; display: flex; align-items: flex-start; gap: 8px; max-width: 30em; font: 13px/1.5 var(--font); color: rgba(255, 255, 255, .84); animation: rise .6s var(--ease) both; }
 .title-time .i { width: 16px; height: 16px; margin-top: 2px; opacity: .85; }
@@ -231,7 +233,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .tp-scale span:first-child { transform: none; }
 .tp-scale span:last-child { transform: translateX(-100%); }
 .presets, .wx-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.presets button, .wx-seg button { appearance: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 52px; padding: 7px 2px 6px; border: 0; border-radius: 11px; background: var(--group); color: var(--ink); font: 500 11px/1.15 var(--font); letter-spacing: -.01em; white-space: nowrap; text-align: center; cursor: pointer; transition: background .15s, color .15s; }
+.presets button, .wx-seg button { appearance: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 50px; padding: 7px 2px 6px; border: 0; border-radius: 11px; background: var(--group); color: var(--ink); font: 500 11px/1.15 var(--font); letter-spacing: -.01em; white-space: nowrap; text-align: center; cursor: pointer; transition: background .15s, color .15s; }
 .presets button:hover, .wx-seg button:hover { background: var(--mat-strong); }
 .presets .i, .wx-seg .i { width: 20px; height: 20px; color: var(--ink2); }
 .presets button.on, .wx-seg button.on { background: var(--accent); color: var(--accent-ink); }
@@ -248,6 +250,8 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .tp-sun span { display: inline-flex; align-items: center; gap: 6px; }
 .tp-sun .i { width: 16px; height: 16px; }
 .tp-sun b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.h3-row { display: flex; justify-content: space-between; align-items: baseline; }
+.wx-now { font-weight: 500; color: var(--ink3); font-variant-numeric: tabular-nums; }
 .tp-note { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 0; padding: 8px 11px; border-radius: 11px; background: var(--accent-soft); font: 12.5px/1.45 var(--font); color: var(--ink); }
 .tp-note .i { width: 16px; height: 16px; margin-top: 1px; color: var(--accent); }
 /* controls sheet */
@@ -302,7 +306,8 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .mctl { position: absolute; right: calc(12px + var(--sr)); bottom: calc(44px + var(--sb)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .mctl .iconbtn { width: 40px; height: 40px; border-radius: 12px; background: var(--mat); color: var(--here); }
 .mctl .iconbtn .i { width: 19px; height: 19px; }
-.bigmap .close { position: absolute; right: calc(12px + var(--sr)); top: calc(12px + var(--st)); width: 40px; height: 40px; background: var(--mat); color: var(--ink); }
+.bigmap .close { position: absolute; right: calc(16px + var(--sr)); top: calc(16px + var(--st)); width: 40px; height: 40px; background: var(--mat-strong); color: var(--ink); }
+.bigmap .close .i { width: 19px; height: 19px; }
 .mfoot { position: absolute; right: calc(14px + var(--sr)); bottom: calc(14px + var(--sb)); display: flex; align-items: center; gap: 14px; font: 500 11px/1 var(--font); color: #4e5258; text-shadow: 0 0 3px #ecebe5; }
 .mscale { display: inline-flex; align-items: center; gap: 7px; }
 .mscale i { display: block; height: 6px; border: 1.5px solid #4e5258; border-top: 0; }

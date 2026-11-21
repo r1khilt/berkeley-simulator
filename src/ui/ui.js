@@ -78,7 +78,7 @@ export class UI {
   note(t) { this.titleNote.textContent = t; if (/^Could not/.test(t)) this.title.classList.add('failed'); }
   ready() {
     this.title.querySelector('.loading').classList.add('hidden'); this.menu.classList.remove('hidden');
-    if (this.titleTimeEl.innerHTML) this.titleTimeEl.classList.remove('hidden');
+    if (this.titleTimeEl.innerHTML) { this.titleTimeEl.classList.remove('hidden'); this.titleTimeSeen = true; }
     this.boot.classList.add('done'); setTimeout(() => this.boot.remove(), 1500);
     this.title.classList.add('ready');
   }
@@ -213,7 +213,7 @@ export class UI {
   fmtSpeed(mps) { return this.units === 'metric' ? `${Math.round(mps * 3.6)} km/h` : `${Math.round(mps * 2.23694)} mph`; }
   fmtDist(m) {
     if (this.units === 'metric') return m < 950 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(m < 9500 ? 1 : 0)} km`;
-    const ft = m * 3.28084; return ft < 1000 ? `${Math.max(50, Math.round(ft / 50) * 50)} ft` : `${(ft / 5280).toFixed(ft < 52800 ? 1 : 0)} mi`;
+    const ft = m * 3.28084; return ft < 800 ? `${Math.max(50, Math.round(ft / 50) * 50)} ft` : `${(ft / 5280).toFixed(ft < 52800 ? 1 : 0)} mi`;
   }
   // ---------- minimap (rounded square, heading-up or north-up; compass button in the corner)
   setMap(map) { this.map = map; }
@@ -460,7 +460,7 @@ export class UI {
       <div class="presets">${PRESETS.map((p) => `<button data-x="${p.id}" title="${p.label}">${icon(p.icon)}<span>${p.label}</span></button>`).join('')}</div>
       <div class="row tp-daterow"><span class="lbl">${icon('calendar')}Date</span><span class="tp-dctl"><button class="btn tertiary sm" data-x="today">Today</button><button class="iconbtn" data-x="prev" aria-label="Previous day" title="Previous day">${icon('chevronLeft')}</button><label class="tp-dpick" title="Pick a date"><span></span><input type="date" data-k="date" aria-label="Date"></label><button class="iconbtn" data-x="next" aria-label="Next day" title="Next day">${icon('chevronRight')}</button></span></div>
       <div class="tp-sun"><span>${icon('sunrise')}Sunrise <b class="rise"></b></span><span>${icon('sunset')}Sunset <b class="set"></b></span></div>
-      <h3>Weather</h3>
+      <h3 class="h3-row">Weather<span class="wx-now"></span></h3>
       <div class="wx-seg">${WEATHER.map(([v, l, ic, t]) => `<button data-w="${v}" title="${t}">${icon(ic)}<span>${l}</span></button>`).join('')}</div>
       <p class="tp-note hidden">${icon('info')}<span></span></p>`, (p) => {
       const $q = (s) => p.querySelector(s), hr = $q('[data-k=hour]'), lv = $q('[data-k=live]'), dt = $q('[data-k=date]');
@@ -475,7 +475,8 @@ export class UI {
         dt.value = st.date || pacificDay();
         p.querySelectorAll('.presets [data-x]').forEach((b) => b.classList.toggle('on', !st.live && Math.abs(presetHour(b.dataset.x, st.date) - st.hour) < 0.02));
         p.querySelectorAll('.wx-seg [data-w]').forEach((b) => b.classList.toggle('on', b.dataset.w === (st.weather || 'live')));
-        const note = $q('.tp-note'); const msg = st.autoDay ? `Opened in daylight · it was ${fmtHour(pacificHour(st.autoDay))} and dark in Berkeley` : '';
+        const note = $q('.tp-note'); const msg = st.autoDay ? `Daylight view · Berkeley time is now ${fmtHour(pacificHour(new Date()))}` : '';
+        const w = st.wx; $q('.wx-now').textContent = w && Number.isFinite(w.temperature_2m) ? `Berkeley now: ${this.units === 'metric' ? Math.round(w.temperature_2m) + '°C' : Math.round(w.temperature_2m * 9 / 5 + 32) + '°F'}` : '';
         note.classList.toggle('hidden', !msg); note.querySelector('span').textContent = msg; $q('.tp-sun').classList.toggle('hidden', !!msg);
       };
       this._tday = null; this._timeRefresh = refresh;

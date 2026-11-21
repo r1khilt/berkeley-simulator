@@ -216,7 +216,7 @@ async function boot() {
   // ---- UI wiring
   const lockPointer = () => { try { const r = canvas.requestPointerLock?.(); r && r.catch && r.catch(() => {}); } catch (e) {} }; // ui-pro: no unhandled rejections
   const startPlay = () => { ui.showTitle(false); state = 'play'; player.enabled = true; audio.start(); if (!isTouch) lockPointer(); if (!store.get('helped', false)) { store.set('helped', true); } BS.flyover = false;
-    if (timeSt.autoDay) ui.notify(`Daylight view · Berkeley time is ${fmtHour(pacificHour(new Date()))}`, { icon: 'sun', ms: 6000 }); }; // ui-pro
+    if (timeSt.autoDay && !ui.titleTimeSeen) ui.notify(`Daylight view · Berkeley time is ${fmtHour(pacificHour(new Date()))}`, { icon: 'sun', ms: 6000 }); }; // ui-pro: only if the landing didn't already say so
   let state = 'title';
   ui.on('play', startPlay);
   ui.on('look', () => {
