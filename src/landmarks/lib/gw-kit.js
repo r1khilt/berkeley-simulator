@@ -2,6 +2,7 @@
 // recessed colonnade base, draped ground surfaces, ring utilities. Built on classic-kit's Kit (u = x, v = z, run-local
 // coords: x along the run, y up, z outward).
 import * as THREE from 'three';
+import { U } from '../../materials.js';
 
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const hash = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -31,7 +32,7 @@ export function sagArc(p0, p1, sag, nrm, seg = 10) {
 }
 
 // Subdivided, terrain-draped polygon (holes ok); lift above ground; maxEdge controls tessellation.
-export function drape(K, mat, poly, lift = 0.04, maxEdge = 2.5, holes = [], { yFn = null, detail = false } = {}) {
+export function drape(K, mat, poly, lift = 0.04, maxEdge = 2.5, holes = [], { yFn = null, detail = false, down = false } = {}) {
   const s = new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, z)));
   for (const h of holes) s.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, z))));
   const sg = new THREE.ShapeGeometry(s); const pos = sg.attributes.position; const idx = sg.index ? sg.index.array : null;
@@ -53,7 +54,7 @@ export function drape(K, mat, poly, lift = 0.04, maxEdge = 2.5, holes = [], { yF
   for (const [a, b, c] of tris) {
     // decide winding so the face points up
     const cr = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-    const P = cr > 0 ? [a, c, b] : [a, b, c];
+    const P = (cr > 0) !== down ? [a, c, b] : [a, b, c];
     for (const p of P) out.push(p[0], Y(p[0], p[1]), p[1]);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
@@ -90,10 +91,10 @@ export function cutRanges(s0, s1, cuts) { let segs = [[s0, s1]]; for (const [a, 
 // a dark slab band, and bowed champagne-aluminium panels on a 1.5 m module, shifted half a module on alternate floors
 // (with occasional doubled panels): "alternating metal panels and glazing", about half glass.
 export function panelStorey(K, R, s0, s1, ya, yb, k, mats, o = {}) {
-  const W = o.module ?? 1.5, pw = o.panelW ?? 0.6, dep = o.panelD ?? 0.32; const L = s1 - s0; if (L < 0.4) return;
+  const W = o.module ?? 1.5, pw = o.panelW ?? 0.42, dep = o.panelD ?? 0.36; const L = s1 - s0; if (L < 0.4) return;
   K.rbox(R, mats.glass, s0, ya, -0.2, s1, yb, -0.14);
-  K.rbox(R, mats.spandrel, s0, ya, -0.14, s1, ya + 0.8, -0.125);
-  K.rbox(R, mats.band, s0 - 0.01, ya - 0.3, -0.16, s1 + 0.01, ya + 0.04, 0.04);
+  K.rbox(R, mats.spandrel, s0, ya, -0.14, s1, ya + 0.55, -0.125);
+  K.rbox(R, mats.band, s0 - 0.01, ya - 0.22, -0.16, s1 + 0.01, ya + 0.03, 0.03);
   K.rbox(R, mats.mull, s0, ya + (yb - ya) * 0.74 - 0.04, -0.14, s1, ya + (yb - ya) * 0.74 + 0.04, -0.08, { detail: true });
   const n = Math.max(1, Math.round(L / W)); const w = L / n; const off = (k % 2) ? 0.5 : 0.0;
   const g = [];
@@ -111,10 +112,10 @@ export function panelStorey(K, R, s0, s1, ya, yb, k, mats, o = {}) {
 export function ribbonStorey(K, R, s0, s1, ya, yb, mats, o = {}) {
   const W = o.module ?? 1.5; const L = s1 - s0; if (L < 0.3) return;
   K.rbox(R, mats.glass, s0, ya, -0.12, s1, yb, -0.06);
-  K.rbox(R, mats.spandrel, s0 - 0.01, ya - 0.4, -0.07, s1 + 0.01, ya + 0.4, 0.0);
-  K.rbox(R, mats.silver, s0 - 0.01, ya - 0.42, 0.0, s1 + 0.01, ya - 0.34, 0.06);
+  K.rbox(R, mats.spandrel, s0 - 0.01, ya - 0.25, -0.07, s1 + 0.01, ya + 0.25, 0.0);
+  K.rbox(R, mats.silver, s0 - 0.01, ya - 0.27, 0.0, s1 + 0.01, ya - 0.21, 0.05);
   const n = Math.max(1, Math.round(L / W)); const w = L / n;
-  for (let i = 0; i <= n; i++) { const s = s0 + i * w; K.rbox(R, mats.silver, s - 0.04, ya + 0.4, -0.06, s + 0.04, yb - 0.4, 0.08, { detail: !(i === 0 || i === n) }); }
+  for (let i = 0; i <= n; i++) { const s = s0 + i * w; K.rbox(R, mats.silver, s - 0.04, ya + 0.25, -0.06, s + 0.04, yb - 0.25, 0.08, { detail: !(i === 0 || i === n) }); }
   K.rbox(R, mats.silver, s0, ya + (yb - ya) * 0.72 - 0.03, -0.06, s1, ya + (yb - ya) * 0.72 + 0.03, 0.03, { detail: true });
 }
 
@@ -141,15 +142,30 @@ export function youngTree(K, mats, x, y, z, h = 6, r = 2.0, seed = 0) {
   const b = new THREE.IcosahedronGeometry(r * 0.7, 1); b.translate(x + (hash(seed, 1) - 0.5) * r, y + h - r * 1.5, z + (hash(seed, 2) - 0.5) * r); K.add(mats.leaf, b, { uvMode: 'keep' });
 }
 
-// Canvas-text sign material (brushed-aluminium letters on transparent background)
-export function signMaterial(text, { w = 2048, h = 128, color = '#ecebe6', font = '600 80px Helvetica, Arial, sans-serif', spacing = 12 } = {}) {
+// Canvas-text sign material: light brushed-aluminium letters on the dark fascia colour (opaque, so no alpha dropout)
+export function signMaterial(text, { w = 2048, h = 100, bg = '#4a4642', color = '#f3f2ec', font = '700 70px Helvetica, Arial, sans-serif', spacing = 9 } = {}) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d');
-  g.clearRect(0, 0, w, h); g.fillStyle = color; g.font = font; g.textBaseline = 'middle';
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = color; g.font = font; g.textBaseline = 'middle';
   if ('letterSpacing' in g) g.letterSpacing = spacing + 'px';
-  const tw = g.measureText(text).width; g.fillText(text, (w - tw) / 2, h / 2 + 4);
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const m = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, roughness: 0.35, metalness: 0.55, side: THREE.DoubleSide }); m.name = 'gwSign';
+  const tw = g.measureText(text).width; g.fillText(text, (w - tw) / 2, h / 2 + 3);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.35, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.12 }); m.name = 'gwSign';
   return m;
+}
+
+// Ground-level hardscape sits on the terrain: opt it out of the engine's contact-AO (which halves indirect light within ~2 m of
+// the terrain and is meant for walls), using the same cache-key exclusion the engine applies to its own ground materials.
+export function groundMat(m) { const k = m.name || 'gw'; m.customProgramCacheKey = () => k + '|ground-ring'; return m; }
+
+// Irregular young tree crown (jittered icospheres) on a slim trunk
+export function youngTree2(K, mats, x, y, z, h = 6, r = 2.0, seed = 0) {
+  K.cyl(mats.trunk, x, y - 0.3, z, 0.12, 0.08, h * 0.6 + 0.3, 6);
+  const lobes = [[0, h - r * 0.85, 0, r], [r * 0.45, h - r * 1.25, r * 0.2, r * 0.7], [-r * 0.4, h - r * 1.2, -r * 0.3, r * 0.72], [r * 0.1, h - r * 0.45, -r * 0.35, r * 0.6]];
+  lobes.forEach(([dx, dy, dz, rr], li) => {
+    const g = new THREE.IcosahedronGeometry(rr, 1); const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const j = 0.82 + 0.36 * hash(i + li * 31 + seed * 7, seed + li); p.setXYZ(i, p.getX(i) * j, p.getY(i) * j * 0.9, p.getZ(i) * j); }
+    g.computeVertexNormals(); g.translate(x + dx, y + dy, z + dz); K.add(li % 2 ? mats.leaf2 || mats.leaf : mats.leaf, g, { uvMode: 'keep' });
+  });
 }
 
 // Offset a simple polygon by d (>0 inward, <0 outward) with mitre clamping (no spikes at sharp corners).
@@ -162,10 +178,66 @@ export function offsetPoly(poly, d, maxMiter = 2.0) {
     const dd = 1 + n1[0] * n2[0] + n1[1] * n2[1];
     let mx = (n1[0] + n2[0]) / Math.max(dd, 1e-6), mz = (n1[1] + n2[1]) / Math.max(dd, 1e-6);
     const m = Math.hypot(mx, mz);
-    if (m > maxMiter || dd < 1e-3) { // bevel: two points along each edge normal
-      out.push([p[0] - d * n1[0], p[1] - d * n1[1]], [p[0] - d * n2[0], p[1] - d * n2[1]]); continue;
-    }
+    if (dd < 1e-3) { mx = n1[0]; mz = n1[1]; } else if (m > maxMiter) { mx *= maxMiter / m; mz *= maxMiter / m; } // clamp long mitres
     out.push([p[0] - d * mx, p[1] - d * mz]);
   }
   return out;
+}
+
+// Horizontal polygon at height y facing down (soffits), exact x/z (no mirroring)
+export function flatDown(K, mat, poly, y, opts = {}) { return drape(K, mat, poly, 0, 1000, [], { yFn: () => y, down: true, ...opts }); }
+
+// Campus trees from the engine's own procedural tree library (same look as the rest of campus) when running in the game;
+// returns null in the harness (caller falls back to simple crowns). spec: [{x, y, z, h, r, sp, rot}] in local coords.
+export function engineTrees(spec) {
+  const lib = globalThis.BSIM && globalThis.BSIM.treeLib; if (!lib || !lib.species) return null;
+  const group = new THREE.Group(); group.name = 'gw-trees'; const by = {};
+  for (const t of spec) (by[t.sp] = by[t.sp] || []).push(t);
+  for (const [sp, list] of Object.entries(by)) {
+    const S = lib.species[sp] || lib.species.deciduous || Object.values(lib.species)[0]; if (!S) continue;
+    const lod = S.lods[0]; const nr = S.normRadius || 0.5;
+    for (const p of lod.parts) {
+      const m = new THREE.InstancedMesh(p.geometry, p.material, list.length); m.name = 'gwTree:' + (p.material.name || sp);
+      if (p.depthMaterial) m.customDepthMaterial = p.depthMaterial; if (p.distanceMaterial) m.customDistanceMaterial = p.distanceMaterial;
+      m.castShadow = p.castShadow !== false; m.receiveShadow = true;
+      list.forEach((t, i) => { const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), t.rot || 0); m.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(t.x, t.y, t.z), q, new THREE.Vector3(t.r / nr, t.h, t.r / nr))); m.setColorAt(i, new THREE.Color(t.tint || 0x4f6a35).convertSRGBToLinear()); });
+      m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere();
+      group.add(m);
+    }
+  }
+  return group;
+}
+
+// Procedural "interior behind glass" map: per 1.5 m module, lit ceiling band, random blinds, darker room depth and furniture.
+// UVs are boxUV metres/2; one tile = 4 modules (6 m) x one storey (floorH m), aligned to floor lines at y0.
+export function interiorMap(floorH, y0, { seed = 1, blinds = 0.5 } = {}) {
+  const W = 512, H = 448, NM = 8; const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  g.fillStyle = '#b9bcbd'; g.fillRect(0, 0, W, H);
+  for (let f = 0; f < 2; f++) {
+    const yy = (m) => H - (f * floorH + m) / (2 * floorH) * H; // metres above this floor -> px
+    for (let i = 0; i < NM; i++) {
+      const x0 = i * W / NM, w = W / NM; const r = (k) => hash(i * 13 + f * 101 + seed * 7, k);
+      const grd = g.createLinearGradient(0, yy(floorH - 0.6), 0, yy(0));
+      const d = 138 + Math.floor(r(1) * 40); grd.addColorStop(0, `rgb(${d + 44},${d + 46},${d + 46})`); grd.addColorStop(0.35, `rgb(${d},${d + 3},${d + 6})`); grd.addColorStop(1, `rgb(${d - 34},${d - 31},${d - 28})`);
+      g.fillStyle = grd; g.fillRect(x0, yy(floorH - 0.6), w, yy(0) - yy(floorH - 0.6));
+      g.fillStyle = '#f4f2ec'; g.fillRect(x0, yy(floorH - 0.55), w, 6);
+      if (r(2) < blinds) { const bh = 0.5 + r(3) * 2.4; g.fillStyle = r(4) < 0.5 ? '#e2e1dc' : '#cfd0cc'; g.fillRect(x0 + 2, yy(floorH - 0.6), w - 4, yy(floorH - 0.6 - bh) - yy(floorH - 0.6)); }
+      if (r(5) < 0.55) { g.fillStyle = 'rgba(58,56,54,0.5)'; const fw = w * (0.3 + r(6) * 0.5); g.fillRect(x0 + r(7) * (w - fw), yy(1.0), fw, yy(0.75) - yy(1.0) + 2); }
+      if (r(8) < 0.18 * (blinds > 0.4 ? 1 : 0)) { g.fillStyle = 'rgba(176,150,112,0.3)'; g.fillRect(x0 + w * 0.15, yy(2.3), w * 0.7, yy(0.9) - yy(2.3)); }
+    }
+  }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4;
+  tex.repeat.set(1 / 6, 1 / floorH); tex.offset.set(0, -(y0 * 0.5) / floorH);
+  return tex;
+}
+
+// Like materials.nightGlow, but with a daytime floor so lit interiors read through the glass by day too.
+export function dayNightGlow(mat, day = 0.15, night = 1.0) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = U.uNight;
+    sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>\n totalEmissiveRadiance *= (${day.toFixed(3)} + uNight * ${night.toFixed(3)});`);
+  };
+  mat.customProgramCacheKey = () => 'gwDayNight' + day + '_' + night;
+  return mat;
 }
