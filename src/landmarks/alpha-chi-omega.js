@@ -1,7 +1,7 @@
 // Alpha Chi Omega (ΑΧΩ), 2313 Warring Street. Flat-roofed Bay Region modern chapter house clad in weathered cedar shingles,
 // stepping up the hill (LiDAR roof ~14.3 m throughout, so four storeys at the downhill west end and two at the top) with
 // big warm-brown wood-framed windows and stone planters at the entry.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'alpha-chi-omega',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.371, front: { block: 0, face: 'W', above: 0.5 }, storeyH: 3.2,
     wall: ['shingle', '#8a6e52'], trim: ['wood', '#7a4e2d'], frame: ['wood', '#7a4e2d'], roof: ['roof', '#5a5a5a'], base: ['stone', '#b89a78'], door: ['wood', '#7a4e2d'],
     win: { w: 2.2, h: 1.7, bay: 3.2, sill: 0.7, tran: 0, mull: 2, casing: 0.1 }, belt: false,
@@ -24,7 +24,7 @@ export async function build(ctx) {
     ],
     doors: [{ block: 0, face: 'W', s: 16.0, w: 1.8, h: 2.4 }],
     letters: [{ block: 0, face: 'W', s: 16.0, y: 4.2, h: 0.7, text: 'ΑΧΩ', mat: ['paint', '#efe6d6'] }],
-  });
+  }, { number: '2313' });
   r.object3d.name = 'alpha-chi-omega';
   return r;
 }

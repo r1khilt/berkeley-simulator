@@ -1,7 +1,7 @@
 // ΔΣ, 2311 Prospect Street (OSM: 5 levels). Tall Spanish Colonial Revival house on the steep hillside: cream stucco, a red-tile
 // hipped main roof (LiDAR ridge ~21.8 m), a lower flat-roofed section with a parapet-edged roof terrace (~13 m) and a
 // low west wing; deep recessed entry under a segmental arch on scalloped corbels.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-278068100',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.425, front: { block: 0, face: 'W', above: 0.6 }, storeyH: 3.1, ov: 0.6,
     wall: ['stucco', '#ede6d6'], trim: ['paint', '#2b2b2b'], frame: ['paint', '#2b2b2b'], roof: ['tile', '#c0603f'], base: ['stucco', '#d6cdb9'], door: ['wood', '#5a2e1e'],
     win: { w: 0.85, h: 1.45, bay: 2.6, sill: 0.9, tran: 0.6, casing: 0 }, belt: false, frieze: false,
@@ -25,7 +25,7 @@ export async function build(ctx) {
     ],
     doors: [{ block: 4, face: 'W', s: 8.0, w: 1.6, h: 2.4, arch: 'seg' }],
     letters: [{ block: 4, face: 'W', s: 8.0, y: 4.3, h: 0.45, text: 'ΔΣ', mat: ['paint', '#1a1a1a'] }],
-  });
+  }, { number: '2311' });
   r.object3d.name = 'building-278068100';
   return r;
 }

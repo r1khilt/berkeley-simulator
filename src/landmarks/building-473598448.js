@@ -1,7 +1,7 @@
 // Phi Delta Theta (ΦΔΘ), 2726 Channing Way. Three-storey cream stucco Mediterranean villa on a raised basement with a low
 // hipped red-tile roof and broad eaves; on Channing a two-storey loggia of slender Tuscan columns carries a balustraded
 // balcony, with round-arched windows at the main floor.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-473598448',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.519, front: { block: 0, face: 'N', above: 1.3 }, storeyH: 3.4, ov: 0.8,
     wall: ['stucco', '#e8e0cc'], trim: ['paint', '#e2d8c2'], frame: ['paint', '#3a3a3a'], roof: ['tile', '#c87a5a'], base: ['stucco', '#cfc6b0'], door: ['paint', '#4a3426'],
     win: { w: 0.85, h: 1.8, bay: 2.6, sill: 0.8, tran: 0.72, casing: 0, arch0: false, sillMat: ['paint', '#d8cdb5'] }, frieze: false, belt: false,
@@ -23,7 +23,7 @@ export async function build(ctx) {
     ],
     doors: [{ block: 0, face: 'N', s: 4.15, w: 1.5, h: 2.5, arch: true }],
     porches: [{ block: 0, face: 'N', s0: 0.6, s1: 7.7, depth: 2.4, cols: 4, colD: 0.36, top: 8.4, colMat: ['paint', '#f2f2f2'], balcony: true, rail: false, roofMat: ['stucco', '#e8e0cc'], fascia: ['paint', '#f2f2f2'], letters: { text: 'ΦΔΘ', mat: ['paint', '#1f3a68'], h: 0.34 } }],
-  });
+  }, { number: '2726' });
   r.object3d.name = 'building-473598448';
   return r;
 }

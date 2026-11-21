@@ -2,7 +2,7 @@
 // parapet, an entrance pavilion with a scrolled gable and crest, and an arched, columned porch carrying blue ΚΔΡ letters.
 // Massing from the 2021 LiDAR: main block roof ~12.5 m, lower rear wing ~9.5 m, two-storey front wing ~6.5 m.
 import * as THREE from 'three';
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'kappa-delta-rho',
@@ -14,7 +14,7 @@ export const info = {
 
 export async function build(ctx) {
   const blue = ['paint', '#4e6e93'];
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.788, floor: 0.8, storeyH: 3.55,
     wall: ['stucco', '#e9e2cf'], trim: blue, frame: ['paint', '#f2f2ee'], base: ['stucco', '#d3ccbb'], door: ['paint', '#3e5f86'],
     win: { w: 1.05, h: 1.7, bay: 3.0, sill: 0.95, tran: 0.5, casing: 0 }, belt: false,
@@ -47,7 +47,7 @@ export async function build(ctx) {
       // archivolt around the door
       const ar = new THREE.TorusGeometry(0.82, 0.09, 6, 16, Math.PI); ar.translate(8.3, 0.8 + 2.3, 0.73); K.addRun(R, bl, ar);
     },
-  });
+  }, { number: '2739' });
   r.object3d.name = 'kappa-delta-rho';
   return r;
 }

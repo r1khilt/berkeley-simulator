@@ -1,7 +1,7 @@
 // Delta Delta Delta (ΔΔΔ), 2300 Warring Street. Large L-shaped sorority house painted pale blue-grey with white pilasters and
 // trim: a tall hipped wing on Warring (LiDAR eaves ~15.5 m, ridge ~18.5 m on the slope) and a long lower gabled range running
 // downhill (eaves ~12 m, ridge ~14.4 m); white multi-pane windows and a recessed wood entry door.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-270518509',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.142, front: { block: 1, face: 'E', above: 0.6 }, storeyH: 3.1, ov: 0.6,
     wall: ['clap', '#93a6b8'], trim: ['paint', '#f2f2ee'], roof: ['roof', '#4a4a4a'], base: ['brick', '#9c4a3a'], door: ['wood', '#b5733f'],
     win: { w: 0.9, h: 1.6, bay: 2.6, sill: 0.85, tran: 0.5, casing: 0.12, muntins: 1 },
@@ -23,7 +23,7 @@ export async function build(ctx) {
     doors: [{ block: 1, face: 'E', s: 12.8, w: 1.3, h: 2.4, fan: true }],
     porches: [{ block: 1, face: 'E', s0: 11.0, s1: 14.6, depth: 1.4, cols: 2, colStyle: 'square', colD: 0.3, rail: false, roofMat: ['roof', '#4a4a4a'], fascia: ['paint', '#f2f2ee'], letters: { text: 'ΔΔΔ', mat: ['metal', '#c9a44c'], h: 0.3 } }],
     chimneys: [{ u: 9.0, v: -16.3, w: 1.0, d: 0.7, top: 19.6 }],
-  });
+  }, { number: '2300' });
   r.object3d.name = 'building-270518509';
   return r;
 }

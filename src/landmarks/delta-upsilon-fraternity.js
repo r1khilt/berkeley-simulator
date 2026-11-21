@@ -1,7 +1,7 @@
 // Delta Upsilon (ΔΥ), 2425 Warring Street. Symmetrical Italian Renaissance Revival villa: cream stucco, a low hipped red-tile roof
 // with deep bracketed eaves (LiDAR eaves ~12 m, ridge ~15 m), paired windows on two main floors, an arcaded loggia across the
 // top floor, three round-arched entrance openings up a broad flight of steps and a small iron balcony above them.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'delta-upsilon-fraternity',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.793, front: { block: 0, face: 'W', above: 1.0 }, storeyH: 3.4, ov: 1.0,
     wall: ['stucco', '#e6dcc6'], trim: ['paint', '#7a5a3a'], frame: ['paint', '#f2f0ea'], roof: ['tile', '#c0603f'], base: ['stucco', '#cfc3aa'], door: ['wood', '#5a3e2a'],
     win: { w: 0.7, h: 1.7, bay: 2.9, sill: 0.8, tran: 0.7, casing: 0, pair: true, mull: 1, st: { 2: { arch: true, pair: false, w: 1.5, h: 1.9, sill: 0.5, bay: 2.3 } } }, belt: false, frieze: false,
@@ -28,7 +28,7 @@ export async function build(ctx) {
       for (let s = 14.7; s < 17.9; s += 0.18) K.rbox(R, ir, s - 0.012, b.f0 + 3.45, 0.84, s + 0.012, b.f0 + 4.3, 0.86, { detail: true });
       for (const f of ['W', 'E', 'N', 'S']) { const RR = faceRun(b, f); for (let s = 0.6; s < RR.L - 0.3; s += 1.2) K.rbox(RR, mat(['wood', '#7a5a3a']), s - 0.08, b.eave - 0.3, 0, s + 0.08, b.eave - 0.02, 0.9, { detail: true }); }
     },
-  });
+  }, { number: '2425' });
   r.object3d.name = 'delta-upsilon-fraternity';
   return r;
 }

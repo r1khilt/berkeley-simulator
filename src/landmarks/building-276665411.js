@@ -1,7 +1,7 @@
 // Alpha Epsilon Pi (ΑΕΠ), 2430 Piedmont Avenue. Boxy three-storey beige stucco chapter house with a very low hipped roof
 // hidden behind deep dark eaves, a bracketed blue-grey belt course over the ground floor and big blue ΑΕΠ letters on the
 // Piedmont façade between the second and third floors; entry from a wooden deck.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'building-276665411',
@@ -13,7 +13,7 @@ export const info = {
 
 export async function build(ctx) {
   const slate = ['paint', '#4a5560'];
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.908, front: { block: 0, face: 'E', above: 0.5 }, storeyH: 3.3, ov: 0.9,
     wall: ['stucco', '#d9cdb4'], trim: slate, frame: ['paint', '#e8e0cc'], roof: ['roof', '#5e6670'], base: ['stucco', '#b8ad96'], door: ['paint', '#5a4a3a'],
     win: { w: 0.85, h: 1.65, bay: 2.5, sill: 0.85, tran: 0.5, casing: 0, sillMat: ['paint', '#e8e0cc'] }, frieze: false,
@@ -25,7 +25,7 @@ export async function build(ctx) {
       const b = blocks[0]; const y = b.f0 + 3.3; const bm = mat(['paint', '#6f8496']);
       for (const f of ['S', 'E', 'N', 'W']) { const R = faceRun(b, f); K.rbox(R, bm, -0.1, y - 0.12, 0, R.L + 0.1, y + 0.14, 0.22); for (let s = 0.8; s < R.L - 0.5; s += 1.6) K.rbox(R, bm, s - 0.06, y - 0.4, 0, s + 0.06, y - 0.12, 0.16, { detail: true }); }
     },
-  });
+  }, { number: '2430' });
   r.object3d.name = 'building-276665411';
   return r;
 }

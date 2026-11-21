@@ -1,7 +1,7 @@
 // Alpha Phi (ΑΦ), 2830 Bancroft Steps. Big hillside house in the Berkeley brown-shingle manner: a long range parallel to the steps
 // with a hipped roof (LiDAR eaves ~13.4 m, ridge ~15.4 m) that is four storeys at the downhill west end and two at the top,
 // with hipped wings to the south. Style from the street context; no verified photo of this house was available.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'alpha-phi',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -10.59, front: { block: 0, face: 'N', above: 0.6 }, storeyH: 3.0, ov: 0.8,
     wall: ['shingle', '#7e5f44'], trim: ['paint', '#efe9dc'], roof: ['roof', '#4e4a46'], base: ['stucco', '#8f877a'],
     win: { w: 0.85, h: 1.5, bay: 2.6, sill: 0.8, tran: 0.62, casing: 0.11, pair: true },
@@ -26,7 +26,7 @@ export async function build(ctx) {
     letters: [{ block: 0, face: 'N', s: 13.0, y: 10.4, h: 0.8, text: 'ΑΦ', mat: ['paint', '#efe9dc'] }],
     dormers: [{ block: 0, side: 'N', s: 4.0, w: 2.4, h: 1.3, inset: 0.9 }, { block: 0, side: 'N', s: 22.0, w: 2.4, h: 1.3, inset: 0.9 }],
     chimneys: [{ u: -4.0, v: -3.0, w: 1.0, d: 0.8, top: 16.6 }],
-  });
+  }, { number: '2830' });
   r.object3d.name = 'alpha-phi';
   return r;
 }

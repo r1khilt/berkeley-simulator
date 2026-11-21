@@ -5,7 +5,7 @@
 // rising toward the north end carries the chapter name. A taller rear block steps down the slope behind.
 // LiDAR: street block ~10.5 m (railing), rear block ~12-13 m.
 import * as THREE from 'three';
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 import { hedge, latinLetters, railing } from './lib/b12-greek.js';
 import { nightGlow } from '../materials.js';
 
@@ -21,7 +21,7 @@ export async function build(ctx) {
   const white = ['stucco', '#f4f4f2'], paintW = ['paint', '#ffffff'], grey = ['paint', '#a8aaae'], mustard = ['paint', '#d9b95a'], brick = ['brick', '#d8784e'];
   const glass = nightGlow(new THREE.MeshStandardMaterial({ color: 0x6f7f88, roughness: 0.08, metalness: 0.4, envMapIntensity: 1.8, emissive: 0xffc77a, emissiveIntensity: 1.6 }), 1.0);
   const F = 2.6, H = 3.3, TOP = 9.6;
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -9.075, floor: F, storeyH: H, ov: 0.0, glass,
     wall: white, trim: paintW, frame: paintW, roof: ['roof', '#7a7a7a'], base: ['stucco', '#e4e3de'], door: ['wood', '#9c6b3e'],
     win: { w: 1.6, h: 1.4, bay: 3.4, sill: 0.9, tran: 0, casing: 0, mull: 1 }, belt: false, frieze: false,
@@ -61,7 +61,7 @@ export async function build(ctx) {
         const RP = K.run([u + 0.19, 9.0], [u + 0.19, 6.8]); K.rbox(RP, mat(['stucco', '#d9cdb4']), 0.5, K.g(u, 8) + 0.3, 0, 1.7, K.g(u, 8) + 0.8, 0.03); }
       hedge(api, [[14.8, 8.5], [14.8, 2.0]], { h: 0.8, t: 0.7, color: '#4a6a34' });
     },
-  });
+  }, { number: '2340' });
   r.object3d.name = 'acacia';
   return r;
 }

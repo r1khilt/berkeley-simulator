@@ -1,7 +1,7 @@
 // Sigma Kappa (ΣΚ), 2409 Warring Street. Three-storey pale pink stucco house mixing Tudor and Mediterranean: steep gables with
 // thin white bargeboards (LiDAR ridges ~14.5-15.6 m), divided-light casements, round-arched openings and a one-storey
 // flat-roofed front projection whose parapet edges a terrace; dark ΣΚ letters on the gable wall.
-import { greekHouse } from './lib/greek-kit.js';
+import { rseHouse } from './lib/rse-finish.js'; // refine-south-east: finished-house pass (gutters, stoops, planting, lights...)
 
 export const info = {
   id: 'sigma-kappa-sorority',
@@ -12,7 +12,7 @@ export const info = {
 };
 
 export async function build(ctx) {
-  const r = greekHouse(ctx, {
+  const r = rseHouse(ctx, {
     ang: -8.159, front: { block: 0, face: 'W', above: 0.6 }, storeyH: 3.1, ov: 0.45,
     wall: ['stucco', '#f0d6d9'], trim: ['paint', '#ffffff'], roof: ['roof', '#4a4642'], base: ['stucco', '#d9bfc2'], door: ['wood', '#5a3e2e'],
     win: { w: 0.7, h: 1.5, bay: 2.6, sill: 0.85, tran: 0.66, casing: 0.06, pair: true, mull: 1 },
@@ -27,7 +27,7 @@ export async function build(ctx) {
     doors: [{ block: 2, face: 'W', s: 10.5, w: 1.4, h: 2.3, arch: true }],
     letters: [{ block: 0, face: 'W', s: 4.0, y: 7.4, h: 0.6, text: 'ΣΚ', mat: ['paint', '#2b2b2b'] }],
     dormers: [{ block: 1, side: 'W', s: 9.0, w: 2.2, h: 1.4, inset: 0.8 }],
-  });
+  }, { number: '2409' });
   r.object3d.name = 'sigma-kappa-sorority';
   return r;
 }
