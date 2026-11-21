@@ -40,6 +40,7 @@ export async function build(ctx) {
   const CD = tint(M.concrete, 0xaaa8a3, 'mfConcDark');     // soffits, recesses, weathered parapets
   const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0);
   const FR = std(0x3a322b, 'mfBronze', { rough: 0.45, metal: 0.7 });   // dark bronze anodised frames
+  const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 1.1 } }), 1.0); // shaded podium glazing still catches the sky
   const PG = std(0x3a3633, 'mfPergola', { rough: 0.55, metal: 0.5 });  // dark steel pergola frame
   const GRN = std(0x3d4f2c, 'mfPlant', { rough: 0.95 });
   const WOOD = M.wood;
@@ -219,7 +220,7 @@ export async function build(ctx) {
     // west podium: floors 1–2 recessed behind square piers, deep terrace slab, solid upstand + rail
     K.box(CD, PU + 3.0, -5, PN, GW + 0.4, F3 - 1.8, PS - 3.0);
     const RPw = K.run([PU + 3.0, PN], [PU + 3.0, PS - 3.0]);
-    curtain(K, RPw, 0, RPw.L, -4.4, F3 - 1.85, [0], { glass: GL, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
+    curtain(K, RPw, 0, RPw.L, -4.4, F3 - 1.85, [0], { glass: GLP, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
     K.box(C, PU, F3 - 1.8, PN, GW, F3 - 0.03, PS); K.box(M.paving, PU + 0.4, F3 - 0.03, PN, GW, F3, PS - 0.01);
     for (let v = PN + 4.0; v <= PS - 2.5; v += 7.5) { K.box(C, PU + 1.9, -5, v - 0.4, PU + 2.7, F3 - 1.8, v + 0.4); K.box(C, PU + 0.25, F3 - 2.25, v - 0.32, PU + 1.9, F3 - 1.8, v + 0.32); K.box(C, PU + 0.9, F3 - 2.7, v - 0.32, PU + 1.9, F3 - 2.25, v + 0.32); colliders.push(K.colCyl(PU + 2.3, v, 0.5, -5, F3)); }
     for (const u of [PU + 4.5, PU + 11.0]) K.box(C, u - 0.35, -5, PS - 2.7, u + 0.35, F3 - 1.8, PS - 2.0);
@@ -227,7 +228,7 @@ export async function build(ctx) {
     K.rbox(RPe, CD, 0, F3 - 0.02, -0.4, RPe.L, F3 + 1.3, 0); K.rbox(RPe, C, -0.03, F3 + 1.3, -0.45, RPe.L + 0.03, F3 + 1.42, 0.05);
     // podium south face (floors 1–2 recessed behind piers)
     const RPs = K.run([PU + 3.0, PS - 3.0], [GW + 0.4, PS - 3.0]);
-    curtain(K, RPs, 0, RPs.L, -2, F3 - 1.85, [0], { glass: GL, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
+    curtain(K, RPs, 0, RPs.L, -2, F3 - 1.85, [0], { glass: GLP, mull: 1.8, mullMat: FR, band: 0.25, bandMat: FR, bandD: 0.03, recess: 0.0 });
     // south walkway (east of the podium) to the entrance: solid slab, parapet where the lawn falls away
     K.box(C, GW, -5, GS, 2.5, F3 - 0.03, PS); K.box(CD, GW, F3 - 0.03, GS, 2.5, F3, PS);
     const RWk = K.run([PU, PS], [2.5, PS]);
