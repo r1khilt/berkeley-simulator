@@ -183,6 +183,7 @@ class ThePlay {
     const a = st.packetAnchor, yF = (st.res && st.res.debug && Number.isFinite(st.res.debug.yF)) ? st.res.debug.yF : -1.42;
     this.root.position.set(FCW[0], a.y + yF, FCW[1]); this.root.rotation.y = -Math.atan2(AX[1], AX[0]);
     // replay video boards (16.6 x 9.4 m screens, centred 34.1 m above the stadium anchor like the stadium's own)
+    this.ready = true; if (this.boardTex) return;
     this.boardTex = canvasTex(1024, 512, () => {}); this.boardCanvas = this.boardTex.image;
     const bm = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xffffff, emissiveMap: this.boardTex, emissiveIntensity: 0.95, roughness: 0.4, name: 'bg:board', polygonOffset: true, polygonOffsetFactor: -2 });
     // memorial-stadium.js's board slabs run along the field axis (17.6 m long, front end at |u| = 106.7), so the
@@ -468,7 +469,7 @@ class StanfordTree {
   constructor({ scene, setupMaterials }) {
     this.root = new THREE.Group(); this.root.name = 'bigGame:stanfordTree'; this.root.visible = false; scene.add(this.root);
     this.setupMaterials = setupMaterials; this.ready = false; this.hand = null;
-    const r = rng(1891), S = 1.7; // cartoon scale: about 5.5 m from branch-tips to sneakers, so it reads from the ground
+    const r = rng(1891), S = 2.0; // cartoon scale: about 6.5 m from branch-tips to sneakers, so it reads from the ground
     const greens = [hex(0x2e8a2c), hex(0x41a035), hex(0x267a26), hex(0x58b340)], brown = hex(0x6b4a2e), white = hex(0xf4f2ec), red = hex(0xc8102e), cardinal = hex(0x8c1515);
     const blob = (x, y, z, rad) => { const g = new THREE.IcosahedronGeometry(rad, 1); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + (r() - 0.5) * 0.28; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } g.translate(x, y, z); return paint(g, greens[(r() * greens.length) | 0]); };
     const tier = (y0, y1, rad, z, col) => { // a lumpy cone tier with a ragged hem
@@ -625,7 +626,7 @@ const ICONS = {
   axe: '<svg viewBox="0 0 32 32"><path d="M8 26.5L21.5 13" stroke="#003262" stroke-width="2.6" stroke-linecap="round"/><path d="M17.5 6.5c3.5-1.2 7.6.4 9.3 3.7-2.3.4-4.4 1.8-5.4 4l-3.9-3.9c.6-1.3.6-2.6 0-3.8z" fill="#003262"/></svg>',
 };
 const CSS = `.bg-ach{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-12px);opacity:0;display:flex;gap:14px;align-items:flex-start;width:min(460px,86vw);padding:14px 18px 14px 14px;
-background:rgba(10,18,36,.74);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(253,181,21,.5);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
+background:rgba(10,18,36,.86);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(253,181,21,.5);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
 color:#f6f2ea;transition:opacity .45s,transform .45s cubic-bezier(.2,.8,.2,1);pointer-events:none;z-index:3}
 .bg-ach.on{opacity:1;transform:translate(-50%,0)}
 .bg-ach .ic{flex:none;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#fdb515 58%,#c98a00);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(253,181,21,.16)}
@@ -700,8 +701,9 @@ export function installBigGame({ scene, lm, physics, heightAt, setupMaterials, a
     },
     update(dt, env) {
       camera = env.camera; camPos.copy(env.camera.position);
-      if (!play.ready) { const st = lm.byId.get('memorial-stadium'); if (st && st.state === 'ready') play.attach(st); }
-      if (tree.ready === false) { const tw = lm.byId.get('sather-tower'); if (tw && tw.state === 'ready') tree.attach(tw); }
+      const st = lm.byId.get('memorial-stadium'), tw = lm.byId.get('sather-tower');
+      if (!play.ready) { if (st && st.state === 'ready') play.attach(st); } else if (!st || st.state !== 'ready') { play.ready = play.active = false; play.root.visible = false; }
+      if (tree.ready === false) { if (tw && tw.state === 'ready') tree.attach(tw); } else if (tree.ready === true && (!tw || tw.state !== 'ready')) { tree.ready = false; tree.root.visible = false; }
       const d = play.update(dt, camPos);
       for (const e of play.events) {
         if (e === 'td' && env.player && d != null && d < 170) witnessed = true;
