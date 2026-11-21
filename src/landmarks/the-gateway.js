@@ -164,7 +164,7 @@ export async function build(ctx) {
       bp.push(pa[0], ya, pa[1], pb[0], yb, pb[1], B[0], yb, B[1], pa[0], ya, pa[1], B[0], yb, B[1], A[0], ya, A[1]);
     }
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3)); bg.computeVertexNormals(); K.add(mats.band, bg);
-    const sm = signMaterial('BARBARA & GERSON BAKAR GATEWAY', { bg: '#c3c8cc', color: '#2c3034' }); sm.metalness = 0.55; sm.roughness = 0.32; sm.emissiveIntensity = 0.0;
+    const sm = signMaterial('BARBARA & GERSON BAKAR GATEWAY', { bg: '#c3c8cc', color: '#2c3034' }); sm.metalness = 0.55; sm.roughness = 0.32; sm.emissiveIntensity = 1.0; dayNightGlow(sm, 0.0, 0.45);   // band behind the letters is uplit after dark
     const pos = [], uv = []; const n = 40, t0 = 0.11, t1 = 0.89;
     for (let i = 0; i < n; i++) {
       const ta = t0 + (t1 - t0) * i / n, tb = t0 + (t1 - t0) * (i + 1) / n; const pa = arc3(ta), pb = arc3(tb), na = nrmAt(ta), nb = nrmAt(tb); const o = 0.22;
