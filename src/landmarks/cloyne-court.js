@@ -5,6 +5,7 @@
 // the ground falls ~3 m toward Le Roy Avenue, exposing a garden level at the west end.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'cloyne-court',
@@ -91,5 +92,7 @@ export async function build(ctx) {
     const R = N.runN; const stone = coopMat('cmu', '#7e766a');
     for (let s = 0.5; s < R.L - 0.5; s += 6) { const s1 = Math.min(R.L - 0.5, s + 6); const g0 = Math.min(K.gR(R, s, 3.2), K.gR(R, s1, 3.2)); K.rbox(R, stone, s, g0 - 0.5, 2.9, s1, g0 + 0.55, 3.4); }
   }
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 4, plant: { h: 0.9, depth: 1.3 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('cloyne-court');
 }

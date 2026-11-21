@@ -5,6 +5,7 @@
 // (Few published photos exist; the façade treatment is a plausible reconstruction of the Northside Craftsman style.)
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'kidd-hall',
@@ -27,5 +28,7 @@ export async function build(ctx) {
   K.porch(H, 'N', 0.4, 12.5, 2.4, 2.5, { postH: 2.5, posts: 4, roof: 'shed', roofMat: RF, steps: 4.4, stepW: 1.6, postMat: WH });
   K.dormer(H, 'N', 8.0, 2.2, { h: 0.9, back: 0.9, rise: 0.5, wall: SH, roof: RF, trim: WH, win: { w: 0.6, h: 0.8, sill: 0.25, pair: 2, gap: 0.08, rev: 0.08, casing: 0.06, frame: WH } });
   K.chimney(6.75, 3.0, 1.0, 0.7, 10.8, M.brick);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 2, plant: { hedge: true, h: 0.85, depth: 1.0 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('kidd-hall');
 }

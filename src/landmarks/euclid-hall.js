@@ -5,6 +5,7 @@
 // (Few published photos exist; the façade treatment is a plausible reconstruction of the period style.)
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 import { corniceProfile } from './lib/classic-kit.js';
 
 export const info = {
@@ -37,5 +38,7 @@ export async function build(ctx) {
   { const R = A.runW; const sc = 3.9; K.rbox(R, CS, sc - 1.4, 3.9, 0, sc + 1.4, 4.1, 0.9);
     for (const s of [sc - 1.2, sc + 1.2]) K.rbox(R, CS, s - 0.12, 3.2, 0, s + 0.12, 3.9, 0.7);
     K._rail(R, sc - 1.3, sc + 1.3, 0.8, 4.1, M.iron, 0.9); for (const s of [sc - 1.3, sc + 1.3]) { const S = K.run(R.at(s, 0), R.at(s, 0.85)); K._rail(S, 0.05, 0.8, 0, 4.1, M.iron, 0.9); } }
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { h: 0.8, depth: 1.0 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('euclid-hall');
 }

@@ -22,8 +22,8 @@ export function rectRuns(K, blocks, { tol = 0.35 } = {}) {
         else { const line = f === 'E' ? b.u1 : b.u0; touch = o.u0 <= line + tol && o.u1 >= line - tol; lo = Math.max(b.v0, o.v0); hi = Math.min(b.v1, o.v1); if (touch && hi > lo) skip.push(f === 'E' ? [b.v1 - hi, b.v1 - lo] : [lo - b.v0, hi - b.v0]); }
       }
       const extraSkip = [];
-      const dl = b.faces && b.faces[f] && b.faces[f].doors; if (Array.isArray(dl)) for (const d of dl) { const ds = typeof d === 'number' ? d : d.s; const dw = (typeof d === 'number' ? 1.2 : (d.w ?? 1.2)); if (ds != null) extraSkip.push([ds - dw / 2 - 1.0, ds + dw / 2 + 1.0]); }
-      out.push({ R, f, b, floor: b.floor, skip, extraSkip });
+      const dl = b.faces && b.faces[f] && b.faces[f].doors; if (Array.isArray(dl)) for (const d of dl) { const ds = typeof d === 'number' ? d : d.s; const dw = (typeof d === 'number' ? 1.2 : (d.w ?? 1.2)); if (ds != null) { extraSkip.push([ds - dw / 2 - 1.0, ds + dw / 2 + 1.0]); (b._doorS ||= {})[f] = [...((b._doorS || {})[f] || []), ds]; } }
+      out.push({ R, f, b, floor: b.floor, skip, extraSkip, doorS: (b._doorS || {})[f] || [] });
     }
   }
   return out;
@@ -58,6 +58,11 @@ export function finishGround(K, ctx, runs, o = {}) {
     const sb = d0.s + side * ((o.entry?.w ?? 1.8) / 2 + 2.6 + nb * 0.48);
     if (nb > 0 && free(R.L, d0.run.skip, sb - nb * 0.5 - 0.4, sb + nb * 0.5 + 0.4)) { colliders.push(...bikes(K, R, sb, o.bikeD ?? 2.3, nb, Math.min(o.parked ?? 1, nb))); mark(R, sb - nb * 0.5 - 0.6, sb + nb * 0.5 + 0.6); }
     if (o.bench) { const sc = d0.s - side * ((o.entry?.w ?? 1.8) / 2 + 2.4); if (free(R.L, d0.run.skip, sc - 1.2, sc + 1.2)) { colliders.push(furniture(K, R, 'bench', sc, 2.2, Math.PI)); mark(R, sc - 1.3, sc + 1.3); } }
+  }
+  // no new doors: put the bike racks beside the first existing door that has room
+  if (!doors.length && (o.bikes ?? 0) > 0) {
+    const nb = o.bikes; let done = false;
+    for (const r of runs) { if (done) break; for (const ds of (r.doorS || [])) { for (const side of [1, -1]) { const sb = ds + side * (2.4 + nb * 0.48); if (free(r.R.L, [...r.skip, ...(used.get(r.R) || [])], sb - nb * 0.5 - 0.4, sb + nb * 0.5 + 0.4)) { colliders.push(...bikes(K, r.R, sb, o.bikeD ?? 2.2, nb, Math.min(o.parked ?? 1, nb))); mark(r.R, sb - nb * 0.5 - 0.6, sb + nb * 0.5 + 0.6); done = true; break; } } if (done) break; } }
   }
   // explicit extra bike racks / benches: [{run|f, b?, s, d, n, kind:'bikes'|'bench'|'trashCan'}]
   for (const e of (o.props || [])) {
@@ -109,4 +114,39 @@ export function stoop(K, R, s, w, floor, { depth = 1.5, mat, tread = 0.32, cheek
     walk.push({ type: 'fn', bounds: [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)], heightAt: (x, z) => { const [u, v] = K.uv(x, z); const du = u - R.a[0], dv = v - R.a[1]; const ss = du * R.t[0] + dv * R.t[1], dd = du * R.n[0] + dv * R.n[1]; if (Math.abs(ss - s) > sw / 2 + 0.05 || dd < depth - 0.05 || dd > d1 + 0.05) return null; const i = Math.min(n - 1, Math.max(0, Math.floor((dd - depth) / tread))); return floor - rr * (i + 1); } });
   }
   return { walkables: walk, grade: gy, rise };
+}
+
+// Window/door openings for b08a-kit house() faces (same layout as its default) that leave out openings buried by the slope:
+// returns (R) => ops. fl: floor levels, fh: floor height, o: {nb, bay, ww, wh, sill, mull, doors:[bay idx], tran}
+export function gradedOps(K, fl, fh, o = {}, { clear = 0.3, doorArch } = {}) {
+  return (R) => {
+    const nb = o.nb ?? Math.max(1, Math.round(R.L / (o.bay ?? 3.0))); const bw = R.L / nb; const ops = [];
+    const ww = o.ww ?? 1.0, wh = Math.min(o.wh ?? 1.45, fh - 1.1);
+    for (let i = 0; i < nb; i++) {
+      const c = bw * (i + 0.5); const g = Math.max(gRun(K, R, c - ww / 2, 0.5), gRun(K, R, c + ww / 2, 0.5));
+      fl.forEach((y, k) => {
+        if (k === 0 && o.doors?.includes(i)) { if (Math.abs(g - y) < 1.2) ops.push({ s0: c - 0.55, s1: c + 0.55, y0: y, y1: y + 2.4, kind: 'door', doorTop: y + 1.9, sill: false, arch: doorArch }); return; }
+        const y0 = y + (o.sill ?? 0.85); if (y0 < g + clear) return;
+        ops.push({ s0: c - ww / 2, s1: c + ww / 2, y0, y1: y0 + wh, mull: o.mull ?? 1, muntins: o.muntins ?? 0, tran: o.tran });
+      });
+    }
+    return ops;
+  };
+}
+
+// Split-redwood / cedar shingle wall material (random widths, staggered courses, strong butt shadow). One 2 m tile.
+import { bakeMat } from './rn-kit.js';
+import { hash2 } from '../../lib/noise.js';
+export function shingleMat(key, { base = 0x574739, vary = 0.18, rows = 8, rough = 0.92 } = {}) {
+  const B = [(base >> 16) & 255, (base >> 8) & 255, base & 255];
+  const cuts = []; // per row: sorted shingle edges in [0,1)
+  for (let r = 0; r < rows; r++) { const e = [0]; let x = 0; while (true) { x += (0.07 + 0.13 * hash2(r, e.length, 41)); if (x > 0.97) break; e.push(x); } cuts.push(e); }
+  return bakeMat('shingle:' + key, (u, v) => {
+    const rv = v * rows; const row = Math.floor(rv) % rows; const fv = rv - Math.floor(rv);
+    const e = cuts[row]; let k = 0; while (k + 1 < e.length && e[k + 1] <= u) k++;
+    const left = u - e[k], right = (k + 1 < e.length ? e[k + 1] : 1) - u; const gap = Math.min(left, right) < 0.0035;
+    const tone = 1 + (hash2(row, k, 7) - 0.5) * 2 * vary; const grain = 0.93 + 0.14 * hash2(Math.floor(u * 900), row, 3) * (0.6 + 0.4 * Math.sin(u * 260 + row));
+    const butt = fv < 0.1 ? 0.38 + fv * 3 : 1 - (fv - 0.1) * 0.12; const sh = gap ? 0.62 : 1; const kk = tone * grain * butt * sh;
+    return [Math.min(255, B[0] * kk), Math.min(255, B[1] * kk), Math.min(255, B[2] * kk), gap ? 0.1 : (fv < 0.13 ? 0.15 : 0.35 + (1 - fv) * 0.5), rough];
+  }, { span: 2, rough, normal: 5 });
 }

@@ -4,6 +4,7 @@
 // (Few published photos exist; the façade treatment is a plausible reconstruction consistent with the LiDAR massing.)
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'stebbins-hall',
@@ -37,5 +38,7 @@ export async function build(ctx) {
   K._rail(L.runS, 0.3, L.runS.L - 0.3, -0.2, 4.9, M.iron, 0.9);
   // rooftop mechanical penthouse
   K.box(ST, -3, 12.7, -4, 2, 14.6, 1); K.box(DK, -3.2, 14.6, -4.2, 2.2, 14.8, 1.2);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { h: 0.9, depth: 1.2 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('stebbins-hall');
 }

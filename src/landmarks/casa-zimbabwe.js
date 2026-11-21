@@ -5,6 +5,7 @@
 // penthouse to ~24 m); the ground falls ~10 m from the north-west corner to the south-east.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'casa-zimbabwe',
@@ -46,5 +47,7 @@ export async function build(ctx) {
   K.solar(-17.5, 1.0, -6.0, 9.0, 20.3 + 0.5); K.solar(6.5, 2.0, 16.0, 19.0, 19.8 + 0.5); K.solar(-6.0, -19.0, 7.0, -10.0, 17.0 + 0.4);
   // rooftop exhaust stacks
   K.cyl(coopMat('metal', '#c9c9c4'), 12.5, 23.2, -4.0, 0.3, 0.3, 1.6, 12); K.cyl(coopMat('metal', '#c9c9c4'), -12.0, 20.3, -16.0, 0.25, 0.25, 1.4, 12);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 4, plant: { h: 0.8, depth: 1.1 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('casa-zimbabwe');
 }

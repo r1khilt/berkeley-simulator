@@ -5,6 +5,7 @@
 // lot climbs ~5 m from the street to the east.
 import * as THREE from 'three';
 import { CoopKit, coopMat } from './lib/coop-kit.js';
+import { coopRuns, finishGround, stoop } from './lib/rn-b-ground.js';
 
 export const info = {
   id: 'kingman-hall',
@@ -37,5 +38,7 @@ export async function build(ctx) {
     K.rbox(R, ST, sc - 2.45, 4.2, -0.02, sc + 2.45, 4.55, 2.3); K.rbox(R, RED, sc - 2.5, 4.55, -0.02, sc + 2.5, 4.65, 2.35);
     const n = Math.max(1, Math.round((1.6 - gy) / 0.17)); for (let k = 0; k < n; k++) { const h = 1.6 - (1.6 - gy) * (k + 1) / n; if (h < gy + 0.02) break; K.rbox(R, M.concrete, sc - 0.9, gy - 0.5, 2.2 + k * 0.3, sc + 0.9, h, 2.5 + k * 0.3); } }
   K.chimney(4.0, 6.5, 1.0, 0.9, 19.9, ST); K.chimney(3.5, -9.0, 1.0, 0.9, 19.4, ST);
+  // finished grounds: foundation planting along the walls (kept clear of doors and slopes), bike racks by the door (rn-b-ground)
+  { const Gd = finishGround(K, ctx, coopRuns(K), { entries: [], ...{ bikes: 3, plant: { hedge: true, h: 0.9, depth: 1.0 } } }); K.colliders.push(...Gd.colliders); K.walkables.push(...Gd.walkables); }
   return K.done('kingman-hall');
 }
