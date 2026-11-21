@@ -5,7 +5,7 @@ import { nightGlow } from '../../materials.js';
 
 let _mats = null;
 // Canvas texture of large precast concrete panels: one tile = 2 m x 2 m (boxUV maps metres/2), panels 2.0 x 1.0 m.
-function panelTexture() {
+function panelTexture(base = [201, 194, 182], jointK = 0.66) {
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
   const img = g.createImageData(S, S); let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const n0 = []; for (let i = 0; i < 64 * 64; i++) n0.push(rnd());
@@ -17,11 +17,11 @@ function panelTexture() {
     const jx = Math.min(x, S - 1 - x) < 2, jy = Math.min(y, S - 1 - y) < 2 || Math.abs(y - S / 2) < 2;
     // faint form-tie dots
     const tie = ((Math.abs(x - S * 0.25) < 2 || Math.abs(x - S * 0.75) < 2) && (Math.abs(y - S * 0.25) < 2 || Math.abs(y - S * 0.75) < 2));
-    if (jx || jy) k = 0.66; else if (tie) k *= 0.86;
-    const i = (y * S + x) * 4; img.data[i] = Math.min(255, 201 * k); img.data[i + 1] = Math.min(255, 194 * k); img.data[i + 2] = Math.min(255, 182 * k); img.data[i + 3] = 255;
+    if (jx || jy) k = jointK; else if (tie && jointK < 0.8) k *= 0.86;
+    const i = (y * S + x) * 4; img.data[i] = Math.min(255, base[0] * k); img.data[i + 1] = Math.min(255, base[1] * k); img.data[i + 2] = Math.min(255, base[2] * k); img.data[i + 3] = 255;
   }
   g.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(2 / 3, 2 / 3); return t;
 }
 // Polished concrete / terrazzo floor with saw-cut joints every 1.5 m (tile = 2 m)
 function floorTexture() {
@@ -35,13 +35,16 @@ export function grimesMats(M) {
   if (_mats) return _mats;
   const std = (o) => new THREE.MeshStandardMaterial(o);
   _mats = {
-    panel: std({ color: 0xffffff, map: panelTexture(), roughness: 0.9, name: 'grimes-precast' }),
+    panel: std({ color: 0xffffff, map: panelTexture([206, 197, 181], 0.8), roughness: 0.9, name: 'grimes-precast' }),
     steel: std({ color: 0xf1f1ee, roughness: 0.45, metalness: 0.15, name: 'grimes-white-steel' }),
     louvre: std({ color: 0xe9ecec, roughness: 0.5, metalness: 0.25, name: 'grimes-louvre' }),
-    metalPanel: std({ color: 0xeeeeea, roughness: 0.5, metalness: 0.1, name: 'grimes-white-panel' }),
+    metalPanel: std({ color: 0xffffff, map: panelTexture([240, 240, 236], 0.9), roughness: 0.5, metalness: 0.1, name: 'grimes-white-panel' }),
+    soffit: std({ color: 0xc9d0d4, roughness: 0.6, metalness: 0.2, name: 'grimes-soffit' }),
+    rod: std({ color: 0xdfe2e2, roughness: 0.3, metalness: 0.6, name: 'grimes-sma-rod' }),
+    storeGlass: nightGlow(std({ color: 0x6d8fae, roughness: 0.04, metalness: 0.4, envMapIntensity: 1.5, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
     frame: std({ color: 0xe4e6e6, roughness: 0.4, metalness: 0.4, name: 'grimes-mullion' }),
     darkFrame: std({ color: 0x3a3d40, roughness: 0.45, metalness: 0.5, name: 'grimes-dark-frame' }),
-    glass: std({ color: 0x9cb6c4, roughness: 0.04, metalness: 0.25, transparent: true, opacity: 0.34, envMapIntensity: 1.6, depthWrite: false, name: 'grimes-glass' }),
+    glass: std({ color: 0x7ea6cf, roughness: 0.03, metalness: 0.45, transparent: true, opacity: 0.56, envMapIntensity: 1.6, depthWrite: false, name: 'grimes-glass' }),
     deck: std({ color: 0xffffff, map: floorTexture(), roughness: 0.85, name: 'grimes-deck' }),
     slab: std({ color: 0xdcdad4, roughness: 0.9, name: 'grimes-slab' }),
     ceiling: nightGlow(std({ color: 0xb98a5a, roughness: 0.8, emissive: 0xffd9a0, emissiveIntensity: 0.9, name: 'grimes-wood-ceiling' }), 1.0),
