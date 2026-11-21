@@ -87,6 +87,23 @@ export function bowPanel(s, w, y0, y1, d0, dep, seg = 4) {
 // Subtract [a,b] intervals from [s0,s1]
 export function cutRanges(s0, s1, cuts) { let segs = [[s0, s1]]; for (const [a, b] of cuts) { const ns = []; for (const [p, q] of segs) { if (b <= p || a >= q) { ns.push([p, q]); continue; } if (a > p) ns.push([p, a]); if (b < q) ns.push([b, q]); } segs = ns; } return segs.filter(([p, q]) => q - p > 0.05); }
 
+// Signature sagging slab-edge "eyebrow": a projecting aluminium band whose underside (and, less, its top) dips in a gentle
+// catenary between high points every `bay` metres (phase = global arc length sOff + s, so dips run on across run joints).
+export function sagBand(K, R, mat, s0, s1, yTop, yBot, zIn, zOut, o = {}) {
+  const bay = o.bay ?? 7.5, dip = o.dip ?? 0.5, topK = o.topK ?? 0.3, off = o.sOff ?? 0, st = o.step ?? 0.75; if (s1 - s0 < 0.05) return;
+  const sh = (s) => { const u = (s + off) / bay; const f = u - Math.floor(u); return Math.pow(Math.sin(Math.PI * f), 1.6); };   // soft-shouldered catenary-like dip
+  const n = Math.max(1, Math.ceil((s1 - s0) / st)); const pos = [];
+  for (let i = 0; i < n; i++) {
+    const a = s0 + (s1 - s0) * i / n, b = s0 + (s1 - s0) * (i + 1) / n; const da = sh(a) * dip, db = sh(b) * dip;
+    const ta = yTop - da * topK, tb = yTop - db * topK, ba = yBot - da, bb = yBot - db;
+    pos.push(a, ba, zOut, b, bb, zOut, b, tb, zOut, a, ba, zOut, b, tb, zOut, a, ta, zOut);   // face
+    pos.push(a, ba, zIn, b, bb, zIn, b, bb, zOut, a, ba, zIn, b, bb, zOut, a, ba, zOut);      // soffit (down)
+    pos.push(a, ta, zOut, b, tb, zOut, b, tb, zIn, a, ta, zOut, b, tb, zIn, a, ta, zIn);      // top
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return K.addRun(R, mat, g);
+}
+
 // The Gateway's signature outer wall for one storey [ya, yb] (floor line at ya): vision glass, etched spandrel at the sill,
 // a dark slab band, and bowed champagne-aluminium panels on a 1.5 m module, shifted half a module on alternate floors
 // (with occasional doubled panels): "alternating metal panels and glazing", about half glass.
@@ -94,14 +111,15 @@ export function panelStorey(K, R, s0, s1, ya, yb, k, mats, o = {}) {
   const W = o.module ?? 1.5, pw = o.panelW ?? 0.42, dep = o.panelD ?? 0.36; const L = s1 - s0; if (L < 0.4) return;
   const fin = o.finMat || mats.metal; const stagger = o.stagger ?? true;
   K.rbox(R, mats.glass, s0, ya, -0.2, s1, yb, -0.14);
-  K.rbox(R, o.bandMat || mats.band, s0 - 0.01, ya - 0.2, -0.16, s1 + 0.01, ya + 0.02, 0.04);
+  if (o.sag) sagBand(K, R, o.bandMat || mats.band, s0 - 0.01, s1 + 0.01, ya + 0.06, ya - 0.26, -0.16, -0.15 + dep + 0.12, o.sag);
+  else K.rbox(R, o.bandMat || mats.band, s0 - 0.01, ya - 0.2, -0.16, s1 + 0.01, ya + 0.02, 0.04);
   K.rbox(R, mats.mull, s0, ya + (yb - ya) * 0.74 - 0.03, -0.14, s1, ya + (yb - ya) * 0.74 + 0.03, -0.09, { detail: true });
   const n = Math.max(1, Math.round(L / W)); const w = L / n; const off = stagger && (k % 2) ? 0.5 : 0.0;
   const g = [];
   for (let i = -1; i < n + 1; i++) {
     const s = s0 + (i + off + 0.25) * w; const pwi = typeof pw === 'function' ? pw(i) : pw; if (s - pwi / 2 < s0 - 0.01 || s + pwi / 2 > s1 + 0.01) continue;
     const h = hash(i + Math.round(R.a[0] * 7), k + Math.round(R.a[1] * 3));
-    const y0 = stagger ? ya + 0.08 : ya + 0.02, y1 = stagger ? yb - 0.3 : yb - 0.2;
+    const y0 = stagger ? ya + 0.08 : (o.sag ? ya - 0.14 : ya + 0.02), y1 = stagger ? yb - 0.3 : yb - 0.2;
     g.push(bowPanel(s, pwi, y0, y1, -0.15, dep));
     if (stagger && h > 0.8 && s + pwi * 1.6 < s1) g.push(bowPanel(s + pwi + 0.05, pwi, y0, y1, -0.15, dep));
     if (o.mullions !== false) K.rbox(R, mats.mull, s + w / 2 - 0.03, ya + 0.04, -0.14, s + w / 2 + 0.03, yb - 0.2, -0.09, { detail: true });
@@ -114,7 +132,8 @@ export function ribbonStorey(K, R, s0, s1, ya, yb, mats, o = {}) {
   const W = o.module ?? 1.5; const L = s1 - s0; if (L < 0.3) return;
   K.rbox(R, mats.glass, s0, ya, -0.12, s1, yb, -0.06);
   K.rbox(R, mats.spandrel, s0 - 0.01, ya - 0.25, -0.07, s1 + 0.01, ya + 0.25, 0.0);
-  K.rbox(R, mats.silver, s0 - 0.01, ya - 0.27, 0.0, s1 + 0.01, ya - 0.21, 0.05);
+  if (o.sag) sagBand(K, R, o.sagMat || mats.silver, s0 - 0.01, s1 + 0.01, ya + 0.08, ya - 0.3, -0.07, 0.3, o.sag);
+  else K.rbox(R, mats.silver, s0 - 0.01, ya - 0.27, 0.0, s1 + 0.01, ya - 0.21, 0.05);
   const n = Math.max(1, Math.round(L / W)); const w = L / n;
   for (let i = 0; i <= n; i++) { const s = s0 + i * w; K.rbox(R, mats.silver, s - 0.04, ya + 0.25, -0.06, s + 0.04, yb - 0.25, 0.08, { detail: !(i === 0 || i === n) }); }
   K.rbox(R, mats.silver, s0, ya + (yb - ya) * 0.72 - 0.03, -0.06, s1, ya + (yb - ya) * 0.72 + 0.03, 0.03, { detail: true });
@@ -185,6 +204,21 @@ export function offsetPoly(poly, d, maxMiter = 2.0) {
   return out;
 }
 
+// Profile sweep round a polygon like Kit.loop, but every ring comes from offsetPoly (mitre-clamped), so acute corners can't
+// throw long spikes. prof: [[outward offset, y], ...].
+export function fasciaLoop(K, mat, poly, prof, opts = {}) {
+  const sgn = signedArea(poly) > 0 ? 1 : -1; const n = poly.length; const rings = prof.map(([o]) => offsetPoly(poly, -o, 1.4)); const pos = [];
+  for (let k = 0; k < prof.length - 1; k++) {
+    const y0 = prof[k][1], y1 = prof[k + 1][1]; const ra = rings[k], rb = rings[k + 1];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n; const P0 = [ra[i][0], y0, ra[i][1]], P1 = [ra[j][0], y0, ra[j][1]], P2 = [rb[j][0], y1, rb[j][1]], P3 = [rb[i][0], y1, rb[i][1]];
+      if (sgn > 0) pos.push(...P0, ...P2, ...P1, ...P0, ...P3, ...P2); else pos.push(...P0, ...P1, ...P2, ...P0, ...P2, ...P3);
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return K.add(mat, g, opts);
+}
+
 // Horizontal polygon at height y facing down (soffits), exact x/z (no mirroring)
 export function flatDown(K, mat, poly, y, opts = {}) { return drape(K, mat, poly, 0, 1000, [], { yFn: () => y, down: true, ...opts }); }
 
@@ -233,13 +267,19 @@ export function interiorMap(floorH, y0, { seed = 1, blinds = 0.5 } = {}) {
 }
 
 // Like materials.nightGlow, but with a daytime floor so lit interiors read through the glass by day too.
-export function dayNightGlow(mat, day = 0.15, night = 1.0) {
+export function dayNightGlow(mat, day = 0.15, night = 1.0, o = {}) {
+  const mapMix = o.mapMix, bronze = o.bronze ? new THREE.Color(o.bronze) : null, bk = o.bronzeK ?? 0.5;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = U.uNight;
-    sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+    let fs = 'uniform float uNight;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>\n totalEmissiveRadiance *= (${day.toFixed(3)} + uNight * ${night.toFixed(3)});`);
+    if (mapMix != null) fs = fs.replace('#include <map_fragment>', `#include <map_fragment>\n diffuseColor.rgb = mix(diffuse, diffuseColor.rgb, ${mapMix.toFixed(3)});`);
+    if (bronze) fs = fs.replace('#include <color_fragment>', `#include <color_fragment>
+ { vec3 gwR = inverseTransformDirection(reflect(-normalize(vViewPosition), normalize(vNormal)), viewMatrix);
+   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${bronze.r.toFixed(3)}, ${bronze.g.toFixed(3)}, ${bronze.b.toFixed(3)}), ${bk.toFixed(3)} * smoothstep(-0.05, -0.55, gwR.y)); }`);
+    sh.fragmentShader = fs;
   };
-  mat.customProgramCacheKey = () => 'gwDayNight' + day + '_' + night;
+  mat.customProgramCacheKey = () => 'gwDayNight' + day + '_' + night + '_' + mapMix + '_' + (bronze ? bronze.getHexString() + bk : '');
   return mat;
 }
 
