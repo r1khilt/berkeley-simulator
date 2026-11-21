@@ -51,8 +51,8 @@ function boardTexture(base = [198, 198, 195]) {
 // Canopy soffit: white aluminium slats with thin shadow gaps (4 slats per texture tile, stripes along U)
 function slatTexture() {
   const W = 256, H = 4, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-  g.fillStyle = '#f7f8f8'; g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 4; i++) { const x = i * 64; g.fillStyle = '#8d979e'; g.fillRect(x + 50, 0, 10, H); g.fillStyle = '#c3cacf'; g.fillRect(x + 46, 0, 4, H); g.fillRect(x + 60, 0, 4, H); }
+  g.clearRect(0, 0, W, H);
+  for (let i = 0; i < 4; i++) { const x = i * 64; g.fillStyle = '#f7f8f8'; g.fillRect(x, 0, 46, H); g.fillStyle = '#b9c1c6'; g.fillRect(x + 46, 0, 4, H); }   // open gaps (alpha 0) between slats: sky reads through
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 // Polished concrete / terrazzo floor with saw-cut joints every 1.5 m (tile = 2 m)
@@ -67,20 +67,20 @@ export function grimesMats(M) {
   if (_mats) return _mats;
   const std = (o) => new THREE.MeshStandardMaterial(o);
   _mats = {
-    panel: std({ color: 0xffffff, map: boardTexture([200, 201, 199]), roughness: 0.92, name: 'grimes-board-concrete' }),
+    panel: std({ color: 0xffffff, map: boardTexture([192, 190, 184]), roughness: 0.92, name: 'grimes-board-concrete' }),
     whitePanel: std({ color: 0xffffff, map: panelTexture([243, 244, 244], 0.95), roughness: 0.6, metalness: 0.05, name: 'grimes-white-cladding' }),
     steel: dayLift(std({ color: 0xffffff, roughness: 0.45, metalness: 0.05, name: 'grimes-white-steel' }), 0x5e6062, 's'),
     louvre: dayLift(std({ color: 0xffffff, roughness: 0.6, metalness: 0.0, name: 'grimes-louvre' }), 0x5c6064, 'l'),
-    slats: dayLift(std({ color: 0xffffff, map: slatTexture(), roughness: 0.7, metalness: 0.0, name: 'grimes-slat-soffit' }), 0x6a6e72, 'sl'),
+    slats: dayLift(std({ color: 0xffffff, map: slatTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7, metalness: 0.0, name: 'grimes-slat-soffit' }), 0x6a6e72, 'sl'),
     veil: dayLift(std({ color: 0xeef1f3, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false, name: 'grimes-canopy-veil' }), 0x7a7f84, 'v'),
     metalPanel: dayLift(std({ color: 0xffffff, map: panelTexture([246, 247, 247], 0.94), roughness: 0.45, metalness: 0.05, name: 'grimes-white-panel' }), 0x4a4c4e, 'mp'),
     soffit: std({ color: 0xc9d0d4, roughness: 0.6, metalness: 0.2, name: 'grimes-soffit' }),
     rod: dayLift(std({ color: 0xf4f5f3, roughness: 0.4, metalness: 0.1, name: 'grimes-sma-rod' }), 0x5a5a58, 'r'),
     sleeve: std({ color: 0xd4d7d8, roughness: 0.3, metalness: 0.45, name: 'grimes-sma-sleeve' }),
-    storeGlass: nightGlow(std({ color: 0x46709a, roughness: 0.05, metalness: 0.6, envMapIntensity: 1.8, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
+    storeGlass: nightGlow(std({ color: 0x8ba8ba, roughness: 0.05, metalness: 0.35, envMapIntensity: 1.6, emissive: 0xffd9a8, emissiveIntensity: 1.1, name: 'grimes-storefront-glass' }), 1.0),
     frame: dayLift(std({ color: 0xf6f7f7, roughness: 0.4, metalness: 0.2, name: 'grimes-mullion' }), 0x3c3e40, 'fr'),
     darkFrame: std({ color: 0x3a3d40, roughness: 0.45, metalness: 0.5, name: 'grimes-dark-frame' }),
-    glass: std({ color: 0x5b8ab8, roughness: 0.03, metalness: 0.55, transparent: true, opacity: 0.62, envMapIntensity: 2.0, depthWrite: false, name: 'grimes-glass' }),
+    glass: std({ color: 0xa6c1d2, roughness: 0.03, metalness: 0.45, transparent: true, opacity: 0.5, envMapIntensity: 2.2, depthWrite: false, name: 'grimes-glass' }),
     deck: std({ color: 0xffffff, map: floorTexture(), roughness: 0.85, name: 'grimes-deck' }),
     slab: std({ color: 0xe2e3e1, roughness: 0.88, name: 'grimes-slab' }),
     ceiling: nightGlow(std({ color: 0xe6e2da, roughness: 0.8, emissive: 0xffd9a0, emissiveIntensity: 0.9, name: 'grimes-wood-ceiling' }), 1.0),
