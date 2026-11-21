@@ -3,6 +3,7 @@
 import { install as installScooters } from './scooter.js';
 import { install as installHoverboard } from './hoverboard.js';
 export function installModes(player, ctx) {
+  if (typeof location !== 'undefined' && /[?&]noride\b/.test(location.search)) return; // debug: ?noride disables ride plugins
   // e.g. import('./scooter.js').then((m) => m.install(player, ctx));
   installScooters(player, ctx); // Lime / Veo shared e-scooters: E (or U) near a parked one
   installHoverboard(player, ctx); // X: hoverboard

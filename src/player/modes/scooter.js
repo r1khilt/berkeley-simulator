@@ -176,7 +176,7 @@ export function install(player, ctx) {
       // ---- longitudinal dynamics (power-limited motor, governor at vmax, brakes, drag, gravity along the slope)
       const v = r.speed; let a = 0; const fx = -Math.sin(r.yaw), fz = -Math.cos(r.yaw);
       const slope = r.air ? 0 : Math.sin(r.pitch);
-      if (r.throttle > 0.02 && v > -0.3) { const motor = Math.min(1.75, 4.6 / Math.max(0.9, v)) * r.throttle; const gov = clamp((S.vmax * Math.max(0.35, r.throttle) - v) / 0.7, 0, 1); a += motor * gov; }
+      if (r.throttle > 0.02 && v > -0.3) { const motor = Math.min(2.0, 6.2 / Math.max(0.9, v)) * r.throttle; const gov = clamp((S.vmax * Math.max(0.35, r.throttle) - v) / 0.7, 0, 1); a += motor * gov; }
       if (brake > 0) { if (v > 0.05) a -= 4.2 * brake; else if (inp.f < -0.1 && v > -0.85) a -= 1.1; else if (v < 0 && inp.f >= -0.1) a += 3; }
       a -= (Math.abs(v) > 0.02 ? Math.sign(v) * 0.22 : 0) + 0.0045 * v * Math.abs(v);
       if (!r.air) a -= 9.81 * slope * 0.92;

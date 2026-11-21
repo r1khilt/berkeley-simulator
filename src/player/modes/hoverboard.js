@@ -88,7 +88,7 @@ export function install(player, ctx) {
       st.bobT += dt; const bob = Math.sin(st.bobT * 2.3) * 0.022 + Math.sin(st.bobT * 5.1) * 0.006;
       const target = g + HOVER_H + bob - st.crouch * 0.25; const h = st.y - target;
       if (p.jumpReq) { p.jumpReq = false; if ((!st.air || st.airT < 0.15) && st.ollieCD <= 0) { st.vy = 5.4 + Math.min(1.2, sp * 0.06); st.air = true; st.airT = 0.2; st.ollieCD = 0.35; st.crouchV = -2.2; sound.whoosh(); } }
-      if (h > 0.55) { st.vy -= G * dt; st.air = true; st.airT += dt; }
+      if (h > 0.55 || (st.air && st.vy > 0 && st.airT > 0)) { st.vy -= G * dt; st.air = true; st.airT += dt; } // ballistic while rising after an ollie
       else { const kS = 95, cS = 15; st.vy += (-kS * h - cS * st.vy) * dt - (h > 0 ? G * 0.15 * dt : 0); if (st.air && st.airT > 0.25) { const s = clamp((-st.vy + 1) / 6, 0.15, 1); sound.land(s); st.crouchV += 2.5 * s; } st.air = false; st.airT = 0; }
       let ny = st.y + st.vy * dt; if (ny < g + 0.06) { ny = g + 0.06; if (st.vy < 0) st.vy *= -0.2; }
       // ---- board attitude: lean into the carve, pitch with slope / acceleration / vertical speed
