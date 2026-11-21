@@ -34,7 +34,7 @@ export async function build(ctx) {
   const N = 28;                       // bays around the drum (~4.1 m each)
   const rW = rr + 0.1;                // upper drum face
   const rG = rW - 0.6;                // ground-floor wall (set back under the canopy)
-  const yC0 = 4.1, yC1 = 4.4;         // canopy slab underside / top (thin cantilevered ring)
+  let yC0 = 4.1, yC1 = 4.4;           // canopy slab underside / top (thin cantilevered ring; raised to clear the doors below)
   const eave = 13.6;                  // top of the drum wall (cornice above)
   const rCan = rG + 3.1, rPier = rG + 2.6;
   const yRing = 16.6, rIn = 9.8;      // light-well ring (kept low so the roof stays hidden behind the eave from the ground)
@@ -43,6 +43,7 @@ export async function build(ctx) {
   const ring = (r, n = N, off = 0) => { const out = []; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + off; out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return out; };
   let gMin = Infinity, gMax = -Infinity; for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2; const g = ctx.groundAt(cx + Math.cos(a) * (rW + 2), cz + Math.sin(a) * (rW + 2)); gMin = Math.min(gMin, g); gMax = Math.max(gMax, g); }
   const yF = Math.max(0, gMax) + 0.15; // ground-floor finished level
+  yC0 = Math.max(yC0, yF + 3.35); yC1 = yC0 + 0.3;
   const yB = gMin - 1.2;               // foundations
   // entrances where the footpaths meet the drum (compass 334° NNW and 155° SSE): bay index nearest to that bearing
   const bayAt = (compass) => { const th = THREE.MathUtils.degToRad(compass); const a = Math.atan2(-Math.cos(th), Math.sin(th)); let best = 0, bd = 9; for (let k = 0; k < N; k++) { const am = ang(k + 0.5); let d = Math.abs(Math.atan2(Math.sin(am - a), Math.cos(am - a))); if (d < bd) { bd = d; best = k; } } return best; };
@@ -52,7 +53,7 @@ export async function build(ctx) {
     // runs go clockwise in (x,z) seen from above (z south) => building on the left, normal outward
     const a = P(rW, k + 1), b = P(rW, k); const R = K.run(a, b); const L = R.L; const sm = L / 2;
     // ---- upper drum: plain render, one tall white-framed window per bay per floor (upper row shorter) ----
-    const w2 = { s0: sm - 0.65, s1: sm + 0.65, y0: 5.3, y1: 7.95, mull: 0, muntins: 3, sillMat: CW, fw: 0.05 };
+    const w2 = { s0: sm - 0.65, s1: sm + 0.65, y0: Math.max(5.3, yC1 + 0.55), y1: 7.95, mull: 0, muntins: 3, sillMat: CW, fw: 0.05 };
     const w3 = { s0: sm - 0.65, s1: sm + 0.65, y0: 9.3, y1: 11.35, mull: 0, muntins: 2, sillMat: CW, fw: 0.05 };
     K.wall(R, C, 0, L, yC1, eave, [w2, w3], 0.34);
     for (const o of [w2, w3]) K.fill(R, o, { rev: 0.25, frame: SASH, mull: 0 });
@@ -63,18 +64,18 @@ export async function build(ctx) {
     // ---- ground floor: solid render with tall punched windows / entrance doors, recessed under the canopy ----
     const ag = P(rG, k + 1), bg = P(rG, k); const RG = K.run(ag, bg); const Lg = RG.L; const sg = Lg / 2;
     if (doors.has(k)) {
-      const d = { s0: sg - 0.7, s1: sg + 0.7, y0: yF, y1: yF + 3.3, doorTop: yF + 2.5, sill: false };
+      const d = { s0: sg - 0.7, s1: sg + 0.7, y0: yF, y1: yC0 - 0.2, doorTop: yF + 2.45, sill: false };
       K.wall(RG, C, 0, Lg, yB, yC0 + 0.05, [d], 0.35);
       K.fill(RG, d, { kind: 'door', rev: 0.22, frame: M.darkBronze, door: M.windowNight });
       K.rbox(RG, M.darkBronze, d.s0 - 0.08, yF, -0.25, d.s0, d.y1, 0.02); K.rbox(RG, M.darkBronze, d.s1, yF, -0.25, d.s1 + 0.08, d.y1, 0.02);
-      K.rbox(RG, M.wood, sg - 0.66, yF, -0.2, sg + 0.66, yF + 2.48, -0.16); // light timber door with two large glazed panels
-      K.rbox(RG, M.windowNight, sg - 0.52, yF + 1.3, -0.16, sg + 0.52, yF + 2.3, -0.15); K.rbox(RG, M.windowNight, sg - 0.52, yF + 0.2, -0.16, sg + 0.52, yF + 1.15, -0.15);
-      K.rbox(RG, CW, sg - 0.7, yF + 2.5, -0.2, sg + 0.7, yF + 2.72, -0.12); // white band under the transom
+      K.rbox(RG, M.wood, sg - 0.66, yF, -0.2, sg + 0.66, yF + 2.43, -0.16); // light timber door with two large glazed panels
+      K.rbox(RG, M.windowNight, sg - 0.52, yF + 1.3, -0.16, sg + 0.52, yF + 2.27, -0.15); K.rbox(RG, M.windowNight, sg - 0.52, yF + 0.2, -0.16, sg + 0.52, yF + 1.15, -0.15);
+      K.rbox(RG, CW, sg - 0.7, yF + 2.45, -0.2, sg + 0.7, yF + 2.65, -0.12); // white band under the transom
       // bronze letters beside the door
       const R2 = K.run(RG.at(0, 0.02), RG.at(Lg, 0.02));
-      if (k === bayAt(334)) sign(K, R2, 'MELVIN CALVIN LABORATORY', sg + 1.75, yF + 1.7, 0.2, { color: '#3a3a3a', d: 0.0 });
+      if (k === bayAt(334)) { sign(K, R2, 'MELVIN CALVIN', sg + 1.2, yF + 1.82, 0.13, { color: '#2a2a2a', d: 0.0 }); sign(K, R2, 'LABORATORY', sg + 1.2, yF + 1.64, 0.13, { color: '#2a2a2a', d: 0.0 }); }
     } else {
-      const wg = { s0: sg - 0.6, s1: sg + 0.6, y0: yF + 0.8, y1: yF + 3.3, mull: 0, muntins: 2, sillMat: CW };
+      const wg = { s0: sg - 0.6, s1: sg + 0.6, y0: yF + 0.6, y1: yC0 - 0.3, mull: 0, muntins: 2, sillMat: CW };
       K.wall(RG, C, 0, Lg, yB, yC0 + 0.05, [wg], 0.35);
       K.fill(RG, wg, { rev: 0.22, frame: SASH, mull: 0 });
       K.rbox(RG, CW, -0.25, yF, 0, 0.25, yC0, 0.14); // bay-defining strip
