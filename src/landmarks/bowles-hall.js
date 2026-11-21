@@ -24,7 +24,7 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const W = B.bowWall, T = B.bowTrim, RT = B.clayTile, SA = B.bowSash; // stone-coloured sash: reads as stone-mullioned lights
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
-  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.14, lightW: 0.58, winH: 1.8, topH: 1.5,
+  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.03, lightW: 0.58, winH: 1.8, topH: 1.5,
     lights: (i, k, f) => (k === 0 ? 3 : (i % 2 === 0 ? 3 : 2)) };
 
   // ---------- ranges ----------
@@ -41,7 +41,7 @@ export async function build(ctx) {
   let base = 0;
   const GW = [[3.8, 6.8], [AC, 6.6], [22.6, 6.8]]; // court-face wall gables (u centre, width)
   const rA = gothRange(K, { ...common, ...A, core: false, corniceGaps: { S: GW.map(([u, w]) => [u - A.u0 - w / 2, u - A.u0 + w / 2]) },
-    ops: (f, R, k, ly) => (f === 'S' && k === 0 ? [0, 1, 2, 3].map((i) => ({ s0: arcS(i) - AW / 2, s1: arcS(i) + AW / 2, y0: ly - 0.05, y1: ly + AH, arch: 'gothic', rise: 1.45 })) : null),
+    ops: (f, R, k, ly) => (f === 'S' && k === 0 ? [0, 1, 2, 3].map((i) => ({ s0: arcS(i) - AW / 2, s1: arcS(i) + AW / 2, y0: ly - 0.05, y1: ly + AH, arch: 'gothic', rise: 1.95 })) : null),
     skip: (f, s, k) => f === 'S' && k <= 2 && Math.abs(s - (AC - A.u0)) < 2.2 && k >= 1, // oriel bays
   });
   base = rA.base;
@@ -57,14 +57,14 @@ export async function build(ctx) {
     // loggia: dark back wall with three entrance doors, paved floor, ceiling
     const RB = K.run([lu0, A.v1 - LD], [lu1, A.v1 - LD]);
     const doors = [-1, 0, 1].map((j) => ({ s0: RB.L / 2 + j * AP - 0.8, s1: RB.L / 2 + j * AP + 0.8, y0: base, y1: base + 2.9, doorTop: base + 2.25, sill: false }));
-    K.wall(RB, B.loggia, 0, RB.L, base - 0.2, ct, doors, 0.3);
+    K.wall(RB, B.bowShade, 0, RB.L, base - 0.2, ct, doors, 0.3);
     for (const o of doors) K.fill(RB, o, { kind: 'door', rev: 0.2, door: M.woodDark, frame: T });
     K.box(M.paving, lu0, base - 0.6, A.v1 - LD, lu1, base - 0.02, A.v1 - 0.3);
     K.box(B.loggia, lu0, ct - 0.45, A.v1 - LD, lu1, ct, A.v1 - 0.4);
     for (let i = 0; i < 4; i++) { // chamfered stone surrounds on the arches (jambs + label)
       const R = rA.runs.S; const s = arcS(i);
-      K.rbox(R, T, s - AW / 2 - 0.3, base - 0.05, 0, s - AW / 2, base + AH - 1.45, 0.08);
-      K.rbox(R, T, s + AW / 2, base - 0.05, 0, s + AW / 2 + 0.3, base + AH - 1.45, 0.08);
+      K.rbox(R, T, s - AW / 2 - 0.3, base - 0.05, 0, s - AW / 2, base + AH - 1.95, 0.08);
+      K.rbox(R, T, s + AW / 2, base - 0.05, 0, s + AW / 2 + 0.3, base + AH - 1.95, 0.08);
     }
     K.rbox(rA.runs.S, T, arcS(0) - AW / 2 - 0.4, base + AH + 0.12, 0, arcS(3) + AW / 2 + 0.4, base + AH + 0.32, 0.14);
     walkables.push(K.walkPoly([[lu0, A.v1 - LD], [lu1, A.v1 - LD], [lu1, A.v1], [lu0, A.v1]], base - 0.02));
@@ -129,10 +129,10 @@ export async function build(ctx) {
       faces.forEach(([a, b], fi) => {
         const R = K.run(a, b, 0.02); const L = R.L, c = L / 2;
         const ops = [];
-        for (let y = g0 + 7.3; y < Pt.top - 2.4; y += 3.05) ops.push({ s0: c - 0.75, s1: c + 0.75, y0: y, y1: y + 1.7 });
+        if (fi === 0 || (fi === 1 && Pt.door)) for (let y = g0 + 7.3; y < Pt.top - 2.4; y += 6.1) ops.push({ s0: c - 0.3, s1: c + 0.3, y0: y, y1: y + 1.6, slit: true }); // plain keep: a few narrow lights
         if (Pt.door && fi === 0) ops.push({ s0: c - 1.25, s1: c + 1.25, y0: g0, y1: g0 + 4.1, arch: 'gothic', rise: 1.35, doorTop: g0 + 2.8, sill: false });
         K.wall(R, W, 0, L, yG, Pt.top, ops, 0.5);
-        for (const o of ops) { if (o.arch) { K.fill(R, o, { kind: 'door', rev: 0.45, door: M.woodDark, frame: T }); K.rbox(R, T, o.s0 - 0.35, o.y1 + 0.05, 0, o.s1 + 0.35, o.y1 + 0.25, 0.15); } else mullGroup(K, R, o, { n: 2, stone: T, sash: SA, depth: 0.5, panes: 1, tranAt: o.y0 + 1.2 }); }
+        for (const o of ops) { if (o.arch) { K.fill(R, o, { kind: 'door', rev: 0.45, door: M.woodDark, frame: T }); K.rbox(R, T, o.s0 - 0.35, o.y1 + 0.05, 0, o.s1 + 0.35, o.y1 + 0.25, 0.15); } else { K.fill(R, o, { rev: 0.35, frame: SA, mull: 0, muntins: 2 }); K.rbox(R, T, o.s0 - 0.15, o.y1 + 0.05, 0, o.s1 + 0.15, o.y1 + 0.2, 0.1); } }
         K.rbox(R, T, -0.1, Pt.top - 0.6, 0, L + 0.1, Pt.top - 0.35, 0.2); // corbel course
         battlement(K, R, T, -0.15, L + 0.15, Pt.top - 0.35, 0.7, 0.7, 0.75, 1.15, -0.45, 0.12);
       });

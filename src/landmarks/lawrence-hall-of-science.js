@@ -1,7 +1,7 @@
 // Lawrence Hall of Science (1968), UC Berkeley's public science center on the hills above campus.
 // Massing from the 2021 LiDAR: a broad octagonal plaza deck (~12 m above the downhill west edge) built over lower floors
 // that open to the bay in horizontal window bands; south of it rise the building's signature monolithic, khaki board-formed
-// concrete masses: vertical walls with steep facets to truncated tops (a central mass on the plaza with the main entrance,
+// concrete masses: monolithic battered shells rising off the plaza to small flat tops (a central mass with the main entrance portal,
 // two splayed folded-plate exhibit halls, a flat-roofed spine and the tall polygonal lantern). The plaza carries the
 // fountain, Pheena the life-size fin whale and the climbable DNA double helix, facing the bay.
 import * as THREE from 'three';
@@ -75,21 +75,18 @@ export async function build(ctx) {
   // central mass on the plaza (main entrance at x = 0 where the plaza walk arrives)
   {
     const ring = oct(-14.0, -3.8, 16.0, 19.6, 3.4);
-    let RN = null;
-    mass(ring, 5.4, PZ - 0.1, 18.0, 21.0, (a, b, R) => {
-      if (Math.abs(a[1] + 3.8) < 1e-6 && Math.abs(b[1] + 3.8) < 1e-6) { RN = R; const sc = a[0] - 0.0; return [{ s0: sc - 1.7, s1: sc + 1.7, y0: PZ, y1: PZ + 4.4, door: true }]; }
-      return []; // blind board-formed walls apart from the entrance
-    });
+    // one monolithic battered shell (same form as the halls), with a vertical concrete entrance portal on the plaza side
+    frustum(K, CON, ring, offsetRing(ring, -5.6), PZ - 0.1, 21.0, { cap: true, uvMode: 'roof' });
+    K.box(CON, -2.7, PZ - 0.1, -5.2, -1.7, PZ + 5.3, -1.0); K.box(CON, 1.7, PZ - 0.1, -5.2, 2.7, PZ + 5.3, -1.0); // portal jambs
+    K.box(CON, -1.7, PZ + 4.4, -5.2, 1.7, PZ + 5.3, -1.0); K.box(CON, -1.7, PZ - 0.1, -2.6, 1.7, PZ + 4.4, -1.0); // lintel + back infill
+    K.box(CONd, -2.85, PZ + 5.3, -5.35, 2.85, PZ + 5.55, -1.0);         // portal coping
+    const RN = K.run([2.7, -5.2], [-2.7, -5.2]); const s = RN.L / 2;  // north (plaza) face of the portal
     // deep entrance recess lined in rust-orange, glass doors at the back
     const RED = plainMat(0xb5612e, { roughness: 0.8 });
-    const sc = RN.at(0)[0] - 0.0; const s = Math.abs(RN.a[0] - 0); // run starts at the east end: x=0 is s
-    K.rbox(RN, RED, s - 1.7, PZ, -2.6, s - 1.55, PZ + 4.4, -0.6); K.rbox(RN, RED, s + 1.55, PZ, -2.6, s + 1.7, PZ + 4.4, -0.6);
-    K.rbox(RN, RED, s - 1.7, PZ + 4.25, -2.6, s + 1.7, PZ + 4.4, -0.6);
-    K.rbox(RN, CONd, s - 1.7, PZ - 0.02, -2.6, s + 1.7, PZ + 0.03, 0);
+    K.rbox(RN, RED, s - 1.7, PZ, -2.6, s - 1.55, PZ + 4.4, -0.01); K.rbox(RN, RED, s + 1.55, PZ, -2.6, s + 1.7, PZ + 4.4, -0.01);
+    K.rbox(RN, RED, s - 1.7, PZ + 4.25, -2.6, s + 1.7, PZ + 4.4, -0.01);
+    K.rbox(RN, CONd, s - 1.7, PZ - 0.02, -2.6, s + 1.7, PZ + 0.03, 0.02);
     glazing(K, RN, s - 1.55, s + 1.55, PZ + 0.02, PZ + 4.25, { d: -2.5, pitch: 0.78, transoms: [PZ + 2.4], frame: FR, glass: GL });
-    // small square inset panel high on the end face
-    K.rbox(RN, GL, s - 0.7, 18.0, -0.95, s + 0.7, 19.4, -0.75);
-    K.rbox(RN, CON, s - 0.9, 17.8, -1.0, s + 0.9, 18.0, -0.55);
     interactions.push({ id: 'lhs-entrance', pos: [0, PZ + 1, -5.5], radius: 3, label: 'Lawrence Hall of Science: main entrance' });
     colliders.push(K.colPoly(ring, PZ - 1, 21.2));
   }

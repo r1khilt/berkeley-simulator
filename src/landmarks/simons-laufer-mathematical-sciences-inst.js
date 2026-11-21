@@ -63,21 +63,20 @@ export async function build(ctx) {
   // tubular railing on the lower roofs' edges
   // central block
   brickBlock([[-5.7, -10.5], [9.8, -8.9], [19.4, -8.9], [19.4, 16.5], [0.4, 17.4], [0.2, 21.6], [-5.7, 22.2]], 13.0, [1.1, 4.5, 7.9], { bay: 4.2 });
-  // entrance wing: glazed storefront under the brick upper floor (square windows), corner glass panels
+  // east wing: the newer louvred glass addition (Chern Hall): full-height glazing behind closely spaced vertical light-grey
+  // fins, a thin white parapet band, and the glazed entrance storefront at its foot
   const E = [[14.3, -11.8], [28.0, -14.8], [28.7, 2.5], [22.6, 7.5], [19.7, 10.7], [19.4, -8.9]];
+  const FIN = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.35, metalness: 0.4 });
+  const WHT = new THREE.MeshStandardMaterial({ color: 0xe8e8e4, roughness: 0.6 });
   for (const { R } of runsOf(K, E)) {
     if (R.L < 1.5) continue;
-    const big = R.L > 12;
-    const ops = []; const n = big ? 2 : Math.max(1, Math.round((R.L - 1.0) / 3.0));
-    for (let k = 0; k < n; k++) { const c = 0.5 + (R.L - 1.0) * (k + 0.5) / n; const w = big ? Math.min(7.0, (R.L - 2.0) / 2 - 0.8) : 1.6; ops.push({ s0: c - w / 2, s1: c + w / 2, y0: big ? 6.0 : 6.6, y1: big ? 9.6 : 8.1, sill: false, big }); }
-    K.wall(R, BR, 0, R.L, -2.5, 13.4, ops, 0.32);
-    for (const o of ops) {
-      if (o.big) curtain(K, R, o.s0, o.s1, o.y0, o.y1, { glass: GL, frame: plainFr, mw: (o.s1 - o.s0) / 4, levels: [o.y0, o.y0 + 1.2, o.y0 + 2.4, o.y1], rec: 0.2 });
-      else K.fill(R, o, { rev: 0.17, mull: 1, tran: [o.y0 + 1.0], frame: FR, glass: GL });
-    }
-    K.rbox(R, CP, -0.04, 13.4, -0.36, R.L + 0.04, 13.49, 0.05);
+    curtain(K, R, 0, R.L, -2.5, 13.0, { glass: M.glass, frame: FR, mw: 1.5, levels: [-2.5, 2.6, 6.2, 9.6, 13.0], rec: 0.45 });
+    const n = Math.floor(R.L / 0.6);
+    for (let k = 1; k < n; k++) { const sx = R.L * k / n; K.rbox(R, FIN, sx - 0.03, 2.8, -0.05, sx + 0.03, 12.9, 0.38, { detail: k % 3 !== 0 }); }
+    K.rbox(R, FIN, 0, 2.65, -0.1, R.L, 2.8, 0.42); // fin carrier rail
+    K.rbox(R, WHT, -0.05, 13.0, -0.45, R.L + 0.05, 13.7, 0.06); // white parapet band
   }
-  K.prism(M.concreteDark, offsetRing(orient(E), -0.75), -2.5, 12.8);
+  K.prism(M.concreteDark, offsetRing(orient(E), -0.9), -2.5, 12.8);
   flatRoof(K, E, 12.9, { parapet: 0, deckMat: M.concreteDark });
   // slim round columns under the entrance oversail
   { const R = K.run([22.6, 7.5], [28.7, 2.5]); for (const s of [1.0, R.L / 2, R.L - 1.0]) { const p = R.at(s, 0.2); K.cyl(M.whitePaint, p[0], Math.max(0, K.g(p[0], p[1])) - 0.5, p[1], 0.16, 0.16, 5.5, 10, { detail: true }); } }

@@ -111,6 +111,7 @@ export function rmats(M) {
     // SLMath: flat, uniform warm orange-brown brick; dark bronze sash
     slBrick: std({ map: brickTex(['#9a5a3c', '#9d5d3e', '#97583b', '#a0603f', '#985a3d'], '#a88a76'), roughness: 0.9 }),
     bronze: std({ color: 0x2f2b27, roughness: 0.45, metalness: 0.5 }),
+    davisBrick: std({ map: brickTex(['#b5583f', '#a8503a', '#bd6446', '#a14b36', '#b05a40'], '#c4b6a2'), roughness: 0.88 }),
     coping: std({ color: 0x6e5c50, roughness: 0.5, metalness: 0.4 }),
     concreteLight: tinted(M.concrete, 0xe3ded2, 0.95),
     // Foothill v2: weathered cedar shingle walls, warm dark composition-shingle roofs
