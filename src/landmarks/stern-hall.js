@@ -50,15 +50,17 @@ const _sm = new WeakMap();
 function sternMats(M) { // refine-north A: warmer, less saturated ochre stucco; dark low roofs; red steel for the loggia columns
   if (_sm.has(M)) return _sm.get(M); const B = bmats(M);
   const wall = B.sternWall.clone(); wall.color = new THREE.Color(0xdcb868); wall.name = 'stern:wall';
-  const roof = B.sternRoof.clone(); roof.color = new THREE.Color(0x5b5f5d); roof.name = 'stern:roof';
-  const red = new THREE.MeshStandardMaterial({ color: 0xa9483a, roughness: 0.45, metalness: 0.35, name: 'stern:redSteel' });
-  const o = { wall, roof, red }; _sm.set(M, o); return o;
+  const roof = B.sternRoof.clone(); roof.color = new THREE.Color(0x6e7368); roof.name = 'stern:roof';
+  const red = new THREE.MeshStandardMaterial({ color: 0xb5544a, roughness: 0.45, metalness: 0.3, name: 'stern:redSteel' });
+  const soffit = new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.7, name: 'stern:soffit' });
+  const o = { wall, roof, red, soffit }; _sm.set(M, o); return o;
 }
 
 function wingSet(ctx, ang, blocks, extra, entries = 1) {
   const M = ctx.M; const B = bmats(M); const SM = sternMats(M);
   const K = new Kit(ctx, THREE.MathUtils.degToRad(ang)); const colliders = [], walkables = [], wings = [];
-  for (const b of blocks) {
+  for (const b0 of blocks) {
+    const hs = Math.min(b0.u1 - b0.u0, b0.v1 - b0.v0) / 2 + 1.15; const b = { ...b0, eave: Math.max(b0.eave, b0.ridge - Math.max(0.45, hs * 0.13)) }; // 5-8 degree roofs
     const res = stuccoBlock(K, { ...b, mat: b.red ? B.sternRed : SM.wall, roofMat: SM.roof, corniceMat: B.teal, corniceP: 0.12, corniceH: 0.2, frame: B.paleBlue, overhang: 1.15, fh: 3.1, base: b.g + 0.4, y0: b.g - 1.5, depth: 0.32, win: { w: 1.5, h: 1.55, mull: 1, tran: 0.62 }, groundWin: { w: 1.9, h: 2.2, mull: 2, tran: 0.8 }, bay: 3.2 });
     wings.push({ b, runs: res.runs });
     // thin teal eave slab edge
@@ -86,13 +88,13 @@ export async function build(ctx) {
     // brick paving, with London plane trees in the court
     {
       const ua = 11.0, ub = 43.0, d = 3.4; const gL = K.gMin(ua, 0, ub, d, 6); const y = gL + 3.35;
-      K.box(B.teal, ua - 0.3, y, 0, ub + 0.3, y + 0.2, d + 0.25);
-      K.box(B.teal, ua - 0.3, y - 0.1, d + 0.1, ub + 0.3, y + 0.24, d + 0.28, { detail: true });
+      K.box(SM.soffit, ua - 0.3, y, 0, ub + 0.3, y + 0.2, d + 0.25);
+      K.box(SM.soffit, ua - 0.3, y - 0.1, d + 0.1, ub + 0.3, y + 0.24, d + 0.28, { detail: true });
       K.box(M.brick, ua - 0.4, gL - 0.4, 0.05, ub + 0.4, gL + 0.05, d + 0.6);
       const nc = 8;
-      for (let i = 0; i < nc; i++) { const u = ua + 0.4 + (ub - ua - 0.8) * i / (nc - 1); K.cyl(SM.red, u, gL, d - 0.2, 0.08, 0.08, y - gL, 10); const [x, z] = K.xz(u, d - 0.2); cols.push({ type: 'cyl', x, z, r: 0.15, y0: gL - 0.5, y1: y }); }
+      for (let i = 0; i < nc; i++) { const u = ua + 0.4 + (ub - ua - 0.8) * i / (nc - 1); K.cyl(SM.red, u, gL, d - 0.2, 0.12, 0.12, y - gL, 10); const [x, z] = K.xz(u, d - 0.2); cols.push({ type: 'cyl', x, z, r: 0.15, y0: gL - 0.5, y1: y }); }
       const X = rnMats(M);
-      for (const [u, v] of [[15, 12], [24, 15], [33, 12], [40, 19], [20, 23]]) { const g = K.g(u, v); K.cyl(X.bark, u, g, v, 0.22, 0.17, 4.2, 8); blob(K, X.leafA, u, g + 6.2, v, 3.2, 2.4, 3.2, u * 3 + v); blob(K, X.leafB, u + 1.2, g + 7.4, v - 0.8, 2.2, 1.8, 2.2, u + v * 5); const [x, z] = K.xz(u, v); cols.push({ type: 'cyl', x, z, r: 0.3, y0: g - 0.5, y1: g + 4 }); }
+      for (const [u, v] of [[14, 20], [40, 22], [27, 26]]) { const g = K.g(u, v); K.cyl(M.woodDark, u, g, v, 0.22, 0.17, 4.2, 8, { detail: true }); blob(K, X.leafA, u, g + 6.2, v, 3.2, 2.4, 3.2, u * 3 + v); blob(K, X.leafB, u + 1.2, g + 7.4, v - 0.8, 2.2, 1.8, 2.2, u + v * 5); const [x, z] = K.xz(u, v); cols.push({ type: 'cyl', x, z, r: 0.3, y0: g - 0.5, y1: g + 4 }); }
     }
     // courtyard porch: cantilevered balcony slab with wire-grid guard on a slender red steel column (south wing, east face)
     const u = 9.5, v0 = 10.0, v1 = 22.0, g = K.gMin(u, v0, u + 3, v1), y = g + 3.3, d = 2.6;

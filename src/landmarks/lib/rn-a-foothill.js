@@ -21,22 +21,22 @@ const _fm = new WeakMap();
 export function faMats(M) {
   if (_fm.has(M)) return _fm.get(M);
   // weathered stained cedar shingles: 13 courses per 2 m (0.154 m exposure), 9 shingles per course per tile, random widths
-  const S1 = C3(0x433d39), S2 = C3(0x4f4741), S3 = C3(0x38322f), S4 = C3(0x615850);
+  const S1 = C3(0x5f4b3d), S2 = C3(0x6d5848), S3 = C3(0x524032), S4 = C3(0x7a6655);
   const NC = 10, NW = 7;
-  const shingle = bakeMat('fa:shingle6', (u, v) => {
+  const shingle = bakeMat('fa:shingle7', (u, v) => {
     const cv = v * NC; const row = Math.floor(cv); const fv = cv - row; const r = wrap(row, NC);
     const x = u * NW + Math.floor(hash2(r, 3, 1) * NW) + 0.5 * (r % 2); let k = Math.floor(x);
     const jit = (kk) => (hash2(wrap(kk, NW), r, 2) - 0.5) * 0.7;
     if (x < k + jit(k)) k -= 1;
     const left = k + jit(k), right = k + 1 + jit(k + 1); const dm = Math.min(x - left, right - x) / NW * 2; // metres to nearest keyway
     const km = wrap(k, NW); const h = hash2(km, r, 7);
-    const base = mix(S1, h < 0.5 ? S2 : S3, Math.abs(h - 0.5) * 0.6);
+    const base = h < 0.9 ? mix(S1, h < 0.45 ? S2 : S3, Math.abs(h - 0.45) * 1.8) : S4;
     const grain = 0.93 + 0.14 * vnoise(u * 256, r * 11 + fv * 1.5, 256, 4);
-    const streak = 0.8 + 0.38 * vnoise(u * 28, 3.5, 28, 12) * (0.6 + 0.4 * fbm(u * 2, v * 2, 2, 2, 5)); // vertical weathering streaks
+    const streak = 0.92 + 0.14 * vnoise(u * 12, 3.5, 12, 12) * (0.6 + 0.4 * fbm(u * 2, v * 2, 2, 2, 5)); // faint weathering streaks
     let kk = grain * streak * (0.97 + 0.06 * (1 - fv));
     let ht = 0.3 + 0.7 * (1 - fv);
-    if (fv > 0.86) kk *= 0.78 + (1 - fv) * 1.5; // soft shadow line under the next course butt // soft shadow under the next course butt
-    if (dm < 0.004) { kk *= 0.94; ht = 0.2; } // faint keyway
+    if (fv > 0.84) kk *= 0.6 + (1 - fv) * 2.5; // shadow line under the next course butt // soft shadow under the next course butt
+    if (dm < 0.005) { kk *= 0.82; ht = 0.15; } // faint keyway
     return [base[0] * kk, base[1] * kk, base[2] * kk, ht, 0.93];
   }, { size: 512, span: 2, normal: 3, rough: 0.93 });
   // pale grey-green vertical board-and-batten (0.25 m)
@@ -64,7 +64,7 @@ export function faMats(M) {
   }, { size: 256, span: 2, normal: 3, rough: 0.88 });
   const o = {
     shingle, board, plinth, roof,
-    trim: new THREE.MeshStandardMaterial({ color: 0x263c30, roughness: 0.55, name: 'fa:trim' }),
+    trim: new THREE.MeshStandardMaterial({ color: 0x2f4c3b, roughness: 0.55, name: 'fa:trim' }),
     sash: new THREE.MeshStandardMaterial({ color: 0xddd5bf, roughness: 0.5, name: 'fa:sash' }),
     red: new THREE.MeshStandardMaterial({ color: 0x74302a, roughness: 0.75, name: 'fa:red' }),
     wood: new THREE.MeshStandardMaterial({ color: 0x9a5a36, roughness: 0.75, name: 'fa:wood' }),
@@ -193,7 +193,7 @@ export function faGableBay(K, F, R, s, w, g, eave, { d = 1.0, board = true } = {
   const M = K.M; const base = g + 1.05; const top = eave + 0.15;
   const Rf = K.run(R.at(s - w / 2, d), R.at(s + w / 2, d));
   const n = Math.max(1, Math.round((eave - 0.35 - base) / FA_FH)); const h = (eave - 0.35 - base) / n;
-  const k2 = w >= 2.8 ? 2 : 1; const gw = k2 * FA_UW + (k2 - 1) * 0.2; const ops = [];
+  const k2 = w >= 3.9 ? 3 : w >= 2.8 ? 2 : 1; const gw = k2 * FA_UW + (k2 - 1) * 0.16; const ops = [];
   for (let k = 0; k < n; k++) {
     const wh = Math.min(1.95, h - 0.7); const wy0 = base + k * h + Math.max(0.5, (h - wh) * 0.58);
     ops.push({ s0: w / 2 - gw / 2, s1: w / 2 + gw / 2, y0: wy0, y1: wy0 + wh, k: k2 });
