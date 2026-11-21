@@ -6,7 +6,7 @@
 // with a canted oriel on stepped corbels above it; a canted, pyramid-roofed bay tower closes the north end.
 // Massing follows the 2021 LiDAR (frame -4°): eaves ~16.5 m, ridges ~21.5–22 m, west annex ~15 m.
 import * as THREE from 'three';
-import { Kit, deg, openWall, hipRoof } from './lib/b05b-kit.js';
+import { Kit, deg, openWall, hipRoof, gableEnd } from './lib/b05b-kit.js';
 import { haasMats, archPart, archPortal, discLamp } from './lib/reastc-haas.js';
 
 export const info = {
@@ -40,7 +40,7 @@ export async function build(ctx) {
     let A = null; const clear = (o) => !A || o.s1 < A.s - A.w / 2 - 1.2 || o.s0 > A.s + A.w / 2 + 1.2;
     const holes = [];
     if (arch) {
-      A = { ...arch, yTop: arch.yTop ?? gs + 7.4, g: gs + 0.15 };
+      A = { ...arch, yTop: arch.yTop ?? gs + 7.9, g: gs + 0.15 };
       for (const [y0, y1] of [[gs - 1.2, y2], [y2, y3], [y3, eave - 1.0]]) holes.push(y1 > y0 ? archPart(A.s, A.w, A.yTop, y0, y1) : null);
     }
     // glazed double-door entries at plaza level (when the ground storey is tall enough)
@@ -48,11 +48,19 @@ export async function build(ctx) {
     openWall(K, R, CS, 0, L, gs - 1.2, y2, [...bOps.filter((o) => o.y1 < y2 - 0.3 && o.y1 > o.y0 + 0.8 && clear(o)), ...(holes[0] ? [holes[0]] : [])], { depth: 0.45, rev: 0.3, frame: TEAL, sillMat: CREAM });
     openWall(K, R, STU, 0, L, y2, y3, [...sOps.filter(clear), ...(holes[1] ? [holes[1]] : [])], { depth: 0.45, rev: 0.3, frame: TEAL, sillMat: CREAM });
     openWall(K, R, SID, 0, L, y3, eave - 0.3, [...tOps.filter(clear), ...(holes[2] ? [holes[2]] : [])], { depth: 0.45, rev: 0.3, frame: TEAL, sillMat: CREAM });
-    K.rbox(R, CREAM, -0.05, eave - 0.6, 0, L + 0.05, eave - 0.3, 0.14);                     // single plaster cornice band
+    for (const [a0, a1] of (A ? [[-0.05, A.s - 5.0], [A.s + 5.0, L + 0.05]] : [[-0.05, L + 0.05]])) K.rbox(R, CREAM, a0, eave - 0.6, 0, a1, eave - 0.3, 0.14); // single plaster cornice band
+    if (A) { // front-gabled arch pavilion rising through the eave
+      const Rp = K.run(R.at(A.s - 5.0, 0.0), R.at(A.s + 5.0, 0.0));
+      K.wall(Rp, STU, 0, 10.0, eave - 0.3, eave + 0.4, [], 0.45);
+      gableEnd(K, Rp, STU, eave + 0.4, 3.4, 0.45);
+      K.rbox(Rp, CREAM, -0.1, eave + 0.25, 0, 10.1, eave + 0.45, 0.16);
+      const pa = R.at(A.s - 5.0, 0.0), pb = R.at(A.s + 5.0, -6.0); const ua = [Math.min(pa[0], pb[0]), Math.max(pa[0], pb[0])], va = [Math.min(pa[1], pb[1]), Math.max(pa[1], pb[1])];
+      K.gable(ROOF, ua[0], va[0], ua[1], va[1], eave + 0.4, 3.4, Math.abs(R.n[0]) > 0.5 ? 'u' : 'v', { overhang: 0.6 });
+    }
     K.rbox(R, CREAM, -0.05, gs - 1.2, 0, L + 0.05, gs + 0.55, 0.06);                         // low cast plinth
     const segs = A ? [[-0.05, A.s - A.w / 2 - 0.95], [A.s + A.w / 2 + 0.95, L + 0.05]] : [[-0.05, L + 0.05]];
-    for (const [a0, a1] of segs) K.rbox(R, CREAM, a0, y2 - 0.12, 0, a1, y2 + 0.08, 0.1);    // belt course at the 2nd-floor sill
-    if (A) archPortal(K, R, A.s, A.g, A.w, A.yTop, { depth: A.depth ?? 5.0, X, wallD: 0.45, oriel: { w: 5.6, h: 3.4, proj: 1.4, gap: 0.15, maxTop: eave - 0.7 } });
+    for (const [a0, a1] of segs) { K.rbox(R, CREAM, a0, y2 - 0.2, 0, a1, y2 + 0.1, 0.1); K.rbox(R, CREAM, a0, y3 - 0.2, 0, a1, y3 + 0.1, 0.1); } // string courses
+    if (A) archPortal(K, R, A.s, A.g, A.w, A.yTop, { depth: A.depth ?? 5.0, X, wallD: 0.45, oriel: { w: 6.0, h: 3.6, proj: 1.3, gap: 0.15, maxTop: eave + 1.6 } });
     return gs;
   }
   function block(u0, u1, v0, v1, eave, slope, faces = { S: 1, E: 1, N: 1, W: 1 }, cupolas = [], opts = {}) {
@@ -71,10 +79,20 @@ export async function build(ctx) {
     colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], gm - 1.2, eave + 4));
   }
   // north range + courtyard front: the great arched porch sits in the 3 m notch of the footprint (u 6..9, v -3.2..7.8)
-  { const gE = K.g(9.6, 2.6); block(-8.5, 9.0, -16.7, 7.8, EAVE, 0.62, { S: 0, E: 1, N: 1, W: 1 }, [], { arch: { E: { s: 5.2, w: 6.4, depth: 5.0 } }, doors: { E: [19.5] }, porch: { vA: 2.6 - 3.6, vB: 2.6 + 3.6, uP: 9.0 - 0.45 - 5.0 - 0.4, yP: gE + 7.4 + 0.6 } }); }
-  block(-8.4, 12.0, 7.8, 21.9, EAVE, 0.7, { S: 1, E: 1, N: 1, W: 1 }, [], { doors: { E: [7.0] } });
+  { const gE = K.g(9.6, 2.6); block(-8.5, 9.0, -16.7, 7.8, EAVE, 0.54, { S: 0, E: 1, N: 1, W: 1 }, [], { arch: { E: { s: 5.2, w: 6.8, depth: 5.0 } }, doors: { E: [19.5] }, porch: { vA: 2.6 - 3.8, vB: 2.6 + 3.8, uP: 9.0 - 0.45 - 5.0 - 0.4, yP: gE + 7.9 + 0.6 } }); }
+  block(-8.4, 12.0, 7.8, 21.9, EAVE, 0.6, { S: 1, E: 1, N: 1, W: 1 }, [], { doors: { E: [7.0] } });
   block(-12.6, -8.5, -16.7, -3.2, 15.0, 0.62, { S: 1, E: 0, N: 1, W: 1 });
   block(-11.1, -8.4, 14.9, 21.6, 15.0, 0.62, { S: 1, E: 0, N: 1, W: 1 });
+  { const vC = -10.5, hw = 3.0, pr = 2.0, ch = 1.0, u1 = 9.0; const top = EAVE + 1.0;
+    const P = [[u1, vC + hw], [u1 + pr - ch, vC + hw], [u1 + pr, vC + hw - ch], [u1 + pr, vC - hw + ch], [u1 + pr - ch, vC - hw], [u1, vC - hw]];
+    for (let i = 0; i < P.length - 1; i++) { const R = K.run(P[i], P[i + 1]); const L = R.L; let gs = Infinity; for (let k = 0; k <= 2; k++) { const p = R.at(L * k / 2, 0.5); gs = Math.min(gs, K.g(p[0], p[1])); }
+      const ops = L > 2.5 ? [{ s0: L / 2 - 0.95, s1: L / 2 - 0.1, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }, { s0: L / 2 + 0.1, s1: L / 2 + 0.95, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }] : [{ s0: 0.2, s1: L - 0.2, y0: gs + 1.2, y1: top - 1.4, muntins: 8, frame: TEAL, sill: false }];
+      openWall(K, R, STU, 0, L, gs - 1.2, top, ops, { depth: 0.4, rev: 0.25, frame: TEAL });
+      K.rbox(R, CREAM, -0.05, gs - 1.2, 0, L + 0.05, gs + 0.55, 0.06); K.rbox(R, CREAM, -0.05, top - 0.5, 0, L + 0.05, top - 0.2, 0.14); }
+    K.prism(M.concreteDark, P.map(([u, v]) => [u - 0.35 + (u - u1) * -0.1, v]), -1, top);
+    const gm = Math.min(K.g(u1 + 1, vC - 2), K.g(u1 + 1, vC + 2)); void gm;
+    K.hip(ROOF, u1 - 1.0, vC - hw - 0.6, u1 + pr + 0.6, vC + hw + 0.6, top, 0.6);
+    colliders.push(K.colPoly(P.concat([[u1 - 0.5, vC - hw], [u1 - 0.5, vC + hw]]).slice(0, 6), -1, top)); }
   // canted three-sided bay tower at the north end
   {
     const P = [[8.0, -16.7], [8.0, -24.2], [5.2, -27.4], [0.9, -27.4], [-2.0, -24.2], [-2.1, -20.1], [0.6, -17.3]];

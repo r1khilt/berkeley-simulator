@@ -14,12 +14,12 @@ export function haasMats(M) {
   const b = boardTex();
   const siding = new THREE.MeshStandardMaterial({ color: 0xb4ada4, roughness: 0.9, map: b.map, normalMap: b.normalMap }); siding.normalScale = new THREE.Vector2(0.45, 0.45); siding.name = 'haas-siding';
   const X = {
-    stucco: clone('stucco', 0xebe0cc, 'stucco'),            // sand-beige render (~#D8C5A2 after the stucco texture)
-    cast: clone('stucco', 0xfbf3e4, 'cast'),                // lighter cast-stone trim, plinths, voussoirs (~#E3D5B8)
+    stucco: clone('stuccoWhite', 0xebdabd, 'stucco'),       // smooth sand-beige render (~#D8C9AE)
+    cast: clone('stuccoWhite', 0xf8eedb, 'cast'),          // lighter cast-stone trim, plinths, voussoirs (~#E3D5BC)
     siding,                                                  // grey-taupe horizontal siding (~#7B766E)
-    roof: clone('slate', 0xeeeeee, 'roof', { roughness: 0.78 }), // dark blue-grey slate (~#4A4E55)
-    fascia: new THREE.MeshStandardMaterial({ color: 0x9c5236, roughness: 0.55, metalness: 0.25, name: 'haas-fascia' }), // copper-brown eave band
-    teal: new THREE.MeshStandardMaterial({ color: 0x46645c, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
+    roof: clone('slate', 0xbdbab5, 'roof', { roughness: 0.8 }),  // dark charcoal slate/concrete tile (~#3A3C40)
+    fascia: new THREE.MeshStandardMaterial({ color: 0x8a4a32, roughness: 0.55, metalness: 0.25, name: 'haas-fascia' }), // copper-brown eave band
+    teal: new THREE.MeshStandardMaterial({ color: 0x4a6b5c, roughness: 0.5, metalness: 0.15, name: 'haas-teal' }),      // window frames
     steel: new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.45, metalness: 0.55, name: 'haas-steel' }),   // pergola / trellis
   };
   _cache.set(M, X); return X;
@@ -51,7 +51,7 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
   K.rbox(R, X.cast, s - 0.45, yTop + 0.55, 0, s + 0.45, yTop + 1.05, 0.4); // keystone
   for (const sg of [-1, 1]) {
     const e = s + sg * r;
-    K.rbox(R, X.cast, Math.min(e, e + sg * 0.95), g - 0.6, 0, Math.max(e, e + sg * 0.95), spring, 0.24);   // jamb pilasters
+    K.rbox(R, X.cast, Math.min(e, e + sg * 1.2), g - 0.6, 0, Math.max(e, e + sg * 1.2), spring, 0.3);   // arch-flanking piers
     K.rbox(R, X.cast, Math.min(e - sg * 0.05, e + sg * 1.1), spring - 0.35, 0, Math.max(e - sg * 0.05, e + sg * 1.1), spring, 0.4); // impost
   }
   // porch: side walls, barrel vault, paving, back wall of glazed doors
@@ -71,15 +71,15 @@ export function archPortal(K, R, s, g, w, yTop, { depth = 4.0, X, oriel = { w: 5
   // oriel bay over the crown on stepped corbels
   if (oriel) {
     const { w: ow, proj: op, gap } = oriel; const y0 = yTop + 1.05 + gap; const y1 = y0 + Math.min(oriel.h, (oriel.maxTop ?? Infinity) - y0);
-    for (const sg of [-1, 1]) { const c = s + sg * (ow / 2 - 0.45); for (let k = 0; k < 3; k++) K.rbox(R, X.cast, c - 0.32, y0 - 0.45 * (k + 1), 0, c + 0.32, y0 - 0.45 * k, op * (1 - k * 0.3)); }
+    for (const c of [s - ow / 2 + 0.45, s, s + ow / 2 - 0.45]) for (let k = 0; k < 3; k++) K.rbox(R, X.cast, c - 0.3, y0 - 0.4 * (k + 1), 0, c + 0.3, y0 - 0.4 * k, op * (1 - k * 0.3));
     K.rbox(R, X.cast, s - ow / 2 - 0.1, y0 - 0.25, 0, s + ow / 2 + 0.1, y0, op + 0.12); // sill slab
     const ch = 0.7; // canted corners
     const A = R.at(s - ow / 2, 0), B = R.at(s - ow / 2 + ch, op), C = R.at(s + ow / 2 - ch, op), D = R.at(s + ow / 2, 0);
     for (const [p, q] of [[A, B], [B, C], [C, D]]) {
-      const Rr = K.run(p, q); const L = Rr.L; const nm = Math.max(1, Math.round(L / 1.5));
-      const ops = []; for (let i = 0; i < nm; i++) ops.push({ s0: 0.2 + (L - 0.4) * i / nm + 0.08, s1: 0.2 + (L - 0.4) * (i + 1) / nm - 0.08, y0: y0 + 0.45, y1: y1 - 0.35, muntins: 3, sill: false });
-      K.wall(Rr, X.stucco, 0, L, y0, y1, ops, 0.25);
-      for (const o of ops) K.fill(Rr, o, { rev: 0.12, frame: X.teal, mull: 1 });
+      const Rr = K.run(p, q); const L = Rr.L; const nm = Math.max(1, Math.round(L / 0.55));
+      const o = { s0: 0.15, s1: L - 0.15, y0: y0 + 0.35, y1: y1 - 0.3, muntins: 4, sill: false };
+      K.wall(Rr, X.stucco, 0, L, y0, y1, [o], 0.25);
+      K.fill(Rr, o, { rev: 0.12, frame: X.teal, mull: nm - 1 });
     }
     // copper-brown capped roof slab
     K.rbox(R, X.fascia, s - ow / 2 - 0.15, y1, -0.05, s + ow / 2 + 0.15, y1 + 0.3, op + 0.2);
