@@ -10,7 +10,7 @@ export const info = {
   replaces: ['w/41746395'],
 };
 
-const P = { ...{"ang": -8.578, "u0": -18.9, "u1": 18.92, "v0": -5.78, "v1": 6.72, "roof": 31.5, "pent": {"u0": -14.9, "u1": -4.4, "v0": -0.28, "v1": 4.72, "top": 35.1}, "entrance": {"face": "N", "u": -11.24}, "style": "u3", "nb": 9, "floors": 9, "seed": "priestley-hall", "endWinEdge": false}, tint: { span: 0xdcc7b9, wall: 0xcfb9aa, base: 0xb9a99c } };
+const P = { ...{"ang": -8.578, "u0": -18.9, "u1": 18.92, "v0": -5.78, "v1": 6.72, "roof": 31.5, "pent": {"u0": -14.9, "u1": -4.4, "v0": -0.28, "v1": 4.72, "top": 35.1}, "entrance": {"face": "N", "u": -11.24}, "style": "u3", "nb": 9, "floors": 9, "seed": "priestley-hall", "endWinEdge": false}, tint: { span: 0xdcd6ca, wall: 0xcbc3b6, base: 0xb9b0a3 } };
 
 export async function build(ctx) {
   const r = tower(ctx, P);

@@ -14,7 +14,7 @@
 // tops and returns no holes, for engines without the terrainHoles hook.
 import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
-import { shrubMat, tintGeo, blobGeo } from './lib/rsw-site.js';
+import { tintGeo, blobGeo, addShrubGeo } from './lib/rsw-site.js';
 
 const UNDERGROUND_WALKABLE = true;
 
@@ -421,7 +421,7 @@ export async function build(ctx) {
     if (long) { K.box(parapet, x1 + 0.2, g - 0.4, z0 + 0.3, x1 + 0.55, g + 0.45, z1 - 0.3); } else { K.box(parapet, x0 + 0.3, g - 0.4, z0 - 0.55, x1 - 0.3, g + 0.45, z0 - 0.2); }
     { const n = Math.round(Math.max(x1 - x0, z1 - z0) * 1.3); const hx = [0x6f7d45, 0x55703c, 0x8a8a52, 0x4c6436];
       for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, r = (k * 0.618) % 1; const px = long ? x0 + 0.35 + r * (x1 - x0 - 0.7) : x0 + 0.3 + f * (x1 - x0 - 0.6), pz = long ? z0 + 0.3 + f * (z1 - z0 - 0.6) : z0 + 0.35 + r * (z1 - z0 - 0.7);
-        const rr = 0.32 + (k % 3) * 0.08; const gb = tintGeo(blobGeo(rr, k * 31 + 5), hx[k % hx.length]); gb.scale(1, k % 2 ? 1.25 : 0.85, 1); gb.translate(px, g + 0.36 + rr * 0.4, pz); K.add(shrubMat(M), gb, { uvMode: 'keep', detail: true }); } }
+        const rr = 0.32 + (k % 3) * 0.08; const gb = tintGeo(blobGeo(rr, k * 31 + 5), hx[k % hx.length]); gb.scale(1, k % 2 ? 1.25 : 0.85, 1); gb.translate(px, g + 0.36 + rr * 0.4, pz); addShrubGeo(K, gb); } }
     { const ex = long ? [x0 - 0.2, z0 - 0.2, x1 + 0.55, z1 + 0.2] : [x0 - 0.2, z0 - 0.55, x1 + 0.2, z1 + 0.2]; colliders.push({ type: 'poly', pts: [[ex[0], ex[1]], [ex[2], ex[1]], [ex[2], ex[3]], [ex[0], ex[3]]], y0: g - 1, y1: g + 0.5 }); }
   }
   for (const [x, z] of [[-2.0, 21.0], [0.4, 23.6], [-2.6, 26.2], [1.2, 28.4], [4.0, 21.8]]) { const g = groundAt(x, z);

@@ -11,6 +11,21 @@ export function siteMat(M, key, opts) { const c = mc(M); if (c.has(key)) return 
 // one vertex-coloured foliage material for every shrub / planter fill (keeps draw calls down)
 export const shrubMat = (M) => siteMat(M, 'shrub', { color: 0xffffff, vertexColors: true, roughness: 0.95, flatShading: true });
 export function tintGeo(g, hex) { const c = new THREE.Color(hex); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
+// Kit merging strips vertex colours, so vertex-coloured foliage is collected per kit and added as one extra detail mesh
+// when the kit finishes (the instance's finish() is wrapped on first use).
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+export function addShrubGeo(K, g) {
+  if (!K._rswShrubs) {
+    K._rswShrubs = []; const fin = K.finish.bind(K);
+    K.finish = function () {
+      if (K._rswShrubs.length) { const parts = K._rswShrubs.map((x) => { const y = x.index ? x.toNonIndexed() : x; for (const k of Object.keys(y.attributes)) if (!['position', 'normal', 'color'].includes(k)) y.deleteAttribute(k); if (!y.attributes.normal) y.computeVertexNormals(); return y; });
+        const mg = mergeGeometries(parts, false); if (mg) { const mesh = new THREE.Mesh(mg, shrubMat(K.M)); mesh.userData.detail = true; mesh.castShadow = false; mesh.receiveShadow = true; mesh.name = 'rsw-planting'; K.extra.push(mesh); } }
+      K._rswShrubs = []; return fin();
+    };
+  }
+  K._rswShrubs.push(g);
+}
+export function addShrubRun(K, R, g) { g.applyMatrix4(R.m); addShrubGeo(K, g); }
 // kits may set K.siteMats = {galv, dark} to reuse their own frame / fascia materials for furniture
 const GALV = (K) => (K.siteMats && K.siteMats.galv) || galvMat(K.M);
 const DARK = (K) => (K.siteMats && K.siteMats.dark) || charcoalMat(K.M);
@@ -19,15 +34,15 @@ export const charcoalMat = (M) => siteMat(M, 'charcoal', { color: 0x34373a, roug
 
 // canvas sign texture, cached by text+style
 const texCache = new Map();
-export function signTex(text, { w = 1024, h = 160, bg = '#2f3336', fg = '#f2efe6', font = 'bold', size = 0.56, track = 0.08, align = 'center', border = null } = {}) {
-  const key = [text, w, h, bg, fg, font, size, track, align, border].join('|'); if (texCache.has(key)) return texCache.get(key);
+export function signTex(text, { w = 1024, h = 160, bg = '#2f3336', fg = '#f2efe6', font = 'bold', size = 0.56, track = 0.08, align = 'center', border = null, family = 'Helvetica, Arial, sans-serif' } = {}) {
+  const key = [text, w, h, bg, fg, font, size, track, align, border, family].join('|'); if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); } else g.clearRect(0, 0, w, h);
   if (border) { g.strokeStyle = border; g.lineWidth = h * 0.05; g.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1); }
   let fs = Math.floor(h * size); g.fillStyle = fg; g.textBaseline = 'middle';
   const sp = (t) => t.split('').join(String.fromCharCode(8202).repeat(Math.round(track * 10)));
   const txt = track > 0 ? sp(text) : text;
-  g.font = `${font} ${fs}px Helvetica, Arial, sans-serif`; while (g.measureText(txt).width > w * 0.9 && fs > 10) { fs -= 2; g.font = `${font} ${fs}px Helvetica, Arial, sans-serif`; }
+  g.font = `${font} ${fs}px ${family}`; while (g.measureText(txt).width > w * 0.9 && fs > 10) { fs -= 2; g.font = `${font} ${fs}px ${family}`; }
   g.textAlign = align; g.fillText(txt, align === 'left' ? w * 0.05 : align === 'right' ? w * 0.95 : w / 2, h * 0.54);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t;
 }
@@ -48,8 +63,8 @@ export function shrubRow(K, R, s0, s1, d, groundFn, { r = 0.55, gap = 0.85, hex 
   const M = K.M; let k = 0;
   for (let s = s0 + r; s <= s1 - r * 0.6; s += gap, k++) {
     const rr = r * (0.8 + ((k * 37 + seed) % 10) / 22); const hx = hexes ? hexes[(k + seed) % hexes.length] : hex;
-    const g = tintGeo(blob(rr, 1 + k * 131 + seed * 17), hx); g.translate(s, groundFn(s, d) + rr * 0.55, d + (((k * 53) % 7) - 3) * 0.06);
-    K.addRun(R, shrubMat(M), g, { detail: true, uvMode: 'keep' });
+    const g = tintGeo(blob(rr, 1 + k * 131 + seed * 17), hx); g.translate(s, groundFn(s, d) + rr * 0.45, d + (((k * 53) % 7) - 3) * 0.06);
+    addShrubRun(K, R, g);
   }
 }
 // raised planter bed with concrete curb and shrubs (run frame): s0..s1, d0..d1 (outward), top y
@@ -57,7 +72,7 @@ export function planterBed(K, R, s0, s1, d0, d1, yGround, { curb = 0.45, mat = n
   const M = K.M; const m = mat || M.concrete; const y = yGround;
   K.rbox(R, m, s0, y - 0.6, d0, s1, y + curb, d0 + 0.18); K.rbox(R, m, s0, y - 0.6, d1 - 0.18, s1, y + curb, d1);
   K.rbox(R, m, s0, y - 0.6, d0, s0 + 0.18, y + curb, d1); K.rbox(R, m, s1 - 0.18, y - 0.6, d0, s1, y + curb, d1);
-  { const g = tintGeo(new THREE.BoxGeometry(s1 - s0 - 0.36, curb + 0.32, d1 - d0 - 0.36), 0x4a3a2c); g.translate((s0 + s1) / 2, y - 0.4 + (curb + 0.32) / 2, (d0 + d1) / 2); K.addRun(R, shrubMat(M), g, { uvMode: 'keep' }); }
+  { const g = tintGeo(new THREE.BoxGeometry(s1 - s0 - 0.36, curb + 0.32, d1 - d0 - 0.36), 0x4a3a2c); g.translate((s0 + s1) / 2, y - 0.4 + (curb + 0.32) / 2, (d0 + d1) / 2); addShrubRun(K, R, g); }
   shrubRow(K, R, s0 + 0.25, s1 - 0.25, (d0 + d1) / 2, () => y + curb - 0.15, { r: Math.min(0.6, (d1 - d0) / 2 - 0.1), gap: 0.9, hexes, seed });
 }
 
@@ -116,4 +131,49 @@ export function roofRail(K, rect, y, { h = 1.07, post = 2.0 } = {}) {
   for (const [a, b, c, d] of edges) { const L = Math.hypot(c - a, d - b); const n = Math.max(1, Math.round(L / post));
     for (const yy of [y + h, y + h * 0.5]) { const g = new THREE.BoxGeometry(L, 0.04, 0.04); g.rotateY(-Math.atan2(d - b, c - a)); g.translate((a + c) / 2, yy, (b + d) / 2); K.add(m, g, { detail: true }); }
     for (let i = 0; i <= n; i++) { const u = a + (c - a) * i / n, v = b + (d - b) * i / n; K.box(m, u - 0.025, y, v - 0.025, u + 0.025, y + h, v + 0.025, { detail: true }); } }
+}
+
+// ---------- weathered wood shingle siding (Bay Area brown-shingle) ----------
+// Canvas texture, one tile = 2 m (matches boxUV): 11 courses (~0.18 m exposure), random widths 0.08-0.30 m, staggered joints,
+// per-shingle tone and grain, a soft butt shadow, vertical weathering streaks; normal map from a height field.
+const shingleCache = new Map();
+export function shingleMat(M, hex = 0x6e5644, { rough = 0.93 } = {}) {
+  const key = hex + ':' + rough; if (shingleCache.has(key)) return shingleCache.get(key);
+  const S = 512, NR = 11, rh = S / NR; const base = new THREE.Color(hex); const br = base.r, bg = base.g, bb = base.b; // linear
+  const ca = document.createElement('canvas'), cn = document.createElement('canvas'); ca.width = ca.height = cn.width = cn.height = S;
+  const xa = ca.getContext('2d'), xn = cn.getContext('2d'); const ia = xa.createImageData(S, S), inn = xn.createImageData(S, S); const H = new Float32Array(S * S);
+  let sd = (hex * 9301 + 49297) % 233280 || 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  const streak = new Float32Array(S); for (let x = 0; x < S; x++) streak[x] = 0;
+  for (let k = 0; k < 18; k++) { const c = Math.floor(rnd() * S), w = 4 + rnd() * 18, a = 0.04 + rnd() * 0.1; for (let x = -40; x < 40; x++) { const xx = (c + x + S) % S; streak[xx] += a * Math.exp(-(x * x) / (w * w)); } }
+  const toS = (v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+  for (let r = 0; r < NR; r++) {
+    // shingle boundaries for this course (wrap-around)
+    const edges = []; let x = Math.floor(rnd() * 40); while (x < S + 200) { edges.push(x); x += Math.round((0.08 + rnd() * 0.22) / 2 * S); }
+    const y0 = Math.round(r * rh), y1 = Math.round((r + 1) * rh);
+    for (let e = 0; e < edges.length - 1; e++) {
+      const tone = 0.82 + rnd() * 0.32, warm = (rnd() - 0.5) * 0.08, sdx = rnd() * 100, len = 0.96 + rnd() * 0.04;
+      for (let px = edges[e]; px < edges[e + 1]; px++) {
+        const xx = ((px % S) + S) % S; const joint = px - edges[e] < 2;
+        for (let y = y0; y < y1; y++) {
+          const f = (y - y0) / (y1 - y0); // 0 top of course .. 1 butt
+          const grain = 0.94 + 0.05 * Math.sin(px * 1.7 + sdx) + 0.03 * Math.sin(px * 0.41 + sdx * 3) + (rnd() - 0.5) * 0.05;
+          let sh = f > len ? 0.55 : f > 0.9 ? 0.72 + (len - f) * 2.0 : 0.86 + f * 0.16; // soft butt shadow at the bottom, lighter toward the butt
+          if (f < 0.12) sh *= 0.82 + f * 1.5; // overlap shadow under the course above
+          const j = joint ? 0.62 : 1.0; const st = 1.0 - streak[xx] * (0.6 + f * 0.4);
+          const v = tone * grain * sh * j * st; const i = (y * S + xx);
+          ia.data[i * 4] = toS(Math.min(1, br * v * (1 + warm))); ia.data[i * 4 + 1] = toS(Math.min(1, bg * v)); ia.data[i * 4 + 2] = toS(Math.min(1, bb * v * (1 - warm))); ia.data[i * 4 + 3] = 255;
+          H[i] = f * 1.1 - (joint ? 0.35 : 0) + (grain - 0.94) * 0.6;
+        }
+      }
+    }
+  }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const hx = H[y * S + ((x + 1) % S)] - H[y * S + ((x - 1 + S) % S)], hy = H[((y + 1) % S) * S + x] - H[((y - 1 + S) % S) * S + x];
+    let nx = -hx * 2.2, ny = hy * 2.2, nz = 1; const l = Math.hypot(nx, ny, nz); const i = (y * S + x) * 4;
+    inn.data[i] = (nx / l * 0.5 + 0.5) * 255; inn.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; inn.data[i + 2] = (nz / l * 0.5 + 0.5) * 255; inn.data[i + 3] = 255;
+  }
+  xa.putImageData(ia, 0, 0); xn.putImageData(inn, 0, 0);
+  const tx = (c, srgb) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t; };
+  const m = new THREE.MeshStandardMaterial({ map: tx(ca, true), normalMap: tx(cn, false), roughness: rough, metalness: 0 }); m.name = 'rsw-shingle';
+  shingleCache.set(key, m); return m;
 }

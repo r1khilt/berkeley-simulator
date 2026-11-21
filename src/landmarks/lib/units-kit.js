@@ -66,7 +66,7 @@ export function tower(ctx, P) {
   const mBrace = T.brace != null ? paintTint(M, T.brace) : mWall; // seismic frame colour (Unit 2 braces are a contrasting terracotta)
   const mGround = concreteTint(M, T.ground ?? 0xa9a59b); // recessed ground storey: plain board-formed concrete
   const mBase = mGround;
-  const mFas = charcoalMat(M); const mPave = M.concrete;
+  const mFas = charcoalMat(M); const mPave = concreteTint(M, 0x9f998e); // warmer, darker apron paving (light concrete in tower shadow read as sky-blue in-game)
   K.siteMats = { galv: mFrame, dark: mFas };
   const NAME = (P.name || String(P.seed || '').replace(/-/g, ' ')).toUpperCase();
   const mRoof = M.concreteDark, mRing = paintTint(M, T.ring ?? T.wall ?? 0xe4dcc4);
@@ -180,12 +180,12 @@ export function tower(ctx, P) {
           : [{ s0: c1 - ww / 2, s1: c1 + ww / 2, y0: y + 0.95, y1: y + 2.45, sill: false }, { s0: c2 - ww / 2, s1: c2 + ww / 2, y0: y + 0.95, y1: y + 2.45, sill: false }];
         K.wall(R, mSpan, sA, sB, y, y2, ops, 0.3);
         for (const o of ops) {
-          K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false });
+          K.fill(R, o, { rev: 0.24, glass: mGlass, frame: mFrame, mull: balcF || u3 ? 1 : 0, tran: balcF ? [] : [o.y0 + 0.45], sill: false }); // Unit 3: paired sashes
           const r = rnd();
-          if (r < 0.34) { // roller / venetian blind lowered from the head to a random height
-            const bh = (o.y1 - o.y0) * (0.15 + 0.8 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
-          } else if (r < 0.56) { // curtain drawn to one side
-            const cw = (o.s1 - o.s0) * (0.25 + 0.5 * rnd()); const left = rnd() < 0.5;
+          if (r < 0.26) { // roller / venetian blind lowered from the head to a random height
+            const bh = (o.y1 - o.y0) * (0.12 + 0.48 * rnd()); K.rbox(R, mCurt, o.s0 + 0.05, o.y1 - 0.06 - bh, -0.235, o.s1 - 0.05, o.y1 - 0.06, -0.229);
+          } else if (r < 0.42) { // curtain drawn to one side
+            const cw = (o.s1 - o.s0) * (0.2 + 0.3 * rnd()); const left = rnd() < 0.5;
             K.rbox(R, mCurt, left ? o.s0 + 0.04 : o.s1 - 0.04 - cw, o.y0 + 0.05, -0.235, left ? o.s0 + 0.04 + cw : o.s1 - 0.04, o.y1 - 0.06, -0.228);
           }
           if (!balcF) K.rbox(R, mFrame, o.s0 - 0.03, o.y0 - 0.05, -0.25, o.s1 + 0.03, o.y0 + 0.01, 0.05, { detail: true }); // aluminium sill flashing

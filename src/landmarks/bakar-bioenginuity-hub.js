@@ -42,7 +42,7 @@ function clip(P, C) {
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
   const fp = ctx.footprints[0].outer.map(([x, z]) => [x, z]);
-  const conc = new THREE.MeshStandardMaterial({ map: boardTex(), color: 0xffffff, roughness: 0.88 }); conc.name = 'bakarConcrete';
+  const conc = new THREE.MeshStandardMaterial({ map: boardTex(), color: 0xcfc6b8, roughness: 0.9 }); // refine-south-west: weathered board-formed concrete, not near-white conc.name = 'bakarConcrete';
   const dark = std(0x1e1f22, 'bakarFrame', { rough: 0.45, metal: 0.4 });
   const pglass = new THREE.MeshStandardMaterial({ color: 0x9fb3b8, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }); pglass.name = 'bakarPavilionGlass';
   const warm = nightGlow(std(0xe8b878, 'bakarInterior', { rough: 0.9, emissive: 0xe8b878, emissiveIntensity: 0.8 }), 1.0);
