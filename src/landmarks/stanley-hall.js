@@ -18,7 +18,7 @@ export const info = {
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16.2)); const M = ctx.M;
   const Wp = panelMat('stanleyPanel', { pw: 1.5, ph: 3.0, span: 6.0, base: 0xe6e6e1, joint: 0xc3c4c0, vary: 0.012, grain: 0.01, stagger: false }), Tl = plain(M, 0x6f9496, { rough: 0.2, metal: 0.5 });
-  const GL = glassTint(M, 0x56656c, { metal: 0.4 }), GR = glassTint(M, 0x667a84, { rough: 0.06, metal: 0.45 }), FR = plain(M, 0x4a5a5c, { rough: 0.5, metal: 0.6 });
+  const GL = M.windowNight, GR = M.windowNight, FR = plain(M, 0x4a5a5c, { rough: 0.5, metal: 0.6 });
   const PJ = tint(M, 'stuccoWhite', 0xcfcbc1);
   const colliders = [], walkables = [];
   const levels = (top, g = 0) => { const out = [g]; let y = g + 5.0; while (y < top - 2.5) { out.push(y); y += 4.2; } out.push(top); return out; };

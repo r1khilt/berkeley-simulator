@@ -18,7 +18,7 @@ export const info = {
 export async function build(ctx) {
   const M = ctx.M; const K = new Kit(ctx, Math.atan2(-1.9, 12.1));
   const W = ashlarMat('uhStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xdcd6c9, joint: 0xc9c2b4, jw: 0.006, vary: 0.012, grain: 0.01 }), Q = tint(K, M.ashlar, 0xd2cab9, 'uhQuoin'), T = tint(K, M.granite, 0xebe6db, 'uhTrim'); // smooth pale grey-cream stone (refine-north)
-  const FR = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.5 }), GL = paleGlass(); // white six-over-six sash frames
+  const FR = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.5 }), GL = M.windowNight; // white six-over-six sash frames; shared window glass
   const colliders = [], walkables = [];
   const BASE = 0.9, F2 = 5.1, TOP = 9.6, EAVE = 11.5;
   const blocks = [

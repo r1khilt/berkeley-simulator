@@ -33,7 +33,7 @@ export async function build(ctx) {
   const wing = [[-6.8, -5.9], [-18.8, -28.0], [-2.6, -36.8], [9.5, -13.1], [11.8, -9.1], [4.4, -4.8], [2.9, -3.9], [2.9, 6.7], [-17.4, 6.7], [-17.4, 1.9], [-7.2, -3.6]];
   for (const { R } of runsOf(K, wing)) {
     if (R.L < 2.5) continue;
-    const g = grid(K, R, 0, R.L, [-2.0, 3.8, 7.6, 11.4, 15.2, 18.4], { mat: Cf, bay: 3.4, pier: 0.4, pierOut: 0.75, bandOut: 0.75, sill: 0.9, head: 0.3, rec: 0.3, mull: 1, glass: glassTint(M, 0x2c3236), frame: M.darkBronze, endPier: 0.5, topBand: 0.5 });
+    const g = grid(K, R, 0, R.L, [-2.0, 3.8, 7.6, 11.4, 15.2, 18.4], { mat: Cf, bay: 3.4, pier: 0.4, pierOut: 0.75, bandOut: 0.75, sill: 0.9, head: 0.3, rec: 0.3, mull: 1, glass: M.windowNight, frame: M.darkBronze, endPier: 0.5, topBand: 0.5 });
     for (const y of [3.0, 6.8, 10.6, 14.4]) K.rbox(R, Lv, 0.3, y, 0.15, R.L - 0.3, y + 0.08, 0.7, { detail: true });
   }
   K.prism(M.concreteDark, wing.slice().reverse().map(([u, v]) => [u, v]), -2.0, 18.3);
