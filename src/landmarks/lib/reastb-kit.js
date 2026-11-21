@@ -101,6 +101,7 @@ export function rmats(M) {
     sash: std({ color: 0xe8e6df, roughness: 0.5 }),
     sashDark: std({ color: 0x2f2c29, roughness: 0.55 }),
     loggia: std({ color: 0x2a2724, roughness: 0.95 }),
+    bowLoggia: std({ color: 0x5a5650, roughness: 0.95 }),
     // I-House: bright smooth off-white stucco
     ihStucco: std({ color: 0xe9ddc2, roughness: 0.9 }), // smooth warm-cream stucco
     ihTrim: tinted(M.stuccoWhite, 0xe9e2d2, 0.9),
@@ -189,7 +190,7 @@ export function gothRange(K, sp) {
       }
     }
     K.wall(R, W, 0, R.L, y0, eave, ops.filter((o) => !o.noWallCut), depth);
-    for (const { o, n, tran } of groups) mullGroup(K, R, o, { n, stone: T, sash: sp.sash, tranAt: sp.noTransom ? null : tran, panes: sp.panes ?? 1, depth, hood: sp.hood ?? true, mw: sp.mullW ?? 0.14 });
+    for (const { o, n, tran } of groups) mullGroup(K, R, o, { n, stone: T, sash: sp.sash, tranAt: sp.noTransom ? null : tran, panes: sp.panes ?? 1, depth, hood: sp.hood ?? true, mw: sp.mullW ?? 0.14, rev: sp.rev ?? 0.3 });
     if (sp.after) sp.after(f, R, ops, levels);
     // plinth (where exposed) + string course over the ground floor
     K.rbox(R, sp.plinth || T, -0.08, y0, 0, R.L + 0.08, base + 0.15, 0.1);

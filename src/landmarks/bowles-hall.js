@@ -24,7 +24,7 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const W = B.bowWall, T = B.bowTrim, RT = B.clayTile, SA = B.bowSash; // stone-coloured sash: reads as stone-mullioned lights
   const col = (u0, v0, u1, v1, y1) => colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], -2, y1));
-  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.03, lightW: 0.58, winH: 1.8, topH: 1.5,
+  const common = { mat: W, trim: T, roofMat: RT, sash: SA, fh: 3.05, bay: 3.4, overhang: 0.03, lightW: 0.58, winH: 1.8, topH: 1.5, depth: 0.52, rev: 0.4, // deep reveals
     lights: (i, k, f) => (k === 0 ? 3 : (i % 2 === 0 ? 3 : 2)) };
 
   // ---------- ranges ----------
@@ -57,7 +57,7 @@ export async function build(ctx) {
     // loggia: dark back wall with three entrance doors, paved floor, ceiling
     const RB = K.run([lu0, A.v1 - LD], [lu1, A.v1 - LD]);
     const doors = [-1, 0, 1].map((j) => ({ s0: RB.L / 2 + j * AP - 0.8, s1: RB.L / 2 + j * AP + 0.8, y0: base, y1: base + 2.9, doorTop: base + 2.25, sill: false }));
-    K.wall(RB, B.bowShade, 0, RB.L, base - 0.2, ct, doors, 0.3);
+    K.wall(RB, B.bowLoggia, 0, RB.L, base - 0.2, ct, doors, 0.3);
     for (const o of doors) K.fill(RB, o, { kind: 'door', rev: 0.2, door: M.woodDark, frame: T });
     K.box(M.paving, lu0, base - 0.6, A.v1 - LD, lu1, base - 0.02, A.v1 - 0.3);
     K.box(B.loggia, lu0, ct - 0.45, A.v1 - LD, lu1, ct, A.v1 - 0.4);
