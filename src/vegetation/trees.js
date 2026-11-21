@@ -668,7 +668,7 @@ const SPECIES_DEF = {
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.7, 0.7] },
     cards: { n: 1500, size: 1.35, vbias: 0.35, out: 0.9, face: 0.6, jit: 0.5 },
     normal: 'ellipsoid', lod1Core: true,
-    look: { cols: ['#34492a', '#405632', '#5c5834'], ramp: [0.4, 0.9, 0.1, 0.2], twig: '#4f4538', rough: 0.38, leafSpec: 0.65, // glossy leathery leaves transBack: 0.2, transWrap: 0.2, blobK: 1.6, sway: 0.006, flutter: 0.0008, tintK: 1.0 },
+    look: { cols: ['#34492a', '#405632', '#5c5834'], ramp: [0.4, 0.9, 0.1, 0.2], twig: '#4f4538', rough: 0.38, leafSpec: 0.65, transBack: 0.2, transWrap: 0.2, blobK: 1.6, sway: 0.006, flutter: 0.0008, tintK: 1.0 },
   },
   bay: {
     lod2K: 0.7, cardK: 1.2, name: 'California bay laurel', arche: 'decurrent', leaf: 'bay', bark: 'smooth', seed: 1212, typical: { height: 11, crownR: 5.5 },
