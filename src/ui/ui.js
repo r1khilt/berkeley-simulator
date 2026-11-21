@@ -78,7 +78,7 @@ export class UI {
   note(t) { this.titleNote.textContent = t; if (/^Could not/.test(t)) this.title.classList.add('failed'); }
   ready() {
     this.title.querySelector('.loading').classList.add('hidden'); this.menu.classList.remove('hidden');
-    if (this.titleTimeEl.innerHTML) { this.titleTimeEl.classList.remove('hidden'); this.titleTimeSeen = true; }
+    if (this.titleTimeEl.innerHTML) { this.titleTimeEl.classList.remove('hidden'); this.titleTimeSeen = true; } this._readyAt = performance.now();
     this.boot.classList.add('done'); setTimeout(() => this.boot.remove(), 1500);
     this.title.classList.add('ready');
   }
@@ -91,6 +91,8 @@ export class UI {
     }
     this.titleTimeEl.innerHTML = html; this.titleTimeEl.classList.toggle('hidden', !html || !this.title.classList.contains('ready'));
   }
+  // true once the landing has shown the time note for a moment (so the HUD needn't repeat it)
+  noteSeen() { return !!this.titleTimeSeen && performance.now() - (this._readyAt || 0) > 1500; }
   titlePlace(t) { const e = this.title.querySelector('.tf-place span'); if (e && e.textContent !== t) e.textContent = t; }
   showTitle(on) {
     this.title.classList.toggle('off', !on); this.hud.classList.toggle('off', on); this.state = on ? 'title' : 'play';
@@ -162,7 +164,7 @@ export class UI {
   }
   toast({ kind = 'Discovered', name, sub, blurb, icon: ic } = {}, ms = 6500) {
     const t = this.toastEl, disc = kind === 'Discovered';
-    t.querySelector('.k').textContent = disc ? 'New place' : (kind || ''); t.querySelector('.n').textContent = name || ''; t.querySelector('.s').textContent = sub || ''; t.querySelector('.b').textContent = blurb || '';
+    t.querySelector('.k').textContent = disc ? '' : (kind || ''); t.querySelector('.k').classList.toggle('hidden', disc || !kind); t.querySelector('.n').textContent = name || ''; t.querySelector('.s').textContent = sub || ''; t.querySelector('.b').textContent = blurb || '';
     t.querySelector('.s').classList.toggle('hidden', !sub); t.querySelector('.b').classList.toggle('hidden', !blurb);
     t.querySelector('.t-ic').innerHTML = icon(ic || (disc ? 'landmark' : 'info'));
     t.classList.remove('off'); clearTimeout(this._tt); this._tt = setTimeout(() => t.classList.add('off'), ms);

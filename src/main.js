@@ -216,7 +216,7 @@ async function boot() {
   // ---- UI wiring
   const lockPointer = () => { try { const r = canvas.requestPointerLock?.(); r && r.catch && r.catch(() => {}); } catch (e) {} }; // ui-pro: no unhandled rejections
   const startPlay = () => { ui.showTitle(false); state = 'play'; player.enabled = true; audio.start(); if (!isTouch) lockPointer(); if (!store.get('helped', false)) { store.set('helped', true); } BS.flyover = false;
-    if (timeSt.autoDay && !ui.titleTimeSeen) ui.notify(`Daylight view · Berkeley time is ${fmtHour(pacificHour(new Date()))}`, { icon: 'sun', ms: 6000 }); }; // ui-pro: only if the landing didn't already say so
+    if (timeSt.autoDay && !ui.noteSeen()) ui.notify(`Daylight view · Berkeley time is ${fmtHour(pacificHour(new Date()))}`, { icon: 'sun', ms: 6000 }); }; // ui-pro: only if the landing didn't already say so
   let state = 'title';
   ui.on('play', startPlay);
   ui.on('look', () => {
@@ -262,7 +262,7 @@ async function boot() {
   });
   if (isTouch) ui.touchControls(player, { jump: () => { player.jumpReq = true; }, run: (b) => { player.touch.run = !player.touch.run; b.classList.toggle('on', player.touch.run); }, bike: () => player.setMode(player.mode === 'bike' ? 'walk' : 'bike'), use: () => { if (player.activeInteraction) player.onInteract(player.activeInteraction); }, map: () => openMap() });
   player.onInteract = (it) => { if (it.teleport) ui.fade(() => { player.teleport(it.teleport[0], it.teleport[1] + 0.02, it.teleport[2]); player.setMode('walk'); }); };
-  player.onModeChange = (m) => { ui.reticleOn(false); setupMaterials(player.bike.root); };
+  player.onModeChange = (m) => { ui.reticleOn(false); setupMaterials(player.bike.root); ui.modes(); }; // ui-pro: mode bar updates immediately
   installModes(player, { scene, physics, audio, ui, THREE, camera, setupMaterials });
   ui.bindPlayer(player); // ui-pro: HUD mode bar + controls list are driven by player.mode / player.plugins
   // ---- title flyover shots
@@ -307,7 +307,7 @@ async function boot() {
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     // HUD (throttled)
     if (state === 'play' && frameN % 3 === 0) hud(date);
-    if (frameN % 20 === 0) ui.setNight(U.uNight.value); // ui-pro: light/dark UI follows the scene (landing too)
+    if (frameN % 20 === 1) ui.setNight(U.uNight.value); // ui-pro: light/dark UI follows the scene (landing too; first frame included)
     if (state === 'play') { ui.compass(((-player.camYaw * 180 / Math.PI) % 360 + 360) % 360); ui.minimap(player.pos.x, player.pos.z, player.camYaw, settings.north); ui.prompt(player.activeInteraction ? player.activeInteraction.label : null); }
     audio.update(dt, { night: U.uNight.value, wind: U.uWind.value, bikeSpeed: player.mode === 'bike' ? player.speed : 0 });
     // bells
