@@ -82,6 +82,9 @@ export async function build(ctx) {
       if (R.y - g0 > 0.1) { if (a === R.lo) gE.quad([p0[0], g0, p0[1]], [p1[0], g0, p1[1]], [p1[0], R.y, p1[1]], [p0[0], R.y, p0[1]]); else gE.quad([p1[0], g0, p1[1]], [p0[0], g0, p0[1]], [p0[0], R.y, p0[1]], [p1[0], R.y, p1[1]]); }
     }
   }
+  // r4-sweep-outer2: the tread, riser and tier-end quads were wound inside out (treads faced down, risers into the hill), so
+  // from the bowl they were back-face culled and the dirt behind showed through as dark stripes. Flip them to face out.
+  for (const G of [gT, gR, gE]) { const p = G.p; for (let i = 0; i < p.length; i += 9) for (let k = 0; k < 3; k++) { const t = p[i + 3 + k]; p[i + 3 + k] = p[i + 6 + k]; p[i + 6 + k] = t; } }
   // orchestra disc (cut by the stage front)
   const gO = new Geo();
   { const n = 72; for (let q = 0; q < n; q++) { const a0 = q / n * Math.PI * 2, a1 = (q + 1) / n * Math.PI * 2; const p0 = polar(rOrch + 0.02, a0), p1 = polar(rOrch + 0.02, a1); gO.tri([C[0], yOrch, C[1]], [p1[0], yOrch, p1[1]], [p0[0], yOrch, p0[1]]); } }
@@ -303,6 +306,28 @@ export async function build(ctx) {
       const shape = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
       const eg = new THREE.ExtrudeGeometry(shape, { depth: yr + 1.5, bevelEnabled: false }); eg.rotateX(-Math.PI / 2); eg.translate(0, -1.5, 0);
       parts.push(eg);
+      // r4-sweep-outer2: was a bare extrusion. Coping cap and a darker base course (the outline grown ~0.15 m), steel doors and
+      // high louvred service windows along the longer walls, in the skene's buff with darker trim.
+      { let cx = 0, cz = 0; for (const [x, z] of pts) { cx += x; cz += z; } cx /= pts.length; cz /= pts.length;
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+        const grow = (d) => pts.map(([x, z]) => new THREE.Vector2(cx + (x - cx) * (1 + 2 * d / Math.max(1, x1 - x0)), -(cz + (z - cz) * (1 + 2 * d / Math.max(1, z1 - z0)))));
+        const band = (d, y0, y1) => { const g = new THREE.ExtrudeGeometry(new THREE.Shape(grow(d)), { depth: y1 - y0, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, y0, 0); return g; };
+        const trim = M.concrete.clone(); trim.color = new THREE.Color(0xd2c6ae); trim.name = 'gtBackTrim';
+        const base = M.concrete.clone(); base.color = new THREE.Color(0x9a9284); base.name = 'gtBackBase';
+        root.add(new THREE.Mesh(mergeUV([band(0.16, yr - 0.32, yr + 0.06)], boxUV), trim));
+        root.add(new THREE.Mesh(mergeUV([band(0.08, -1.5, 0.45)], boxUV), base));
+        let A = 0; for (let i = 0; i < pts.length; i++) { const [xa, za] = pts[i], [xb, zb] = pts[(i + 1) % pts.length]; A += xa * zb - xb * za; }
+        const dk = []; const lv = []; let longest = -1, li = 0;
+        for (let i = 0; i < pts.length; i++) { const [xa, za] = pts[i], [xb, zb] = pts[(i + 1) % pts.length]; const L = Math.hypot(xb - xa, zb - za); if (L > longest) { longest = L; li = i; } }
+        for (let i = 0; i < pts.length; i++) {
+          const [xa, za] = pts[i], [xb, zb] = pts[(i + 1) % pts.length]; const L = Math.hypot(xb - xa, zb - za); if (L < 4) continue;
+          const tx = (xb - xa) / L, tz = (zb - za) / L; const nx = A > 0 ? tz : -tz, nz = A > 0 ? -tx : tx; const rot = Math.atan2(-tz, tx);
+          const n = Math.floor((L - 1.5) / 3.2); for (let k = 0; k < n; k++) { const s = (L - (n - 1) * 3.2) / 2 + k * 3.2; const px = xa + tx * s + nx * 0.03, pz = za + tz * s + nz * 0.03;
+            if (i === li && k === Math.floor(n / 2)) { dk.push(boxGeo(1.8, 2.3, 0.1, px, 0.0 + 1.15, pz, rot)); continue; } // pair of steel doors
+            if (yr >= 3.4) { dk.push(boxGeo(1.6, 0.9, 0.08, px, yr - 1.6, pz, rot)); for (let q = 0; q < 4; q++) lv.push(boxGeo(1.5, 0.05, 0.1, px + nx * 0.04, yr - 1.95 + q * 0.22, pz + nz * 0.04, rot)); } }
+        }
+        if (dk.length) { const dm = M.concrete.clone(); dm.color = new THREE.Color(0x4a4d4c); dm.name = 'gtBackDoor'; root.add(new THREE.Mesh(mergeUV(dk, boxUV), dm)); }
+        if (lv.length) root.add(new THREE.Mesh(mergeUV(lv, boxUV), trim)); }
       colliders.push({ type: 'poly', pts, y0: -2, y1: yr });
     }
     if (parts.length) root.add(new THREE.Mesh(mergeUV(parts, boxUV), M.stucco));
