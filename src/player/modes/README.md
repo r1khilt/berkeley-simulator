@@ -25,3 +25,12 @@ Grappling hook (grapple.js, mode 'grapple'): hold Q or right mouse in walk, bike
 - `ride-models.js`: procedural models (one shared vertex-colour + decal-atlas material; parked fleets are one InstancedMesh per type per cluster). `ride-common.js`: limb IK, WebAudio ride sounds, road/sidewalk sampler.
 - Extra plugin fields read by the HUD: `label` (a getter on `scooter`: it names the brand you are riding), `key`, `icon` (emoji), `iconSvg` (inline SVG), `hint` (one-line controls).
 - Minimal touch hook: `ui.addTouchButton(label, fn)` (src/ui/ui.js). Debug: `?noride` skips these plugins; `BSIM.scooters` / `BSIM.hoverboard` expose state for scripted sims.
+
+## Controller notes (r5-controls)
+- Built-in modes (walk, bike, fly) integrate in fixed substeps of at most 1/120 s, so jumps, stops and collisions match at any frame rate. Plugin `update()` still gets one call per frame (dt capped at 0.05 s).
+- `player._groundMove(dt, inp, bike)` keeps working for plugins: it substeps, slides along walls (removing the into-wall part of `vel`) and eases step-ups and step-downs visually.
+- Fields a plugin, the avatar or the HUD can read: `player.visDy` (vertical smoothing offset; `avatar.root.position.y = pos.y + visDy` in walk and bike), `player.sprinting`, `player.moveSpeed` (target ground speed, m/s), `player.groundSlope` (rise/run along travel), `player.speedScale` (walk/run multiplier, Settings > Walk speed), `player.flySpeed` (m/s), `player.walkSpeed` and `player.runSpeed` (getters).
+- Speed API: `player.stepSpeed(+1|-1)` and `player.setSpeed('walk'|'fly', v)`. main.js persists through `player.onSpeedChange`. Keys: + and - in any mode, and the wheel in fly mode. The HUD stepper calls stepSpeed.
+- Number keys 1-9 pick the n-th mode in the HUD mode bar (`player.modeOrder()`, set by ui.bindPlayer). Mark always-on abilities `tool: true` so they don't take a number.
+- `avatar.finalize(dt, player)`, if present, runs after `plugin.pose()` every frame (r5-avatar: retargets the proxy rig onto the skinned body).
+- Scooter: when no parked scooter is in reach, `canEnter` summons the nearest parked one (preferring a Lime that is out of view) and you ride it at once. From the air you are first faded down to the ground. E or U parks it where you are.

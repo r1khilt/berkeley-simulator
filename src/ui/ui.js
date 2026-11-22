@@ -240,7 +240,7 @@ export class UI {
   // r5-controls: once per session, point out notable interactions (e.g. the Campanile elevator) when you get close
   _nearby(p) {
     let best = null, bd = 26;
-    for (const it of p.interactions || []) { if (!it.action || !it.label || !(it.radius > 0)) continue; const d = Math.hypot(it.pos[0] - p.pos.x, it.pos[2] - p.pos.z); if (d < bd && Math.abs(it.pos[1] - p.pos.y) < 6) { bd = d; best = it; } }
+    for (const it of p.interactions || []) { if (!it.action || !it.label || !(it.radius > 0) || /-down$/.test(it.action)) continue; // (the way back down is found from the deck itself) const d = Math.hypot(it.pos[0] - p.pos.x, it.pos[2] - p.pos.z); if (d < bd && Math.abs(it.pos[1] - p.pos.y) < 6) { bd = d; best = it; } }
     if (!best || p.activeInteraction || p.mode !== 'walk') return;
     const id = best.id || best.action; this._nearSeen = this._nearSeen || new Set(); if (this._nearSeen.has(id)) return; this._nearSeen.add(id);
     const what = /elevator/i.test(best.label) ? 'Campanile elevator: walk in through the door, then press' : `${best.label}: walk up and press`;
