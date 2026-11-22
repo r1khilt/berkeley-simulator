@@ -7,6 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { loadJSON, loadBin, loadImage, decodePlanar, onProgress } from './data.js';
 import { Grid, HeightField } from './world/heightfield.js';
 import { CoreTerrain, ringMesh, makeWater } from './world/terrain.js';
+import { gradeTerrain, buildGroundworks, reseatTrees } from './world/groundworks.js'; // [r4-ground] kerbs, stairs, walls, grading
 import { SkySystem, fetchWeather } from './world/sky.js';
 import { buildBuildings, initSkeleton } from './world/buildings.js';
 import { decodeTrees, TreeSystem } from './world/vegetation.js';
@@ -84,6 +85,8 @@ async function boot() {
   const mm = metaFar.mid, ff = metaFar.far;
   const midH = decodePlanar(new Int16Array(midRes.buffer, midRes.byteOffset, mm.nx * mm.nz), mm.nx, mm.nz, new Float32Array(mm.nx * mm.nz), 0.1);
   const farH = decodePlanar(new Int16Array(farRes.buffer, farRes.byteOffset, ff.nx * ff.nz), ff.nx, ff.nz, new Float32Array(ff.nx * ff.nz), 0.1);
+  // [r4-ground] grade the core heightfield (road kerbs, stair beds, retaining-wall terraces) before anything samples it
+  let gwPlan = null; if (!qs.get('nogw')) try { gwPlan = gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }); } catch (e) { console.warn('groundworks grade failed', e); }
   const core = new Grid(heights, c.x0 + 0.5, c.z0 + 0.5, c.step, c.nx, c.nz), mid = new Grid(midH, mm.x0, mm.z0, mm.step, mm.nx, mm.nz), far = new Grid(farH, ff.x0, ff.z0, ff.step, ff.nx, ff.nz);
   const hf = new HeightField(core, mid, far); BS.hf = hf;
   const heightAt = (x, z) => hf.heightAt(x, z);
@@ -117,6 +120,7 @@ async function boot() {
   await tick(); ui.progress(0.9);
   // ---- trees
   const trees = decodeTrees(treeBin);
+  if (gwPlan) reseatTrees(gwPlan, trees); // [r4-ground] trees follow the graded terrain
   let treeSys = null;
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
@@ -138,8 +142,9 @@ async function boot() {
       const g = cx2.createRadialGradient(x, z, 0, x, z, r); g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},0.55)`); g.addColorStop(0.7, `rgba(${col[0]},${col[1]},${col[2]},0.25)`); g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`); cx2.fillStyle = g; cx2.beginPath(); cx2.arc(x, z, r, 0, 7); cx2.fill(); }
     const lt = new THREE.CanvasTexture(cv); lt.flipY = false; lt.minFilter = THREE.LinearFilter; lt.generateMipmaps = false; lt.colorSpace = THREE.NoColorSpace; lt.needsUpdate = true; terrain.uniforms.uLeaf.value = lt; }
   let streets = null;
-  try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step } }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
+  try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, skipWalls: !!gwPlan /* [r4-ground] */, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step } }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
   BS.streets = streets; phase('streetscape');
+  let ground = null; if (gwPlan) try { ground = buildGroundworks(gwPlan, { scene, heightAt, trees, treeSys, physics, pois }); BS.ground = ground; } catch (e) { console.warn('groundworks failed', e); } phase('groundworks'); // [r4-ground]
   // a few real point lights follow the player through the nearest lamps at night
   const lampLights = []; for (let i = 0; i < (qs.get('nolamps') ? 0 : 6); i++) { const L = new THREE.PointLight(0xffd6a0, 0, 26, 2); L.castShadow = false; scene.add(L); lampLights.push(L); }
   const lampPts = streets ? streets.lampPts : [];
@@ -318,6 +323,7 @@ async function boot() {
     terrain.update(camera);
     if (treeSys) { treeSys.update(camera); BS.treeLib?.update?.(dt); }
     if (streets) streets.update(camera.position);
+    if (ground) ground.update(camera.position); // [r4-ground]
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
     bridges.update(U.uNight.value);

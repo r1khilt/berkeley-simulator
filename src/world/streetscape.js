@@ -65,7 +65,7 @@ function mergeRibbons(list) {
   const n = g.attributes.normal; for (let i = 0; i < n.count; i++) { if (n.getY(i) < 0) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i)); }
   g.computeBoundingSphere(); return g;
 }
-export async function buildStreetscape({ scene, vectors, pois, heightAt, physics, camPos, rect }) {
+export async function buildStreetscape({ scene, vectors, pois, heightAt, physics, camPos, rect, skipWalls }) {
   const group = new THREE.Group(); group.name = 'streetscape'; scene.add(group);
   const M = materials();
   let PR = null; try { PR = await import('../props/props.js'); } catch (e) { console.warn('props unavailable', e); }
@@ -163,7 +163,7 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   const wallBuf = [], fenceBuf = [], hedgeBuf = [];
   for (const b of vectors.barriers) {
     const pts = b.pts; if (pts.length < 2) continue;
-    if (b.type === 'wall' || b.type === 'retaining_wall' || b.type === 'city_wall') wallBuf.push(extrudeLine(pts, 0.32, Math.min(2.5, b.h || 1.2), heightAt, b.type === 'retaining_wall' ? -1.5 : -0.3));
+    if (b.type === 'wall' || b.type === 'retaining_wall' || b.type === 'city_wall') { if (!skipWalls) wallBuf.push(extrudeLine(pts, 0.32, Math.min(2.5, b.h || 1.2), heightAt, b.type === 'retaining_wall' ? -1.5 : -0.3)); } // [r4-ground] groundworks.js builds walls with coping + terrain terraces
     else if (b.type === 'hedge') hedgeBuf.push(extrudeLine(pts, 0.9, Math.min(2.2, b.h || 1.3), heightAt, -0.2));
     else if (b.type === 'fence' || b.type === 'railing' || b.type === 'guard_rail') fenceBuf.push(...fenceLine(pts, Math.min(2.2, b.h || 1.2), heightAt));
   }
