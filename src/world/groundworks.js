@@ -280,7 +280,7 @@ function project(P, C, x, z) {
     let t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; const first = k === 0, last = k === P.length - 2;
     const tc = Math.max(first ? -1e9 : 0, Math.min(last ? 1e9 : 1, t));
     const px = a[0] + dx * tc, pz = a[1] + dz * tc; const dd = Math.hypot(x - px, z - pz);
-    if (!best || dd < best.dd) { const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L; best = { dd, s: C[k] + tc * L, d: -cr }; }
+    if (!best || dd < best.dd) { const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L; best = { dd, s: C[k] + tc * L, d: cr }; } // cr > 0 on the left normal (-dz, dx) side
   }
   return best; // left normal = (-dz, dx): d > 0 on that side
 }
@@ -288,7 +288,7 @@ function projSeg(P, C, k, x, z) {
   const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1e-9; const L = Math.sqrt(L2);
   const t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; const tc = Math.max(k === 0 ? -1e9 : 0, Math.min(k === P.length - 2 ? 1e9 : 1, t));
   const px = a[0] + dx * tc, pz = a[1] + dz * tc; const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L;
-  return { dd: Math.hypot(x - px, z - pz), s: C[k] + tc * L, d: -cr };
+  return { dd: Math.hypot(x - px, z - pz), s: C[k] + tc * L, d: cr };
 }
 
 // =====================================================================================================================
