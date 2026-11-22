@@ -107,7 +107,7 @@ export async function build(ctx) {
     const [a0, b0, a1, b1] = AU;
     K.box(brick, a0, LB - 0.5, b0, a1, AT - 1.0, b1);
     for (const [p, q] of [[[a0, b1], [a1, b1]], [[a1, b1], [a1, b0]], [[a1, b0], [a0, b0]]]) {
-      const R = K.run(p, q); for (let s = 0.25; s < R.L; s += 0.5) K.rbox(R, brick, s - 0.09, LB, 0.0, s + 0.09, AT - 1.05, 0.09, { detail: true });
+      const R = K.run(p, q); for (let s = 0.5; s < R.L; s += 1.0) K.rbox(R, brick, s - 0.16, LB, 0.0, s + 0.16, AT - 1.05, 0.14, { detail: true }); // r4-sweep: ribs 1 m apart, 32 cm wide (0.5 m / 18 cm aliased into streaks)
     }
     K.box(conc, a0 - 0.15, AT - 1.05, b0 - 0.15, a1 + 0.15, AT - 0.85, b1 + 0.15);
     K.hip(conc, a0 - 0.15, b0 - 0.15, a1 + 0.15, b1 + 0.15, AT - 0.85, 0.07);
