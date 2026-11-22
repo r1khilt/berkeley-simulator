@@ -5,7 +5,8 @@
 // infilled with the 1990s atrium/library), lower three-storey end wings to the east and west.
 // Massing from the 2021 LiDAR: ranges ~24.6 m, central attic strip and penthouses ~29 m, end wings ~15 m.
 import * as THREE from 'three';
-import { siteDress } from './lib/rc-finish.js';
+import { siteDress, lampPost } from './lib/rc-finish.js';
+import { rnMats } from './lib/rn-kit.js';
 import { Kit, corniceProfile, tint, solid, flatRoof, courtWalls, polyWalls, inscription, rect } from './lib/b02-kit.js';
 
 export const info = {
@@ -20,17 +21,17 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.5);
   const K = new Kit(ctx, ANG); const M = ctx.M;
   const ST = tint(M.stuccoWhite, 0xede3cf), STD = tint(M.stuccoWhite, 0xdbd1bd), ROOF = tint(M.concrete, 0xc4c1b9); // [r5a] warmer cream/buff cast stone (photo #e4dfd2 in sun; read cool grey in shade)
-  const STEP = tint(M.concrete, 0xd9d3c5), NOSE = solid(0x8f897d, 0.9, 0.0); // [r5a] steps: concrete treads with a dark shadow line under each nosing so flights read as steps, not ramps
+  const STEP = tint(M.concrete, 0xd9d3c5), NOSE = solid(0x7d776c, 0.9, 0.0), RISER = tint(M.concrete, 0xaaa396); // [r5a] steps: concrete treads with a dark shadow line under each nosing so flights read as steps, not ramps
   const SP = solid(0x1d1e20, 0.6, 0.3), FR = solid(0x1b1c1e, 0.45, 0.5), LV = solid(0x8c8a84, 0.8, 0.2), DOOR = solid(0x2b2a27, 0.4, 0.6);
   const GL = M.windowNight;
-  const RAIL = solid(0xa7abae, 0.38, 0.7);
-  const pipe = (a, b, r = 0.024) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
+  const RAIL = solid(0xc3c6c8, 0.42, 0.35); // galvanised, not mirror-blue
+  const pipe = (a, b, r = 0.03) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
   // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
   const railV = (u, vA, yA, vB, yB) => { const H = 0.92, sg = Math.sign(vB - vA); pipe([u, yA + H, vA], [u, yB + H, vB]); pipe([u, yA + H, vA - sg * 0.3], [u, yA + H, vA]); pipe([u, yB + H, vB], [u, yB + H, vB + sg * 0.3]);
     const np = Math.max(1, Math.round(Math.abs(vB - vA) / 1.6)); for (let k = 0; k <= np; k++) { const t = k / np; pipe([u, yA + (yB - yA) * t - 0.02, vA + (vB - vA) * t], [u, yA + (yB - yA) * t + H, vA + (vB - vA) * t], 0.02); } };
   // flight along v: foot edge vFoot -> top edge vTop (either direction), concrete treads + a dark line under each nosing
   const stairV = (uA, uB, vFoot, vTop, yLo, yHi, n) => { const sg = Math.sign(vTop - vFoot), T = Math.abs(vTop - vFoot) / n, rise = (yHi - yLo) / n;
-    for (let i = 0; i < n; i++) { const e = vFoot + sg * T * i, top = yLo + rise * (i + 1); K.box(NOSE, uA + 0.01, top - 0.075, Math.min(e - sg * 0.012, e + sg * 0.004), uB - 0.01, top - 0.04, Math.max(e - sg * 0.012, e + sg * 0.004), { detail: true }); }
+    for (let i = 0; i < n; i++) { const e = vFoot + sg * T * i, top = yLo + rise * (i + 1); K.box(NOSE, uA + 0.01, top - 0.075, Math.min(e - sg * 0.012, e + sg * 0.004), uB - 0.01, top - 0.04, Math.max(e - sg * 0.012, e + sg * 0.004), { detail: true }); K.box(RISER, uA + 0.01, top - rise + 0.004, Math.min(e - sg * 0.006, e + sg * 0.002), uB - 0.01, top - 0.075, Math.max(e - sg * 0.006, e + sg * 0.002), { detail: true }); }
     return K.stairs(STEP, uA, Math.min(vFoot, vTop), uB, Math.max(vFoot, vTop), yLo, yHi, sg > 0 ? '+v' : '-v', n); };
   const colliders = [], walkables = [];
   const FL = 5.3, CT = 18.0, EN = 20.9, AT = 24.2, TOP = 25.3;
@@ -76,8 +77,8 @@ export async function build(ctx) {
     for (const [x0, x1] of spans) { K.rbox(R, STD, x0, 4.0, -0.6, x1, 4.18, 0.3); K.rbox(R, ST, x0, 4.18, -0.6, x1, FL, 0.12); } // water table + base frieze band
     if (lowDoor) for (const i of ents) for (const x of [s0 + i * p, s0 + (i + 1) * p]) { if (x <= spans[0][1] + 0.01 || x >= spans[1][0] - 0.01) continue; K.rbox(R, ST, x - PW / 2, dY - 0.05, -0.6, x + PW / 2, FL, 0.12); } // pier bases between the doors
     for (let i = 0; i < nb; i++) { const c = s0 + (i + 0.5) * p; if (lowDoor && ents.includes(i)) continue; // roundel + paired stems
-      const g = new THREE.CylinderGeometry(0.42, 0.42, 0.12, 16); g.rotateX(Math.PI / 2); g.translate(c, 4.74, 0.18); K.addRun(R, ST, g, { detail: true });
-      const g2 = new THREE.CylinderGeometry(0.3, 0.3, 0.06, 12); g2.rotateX(Math.PI / 2); g2.translate(c, 4.74, 0.26); K.addRun(R, STD, g2, { detail: true });
+      const g = new THREE.CylinderGeometry(0.5, 0.5, 0.14, 18); g.rotateX(Math.PI / 2); g.translate(c, 4.74, 0.19); K.addRun(R, ST, g, { detail: true });
+      const g2 = new THREE.CylinderGeometry(0.36, 0.36, 0.07, 14); g2.rotateX(Math.PI / 2); g2.translate(c, 4.74, 0.28); K.addRun(R, STD, g2, { detail: true });
       for (const dx of [-1.15, -0.95, 0.95, 1.15]) K.rbox(R, ST, c + dx - 0.05, 4.28, 0.12, c + dx + 0.05, 5.2, 0.2, { detail: true });
     }
     // pilasters
@@ -100,13 +101,13 @@ export async function build(ctx) {
       if (ent) {
         // [r5a] glazed bronze double doors (were flat black slabs): frame, two glass leaves, centre stile, push bars, gridded transom
         K.rbox(R, DOOR, a + 0.25, dY, -0.66, b - 0.25, FL + 2.8, -0.6); if (lowDoor) K.rbox(R, STD, a, dY - 0.1, -0.8, b, FL + 0.4, -0.66); // backing below the strip glass
-        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, GL, x0, dY + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, dY + 1.0, -0.585, x1 - 0.08, dY + 1.06, -0.55, { detail: true }); }
-          K.rbox(R, GL, a + 0.42, FL + 2.18, -0.6, b - 0.42, FL + 2.68, -0.585, { uvMode: 'keep' }); for (let k = 1; k < 4; k++) { const x = a + 0.42 + (b - a - 0.84) * k / 4; K.rbox(R, FR, x - 0.03, FL + 2.18, -0.585, x + 0.03, FL + 2.68, -0.56, { detail: true }); } }
+        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, M.glass, x0, dY + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, dY + 1.0, -0.585, x1 - 0.08, dY + 1.06, -0.55, { detail: true }); }
+          K.rbox(R, M.glass, a + 0.42, FL + 2.18, -0.6, b - 0.42, FL + 2.68, -0.585, { uvMode: 'keep' }); for (let k = 1; k < 4; k++) { const x = a + 0.42 + (b - a - 0.84) * k / 4; K.rbox(R, FR, x - 0.03, FL + 2.18, -0.585, x + 0.03, FL + 2.68, -0.56, { detail: true }); } }
         K.rbox(R, FR, (a + b) / 2 - 0.05, dY, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
         K.rbox(R, FR, a - 0.05, FL + 2.85, -0.6, b + 0.05, FL + 3.45, 0.95); // marquee canopy
         // diamond lattice grille over the rest of the strip
-        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.37; // [r5a] fine dense lattice (photo: ~8-9 diamonds across a bay), was 0.9 m with 0.11 bars
-        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.05, 0.07); }
+        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.45; // [r5a] denser lattice (photos: ~6-8 diamonds across a bay), was 0.9 m with 0.11 bars
+        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.065, 0.08); }
         for (const x of [a + 0.05, b - 0.05]) K.rbox(R, FR, x - 0.06, y0, -0.6, x + 0.06, y1, -0.38);
         K.rbox(R, SP, a, y0 - 0.05, -0.6, b, y0 + 0.05, -0.52, { detail: true });
       } else {
@@ -249,14 +250,18 @@ export async function build(ctx) {
     const n = Math.max(3, Math.round((FLs - g0) / 0.16)); const T = 0.34, len = n * T, rise = (FLs - g0) / n;
     const va = sgn < 0 ? land0 - len : land0, vb = sgn < 0 ? land0 : land0 + len; const vFoot = sgn < 0 ? va : vb;
     walkables.push(stairV(uA, uB, vFoot, sgn < 0 ? vb : va, g0, FLs, n));
-    // the two bottom treads run 1.6 m wider each side
+    // the two bottom treads run 1.0 m wider each side
     for (let i = 0; i < 2; i++) { const p0 = vFoot - sgn * T * i, p1 = vFoot - sgn * T * (i + 1); const y = g0 + rise * (i + 1);
-      for (const [x0, x1] of [[uA - 1.6, uA], [uB, uB + 1.6]]) { K.box(STEP, x0, g0 - 1, Math.min(p0, p1), x1, y, Math.max(p0, p1)); walkables.push(K.walkPoly(rect(x0, Math.min(p0, p1), x1, Math.max(p0, p1)), y)); } }
+      for (const [x0, x1] of [[uA - 1.0, uA], [uB, uB + 1.0]]) { K.box(STEP, x0, g0 - 1, Math.min(p0, p1), x1, y, Math.max(p0, p1)); walkables.push(K.walkPoly(rect(x0, Math.min(p0, p1), x1, Math.max(p0, p1)), y)); } }
     // stepped cheek blocks: full height beside the landing, then three blocks stepping down the flight, stopping two treads short
     const vTopF = sgn < 0 ? vb : va, vStop = vFoot - sgn * T * 2; // flight top edge, cheek end
     for (const u of [uA - 1.2, uB]) {
-      K.box(ST, u, g0 - 1, Math.min(land0, land1), u + 1.2, FLs + 0.75, Math.max(land0, land1));
-      K.box(ST, u - 0.06, FLs + 0.75, Math.min(land0, land1) - 0.06, u + 1.26, FLs + 0.85, Math.max(land0, land1) + 0.06);
+      K.box(ST, u, g0 - 1, Math.min(land0, land1), u + 1.2, FLs + 0.55, Math.max(land0, land1));
+      K.box(ST, u - 0.06, FLs + 0.55, Math.min(land0, land1) - 0.06, u + 1.26, FLs + 0.65, Math.max(land0, land1) + 0.06);
+      // stepped planter cubes descending outward from the cheek (photo 04), shrub-topped
+      { const out = u < UC ? -1 : 1; for (let k = 1; k <= 2; k++) { const x0 = out < 0 ? u - 1.15 * k : u + 1.2 + 1.15 * (k - 1), x1 = x0 + 1.15, yt = Math.max(g0 + 0.45, FLs + 0.55 - 0.8 * k);
+        K.box(ST, x0, g0 - 1, Math.min(land0, land1), x1, yt, Math.max(land0, land1)); K.box(ST, x0 - 0.04, yt, Math.min(land0, land1) - 0.04, x1 + 0.04, yt + 0.08, Math.max(land0, land1) + 0.04);
+        const sg = new THREE.IcosahedronGeometry(0.5, 1); sg.scale(1.0, 0.75, 1.6); sg.translate((x0 + x1) / 2, yt + 0.32, (land0 + land1) / 2); K.add(rnMats(M).leafA, sg, { detail: true }); } }
       for (let k = 0; k < 3; k++) { const f0 = k / 3, f1 = (k + 1) / 3; const pa = vTopF + (vStop - vTopF) * f0, pb = vTopF + (vStop - vTopF) * f1;
         const yb = FLs - (FLs - g0) * (f1 * (len - 2 * T) / len) + 0.75; K.box(ST, u, g0 - 1, Math.min(pa, pb), u + 1.2, yb, Math.max(pa, pb)); }
       colliders.push(K.colPoly(rect(u, Math.min(vStop, land1), u + 1.2, Math.max(vStop, land1)), g0 - 1, FLs + 0.9));
@@ -266,6 +271,7 @@ export async function build(ctx) {
       const ag = new THREE.ExtrudeGeometry(sh, { depth: 0.55, bevelEnabled: false, curveSegments: 1 }); ag.rotateX(Math.PI / 2); ag.translate(0, ya, 0); K.add(STEP, ag);
       const cg = new THREE.TorusGeometry(Rr, 0.07, 4, 32, Math.PI); cg.rotateX(Math.PI / 2); cg.scale(1, 1, -1); cg.translate(UC, ya - 0.05, vFoot); K.add(STD, cg, { detail: true });
       walkables.push({ type: 'poly', pts: K.polyXZ(Array.from({ length: 25 }, (_, k) => { const t = Math.PI * k / 24; return [UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr]; })), y: ya }); (K._stairs || (K._stairs = [])).push([UC - Rr, vFoot - Rr, UC + Rr, vFoot]); }
+    if (sgn < 0) for (const u of [uA - 2.3, uB + 2.3]) lampPost(K, u, vFoot - 0.6, { mat: M.iron }); // [r5a] black lamps flanking the stair foot (photo)
     // four pipe rails
     for (const u of [uA + 0.3, UC - 2.47, UC + 2.47, uB - 0.3]) railV(u, vFoot - sgn * 0.15, g0 + rise * 0.5, vTopF + sgn * 0.05, FLs);
   }
@@ -297,7 +303,7 @@ export async function build(ctx) {
 
   // colliders: the real outline
   for (const fp of ctx.footprints) colliders.push({ type: 'poly', pts: fp.outer.map(([x, z]) => [x, z]), y0: -2, y1: 30 });
-  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0 }); // refine-central: planting, lamps, bike rack where paths arrive
+  siteDress(K, ctx, ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z)), { d: 1.0, lamps: 0 }); // [r5a] lamps: 0 (they stood on the north stair); flanking lamps are placed with the stairs // refine-central: planting, lamps, bike rack where paths arrive
   const object3d = K.finish(); object3d.name = 'valley-life-sciences-building';
   return { object3d, colliders, walkables };
 }
