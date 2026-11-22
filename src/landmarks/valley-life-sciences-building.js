@@ -27,7 +27,7 @@ export async function build(ctx) {
   // [r5a] dark, non-interior glass for the giant window strips, doors and basement lights: the photos show dark bronze glazing,
   // and lit furnished rooms behind 9 m strips made the front read as an office block (attic/pavilion windows keep GL)
   const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x1d2326);
-  const RAIL = solid(0xc3c6c8, 0.42, 0.35); // galvanised, not mirror-blue
+  const RAIL = solid(0xb9bcbd, 0.62, 0.15); // galvanised, matte (glossy metal mirrored the sky blue)
   const pipe = (a, b, r = 0.03) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
   // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
   const railV = (u, vA, yA, vB, yB) => { const H = 0.92, sg = Math.sign(vB - vA); pipe([u, yA + H, vA], [u, yB + H, vB]); pipe([u, yA + H, vA - sg * 0.3], [u, yA + H, vA]); pipe([u, yB + H, vB], [u, yB + H, vB + sg * 0.3]);
