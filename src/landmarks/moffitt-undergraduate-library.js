@@ -41,10 +41,10 @@ function perfCanvas(tile) {
   const e = document.createElement('canvas'); e.width = W; e.height = H; const ge = e.getContext('2d');
   g.fillStyle = '#26272a'; g.fillRect(0, 0, W, H); ge.fillStyle = '#000'; ge.fillRect(0, 0, W, H);
   g.fillStyle = '#34363a'; g.fillRect(0, H * 0.5 - 1, W, 2);                                   // mid-height panel seam
-  for (let y = 4; y < H; y += 8) for (let x = 4 + ((y / 8) % 2) * 4; x < W; x += 8) {
+  for (let y = 2; y < H; y += 4) for (let x = 2 + ((y / 4) % 2) * 2; x < W; x += 4) {
     const dx = (x / W - 0.5) * 1.6, dy = (y / H - 0.68) * 1.9, k = tile ? 0.55 + 0.25 * Math.sin(x * 0.07) * Math.cos(y * 0.09) : Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy));
-    const r = 0.4 + 3.1 * k; if (r < 0.7) continue;
-    g.fillStyle = `rgb(${150 + 60 * k | 0},${148 + 58 * k | 0},${140 + 55 * k | 0})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    const r = 0.3 + 1.45 * k; if (r < 0.55) continue;
+    g.fillStyle = `rgb(${90 + 80 * k | 0},${90 + 78 * k | 0},${88 + 72 * k | 0})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
     ge.fillStyle = '#fff'; ge.beginPath(); ge.arc(x, y, r, 0, 7); ge.fill();
   }
   const t = new THREE.CanvasTexture(c), te = new THREE.CanvasTexture(e);
