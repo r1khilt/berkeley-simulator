@@ -18,6 +18,8 @@ import { UI, buildMapCanvas } from './ui/ui.js';
 import { Audio } from './audio.js';
 import { PLACES } from './places.js';
 import { installBigGame, BIG_GAME_PLACES } from './props/bigGame.js'; // Big Game easter egg (permanent)
+import { installWater } from './world/water.js'; // r4-campanile: Strawberry Creek water, Mining Circle pool, water sounds (?nowater=1 disables)
+import { installCampanile } from './props/campanile.js'; // r4-campanile: elevator ride, carillon recitals + hourly toll (?nobells=1 disables)
 import { buildStreetscape } from './world/streetscape.js';
 import { buildSkyline, buildBridges } from './world/far.js';
 import { buildSigns } from './world/signs.js';
@@ -190,6 +192,7 @@ async function boot() {
   const landmarks = lm.placed; BS.landmarks = landmarks; phase('landmarks');
   const audio = new Audio(); audio.setVolume(settings.volume); BS.audio = audio;
   player.onStep = (k) => audio.step(k, player.speed);
+  let water = null; if (!qs.get('nowater')) try { water = installWater({ scene, heightAt, vectors, terrain, physics, audio, quality: settings.quality, lm }); BS.water = water; setupMaterials(water.group); } catch (e) { console.warn('water failed', e); } // r4-campanile
   // ---- map + places
   const places = [...PLACES, ...(qs.get('nobg') ? [] : BIG_GAME_PLACES)].map((p) => ({ ...p })); // + Big Game easter egg places
   for (const l of manifest.landmarks) {
@@ -277,6 +280,7 @@ async function boot() {
   });
   if (isTouch) ui.touchControls(player, { jump: () => { player.jumpReq = true; }, run: (b) => { player.touch.run = !player.touch.run; b.classList.toggle('on', player.touch.run); }, bike: () => player.setMode(player.mode === 'bike' ? 'walk' : 'bike'), use: () => { if (player.activeInteraction) player.onInteract(player.activeInteraction); }, map: () => openMap() });
   player.onInteract = (it) => { if (it.teleport) ui.fade(() => { player.teleport(it.teleport[0], it.teleport[1] + 0.02, it.teleport[2]); player.setMode('walk'); }); };
+  let campanile = null; if (!qs.get('nobells')) try { campanile = installCampanile({ lm, player, audio, ui, camera, qs }); BS.campanile = campanile; } catch (e) { console.warn('campanile failed', e); } // r4-campanile (wraps onInteract)
   player.onModeChange = (m) => { ui.reticleOn(false); setupMaterials(player.bike.root); ui.modes(); }; // ui-pro: mode bar updates immediately
   installModes(player, { scene, physics, audio, ui, THREE, camera, setupMaterials });
   ui.bindPlayer(player); // ui-pro: HUD mode bar + controls list are driven by player.mode / player.plugins
@@ -329,17 +333,9 @@ async function boot() {
     if (frameN % 20 === 1) ui.setNight(U.uNight.value); // ui-pro: light/dark UI follows the scene (landing too; first frame included)
     if (state === 'play') { ui.compass(((-player.camYaw * 180 / Math.PI) % 360 + 360) % 360); ui.minimap(player.pos.x, player.pos.z, player.camYaw, settings.north); ui.prompt(player.activeInteraction ? player.activeInteraction.label : null); }
     audio.update(dt, { night: U.uNight.value, wind: U.uWind.value, bikeSpeed: player.mode === 'bike' ? player.speed : 0 });
-    // bells
-    const pp = pacificParts(date);
-    if (timeSt.live && audio.started) {
-      const tower = lm.byId.get('sather-tower');
-      const bp = tower?.anchors?.bells || [0, 160, 0];
-      const d = Math.hypot(bp[0] - camera.position.x, bp[1] - camera.position.y, bp[2] - camera.position.z);
-      const pan = Math.sin(Math.atan2(bp[0] - camera.position.x, -(bp[2] - camera.position.z)) + player.camYaw);
-      if (pp.minute === 0 && lastHour !== pp.hour && pp.second < 5) { lastHour = pp.hour; audio.strikeHour(pp.hour, d, pan); }
-      const rk = `${pp.month}-${pp.day}-${pp.hour}`;
-      if (((pp.hour === 7 && pp.minute === 50) || (pp.hour === 12 && pp.minute === 0 && pp.second > 40) || (pp.hour === 18 && pp.minute === 0 && pp.second > 40)) && !recitalDone.has(rk)) { recitalDone.add(rk); audio.carillon(d, pan, 50); }
-    }
+    // bells: r4-campanile (src/props/campanile.js) tolls the hour 8 am-10 pm and plays the real recital schedule (Pacific time)
+    if (campanile) { try { campanile.update(dt, { camera, started: audio.started }); } catch (e) { console.warn('campanile', e); campanile = null; } }
+    if (water) { try { water.update(dt, camera, state === 'play' ? player.pos : null); } catch (e) { console.warn('water', e); water = null; } } // r4-campanile
     if (gpuPost) gpuPost.render(U.uNight.value); /* [gfx-webgpu] */
     else if (post) post.render(dt);   // gfx-post
     else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
