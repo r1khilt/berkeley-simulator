@@ -56,7 +56,7 @@ export const SITES = [
   { type: 'special', special: 10, pts: [[-160.5, 206.0], [-92.0, 206.0], [-92.0, 368.5], [-131.5, 369.0], [-133.5, 353.0], [-141.5, 293.5], [-157.0, 291.0], [-158.5, 272.5], [-160.5, 233.0]] },
   // [r5-sproul] Lower Sproul Plaza (rebuilt 2015): one paved field from Zellerbach to MLK and from the Chávez Center to
   // Eshleman, stamped with special id 9 (terrain.js draws the banded concrete) instead of the old red brick
-  { type: 'paved', special: 9, pts: [[-233.5, 286.0], [-222.0, 283.5], [-216.8, 277.5], [-183.5, 272.0], [-174.6, 275.3], [-170.6, 298.5], [-180.5, 298.0], [-191.6, 299.7],
+  { type: 'paved', special: 9, pts: [[-233.5, 286.0], [-222.0, 283.5], [-216.8, 277.5], [-183.5, 272.0], [-172.6, 275.0], [-168.7, 298.2], [-180.5, 298.0], [-191.6, 299.7],
     [-190.5, 307.0], [-182.9, 354.4], [-192.6, 354.7], [-203.0, 355.5], [-226.1, 357.5], [-226.1, 348.0], [-233.1, 304.3]] },
   // [r5-sproul] the Sproul Plaza entrance from Bancroft/Telegraph is paving, not road: the OSM footway is tagged asphalt,
   // so the bake drew a street running on from Telegraph into the plaza (keeps any brick/granite special underneath)

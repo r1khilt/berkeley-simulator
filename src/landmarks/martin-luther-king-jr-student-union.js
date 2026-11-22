@@ -143,17 +143,17 @@ export async function build(ctx) {
       const Rp = K.run(a, b); const gp = Math.min(g(...a), g(...b)) - 0.5;
       glassBand(K, Rp, 0, Rp.L, gp, ph - 0.9, { glass: sGlass, frame: alu, pitch: 1.45, transoms: [g(...a) + 2.4], doors: Rp.L > 20 ? [{ s0: Rp.L / 2 - 1.0, s1: Rp.L / 2 + 1.0, h: 2.2 }] : [] });
       K.rbox(Rp, warm, 0.3, gp, -0.45, Rp.L - 0.3, ph - 1.0, -0.42);
-      K.rbox(Rp, M.whitePaint, -0.15, ph - 0.9, -0.3, Rp.L + 0.15, ph - 0.45, 0.25); // [r5-sproul] wall head tucked under the folded roof
+      K.rbox(Rp, M.whitePaint, -0.15, ph - 0.9, -0.3, Rp.L + 0.15, ph - 0.8, 0.25); // [r5-sproul] wall head tucked under the folded roof
       if (Rp.L > 20) { // [r5-sproul] street face (MRY 385-UCB_0009): grey fins over the upper glazing, white eyebrow, gold Cal "C" on the glass
         const gpp = g(...a), finMat = tinted(M.iron, 0x8e9294, { metalness: 0.5, roughness: 0.45 });
         for (let s = 0.36; s < Rp.L - 0.2; s += 0.725) K.rbox(Rp, finMat, s - 0.03, ph - 3.1, 0.0, s + 0.03, ph - 0.95, 0.22, { detail: true });
         K.rbox(Rp, M.whitePaint, -0.1, gpp + 3.3, 0.0, Rp.L + 0.1, gpp + 3.45, 0.45);
-        const cg = new THREE.TorusGeometry(0.42, 0.1, 6, 24, Math.PI * 1.55); cg.rotateZ(Math.PI * 0.225); cg.translate(Rp.L * 0.56, ph - 2.1, 0.06); K.addRun(Rp, M.calGold || M.gold, cg, { detail: true });
+        const cg = new THREE.TorusGeometry(0.6, 0.14, 6, 24, Math.PI * 1.55); cg.rotateZ(Math.PI * 0.225); cg.translate(Rp.L * 0.56, ph - 2.3, 0.3); K.addRun(Rp, M.calGold || M.gold, cg, { detail: true });
       }
     }
     // [r5-sproul] thin folded-plate roof instead of a flat slab: a shallow asymmetric gable whose ridge rises to a pointed
     // prow over the west end, knife-edge white fascia, white soffit, dark grey top, deep cantilevered eaves (photo 0009)
-    { const W = [p0 - 3.2, ph + 0.5, 33.6], E = [p1 + 0.4, ph + 0.15, 33.6], SW = [p0 - 1.6, ph - 0.55, q1 + 2.9], SE = [p1 + 0.4, ph - 0.75, q1 + 2.4], NW = [p0 - 1.2, ph - 0.25, V1 + 0.15], NE = [p1 + 0.4, ph - 0.3, V1 + 0.15];
+    { const W = [p0 - 3.6, ph + 1.05, 33.0], E = [p1 + 0.4, ph + 0.3, 33.6], SW = [p0 - 1.8, ph - 0.2, q1 + 3.0], SE = [p1 + 0.4, ph - 0.95, q1 + 2.4], NW = [p0 - 1.4, ph + 0.1, V1 + 0.15], NE = [p1 + 0.4, ph - 0.2, V1 + 0.15]; // prow rises, street eave falls toward MLK
       const roofTop = tinted(M.concrete, 0x5f6366, { roughness: 0.6 }), FT = 0.2, ctr = [(p0 + p1) / 2, 0, 34];
       const face = (P, up) => { const [A, B, C] = P; const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2]; const ny = uz * vx - ux * vz; return (ny > 0) === up ? P : [A, C, B]; };
       const tops = [[W, E, SE], [W, SE, SW], [W, NW, NE], [W, NE, E]];
@@ -241,7 +241,7 @@ export async function build(ctx) {
           K.box(conc, sU0 + 0.08, y - 0.17, va, sU1 - 0.08, y, vb + 0.02);
           K.box(M.blackPaint, sU0 + 0.12, y - 0.003, vb - 0.06, sU1 - 0.12, y + 0.004, vb + 0.025, { detail: true }); }
         const L = vLo - vHi, yA = yLo, yB = yLo + r * n, ang = Math.atan2(yB - yA, L), hyp = Math.hypot(L, yB - yA);
-        for (const [u0, u1, mat, dy, h] of [[sU0, sU0 + 0.1, stringer, 0.0, 0.62], [sU1 - 0.1, sU1, stringer, 0.0, 0.62], [sU0 + 0.1, sU1 - 0.1, orange, -0.5, 0.08]]) { // stringers below the nosing line, orange soffit plate clear of the step blocks
+        for (const [u0, u1, mat, dy, h] of [[sU0, sU0 + 0.1, stringer, 0.08, 0.42], [sU1 - 0.1, sU1, stringer, 0.08, 0.42], [sU0 - 0.02, sU1 + 0.02, orange, -0.42, 0.1]]) { // stringers below the nosing line, orange soffit plate clear of the step blocks
           const gg = new THREE.BoxGeometry(u1 - u0, h, hyp); gg.rotateX(ang); gg.translate((u0 + u1) / 2, (yA + yB) / 2 + dy - h / 2 + 0.17, (vLo + vHi) / 2); K.add(mat, gg); }
         for (const uu of [sU0 + 0.04, sU1 - 0.04]) { // picket guards + handrail
           for (let v = vHi + 0.06; v < vLo; v += 0.12) { const yy = yLo + (vLo - v) / L * (yB - yA) + 0.1; K.box(alu, uu - 0.012, yy, v - 0.012, uu + 0.012, yy + 1.0, v + 0.012, { detail: true }); }

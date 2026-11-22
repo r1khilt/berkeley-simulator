@@ -23,6 +23,7 @@ export async function build(ctx) {
   const sand = tone(M.concrete, 0xc9bb9f, undefined, { roughness: 0.75 }), sandD = tone(M.concrete, 0xa89a80, undefined, { roughness: 0.8 });
   const orange = tinted(M.whitePaint, 0xd9643a, { roughness: 0.6 }); // [r5-sproul] the signature orange soffits
   const colC = tone(M.concrete, 0xbab7b0); // [r5-sproul] round board-smooth concrete columns
+  const bayGlass = tinted(M.windowNight, 0x4c5f6a, { metalness: 0.4, roughness: 0.1 }), bayFrame = tinted(M.darkBronze, 0x3a3d40); // [r5-sproul] dark-framed clear bays (read as frosted light boxes)
   const silver = tinted(M.iron, 0xd8dee6, { metalness: 0.55, roughness: 0.3 });
   const eave = tinted(M.whitePaint, 0xdcdcd8);
   const cglass = tinted(M.windowNight, 0x7fa3c4, { metalness: 0.45, roughness: 0.05 });
@@ -33,10 +34,12 @@ export async function build(ctx) {
   const GP = g(6, V0 - 2); // Lower Sproul level in front of the hall
   const F1 = GP + 4.8, FL = [F1, F1 + 4.15, F1 + 8.3, F1 + 12.45]; // floor levels above the ground floor
   // ---- core + roof ----
-  K.box(M.concreteDark, U0 + 0.4, -1.5, V0 + 3.0, U1 - 0.4, TOP - 0.3, V1 - 0.4);
+  // [r5-sproul] deeper undercroft on the plaza (photos: a ~6 m deep orange-soffited arcade on round columns): ground-floor core
+  // starts 5.5 m back, the floors above still reach the façade line
+  K.box(M.concreteDark, U0 + 0.4, -1.5, V0 + 5.5, U1 - 0.4, F1 + 0.1, V1 - 0.4); K.box(M.concreteDark, U0 + 0.4, F1, V0 + 3.0, U1 - 0.4, TOP - 0.3, V1 - 0.4);
   K.box(M.concreteDark, U0 + 0.4, F1, V0 + 0.4, U1 - 0.4, TOP - 0.3, V0 + 3.1);
   K.box(eave, U0 - 1.2, TOP - 0.3, V0 - 1.2, U1 + 1.2, TOP, V1 + 1.2);
-  colliders.push(K.colPoly([[U0, V0 + 1.5], [U1, V0 + 1.5], [U1, V1], [U0, V1]], -2, TOP));
+  colliders.push(K.colPoly([[U0, V0 + 4.6], [U1, V0 + 4.6], [U1, V1], [U0, V1]], -2, TOP)); // [r5-sproul] walk into the deeper arcade
   // ribbon-window sand façade
   const ribbon = (R, s0, s1, y0, y1, levels) => {
     K.rbox(R, sand, s0, y0, -0.3, s1, y1, 0.0);
@@ -46,14 +49,15 @@ export async function build(ctx) {
   };
   // ---- NORTH (Lower Sproul): glass curtain wall over a recessed ground floor (east two-thirds), sand slab (west third) ----
   {
-    const R = K.run([U1, V0], [U0, V0]); const L = R.L; const cw = 38.0; // curtain-wall length from the east end
+    const R = K.run([U1, V0], [U0, V0]); const L = R.L; const cw = 15.0; // curtain-wall length from the east end ([r5-sproul] 38 -> 15: photos show beige ribbed cladding with ribbon windows across most of the plaza face, glass only at the east bay tower)
     // recessed ground floor storefronts under the cantilever
-    const Rg = K.run([U1, V0 + 2.5], [U0, V0 + 2.5]);
+    const Rg = K.run([U1, V0 + 5.0], [U0, V0 + 5.0]); // [r5-sproul] was 2.5 m back
     glassBand(K, Rg, 0.5, L - 0.5, GP - 0.6, F1, { glass: sglass, frame: silver, pitch: 1.5, transoms: [GP + 2.8], doors: [{ s0: 9.0, s1: 10.8, h: 2.4 }, { s0: 24.0, s1: 25.8, h: 2.4 }] });
     K.rbox(Rg, turq, 12.5, GP + 0.3, -0.42, 13.2, GP + 2.6, -0.4, { detail: true }); K.rbox(Rg, tinted(M.whitePaint, 0x2f6fa6), 8.0, GP + 0.4, 0.02, 8.7, GP + 3.2, 0.1);
     K.rbox(Rg, tinted(M.stucco, 0xe4d2b0), 0.5, GP - 0.6, -0.5, L - 0.5, F1, -0.45);
-    K.rbox(R, eave, -0.3, F1 - 0.2, -2.5, L + 0.3, F1, 0.3); // slab edge over the recessed storefronts
-    K.rbox(R, orange, -0.25, F1 - 0.45, -2.48, L + 0.25, F1 - 0.2, 0.28); // [r5-sproul] orange soffit (photo #E0663A)
+    K.rbox(R, eave, -0.3, F1 - 0.2, -5.0, L + 0.3, F1, 0.3); // slab edge over the recessed storefronts
+    K.rbox(R, orange, -0.25, F1 - 0.45, -4.98, L + 0.25, F1 - 0.2, 0.28); // [r5-sproul] orange soffit (photo #E0663A)
+    for (let s = 1.2; s < L - 0.5; s += 2.4) K.rbox(R, M.lampGlow, s, F1 - 0.47, -4.2, s + 0.18, F1 - 0.45, -0.6, { detail: true }); // recessed downlight strips
     // [r5-sproul] round concrete columns (~0.7 m, ~7.5 m bays) instead of slim silver posts
     for (let s = 4.5; s < L - 2; s += 7.6) { const p = R.at(s, -0.9); K.cyl(colC, p[0], GP - 0.6, p[1], 0.36, 0.36, F1 - 0.45 - GP + 0.6, 18); colliders.push(K.colCyl(p[0], p[1], 0.4, GP - 1, F1)); }
     // curtain wall (4 storeys) with silver floor bands, irregular mullion rhythm
@@ -67,9 +71,9 @@ export async function build(ctx) {
     // [r5-sproul] staggered two-storey glass bay boxes projecting 0.9 m, light frames, orange undersides (photo 0013/0024a)
     for (const [s0, k] of [[3.0, 0], [10.5, 1], [17.5, 0], [24.0, 2], [31.0, 1], [43.0, 1], [50.5, 0]]) {
       if (s0 + 3.2 > L - 0.5) continue; const y0 = FL[k] + 0.4, y1 = (FL[k + 2] ?? TOP - 0.3) - 0.2;
-      K.rbox(R, cglass, s0, y0, 0.1, s0 + 3.0, y1, 0.95);
-      for (const [a0, a1] of [[s0, s0 + 0.08], [s0 + 2.92, s0 + 3.0]]) K.rbox(R, silver, a0, y0, 0.1, a1, y1, 1.0);
-      K.rbox(R, silver, s0, y1 - 0.1, 0.1, s0 + 3.0, y1 + 0.05, 1.0); K.rbox(R, orange, s0, y0 - 0.18, 0.1, s0 + 3.0, y0, 1.0);
+      K.rbox(R, bayGlass, s0, y0, 0.1, s0 + 3.0, y1, 0.95);
+      for (const [a0, a1] of [[s0, s0 + 0.08], [s0 + 2.92, s0 + 3.0]]) K.rbox(R, bayFrame, a0, y0, 0.1, a1, y1, 1.0);
+      K.rbox(R, bayFrame, s0, y1 - 0.1, 0.1, s0 + 3.0, y1 + 0.05, 1.0); K.rbox(R, orange, s0, y0 - 0.18, 0.1, s0 + 3.0, y0, 1.0);
       K.rbox(R, silver, s0, (y0 + y1) / 2 - 0.06, 0.9, s0 + 3.0, (y0 + y1) / 2 + 0.06, 1.0, { detail: true });
     }
     colliders.push(K.colPoly([[U0, V0], [U1, V0], [U1, V0 + 1.7], [U0, V0 + 1.7]], F1 - 0.4, TOP));

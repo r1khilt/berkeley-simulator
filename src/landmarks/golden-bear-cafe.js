@@ -44,7 +44,7 @@ export async function build(ctx) {
   const frieze = tone(M.concrete, 0xb8b0a2);                   // cast relief frieze
   const dark = tinted(M.blackPaint, 0x23211f);                // slot backing, bronze-black frames
   const frame = tinted(M.darkBronze, 0x4e3e2c);
-  const podium = tone(M.concrete, 0xb8b2a6);
+  const podium = tone(M.concrete, 0xcfc8ba); // [r5-sproul] cream podium wall (photo #D9D2C3); read dark
   const navy = tinted(M.calBlue, 0x34465c);
   const sglass = tinted(M.glassLight, 0x7f9196, { opacity: 0.3 }); // transparent storefront glass (lighter: the furnished interior shows through — interiors-cafe)
   const interior = tinted(M.stucco, 0xe6c896);                  // warm-lit café interior seen through the glass
@@ -62,7 +62,7 @@ export async function build(ctx) {
     { u0: 17.7, u1: 24.8, vN: -7.4, vS: 15.1, n: 3 }, { u0: 24.8, u1: 32.05, vN: -10.9, vS: 11.3, n: 3 },
     { u0: 32.05, u1: 39.7, vN: -7.43, vS: 8.0, n: 2 }, { u0: 39.7, u1: 47.3, vN: -10.75, vS: 12.4, n: 3 },
   ];
-  const F = umbrellaField(strips, { yTop: YT, depth: DEP, dip: 0.8, gap: 0.22 });
+  const F = umbrellaField(strips, { yTop: YT, depth: DEP, dip: 0.95, gap: 0.22 }); // [r5-sproul] dip 0.8 -> 0.95: a slightly exaggerated V so the zigzag fascia reads from across the plaza
 
   // ---- building bodies (wall lines inset from the roof edges) ----
   const outlineW = [[-40.9, -22.25], [-33.3, -22.25], [-33.3, -18.6], [-26.1, -18.6], [-26.1, -14.75], [-18.9, -14.75], [-18.9, -18.25], [-11.6, -18.25],

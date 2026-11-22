@@ -141,7 +141,7 @@ export function buildSproulSteps({ heightAt, physics, M }) {
   // terraced planting beds: corten walls on each terrace's downhill face, mulch, shrubs and grasses (vertex-coloured blobs)
   let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   // planting palette from the photos: dark evergreen shrubs, olive grasses, a few red-leaved shrubs (photinia/barberry)
-  const greens = [0x34502a, 0x3e5c2e, 0x2f4626, 0x4d6634, 0x5d6a38, 0x44582c, 0x6b3b2c]; const shrubs = [];
+  const greens = [0x34502a, 0x3e5c2e, 0x2f4626, 0x4d6634, 0x5d6a38, 0x44582c, 0x6b3b2c]; const shrubs = [], grass = { p: [], c: [] };
   for (const bed of Object.values(BEDS)) {
     const { v0, v1, cuts } = bed;
     for (let i = 0; i + 1 < cuts.length; i++) {
@@ -152,12 +152,16 @@ export function buildSproulSteps({ heightAt, physics, M }) {
       for (let u = ua + 0.7; u < ub - 0.45; u += 1.15) for (let v = v0 + 0.6; v < v1 - 0.45; v += 1.15) {
         if (rnd() < 0.22) continue;
         const r0 = 0.32 + rnd() * 0.36, hx = greens[Math.floor(rnd() * (rnd() < 0.9 ? greens.length - 1 : greens.length))];
-        shrubs.push(...shrubClump(rnd, u + (rnd() - 0.5) * 0.4, ys - 0.05, v + (rnd() - 0.5) * 0.4, r0, hx));
+        if (rnd() < 0.3) grassTuft(rnd, u + (rnd() - 0.5) * 0.4, ys - 0.02, v + (rnd() - 0.5) * 0.4, 0.55 + rnd() * 0.35, grass);
+        else shrubs.push(...shrubClump(rnd, u + (rnd() - 0.5) * 0.4, ys - 0.05, v + (rnd() - 0.5) * 0.4, r0, hx));
       }
     }
-    // top edge along Upper Sproul: a low concrete seat wall closing the beds
-    K.box(cheek, SITE.u1 - 0.3, Math.min(base(SITE.u1, v0), p.yU - 1), v0, SITE.u1 + 0.05, p.yU + 0.45, v1);
-    K.box(cope, SITE.u1 - 0.34, p.yU + 0.43, v0 - 0.02, SITE.u1 + 0.09, p.yU + 0.5, v1 + 0.02, { detail: true });
+    // top edge along Upper Sproul: a low concrete kerb with a see-through picket rail (CMG photo: "a low top rail with
+    // vertical pickets runs along the planting terraces"), so the cascade of beds reads from the fountain
+    K.box(cheek, SITE.u1 - 0.3, Math.min(base(SITE.u1, v0), p.yU - 1), v0, SITE.u1 + 0.05, p.yU + 0.15, v1);
+    K.box(cope, SITE.u1 - 0.34, p.yU + 0.13, v0 - 0.02, SITE.u1 + 0.09, p.yU + 0.2, v1 + 0.02, { detail: true });
+    for (let v = v0 + 0.06; v < v1 - 0.03; v += 0.11) K.box(steel, SITE.u1 - 0.17, p.yU + 0.2, v - 0.009, SITE.u1 - 0.15, p.yU + 1.05, v + 0.009, { detail: true });
+    pipeRail(K, steel, [[SITE.u1 - 0.16, v0 + 0.02], [SITE.u1 - 0.16, v1 - 0.02]], p.yU + 0.2, { h: 0.86, pitch: 99, mid: false, r: 0.025 });
     colls.push([[cuts[0] - 0.1, v0 - 0.3], [SITE.u1 + 0.05, v0 - 0.3], [SITE.u1 + 0.05, v1 + 0.3], [cuts[0] - 0.1, v1 + 0.3]]);
   }
   // seat wall with an ipe top facing Lower Sproul at the foot of the middle bed (+ a broad seat step in front)
@@ -169,6 +173,8 @@ export function buildSproulSteps({ heightAt, physics, M }) {
   // north cheek strip against the café terrace wall
   colls.push([[BOT_U, SITE.v0 + 0.05], [SITE.u1, SITE.v0 + 0.05], [SITE.u1, N.v0], [BOT_U, N.v0]]);
   if (shrubs.length) { const mg = mergeGeometries(shrubs, false); if (mg) { const m = new THREE.Mesh(mg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, name: 'r5-shrubs' })); m.userData.detail = true; m.castShadow = true; m.receiveShadow = true; K.extra.push(m); } }
+  if (grass.p.length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(grass.p, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(grass.c, 3)); gg.computeVertexNormals();
+    const m = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide, name: 'r5-grass' })); m.userData.detail = true; m.castShadow = false; m.receiveShadow = true; K.extra.push(m); }
   const obj = K.finish(); obj.position.set(O.x, 0, O.z); obj.name = 'r5:sproul-steps';
   obj.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; if (o.parent && o.parent.userData.detail) o.castShadow = false; } });
   // colliders: beds and cheeks are solid; the stairs are walked on the graded bed (like the other groundworks flights)
@@ -191,6 +197,16 @@ function shrubClump(rnd, u, y, v, r, hex) {
     g.translate(u + ox, y + rr * sq * 0.55, v + oz); out.push(g);
   }
   return out;
+}
+// ornamental grass tuft: n thin blades leaning out from one point (one triangle each), straw/olive, darker at the base
+function grassTuft(rnd, u, y, v, h, out) {
+  const n = 9 + Math.floor(rnd() * 6); const tip = new THREE.Color(rnd() < 0.5 ? 0xb8a466 : 0x8f9450), base = new THREE.Color(0x3f4a26);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rnd() * 0.5, lean = 0.12 + rnd() * 0.28, hh = h * (0.7 + rnd() * 0.4), w = 0.035;
+    const tx = u + Math.cos(a) * lean * hh, tz = v + Math.sin(a) * lean * hh, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+    out.p.push(u - px, y, v - pz, u + px, y, v + pz, tx, y + hh, tz);
+    for (const c of [base, base, tip]) out.c.push(c.r, c.g, c.b);
+  }
 }
 // a box whose top slopes from ya (at u0) to yb (at u1), across v0..v1, bottom at y0 (building frame u, y, v)
 function slopedBox(K, mat, u0, u1, v0, v1, y0, ya, yb, opts) {
