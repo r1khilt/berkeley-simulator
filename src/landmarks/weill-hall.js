@@ -156,7 +156,7 @@ export async function build(ctx) {
     if (Math.abs(R.t[1]) < 0.2 && a[1] > 10) { const s = Math.abs(a[0] - (-31.4)); if (s > 2 && s < R.L - 2) door(R, s); }
     if (Math.abs(R.t[0]) < 0.2 && a[0] < -40) { const s = Math.abs(-1.3 - a[1]); if (s > 2 && s < R.L - 2) door(R, s); } }
   // roof: clay-tile hip over the whole plan (hips follow the chamfers) with a flat mechanical deck
-  polyHip(K, TILE, poly, EAVE, 0.5, { ov: 0.6, yTop: 34.0, deck: M.concreteDark, fascia: C });
+  polyHip(K, TILE, poly, EAVE, 0.62, { ov: 0.9, yTop: 34.0, deck: M.concreteDark, fascia: M.redTile, soffit: C }); // [r5a] steeper (~32 deg) with a deeper eave and a red tile edge, so the roof reads from the ground (was hidden behind the attic from nearby)
   colliders.push({ type: 'poly', pts: K.polyXZ(poly), y0: Y0, y1: EAVE + 5 });
   const object3d = K.finish(); object3d.name = 'weill-hall';
   return { object3d, colliders, walkables };
