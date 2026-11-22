@@ -155,6 +155,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   // tread material and landings here (flights = runs separated by flat landings of `landing` m, centre = middle handrail)
   const STAIR_STYLE = {
     262173804: { w: 5.0, mat: 'brick', flights: 3, landing: 2.2, centre: true }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025)
+    1377317325: { w: 3.4, mat: 'concrete', flights: 1, landing: 0 }, // Hearst -> Cory/SDH courtyard under the Newton bridge: wide ~20-riser flight, board-formed cheeks (C. Sequin 2009)
   };
   // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
   const OWNED_STEPS = new Set([
