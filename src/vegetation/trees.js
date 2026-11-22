@@ -583,10 +583,10 @@ function kmeans(pts, k, iters = 6) { // weighted, deterministic (farthest-point 
 }
 function buildPuffs(sk, d, rnd, density, N, o = {}) {
   const acc = new Acc(PUFF_ATTRS); const env = sk.env, S = d.cardM, P = d.puff || {};
-  if (!sk.clumps.length || N <= 0) return acc;
+  if (!sk.clumps.length || (N <= 0 && !P.fists)) return acc;
   const pts = sk.clumps.map((cl) => ({ c: cl.mode === 'tip' && cl.dir ? cl.c.clone().addScaledVector(cl.dir, S * 0.3) : cl.c.clone(), w: cl.r * cl.r }));
-  const n = Math.max(3, Math.round(N * clamp(0.3 + density * 0.85, 0.3, 1)));
-  const cent = kmeans(pts, Math.min(n, pts.length));
+  const n = N > 0 ? Math.max(3, Math.round(N * clamp(0.3 + density * 0.85, 0.3, 1))) : 0;
+  const cent = n ? kmeans(pts, Math.min(n, pts.length)) : [];
   const ao = aoFn(env, d.aoLift ?? 0), nrm = normalFn(env, d.normal, null), R = env.R;
   for (const a of cent) { let d1 = 1e9, d2 = 1e9; for (const b of cent) { if (a === b) continue; const dd = a.c.distanceTo(b.c); if (dd < d1) { d2 = d1; d1 = dd; } else if (dd < d2) d2 = dd; } a.nn = d2 < 1e8 ? d2 : R; }
   const rK = (o.rK ?? 1) * (P.rK ?? 1) * (0.72 + 0.28 * Math.min(1, density * 1.4));
@@ -603,9 +603,13 @@ function buildPuffs(sk, d, rnd, density, N, o = {}) {
     const k = rad > 1e-4 ? (rad > lim ? lim / rad : lerp(1, lim / rad, o.snap ?? 0.6)) : 1; c.x *= k; c.z *= k;
     list.push({ c, r });
   }
-  { const top = list.reduce((m, p) => Math.max(m, p.c.y + p.r), -1e9); if (top < env.top - 0.04 * (env.top - env.base)) { const r = Math.min(R * 0.35, (env.top - env.base) * 0.12, Math.max(S * 0.5, env.r(env.top - (env.top - env.base) * 0.1, 0) * 1.1)); list.push({ c: V3(0, env.top - r * 0.85, 0), r }); } } // apex
+  if (list.length) { const top = list.reduce((m, p) => Math.max(m, p.c.y + p.r), -1e9); if (top < env.top - 0.04 * (env.top - env.base)) { const r = Math.min(R * 0.35, (env.top - env.base) * 0.12, Math.max(S * 0.5, env.r(env.top - (env.top - env.base) * 0.1, 0) * 1.1)); list.push({ c: V3(0, env.top - r * 0.85, 0), r }); } } // apex
+  if (P.fists && o.fists !== false) for (const kn of sk.knobs) if (kn.r > 0.2) { // pollards: a leafy head over each fist, where the whips are
+    const wl = (d.pollard?.whipLen?.[1] ?? 2) * 0.55, r = wl * (o.fistK ?? 0.75) * (0.6 + 0.6 * Math.min(1, density * 2));
+    list.push({ c: kn.c.clone().add(V3(0, wl * 0.55, 0)).addScaledVector(V3(kn.c.x, 0, kn.c.z).normalize(), wl * 0.2), r });
+  }
   const nc = o.core ?? P.core ?? 2; // dark core so the crown never reads hollow between the shell puffs
-  for (let i = 0; i < nc; i++) { const y = lerp(env.base, env.top, 0.36 + 0.22 * i / Math.max(1, nc - 1)); const re = env.r(y, i) || R * 0.5; list.push({ c: V3((rnd() - 0.5) * re * 0.25, y, (rnd() - 0.5) * re * 0.25), r: Math.min(re * 0.62, (env.top - env.base) * 0.42), core: true }); }
+  for (let i = 0; i < nc; i++) { const y = lerp(env.base, env.top, 0.36 + 0.22 * i / Math.max(1, nc - 1)); const re = env.r(y, i) || R * 0.5; list.push({ c: V3((rnd() - 0.5) * re * 0.25, y, (rnd() - 0.5) * re * 0.25), r: Math.min(re * 0.5, (env.top - env.base) * 0.36, 4.5), core: true }); }
   for (const p of list) puffQuad(acc, p.c, p.r, nrm(p.c), (p.core ? 0.6 : Math.min(1, ao(p.c) * 1.04)) * (o.aoK ?? 1), rnd(), rnd() < 0.5 ? 0 : 1, rnd());
   acc.puffs = list;
   return acc;
@@ -646,7 +650,7 @@ const SPECIES_DEF = {
     crown: { base: 2.6, top: 5.5, R: 2.8, shape: ['superegg', 0.45, 2.5], irr: 0.1 },
     pollard: { limbs: 5, reach: [1.3, 1.9], height: [3.0, 3.5], limbR: 0.13, knobR: 0.3, whips: 14, whipLen: [0.6, 2.4], whipR: 0.016, clumpR: 0.3 }, // a year's whips: brooms on every fist
     cardK: 0.35, cards: { n: 1500, size: 0.9, vbias: 0.6, out: 0.6, face: 0.5, jit: 0.6 },
-    normal: 'ellipsoid', seasonal: 'pollard',
+    normal: 'ellipsoid', seasonal: 'pollard', puff: { n0: 0, n1: 10, n2: 8, core: 0, core0: 0, rK: 0.8, fists: true },
     look: { twig: '#6e6553', rough: 0.8, transBack: 0.7, transWrap: 0.3, blobK: 0.71, sway: 0.006, flutter: 0.0018, tintK: 0.3 },
   },
   redwood: {
@@ -655,7 +659,7 @@ const SPECIES_DEF = {
     crown: { base: 4, top: 35, R: 5, shape: ['cone', 0.85, 6], irr: 0.1 },
     whorls: { spacing: 1.15, n: 4, elev: [-0.35, 0.3], droop: 0.12, r: 0.07, lenK: [0.85, 1.0], clumpK: 0.35, clumpR: [0.6, 1.4] },
     cards: { n: 1500, size: 1.5, vbias: 0.05, out: 1.0, face: 0.35, flat: 0.45, jit: 0.35 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0,
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 10, rK0: 0.7, n1: 44, n2: 26, aspect: 1.3, core: 0, core0: 0, rMax: 0.55 },
     look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
@@ -666,8 +670,8 @@ const SPECIES_DEF = {
     clumps: { n: 38, r: [1.3, 2.3], shell: [0.5, 0.97], twigR: 0.07 }, // fewer, smaller clumps: sky shows through
     branch2: { n: 4, spread: 1.1, twigs: 2, up: [-0.5, 0.7] },
     cards: { n: 1500, size: 2.4, vbias: -0.9, out: 0.35, face: 0.4, jit: 0.35, tangent: 0.2 }, // most sprays hang (pendulous) instead of forming a shell
-    normal: 'ellipsoid',
-    look: { cols: ['#6f8070', '#7f8f7c', '#66745f'], ramp: [0.4, 0.8, 0.25, 0.2], twig: '#8a7a62', rough: 0.6, leafSpec: 0.3, transBack: 0.55, transWrap: 0.3, blobK: 0.79, sway: 0.012, flutter: 0.002, tintK: 0.8 },
+    normal: 'ellipsoid', puff: { rK: 0.8, core: 0, core0: 0, n0: 7, rK0: 0.6, n1: 26, aspect: 0.9 },
+    look: { cols: ['#71857a', '#83968a', '#66766a'], ramp: [0.4, 0.8, 0.25, 0.2], twig: '#8a7a62', rough: 0.6, leafSpec: 0.3, transBack: 0.55, transWrap: 0.3, blobK: 0.79, sway: 0.012, flutter: 0.002, tintK: 0.45 }, // r4-trees: bluer grey-green, less aerial tint (read as oak)
   },
   pine: {
     lod2K: 0.57, cardK: 1.05, name: 'Monterey pine', arche: 'decurrent', leaf: 'needle', bark: 'pine', seed: 606, typical: { height: 22, crownR: 8 },
@@ -677,7 +681,7 @@ const SPECIES_DEF = {
     clumps: { n: 60, r: [1.1, 1.8], shell: [0.55, 0.98], twigR: 0.06 },
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.35, 0.6] },
     cards: { n: 1500, size: 1.7, vbias: 0.45, out: 0.8, face: 0.55, jit: 0.5 },
-    normal: 'ellipsoid',
+    normal: 'ellipsoid', puff: { aspect: 1.15 },
     look: { cols: ['#3f5434', '#4b603b', '#384b30'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#5a4636', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.63, sway: 0.009, flutter: 0.0008, tintK: 1.0 },
   },
   cedar: {
@@ -686,7 +690,7 @@ const SPECIES_DEF = {
     crown: { base: 1.5, top: 20, R: 6.5, shape: ['cone', 1.05, 5], irr: 0.12 },
     whorls: { spacing: 1.3, n: 5, elev: [-0.05, 0.25], droop: 0.3, r: 0.08, lenK: [0.85, 1.0], clumpK: 0.3, clumpR: [0.7, 1.5] },
     cards: { n: 1500, size: 1.7, vbias: -0.35, out: 1.0, face: 0.4, flat: 0.3, jit: 0.4 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0, lod1AO: 0.8,
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, lod1AO: 0.8, puff: { n0: 10, rK0: 0.72, n1: 40, n2: 22, aspect: 1.45, core: 0, core0: 0 },
     look: { cols: ['#56715f', '#637e6c', '#4c6655'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#5c4b3d', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.35, sway: 0.008, flutter: 0.0008, tintK: 0.9 },
   },
   cypress: {
@@ -695,7 +699,7 @@ const SPECIES_DEF = {
     crown: { base: 0.6, top: 14, R: 1.5, shape: ['column'], irr: 0.06 },
     whorls: { spacing: 0.75, n: 4, elev: [1.0, 1.1], droop: 0, r: 0.03, lenK: [0.75, 0.95], clumpK: 0.45, clumpR: [0.35, 0.6], branches: false },
     cards: { n: 1500, size: 0.9, vbias: 1.0, out: 0.45, face: 0.6, jit: 0.35 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0, lod1CardK: 0.9, lod1AO: 0.78,
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, lod1CardK: 0.9, lod1AO: 0.78, puff: { n0: 14, n1: 26, n2: 16, core: 0, core0: 0 },
     look: { cols: ['#36542f', '#41623a', '#2f4a2c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#4a3d33', rough: 0.85, transBack: 0.2, transWrap: 0.2, blobK: 0.64, sway: 0.01, flutter: 0.0005, tintK: 1.0 },
   },
   deciduous: {
@@ -776,7 +780,7 @@ const SEASONAL = {
     spring: { cols: ['#74a03c', '#82ad45', '#669036'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.75 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.8 },
-    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.16 }, // the esplanade pollards are mostly bare by late November (r4-trees: a few brown leaves still cling to the whips)
+    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.22 }, // the esplanade pollards are mostly bare by late November (r4-trees: a few brown leaves still cling to the whips)
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.0 },
   },
   deciduous: {
@@ -853,7 +857,7 @@ function buildSpecies(id, d, season, opts) {
       // fit the puff crowns to where the near LOD's leaves actually are (95th-percentile radius, 3rd-percentile base)
       const lp = L0.leaves.p, rads = [], ys = []; for (let i = 0; i < lp.length; i += 3) { rads.push(Math.hypot(lp[i], lp[i + 2])); ys.push(lp[i + 1]); }
       const fit = rads.length > 60 ? { R: percentile(rads, 0.95), base: percentile(ys, 0.03) } : null;
-      L0.puffs = buildPuffs(sk, d, rnd, density, Math.round((PF.n0 ?? 16) * (opts.puffK ?? 1)), { rK: PF.rK0 ?? 0.78, shell: 0.88, aoK: 0.86, core: PF.core0 ?? 1, fit });
+      L0.puffs = buildPuffs(sk, d, rnd, density, Math.round((PF.n0 ?? 16) * (opts.puffK ?? 1)), { rK: PF.rK0 ?? 0.78, shell: 0.88, aoK: 0.86, core: PF.core0 ?? 1, fit, fistK: 0.5 });
       L1.leaves = buildPuffs(sk, d, rnd, density, Math.round((PF.n1 ?? 30) * (opts.puffK ?? 1)), { fit, aoK: 0.92 });
       L2.trunk = trunkOnly(sk, d);
       L2.puffs = buildPuffs(sk, d, rnd, density, PF.n2 ?? 16, { core: 1, rK: 0.9, fit, aoK: 0.9 });
@@ -895,7 +899,7 @@ function buildSpecies(id, d, season, opts) {
   leafMat.name = `tree:${id}:leaves`; barkMat.name = `tree:${id}:bark`; blobMat.name = `tree:${id}:far`;
   // r4-trees: puff materials (near-core puffs fade out as the camera closes in on them; mid/far puffs never fade)
   const puffTex = (g0.puffs || puff1 || g2.puffs) ? puffTexture(d.leaf, opts.leafTexSize, d.puff?.ballM ?? 3) : null;
-  const puffP0 = { value: new THREE.Vector4(3.4, 0.42, 0.45, 0) }, puffP1 = { value: new THREE.Vector4(0, 0.45, 0.45, 0) }; // x near-fade (radii), y ball-normal weight, z pull toward viewer
+  const asp = d.puff?.aspect ?? 1, puffP0 = { value: new THREE.Vector4(3.4, 0.42, 0.45, asp) }, puffP1 = { value: new THREE.Vector4(0, 0.45, 0.45, asp) }; // x near-fade (radii), y ball-normal weight, z pull toward viewer
   const mkPuff = (pp, nm) => { const m = patchPuff(new THREE.MeshStandardMaterial({ map: puffTex, alphaTest: 0.42, alphaToCoverage: !!opts.alphaToCoverage, side: THREE.DoubleSide, roughness: look.rough ?? 0.8, metalness: 0 }), uni, pp); m.name = nm; return m; };
   const puffMat0 = puffTex ? mkPuff(puffP0, `tree:${id}:puff0`) : null, puffMat1 = puffTex ? mkPuff(puffP1, `tree:${id}:puff`) : null;
   const dp0 = puffTex ? makePuffDepthMaterials(uni, puffP0) : null;

@@ -121,7 +121,7 @@ async function boot() {
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
     const { createTreeLibrary, TREE_REF_TINT } = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js');
-    const lib = createTreeLibrary({ season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024 }); phase('treeLib');
+    const lib = createTreeLibrary({ season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024, puffs: qs.get('treepuffs') !== '0', puffK: { low: 0.7, medium: 0.85, ultra: 1.25 }[settings.quality] ?? 1 }); phase('treeLib'); // r4-trees: volumetric puff crowns (?treepuffs=0 = round-3 cards/blobs)
     treeSys = new TreeSystem({ lib, trees, refTint: TREE_REF_TINT, lodDistances: Q.trees, maxDist: Q.treeMax });
     BS.treeLib = lib;
     // hide trees inside landmark footprints
