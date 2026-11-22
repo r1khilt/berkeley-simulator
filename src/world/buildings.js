@@ -419,7 +419,7 @@ void facade(vec3 wallC){
     }
     if (s == 4) bar = max(bar, 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04));
     vec3 sashC = oldSash ? (bh < 0.7 ? vec3(0.82, 0.81, 0.77) : bh < 0.85 ? vec3(0.08, 0.1, 0.09) : vec3(0.3, 0.2, 0.14))
-                         : (bh < 0.55 ? vec3(0.07, 0.07, 0.075) : bh < 0.8 ? vec3(0.5, 0.5, 0.48) : vec3(0.16, 0.12, 0.09));
+                         : (bh < 0.4 ? vec3(0.06, 0.06, 0.065) : bh < 0.7 ? vec3(0.17, 0.13, 0.1) : vec3(0.52, 0.52, 0.5));   // black / bronze / clear anodised
     // furnished interiors (interiors.js): floors share a room type; rooms span 1-4 bays; lights per room
     int rType = irFloorType(bUse, fi, h21(vec2(fi + 0.5, seed * 17.0)), fract(seed * 7.13));
     float span = min(irSpanOf(rType, h21(vec2(fi + 1.5, seed * 5.0))), nb);
@@ -444,12 +444,14 @@ void facade(vec3 wallC){
       interior = mix(rm, interior, farK);
       covA = mix(irCovOut.a, covA, farK); covAlb = mix(irCovAlb, covAlb, farK);
     }
+    covAlb = mix(covAlb, vec3(dot(covAlb, vec3(0.3, 0.55, 0.15))), 0.45);
+    if (shop) { covA = 0.0; interior = interior / (1.0 + 0.4 * interior); }   // shops: no roller blinds by day; keep lit shop interiors from clipping at night   // sun-faded curtains: keep them from reading as coloured noise
     // ---- glass: Fresnel reflection of sky / opposite buildings / street over a dim room (daylight interiors are far
     // darker than the street). Each pane is tilted a hair differently so reflections break between panes.
     float ph = h21(vec2(bi * 7.1 + seed * 13.0 + step(0.0, gx) * 3.0, fi * 3.3 + step((y0 + y1) * 0.52, gy) * 1.7));
     vec3 Rf = reflect(Vw, Nw); Rf = normalize(Rf + (Tw * (ph - 0.5) * 0.06 + vec3(0.0, (fract(ph * 7.3) - 0.5) * 0.05, 0.0)) * (1.0 - farK));
     float cosT = clamp(-dot(Vw, Nw), 0.0, 1.0);
-    float F0 = s == 4 ? 0.25 : 0.12;   // double glazing / coated curtain wall
+    float F0 = s == 4 ? 0.25 : shop ? 0.07 : 0.12;   // double glazing / coated curtain wall / clear shop glass
     float F = F0 + (1.0 - F0) * pow(1.0 - cosT, 5.0);
     float lumH = dot(uSkyHor, vec3(0.2126, 0.7152, 0.0722));
     float cl = textureLod(uNoise, Rf.xz / max(0.3, Rf.y + 0.45) * 0.03 + seed, 2.0).r;
@@ -466,12 +468,12 @@ void facade(vec3 wallC){
     vec3 oppR = mix(oppC, vec3(0.12, 0.16, 0.1) * (0.7 + 0.6 * textureLod(uNoise, vec2(ang * 9.0, Rf.y * 8.0), 1.0).g), treeK) * lumH;
     vec3 streetR = vec3(0.42, 0.41, 0.4) * lumH * (0.45 + 0.4 * smoothstep(-0.5, 0.0, Rf.y));
     vec3 refl = mix(mix(streetR, oppR, smoothstep(-0.03, 0.005, Rf.y)), skyR, smoothstep(skyline - 0.012, skyline + 0.012, Rf.y));
-    float dayK = mix(shop ? 0.24 : 0.3, 1.0, uNight);   // daylight rooms read dim behind glass (sun patches come via glassAlb)
+    float dayK = mix(shop ? 0.42 : 0.3, 1.0, uNight);   // daylight rooms read dim behind glass (sun patches come via glassAlb)
     float paneK = win * (1.0 - lodW) * onGlass * (1.0 - bar);
     float sashK = win * (1.0 - lodW) * onGlass * bar;
     // compose: casing trim on the wall plane, reveal surfaces, sash, then glass (blind = lit albedo, room + reflection = emissive)
     col = mix(col, frameC, frame*(1.0-lodW));
-    float wallShadow = 0.0;   // extra sun shadow on the wall plane (under sills / sign band)
+    float wallShadow = 0.0, underSill = 0.0;   // extra sun shadow / AO on the wall plane (under sills / sign band)
     if (!shop && s != 4 && s != 3 && s != 10 && s != 8 && !arch) {
       float sx = hwx + (s==1 ? 0.09 : 0.06), sh0 = y0 - (s==1 ? 0.09 : 0.06);
       float inSx = 1.0 - smoothstep(sx - ax, sx + ax, hx);
@@ -480,6 +482,7 @@ void facade(vec3 wallC){
       col = mix(col, sillC, sillM * (1.0 - lodW)); rough = mix(rough, 0.7, sillM);
       float shH = sW.z < -0.02 ? 0.05 * sW.y / -sW.z : 0.0;      // the sill projects ~5 cm
       wallShadow = max(wallShadow, inSx * smoothstep(sh0 - shH - ay, sh0 - shH + ay, y) * (1.0 - smoothstep(sh0 - ay, sh0, y)));
+      underSill = inSx * smoothstep(sh0 - 0.045 - ay, sh0 - 0.045 + ay, y) * (1.0 - smoothstep(sh0 - ay, sh0, y));   // contact shadow under the sill nose
       if (s == 1) {   // brick: stone lintel or soldier course over the opening
         float l1 = y1 + 0.2; float lin = (1.0 - smoothstep(sx - ax, sx + ax, hx)) * smoothstep(y1 - ay, y1 + ay, y) * (1.0 - smoothstep(l1 - ay, l1 + ay, y));
         col = mix(col, bh < 0.5 ? vec3(0.66, 0.63, 0.57) : wallBase * 0.8, lin * (1.0 - lodW));
@@ -502,7 +505,7 @@ void facade(vec3 wallC){
     rough = mix(rough, 0.25, paneK * (1.0 - covA)); rough = mix(rough, 0.6, paneK * covA);
     fEmis = (refl * F + interior * dayK * vec3(0.9, 0.94, 0.94) * (1.0 - covA) * (1.0 - F) * 0.85 + covAlb * covA * litC * lit * 0.35 * uNight) * paneK;
     fSunOcc = mix(1.0, sunOcc, win * (1.0 - lodW)) * (1.0 - wallShadow * (1.0 - win) * (1.0 - lodW));
-    fAmbOcc = mix(1.0, 0.72 + 0.28 * onGlass, win * (1.0 - lodW));
+    fAmbOcc = mix(1.0, 0.72 + 0.28 * onGlass, win * (1.0 - lodW)) * (1.0 - 0.5 * underSill * (1.0 - lodW));
     fNrmK = mix(1.0, 0.0, paneK);
     // far LOD: average window coverage (glass darkens the wall, reflects the sky at grazing angles, lit rooms glow at night)
     float cover = ww*wh;
