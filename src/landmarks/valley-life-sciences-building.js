@@ -219,20 +219,15 @@ export async function build(ctx) {
     polyWalls(K, P, { stories: [{ y0: K.g(76, 0) - 1.5, y1: 4.6, mat: ST, win: null }, { y0: 4.6, y1: 7.6, mat: ST, win: { w: 2.2, h: 2.0, sill: 0.5, mull: 2 } }], bay: 4.0,
       edge: (i, R) => (R.a[0] > 77.0 && Math.abs(R.t[0]) < 0.1 ? { skip: [1, 2] } : null) });
     flatRoof(K, P, 7.6, { mat: ST, parapet: 0.6, deck: ROOF });
-    // [r5a] the east entrance itself (OSM steps u 77 -> 82 had nothing to lead to): glazed double doors with sidelights and a
-    // flat dark canopy at the main floor, a landing and a short flight down to the walk, pipe rails
-    { const R = K.run([77.1, 8.2], [77.1, -8.0]), sc = 8.1, gE = Math.min(K.g(81.5, -1.5), K.g(81.5, 1.5), K.g(81.5, 0)), uL = 78.7;
-      K.rbox(R, FR, sc - 2.1, FL - 0.02, -0.06, sc + 2.1, FL + 3.15, 0.05);
-      for (const [x0, x1] of [[sc - 1.95, sc - 1.25], [sc - 1.15, sc - 0.06], [sc + 0.06, sc + 1.15], [sc + 1.25, sc + 1.95]]) K.rbox(R, GL, x0, FL + 0.1, 0.05, x1, FL + 2.45, 0.065, { uvMode: 'keep' });
-      K.rbox(R, GL, sc - 1.95, FL + 2.58, 0.05, sc + 1.95, FL + 3.02, 0.065, { uvMode: 'keep' }); K.rbox(R, FR, sc - 2.1, FL + 2.45, 0.05, sc + 2.1, FL + 2.58, 0.09);
-      K.rbox(R, FR, sc - 2.6, FL + 3.25, -0.05, sc + 2.6, FL + 3.6, 1.7);
-      if (FL - gE > 0.12) { const n = Math.max(1, Math.round((FL - gE) / 0.155)), T = 0.34, rise = (FL - gE) / n, u1 = uL + n * T;
-        K.box(STEP, 77.1, gE - 1, sc - 8.1 - 2.6, uL, FL, sc - 8.1 + 2.8); walkables.push(K.walkPoly(rect(77.1, -2.5, uL, 2.7), FL)); (K._stairs || (K._stairs = [])).push([77.1, -2.5, uL, 2.7]);
-        walkables.push(K.stairs(STEP, uL, -2.5, u1, 2.7, gE, FL, '-u', n));
-        for (let i = 0; i < n; i++) { const e = u1 - T * i, top = gE + rise * (i + 1); K.box(NOSE, e - 0.004, top - 0.075, -2.49, e + 0.012, top - 0.04, 2.69, { detail: true }); }
-        for (const v of [-2.25, 2.45]) { const H = 0.92; pipe([u1 + 0.3, gE + H, v], [u1, gE + rise * 0.5 + H, v]); pipe([u1, gE + rise * 0.5 + H, v], [uL, FL + H, v]); pipe([uL, FL + H, v], [77.6, FL + H, v]);
-          for (const u of [u1 - 0.1, (u1 + uL) / 2, uL, 77.7]) pipe([u, (u >= uL ? gE + (FL - gE) * (u1 - u) / (u1 - uL) : FL) - 0.02, v], [u, (u >= uL ? gE + (FL - gE) * (u1 - u) / (u1 - uL) : FL) + H, v], 0.02); } } }
-    for (const [a, b] of [[[73.3, 8.2], [73.3, 20.8]], [[73.3, -21.0], [73.3, -8.0]]]) { /* wing face already built */ }
+    // [r5a] the east entrance itself (OSM steps arrive at u ~77 and nothing led in): glazed double doors with sidelights at the
+    // block's own floor (~ grade here), a flat dark canopy under its cornice, and a shallow landing with a step down to the walk
+    { const R = K.run([77.1, 8.2], [77.1, -8.0]), sc = 8.1, gE = Math.min(K.g(80.0, -1.5), K.g(80.0, 1.5), K.g(80.0, 0)), yD = Math.max(4.62, gE + 0.16), uL = 78.9;
+      K.rbox(R, FR, sc - 2.1, yD - 0.02, -0.06, sc + 2.1, yD + 2.55, 0.05);
+      for (const [x0, x1] of [[sc - 1.95, sc - 1.25], [sc - 1.15, sc - 0.06], [sc + 0.06, sc + 1.15], [sc + 1.25, sc + 1.95]]) K.rbox(R, M.glass, x0, yD + 0.1, 0.05, x1, yD + 2.4, 0.065, { uvMode: 'keep' });
+      K.rbox(R, FR, sc - 1.1, yD + 0.95, 0.065, sc + 1.1, yD + 1.01, 0.1, { detail: true });
+      K.rbox(R, FR, sc - 2.5, yD + 2.6, -0.05, sc + 2.5, yD + 2.85, 1.6); // canopy, below the block's cornice (7.6)
+      K.box(STEP, 77.1, gE - 1, -2.6, uL, yD, 2.8); walkables.push(K.walkPoly(rect(77.1, -2.6, uL, 2.8), yD)); (K._stairs || (K._stairs = [])).push([77.1, -2.6, uL + 0.6, 2.8]);
+      if (yD - gE > 0.1) { K.box(STEP, uL, gE - 1, -2.6, uL + 0.38, gE + (yD - gE) * 0.5, 2.8); walkables.push(K.walkPoly(rect(uL, -2.6, uL + 0.38, 2.8), gE + (yD - gE) * 0.5)); } }
   }
 
   // ---------- entrance stairs (north and south) ----------
