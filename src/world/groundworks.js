@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { materials, TEX_M } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
+import { STAIR_FIX, BALUSTRADE, BAL_BASE_H, balustrade, stairRail } from './r5-groundfix.js'; // [r5-east] photo-checked stair/balustrade overrides
 
 const KERB = 0.13;        // road surface drop below the sidewalk (m)
 const KERB_W = 0.17;      // kerb top width
@@ -153,9 +154,10 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const stairs = [];
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2) continue;
-    const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
+    const FX = STAIR_FIX[p.id]; // [r5-east] re-centred / widened flights (r5-groundfix.js)
+    const P = (FX && FX.pts ? FX.pts : p.pts).map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
-    const w = Math.max(1.2, Math.min(14, p.w || 2.6));
+    const w = FX && FX.w ? FX.w : Math.max(1.2, Math.min(14, p.w || 2.6));
     const C = [0]; for (let k = 1; k < P.length; k++) C.push(C[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
     // skip indoor steps and anything hugging a landmark (landmark modules build their own entrance steps)
     let skip = false;
@@ -174,7 +176,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     let worstCut = 0, worstFill = 0;
     for (let s2 = 0; s2 <= L; s2 += 0.7) { const [x, z] = along(P, C, s2); const sl = up ? s2 : L - s2; const ramp = lo + (hi - lo) * (sl / L); const dz = G.at(x, z) - ramp; worstCut = Math.max(worstCut, dz); worstFill = Math.max(worstFill, -dz); }
     if (worstCut > 1.1 || worstFill > 1.4) continue;
-    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45 });
+    stairs.push({ P, C, L, w, n, lo, hi, up, mat: FX && FX.mat ? FX.mat : /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45, rails: !!(FX && FX.rails) });
   }
   // landings first (blend toward the landing heights), then beds (only ever lowered, so treads always cover terrain)
   for (const st of stairs) {
@@ -223,8 +225,9 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const rawH = sgn > 0 ? hl : hr; const spanH = Math.max(...rawH) - Math.min(...rawH);
     const H = spanH < 0.8 ? fit(rawH) : sm(rawH, 4), Lo = sm(sgn > 0 ? hr : hl, 2);
     const defaultH = Math.abs(b.h - 1.4) < 1e-6; // bake default for untagged walls: campus walls are mostly seat height
-    const hFree = defaultH ? (CAMPUS(P[0][0], P[0][1]) ? 0.55 : 1.1) : Math.max(0.4, Math.min(2.5, b.h));
-    walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h, hlS: sm(hl, 2), hrS: sm(hr, 2) });
+    const bal = BALUSTRADE.has(b.id); // [r5-east] stone balustrade on top (r5-groundfix.js)
+    const hFree = bal ? BAL_BASE_H : defaultH ? (CAMPUS(P[0][0], P[0][1]) ? 0.55 : 1.1) : Math.max(0.4, Math.min(2.5, b.h));
+    walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h, hlS: sm(hl, 2), hrS: sm(hr, 2), bal });
   }
   for (const wl of walls) {
     if (wl.ret) continue;
@@ -360,6 +363,11 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
         (st.mat === 'brick' ? bucket(mid[0], mid[1], 'gran') : railGeo).quad([n0[0] - nx * e, y1 + 0.004, n0[1] - nz * e], [n0[0] + nx * e, y1 + 0.004, n0[1] + nz * e], [n1[0] + nx * e, y1 + 0.004, n1[1] + nz * e], [n1[0] - nx * e, y1 + 0.004, n1[1] - nz * e], [0, 1, 0], [[0, 0], [1, 0], [1, 0.03], [0, 0.03]]); }
       nTreads++;
     }
+    if (st.rails) { // [r5-east] handrails just inside both edges of wide flights between balustrades
+      for (const sd of [1, -1]) { const line = []; const nP = Math.max(2, Math.ceil(L / 1.6) + 1);
+        for (let k = 0; k < nP; k++) { const s = (k / (nP - 1)) * L; const A = along(P, C, s); const o = (hw - 0.45) * sd; const ls = up ? s : L - s; line.push([A[0] - A[3] * o, A[1] + A[2] * o, lo + (hi - lo) * Math.min(1, (ls + t) / L)]); }
+        stairRail(railGeo, up ? line : line.reverse()); }
+    }
     if (st.cheeks) {
       // cheek walls follow the nosing line (+0.12 m) and step down to the landing at both ends
       const thick = 0.26, off = hw + thick / 2;
@@ -417,6 +425,11 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       }
       nWallSeg++;
     }
+    if (wl.bal) { // [r5-east] vase balustrade on the coping (retaining: at the drop edge; freestanding: centred on the cap)
+      const gb = bucket(mid[0], mid[1], 'bal');
+      if (ret) balustrade(gb, P, (k) => H[k] + 0.1, () => 0.03 * sgn);
+      else balustrade(gb, P, (k) => { const a = P[k], q = P[Math.min(P.length - 1, k + 1)], r = P[Math.max(0, k - 1)]; const dx = q[0] - r[0], dz = q[1] - r[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l; return Math.max(heightAt(a[0] + nx * 0.5, a[1] + nz * 0.5), heightAt(a[0] - nx * 0.5, a[1] - nz * 0.5)) + hFree + 0.06; }, () => 0);
+    }
   }
   const statics = [];
   // ---- hedges: clipped profile (flared base, rounded shoulders), lumpy, seated 15 cm into the soil, leaf-tone jitter
@@ -446,7 +459,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(H.c, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
     const m = new THREE.Mesh(g, hedgeMat); m.position.set(H.cx, y, H.cz); m.castShadow = true; m.receiveShadow = true; m.name = 'gw:hedge'; m.matrixAutoUpdate = false; m.updateMatrix(); group.add(m); statics.push(m);
   }
-  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron; // walls/cheeks a shade darker than treads and copings
+  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : key === 'bal' ? M.granite /* [r5-east] balustrades */ : M.iron; // walls/cheeks a shade darker than treads and copings
   for (const b of buckets.values()) {
     if (!b.geo.count) continue; const y = heightAt(b.cx, b.cz);
     const mesh = new THREE.Mesh(b.geo.geometry([b.cx, y, b.cz]), matFor(b.key)); mesh.position.set(b.cx, y, b.cz);
