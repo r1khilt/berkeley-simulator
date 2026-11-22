@@ -124,9 +124,12 @@ export class CampusLife {
         if (!this.treeClear(x, z, 1.8) || this.inFootprint(x, z, 2)) continue;
         const k = R(); const size = k < 0.38 ? 1 : k < 0.7 ? 2 : k < 0.9 ? 3 : 4; const face = R() * TAU;
         const g = this._group({ cat: 'lawn', x, z, yaw: face, blanket: size >= 2 ? R() < 0.5 : R() < 0.25, col: BLANKET[Math.floor(R() * BLANKET.length)], size });
+        const sideBySide = size === 2 && R() < 0.5; // pairs often sit next to each other facing the same way
+        if (sideBySide) { g.x = x - Math.sin(face) * 0.35; g.z = z - Math.cos(face) * 0.35; } // blanket under their legs too
         for (let m = 0; m < size; m++) {
           let px = x, pz = z, yaw = face, pose = POSE.GROUND, vari = Math.floor(R() * 5);
           if (size === 1) { if (R() < 0.45) { pose = POSE.LIE; vari = Math.floor(R() * 3); } }
+          else if (sideBySide) { const sx = (m ? 1 : -1) * (0.36 + R() * 0.12); px = x + Math.cos(face) * sx; pz = z - Math.sin(face) * sx; yaw = face + (R() - 0.5) * 0.4; if (R() < 0.2) { pose = POSE.LIE; vari = 1; } }
           else { const aa = face + (m / size) * TAU; const rr = 0.46 + size * 0.05; px = x + Math.cos(aa) * rr; pz = z + Math.sin(aa) * rr; yaw = Math.atan2(Math.cos(aa), Math.sin(aa)); /* face the centre */ if (R() < 0.15) { pose = POSE.LIE; vari = 1; } }
           const look = randomLook(R, { backpack: false }); look.flags &= ~(FLAG.SKIRT | FLAG.BAG);
           const extra = (pose === POSE.GROUND && vari === 4) || (pose === POSE.LIE && vari === 1) ? FLAG.BOOK : 0;
