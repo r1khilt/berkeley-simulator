@@ -98,9 +98,9 @@ export function buildSproulSteps({ heightAt, physics, M }) {
   const K = new Kit({ M, boxUV, groundAt: (x, z) => heightAt(O.x + x, O.z + z) }, ANG);
   // light broom-finished concrete treads/landings, dark anti-slip nosings, board-formed cheek walls, weathering-steel
   // bed walls, stainless rails, ipe seat tops, dark mulch
-  const tread = tone(M.concrete, 0xd2cec5), nose = tinted(M.blackPaint, 0x3c3e40, { roughness: 0.7 }), cheek = tone(M.concrete, 0xb9b4a9), cope = tone(M.concrete, 0xc6c1b6);
+  const tread = tone(M.concrete, 0xd2cec5), nose = tinted(M.blackPaint, 0x2c2e30, { roughness: 0.8 }), cheek = tone(M.concrete, 0xb9b4a9), cope = tone(M.concrete, 0xc6c1b6);
   const riser = tone(M.concrete, 0x8f8b84); // risers a shade darker (shadowed, weathered) so flights read as steps, not ramps
-  const corten = tinted(M.iron, 0x6c3a24, { metalness: 0.1, roughness: 0.9 }), steel = tinted(M.iron, 0xb9bdc0, { metalness: 0.85, roughness: 0.3 });
+  const corten = tinted(M.iron, 0x7a4426, { metalness: 0.15, roughness: 0.85 }), steel = tinted(M.iron, 0xb9bdc0, { metalness: 0.85, roughness: 0.3 });
   const ipe = tinted(M.wood || M.concrete, 0x9a6438, { roughness: 0.7 }), mulch = tinted(M.soil || M.concreteDark, 0xb49c80, { roughness: 1 });
   const base = (u, v) => K.g(u, v) - 0.4;
   const colls = [];
@@ -111,7 +111,7 @@ export function buildSproulSteps({ heightAt, physics, M }) {
       for (let i = 0; i < f.n; i++) {
         const ua = f.uBot + i * f.t, ub = f.uBot + (i + 1) * f.t, y = f.yLo + p.r * (i + 1);
         K.box(tread, ua - 0.02, Math.min(base(ua, vc), y - 0.5), v0, ub, y, v1);
-        K.box(nose, ua - 0.025, y - 0.004, v0 + 0.06, ua + 0.07, y + 0.006, v1 - 0.06);
+        K.box(nose, ua - 0.025, y - 0.004, v0 + 0.06, ua + 0.1, y + 0.007, v1 - 0.06); // 12 cm anti-slip nosing band (reads the steps from above)
         K.box(riser, ua - 0.032, y - p.r + 0.01, v0 + 0.02, ua - 0.022, y - 0.02, v1 - 0.02, { detail: true });
       }
     }
@@ -148,7 +148,7 @@ export function buildSproulSteps({ heightAt, physics, M }) {
       const ua = cuts[i], ub = cuts[i + 1], ys = bedSoil(p, bed, i);
       K.box(mulch, ua, Math.min(base(ua, (v0 + v1) / 2), ys - 1.2), v0, ub, ys, v1);
       const yLow = i === 0 ? p.yB : bedSoil(p, bed, i - 1);
-      K.box(corten, ua - 0.05, Math.min(yLow, base(ua, v0)) - 0.3, v0, ua + 0.05, ys + 0.22, v1);
+      K.box(corten, ua - 0.018, Math.min(yLow, base(ua, v0)) - 0.3, v0, ua + 0.018, ys + 0.22, v1); // thin weathering-steel plate
       for (let u = ua + 0.7; u < ub - 0.45; u += 1.15) for (let v = v0 + 0.6; v < v1 - 0.45; v += 1.15) {
         if (rnd() < 0.22) continue;
         const r0 = 0.32 + rnd() * 0.36, hx = greens[Math.floor(rnd() * (rnd() < 0.9 ? greens.length - 1 : greens.length))];
@@ -179,7 +179,7 @@ export function buildSproulSteps({ heightAt, physics, M }) {
 function shrubClump(rnd, u, y, v, r, hex) {
   const out = []; const base = new THREE.Color(hex); const n = 2 + Math.floor(rnd() * 3);
   for (let i = 0; i < n; i++) {
-    const rr = r * (0.55 + rnd() * 0.45); const g = new THREE.IcosahedronGeometry(rr, 2); const p = g.attributes.position; const col = new Float32Array(p.count * 3);
+    const rr = r * (0.55 + rnd() * 0.45); const g = new THREE.IcosahedronGeometry(rr, 1); const p = g.attributes.position; const col = new Float32Array(p.count * 3);
     const ox = (rnd() - 0.5) * r * 0.9, oz = (rnd() - 0.5) * r * 0.9, sq = 0.62 + rnd() * 0.2;
     for (let k = 0; k < p.count; k++) {
       const x = p.getX(k), yy = p.getY(k), z = p.getZ(k); const nn = 0.86 + 0.28 * Math.abs(Math.sin(x * 7.1 + z * 5.3 + yy * 9.7 + i));

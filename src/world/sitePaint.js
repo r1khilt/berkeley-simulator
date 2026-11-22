@@ -96,7 +96,7 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
       const snx = gt.snx, snz = gt.snz;
       for (let z = Math.max(0, Math.floor(bz0 - z0)); z <= Math.min(snz - 1, Math.ceil(bz1 - z0)); z++) for (let x = Math.max(0, Math.floor(bx0 - x0)); x <= Math.min(snx - 1, Math.ceil(bx1 - x0)); x++) {
         const k = z * snx + x; const v = special[k];
-        if (s.special) { if ((v === 0 || v === 4 || v === 5 || v === 9 || v === 10) && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = s.special; continue; } // [r5-sproul] stamp a paving special id (9 Lower Sproul bands, 10 Upper Sproul brick); water/ivy/turf stay
+        if (s.special) { const ok = s.type === 'special' ? v === 0 : (v === 0 || v === 4 || v === 5); if (ok && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = s.special; continue; } // [r5-sproul] stamp a paving special id (9 Lower Sproul bands over the old brick, 10 Upper Sproul brick only on plain paving: authored granite/brick aprons, water, ivy, turf stay)
         if (v >= 4 && v <= 6 && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = 0;
       }
     }

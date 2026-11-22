@@ -169,8 +169,8 @@ void groundShade(vec2 w, float dist){
     float dv = max(1.0 - smoothstep(0.08 - aa, 0.08 + aa, min(fa, 2.4 - fa)), 1.0 - smoothstep(0.07 - aa, 0.07 + aa, min(fc, 7.2 - fc)));
     float jt = (1.0 - smoothstep(0.0, aa * 1.5, min(fj, 1.2 - fj) - 0.008)) * lodL;
     float dd = dot(rel, vec2(0.934, 0.359)); float dg = max(1.0 - smoothstep(0.3 - aa, 0.3 + aa, abs(dd)), 1.0 - smoothstep(0.3 - aa, 0.3 + aa, abs(dd + 22.0)));
-    pav = mix(bc * (1.0 - 0.18*jt), vec3(0.20,0.205,0.21), dv * mix(0.55, 1.0, lodL));
-    pav = mix(pav, vec3(0.13,0.135,0.14), dg);
+    pav = mix(bc * (1.0 - 0.18*jt), vec3(0.13,0.135,0.14), dv * mix(0.6, 1.0, lodL));
+    pav = mix(pav, vec3(0.075,0.078,0.08), dg);
   } else if (sp > 9.5 && sp < 10.5) { // [r5-sproul] Upper Sproul: clay brick pavers in running bond (0.2 x 0.1 m) inside a grid of
     // 0.35 m light concrete bands at 45 deg to the plaza axis, ~7 m modules (photos: Commons "Students walking in Upper Sproul")
     vec2 rel = w - vec2(-140.0, 280.0); float pa = dot(rel, vec2(0.14, 0.99)), pc = dot(rel, vec2(0.99, -0.14));
@@ -180,7 +180,7 @@ void groundShade(vec2 w, float dist){
     vec2 b = vec2(pc, pa) * vec2(5.0, 10.0); float row = floor(b.y); b.x += mod(row, 2.0) * 0.5; vec2 fb = fract(b);
     float lodB = 1.0 - smoothstep(0.05, 0.25, max(fwidth(b.x), fwidth(b.y)));
     float m = mix(1.0, step(0.05, fb.x) * step(0.1, fb.y), lodB); float bh = texture(uNoise, floor(b) * 0.13).b;
-    vec3 brk = vec3(0.36, 0.165, 0.115) * (0.8 + 0.4 * bh * lodB + 0.12 * (n1.r - 0.5)) * (0.94 + 0.12 * n0.g);
+    vec3 brk = vec3(0.30, 0.16, 0.12) * (0.8 + 0.4 * bh * lodB + 0.12 * (n1.r - 0.5)) * (0.94 + 0.12 * n0.g);
     brk = mix(vec3(0.21, 0.17, 0.15), brk, m);
     pav = mix(brk, vec3(0.55, 0.52, 0.46) * (0.92 + 0.12 * n1.r), band * mix(0.75, 1.0, lodB));
   }

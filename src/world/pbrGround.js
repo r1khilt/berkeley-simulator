@@ -144,22 +144,23 @@ void groundShadePBR(vec2 w, float dist) {
       vec2 ci = floor(vec2(pc / 1.2, pa / 2.4));
       p = gTap(vec2(pc, pa) + vec2(hq12(ci), hq12(ci + 2.7)) * 4.0, 4.04, L_SIDEWALK, kIso, near);
       float bh = hq12(vec2(floor(pa / 2.4), 4.1)), warm = 1.0 - smoothstep(7.5, 9.5, abs(pc));
-      vec3 tw = bh < 0.4 ? vec3(1.2, 1.13, 0.97) : (bh < 0.75 ? vec3(1.1, 0.92, 0.66) : vec3(1.03, 1.01, 0.97));
-      vec3 tg = bh < 0.35 ? vec3(1.03, 1.01, 0.97) : (bh < 0.7 ? vec3(0.84, 0.84, 0.83) : (bh < 0.86 ? vec3(1.2, 1.13, 0.97) : vec3(0.6, 0.6, 0.61)));
+      vec3 tw = bh < 0.4 ? vec3(1.24, 1.15, 0.96) : (bh < 0.75 ? vec3(1.12, 0.9, 0.6) : vec3(0.98, 0.97, 0.94));
+      vec3 tg = bh < 0.35 ? vec3(1.0, 0.99, 0.96) : (bh < 0.7 ? vec3(0.78, 0.78, 0.78) : (bh < 0.86 ? vec3(1.22, 1.14, 0.96) : vec3(0.52, 0.52, 0.53)));
       p.c *= mix(tg, tw, warm) * (0.94 + 0.1 * hq12(ci + 1.3));
       float fa = fract(pa / 2.4) * 2.4, fc = fract(pc / 7.2) * 7.2, fj = fract(pc / 1.2) * 1.2;
-      float dv = max(jointAA(min(fa, 2.4 - fa), 0.08), jointAA(min(fc, 7.2 - fc), 0.07));
+      float dv = max(jointAA(min(fa, 2.4 - fa), 0.07), jointAA(min(fc, 7.2 - fc), 0.06)) * mix(0.75, 1.0, det);
       float jt = jointAA(min(fj, 1.2 - fj), 0.004) * det; jointDark = jt;
       float dd = dot(rel, vec2(0.934, 0.359)); float dg = max(jointAA(abs(dd), 0.3), jointAA(abs(dd + 22.0), 0.3));
       p.c *= 1.0 - 0.35 * jt;
-      p.c = mix(p.c, vec3(0.2, 0.205, 0.21) * (0.9 + 0.2 * n1.r), dv);
-      p.c = mix(p.c, vec3(0.13, 0.135, 0.14) * (0.9 + 0.2 * n1.r), dg);
+      p.c = mix(p.c, vec3(0.12, 0.125, 0.13) * (0.9 + 0.2 * n1.r), dv);
+      p.c = mix(p.c, vec3(0.07, 0.072, 0.075) * (0.9 + 0.2 * n1.r), dg); p.r = mix(p.r, 0.8, dg);
     } else if (sp > 9.5 && sp < 10.5) { // [r5-sproul] Upper Sproul: clay brick pavers inside a grid of 0.35 m light concrete bands
       // at 45 deg to the plaza axis, ~7 m modules (cf. terrain.js)
       vec2 rel = w - vec2(-140.0, 280.0); float pa = dot(rel, vec2(0.14, 0.99)), pc = dot(rel, vec2(0.99, -0.14));
       vec2 bq = vec2(pc, pa); vec2 reg = floor(bq / 9.0);
       p = gTapS(bq / vec2(3.0, 2.0) + vec2(hq12(reg), hq12(reg + 3.1)), L_BRICK, near);
-      p.c = mix(vec3(dot(p.c, vec3(0.2126, 0.7152, 0.0722))), p.c, 0.8) * vec3(1.08, 0.9, 0.86) * (0.85 + 0.3 * n1.r) * (0.9 + 0.2 * hq12(reg + 7.0));
+      p.c = mix(vec3(dot(p.c, vec3(0.2126, 0.7152, 0.0722))), p.c, 0.62) * vec3(1.0, 0.9, 0.88) * 0.9 * (0.85 + 0.3 * n1.r) * (0.9 + 0.2 * hq12(reg + 7.0)); // weathered red-brown, not salmon
+      { PS bf = pbrFarPS(L_BRICK); bf.c = mix(vec3(dot(bf.c, vec3(0.2126, 0.7152, 0.0722))), bf.c, 0.62) * vec3(1.0, 0.9, 0.88) * 0.9; p.c = mix(bf.c, p.c, 0.45 + 0.55 * det); } // calm the far field (moire)
       p.r = mix(p.r, 0.9, 0.3);
       float d1 = (pa + pc) * 0.7071, d2 = (pa - pc) * 0.7071; float f1 = fract(d1 / 7.0) * 7.0, f2 = fract(d2 / 7.0) * 7.0;
       float band = max(jointAA(min(f1, 7.0 - f1), 0.175), jointAA(min(f2, 7.0 - f2), 0.175));

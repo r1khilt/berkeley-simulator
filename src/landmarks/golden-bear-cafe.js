@@ -249,8 +249,8 @@ export async function build(ctx) {
     return g(u, v);
   };
   // r4-sweep: soffits in light board-marked concrete (the untextured white paint read as raw blockout from spawn)
-  const sofC = tone(M.concrete, 0xe8e4dc), sofC2 = tone(M.concrete, 0xd8d3c9);
-  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.1, rimW: 0.12, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv), aoSoffit: 0.42 /* r5-sproul */ });
+  const sofC = tone(M.concrete, 0xdcd7cd), sofC2 = tone(M.concrete, 0xcdc7bb); // [r5-sproul] a touch darker than the sunlit white fascia (photo)
+  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.1, rimW: 0.12, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv), aoSoffit: 0.5 /* r5-sproul */ });
 
   // rooftop mechanical equipment and a small penthouse (LiDAR 12.9–15.0 m)
   const mech = tinted(M.concrete, 0xd0d0cc);
