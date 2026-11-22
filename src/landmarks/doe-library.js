@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { Kit, clipBelow } from './lib/beaux-kit.js';
 import { buildDoeInterior, updateDoeInterior } from './lib/doe-interior.js';
+import { signMat } from './lib/rc-finish.js'; // r5-east: Bancroft entrance lettering
 
 export const info = {
   id: 'doe-library',
@@ -297,7 +298,16 @@ export async function build(ctx) {
     F.box(stone, s0 + 1.2, s1 - 1.2, y, yAttic, -1.8, -1.1);  // attic set back behind the cornice
     if (entry != null) { const st = Math.max(2, Math.round(0.75 / 0.16)); for (let i = 0; i < st; i++) F.box(dark, entry - 3.0 - (st - i) * 0.3, entry + 3.0 + (st - i) * 0.3, yFound, gBe + (i + 1) * 0.75 / st, 0, (st - i) * 0.32); }
   };
-  { const F = k.side('E', BA.u1); bancroftFace(F, F.s(BA.v1), F.s(BA.v0), F.s(5.2)); }
+  { const F = k.side('E', BA.u1); bancroftFace(F, F.s(BA.v1), F.s(BA.v0), F.s(5.2));
+    // r5-east: the east entrance as photographed (Commons "The Bancroft Library, Berkeley, 2022"): incised "THE BANCROFT
+    // LIBRARY" on the frieze band over the doorway, and a grey cast-metal lantern on a post beside the steps
+    const e = F.s(5.2), lg = new THREE.PlaneGeometry(6.6, 0.56); if (F.m && F.m.determinant() < 0) lg.scale(-1, 1, 1); lg.translate(e, 8.38, 0.104); // mirrored side frames would cull/reverse the lettering
+    F.box(stone, e - 3.45, e + 3.45, 8.04, 8.72, 0, 0.1); // raised frieze panel (clears the pilasters)
+    F.geom(signMat('THE BANCROFT LIBRARY', { bg: '#d8d2c3', fg: '#46423a', font: 'Georgia, serif', weight: '500', w: 1536, h: 130 }), lg, { uvMode: 'keep' }); // r5-east2: keep the plane's UVs (box UVs hid the text)
+    const lx = e + 4.6, ly = gBe + 0.02, metal = M.iron;
+    F.box(metal, lx - 0.13, lx + 0.13, ly, ly + 0.35, 1.6, 1.86); F.box(metal, lx - 0.06, lx + 0.06, ly + 0.35, ly + 3.0, 1.67, 1.79);
+    F.box(M.lampGlow || stone, lx - 0.2, lx + 0.2, ly + 3.0, ly + 3.62, 1.53, 1.93); F.box(metal, lx - 0.26, lx + 0.26, ly + 3.62, ly + 3.72, 1.47, 1.99); F.box(metal, lx - 0.12, lx + 0.12, ly + 3.72, ly + 3.92, 1.61, 1.85);
+  }
   { const F = k.side('N', BA.v0); bancroftFace(F, F.s(BA.u1), F.s(BA.u0)); }
   { const F = k.side('S', BA.v1); bancroftFace(F, BA.u0, BA.u1); }
   k.hipRoof(M.redTile, BA.u0 + 0.5, BA.u1 - 1.2, BA.v0 + 1.2, BA.v1 - 1.2, yAttic, 0.56, yDeckB, { soffit: stone });

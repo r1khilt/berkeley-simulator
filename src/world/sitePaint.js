@@ -67,6 +67,9 @@ export const SITES = [
   // with the big south-east tree in a planting bed.
   { type: 'paved', pts: WF(rect(-27.5, 38.0, 28, 61.5)) },
   { type: 'dirt', pts: WF(rect(5.6, 42.0, 10.6, 47.0)) }, // mulched pit round the big LiDAR oak (u 8.1, v 44.5)
+  // [r5-east] Sather Tower's terrace is red brick around the tower and out to the head of the west stair (CC0 photos
+  // "Campanile Way from base of Sather Tower"); the bake had lawn and loose path blobs right up to the tower base
+  { type: 'paved', brick: true, pts: [[-11.0, -9.5], [12.5, -11.5], [15.0, 13.5], [-5.5, 17.0], [-11.0, 11.0], [-11.0, 9.4], [-11.6, 9.4], [-11.6, 1.9], [-11.0, 1.9]] },
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
@@ -101,9 +104,10 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
     if (special && gt.snx && !s.keepSpecial) { // 1 m special ids (brick/granite pavers, turf) are cleared under painted surfaces
       const snx = gt.snx, snz = gt.snz;
       for (let z = Math.max(0, Math.floor(bz0 - z0)); z <= Math.min(snz - 1, Math.ceil(bz1 - z0)); z++) for (let x = Math.max(0, Math.floor(bx0 - x0)); x <= Math.min(snx - 1, Math.ceil(bx1 - x0)); x++) {
-        const k = z * snx + x; const v = special[k];
-        if (s.special) { const ok = s.type === 'special' ? v === 0 : (v === 0 || v === 4 || v === 5); if (ok && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = s.special; continue; } // [r5-sproul] stamp a paving special id (9 Lower Sproul bands over the old brick, 10 Upper Sproul brick only on plain paving: authored granite/brick aprons, water, ivy, turf stay)
-        if (v >= 4 && v <= 6 && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = 0;
+        const k = z * snx + x; const v = special[k]; const ins = sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0;
+        if (s.special) { const ok = s.type === 'special' ? v === 0 : (v === 0 || v === 4 || v === 5); if (ok && ins) special[k] = s.special; continue; } // [r5-sproul] stamp a paving special id (9 Lower Sproul bands over the old brick, 10 Upper Sproul brick only on plain paving: authored granite/brick aprons, water, ivy, turf stay)
+        if (s.brick && ins) special[k] = 4; // [r5-east] brick pavers (special id 4)
+        else if (v >= 4 && v <= 6 && ins) special[k] = 0;
       }
     }
   }

@@ -28,8 +28,10 @@ export async function build(ctx) {
   const PIL = new THREE.MeshStandardMaterial({ color: 0xe6e2d4, roughness: 0.85, map: M.marble.map, normalMap: M.marble.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) });
   const FLUTE = new THREE.MeshStandardMaterial({ color: 0xb9b19e, roughness: 0.9 });
   const PLINTH = new THREE.MeshStandardMaterial({ color: 0xc8c4b6, roughness: 0.9, map: M.marble.map });
-  const TILE = new THREE.MeshStandardMaterial({ color: 0x8fd0d6, roughness: 0.35 });
-  const WATER = new THREE.MeshStandardMaterial({ color: 0x4f93a3, roughness: 0.04, metalness: 0.15, envMapIntensity: 1.3 });
+  const TILE = new THREE.MeshStandardMaterial({ color: 0xa6e3e8, roughness: 0.35, emissive: 0x0d3b40, emissiveIntensity: 0.35 }); // [r5-east2] brighter aqua basin (light scattered up through the water)
+  // [r5-east2] translucent turquoise water over the light tiled basin and lane lines (photos: bright aqua pools); it was an
+  // opaque dark-teal slab that read as a skylight from above. No shadow from the water surface (see after finish()).
+  const WATER = new THREE.MeshStandardMaterial({ color: 0x5ccbd8, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.45, depthWrite: false, envMapIntensity: 0.35 });
   const colliders = [], walkables = [];
   const DECK = 7.0;
 
@@ -246,6 +248,7 @@ export async function build(ctx) {
   // terrace lamps
 
   const object3d = K.finish();
+  object3d.traverse((o) => { if (o.isMesh && o.material === WATER) { o.castShadow = false; o.renderOrder = 2; } }); // [r5-east2]
   object3d.name = 'hearst-memorial-gymnasium';
   return { object3d, colliders, walkables };
 }
