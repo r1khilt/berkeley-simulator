@@ -217,7 +217,7 @@ export class Kit {
   flat(mat, poly, y, holes = [], down = false, opts) {
     // [r4-sweep-outer] down=true used to add rotateX(PI) after the up-facing mapping, which mirrored the polygon across
     // v=0 (hip-roof soffits of b05b/b08a/b02 kits landed beside their buildings, e.g. faculty-club). Build the shape in
-    // (u, v) and rotate +90deg instead: same footprint, normal facing down (same as coop-kit flatDown).
+    // (u, v) and rotate +90deg instead: same footprint, normal facing down (same as coop-kit flatDown). [r4-ground found the same bug: the brown slab by Durant Hall.]
     const sv = down ? 1 : -1;
     const s = new THREE.Shape(); s.setFromPoints(poly.map(([u, v]) => new THREE.Vector2(u, sv * v)));
     for (const h of holes) { const p = new THREE.Path(); p.setFromPoints(h.map(([u, v]) => new THREE.Vector2(u, sv * v))); s.holes.push(p); }

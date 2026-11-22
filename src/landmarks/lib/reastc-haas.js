@@ -162,7 +162,7 @@ export class FrameKit extends Kit {
 }
 
 // Hip roof with overhang and a soffit ring (a thin prism, so it is visible from below and never mirrored).
-// Note: b05b-kit hipRoof builds its soffit with classic-kit K.flat(..., down=true), which mirrors v; avoid it off the v=0 axis.
+// Note: b05b-kit hipRoof builds its soffit with classic-kit K.flat(..., down=true), which mirrored v until r4-ground fixed it.
 export function haasHip(K, mat, u0, v0, u1, v1, yE, slope, ov = 0.8, { soffit, yTop = Infinity } = {}) {
   const y = K.hip(mat, u0 - ov, v0 - ov, u1 + ov, v1 + ov, yE - ov * slope, slope, { yTop });
   if (soffit) { const r = (a, b, c, d) => [[a, d], [c, d], [c, b], [a, b]]; K.prism(soffit, r(u0 - ov, v0 - ov, u1 + ov, v1 + ov), yE - ov * slope - 0.1, yE - ov * slope - 0.02, {}, [r(u0 + 0.05, v0 + 0.05, u1 - 0.05, v1 - 0.05)]); }
