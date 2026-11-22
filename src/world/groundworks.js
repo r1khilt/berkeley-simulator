@@ -154,7 +154,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   // [r5-audit-north] photo-matched flights: OSM only gives a centreline, so a few prominent stairs get their real width,
   // tread material and landings here (flights = runs separated by flat landings of `landing` m, centre = middle handrail)
   const STAIR_STYLE = {
-    262173804: { w: 5.0, mat: 'brick', flights: 3, landing: 2.2, centre: true }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025)
+    262173804: { w: 5.0, mat: 'brickm', flights: 3, landing: 2.2, centre: true, cheekH: 0.85 }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025): muted brick treads, stepped concrete side walls
     1377317325: { w: 3.4, mat: 'concrete', flights: 1, landing: 0 }, // Hearst -> Cory/SDH courtyard under the Newton bridge: wide ~20-riser flight, board-formed cheeks (C. Sequin 2009)
   };
   // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
@@ -187,7 +187,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     for (let s2 = 0; s2 <= L; s2 += 0.7) { const [x, z] = along(P, C, s2); const sl = up ? s2 : L - s2; const ramp = lo + (hi - lo) * (sl / L); const dz = G.at(x, z) - ramp; worstCut = Math.max(worstCut, dz); worstFill = Math.max(worstFill, -dz); }
     if (worstCut > 1.1 || worstFill > 1.4) continue;
     stairs.push({ P, C, L, w, n, lo, hi, up, mat: sty ? sty.mat : /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45,
-      flights: sty ? sty.flights : 1, landing: sty ? sty.landing : 0, centre: !!(sty && sty.centre) });
+      flights: sty ? sty.flights : 1, landing: sty ? sty.landing : 0, centre: !!(sty && sty.centre), cheekH: (sty && sty.cheekH) || 0 });
   }
   // landings first (blend toward the landing heights), then beds (only ever lowered, so treads always cover terrain)
   for (const st of stairs) {
@@ -377,7 +377,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   let nTreads = 0;
   for (const st of plan.stairs) {
     const { P, C, L, w, n, lo, hi, up } = st; const r = (hi - lo) / n, t = L / n, hw = w / 2;
-    const mid = along(P, C, L / 2); const key = st.mat === 'granite' ? 'gran' : st.mat === 'brick' ? 'brick' : 'conc';
+    const mid = along(P, C, L / 2); const key = st.mat === 'granite' ? 'gran' : st.mat === 'brick' ? 'brick' : st.mat === 'brickm' ? 'brickm' : 'conc';
     const geo = bucket(mid[0], mid[1], key), cheekGeo = bucket(mid[0], mid[1], 'concd'), railGeo = bucket(mid[0], mid[1], 'rail');
     const yBase = (x, z) => Math.min(heightAt(x, z), lo) - 0.35;
     for (let i = 0; i < n; i++) {
@@ -389,7 +389,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       slab(geo, a, b, hw, [yBase(a[0], a[1]), yBase(b[0], b[1])], y1, y1, { top: 1, front: 1, back: i === n - 1, left: 1, right: 1 });
       // dark anti-slip nosing strip along each tread edge: makes the flight read as steps from mid distance
       { const ux = dx / l, uz = dz / l, nx = -uz, nz = ux, e = hw - 0.06; const n0 = [a[0], a[1]], n1 = [a[0] + ux * 0.08, a[1] + uz * 0.08];
-        (st.mat === 'brick' ? bucket(mid[0], mid[1], 'gran') : railGeo).quad([n0[0] - nx * e, y1 + 0.004, n0[1] - nz * e], [n0[0] + nx * e, y1 + 0.004, n0[1] + nz * e], [n1[0] + nx * e, y1 + 0.004, n1[1] + nz * e], [n1[0] - nx * e, y1 + 0.004, n1[1] - nz * e], [0, 1, 0], [[0, 0], [1, 0], [1, 0.03], [0, 0.03]]); }
+        (st.mat === 'brick' || st.mat === 'brickm' ? bucket(mid[0], mid[1], 'gran') : railGeo).quad([n0[0] - nx * e, y1 + 0.004, n0[1] - nz * e], [n0[0] + nx * e, y1 + 0.004, n0[1] + nz * e], [n1[0] + nx * e, y1 + 0.004, n1[1] + nz * e], [n1[0] - nx * e, y1 + 0.004, n1[1] - nz * e], [0, 1, 0], [[0, 0], [1, 0], [1, 0.03], [0, 0.03]]); }
       nTreads++;
     }
     if (st.centre && hi - lo > 0.9) { // [r5-audit-north] middle handrail on wide photo-matched flights
@@ -410,7 +410,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
           const sa = (k / N) * L, sb = ((k + 1) / N) * L; const A = along(P, C, sa), B = along(P, C, sb);
           const pa = [A[0] - A[3] * off * sd, A[1] + A[2] * off * sd], pb = [B[0] - B[3] * off * sd, B[1] + B[2] * off * sd];
           const la = up ? sa : L - sa, lb = up ? sb : L - sb; // distance from the low end
-          const ya = stairNose(st, la) + 0.12, yb = stairNose(st, lb) + 0.12;
+          const ya = stairNose(st, la) + (st.cheekH || 0.12), yb = stairNose(st, lb) + (st.cheekH || 0.12);
           // keep the cheek above the soil it retains on the outside
           const ga = heightAt(pa[0] - A[3] * 0.5 * sd, pa[1] + A[2] * 0.5 * sd), gb = heightAt(pb[0] - B[3] * 0.5 * sd, pb[1] + B[2] * 0.5 * sd);
           slab(cheekGeo, pa, pb, thick / 2, [yBase(pa[0], pa[1]), yBase(pb[0], pb[1])], Math.max(ya, ga + 0.05), Math.max(yb, gb + 0.05), { top: 1, front: k === 0, back: k === N - 1, left: 1, right: 1 });
@@ -419,8 +419,9 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
         if (hi - lo > 0.9) {
           const nP = Math.max(2, Math.ceil(L / 1.6) + 1); let prev = null;
           for (let k = 0; k < nP; k++) {
-            const s = (k / (nP - 1)) * L; const A = along(P, C, s); const p = [A[0] - A[3] * off * sd, A[1] + A[2] * off * sd]; const ls = up ? s : L - s;
-            const y = stairNose(st, ls) + 0.12; const top = y + 0.86;
+            const ro = st.cheekH ? hw - 0.12 : off; // tall cheek walls: the rail runs on their inner face
+            const s = (k / (nP - 1)) * L; const A = along(P, C, s); const p = [A[0] - A[3] * ro * sd, A[1] + A[2] * ro * sd]; const ls = up ? s : L - s;
+            const y = st.cheekH ? stairTop(st, ls) : stairNose(st, ls) + 0.12; const top = (st.cheekH ? stairNose(st, ls) : y) + 0.86 + (st.cheekH ? 0.04 : 0);
             slab(railGeo, [p[0] - A[2] * 0.02, p[1] - A[3] * 0.02], [p[0] + A[2] * 0.02, p[1] + A[3] * 0.02], 0.02, y, top, top, { top: 0, front: 1, back: 1, left: 1, right: 1 });
             if (prev) slab(railGeo, [prev[0], prev[1]], [p[0], p[1]], 0.024, [prev[2] - 0.05, top - 0.05], prev[2], top);
             prev = [p[0], p[1], top];
@@ -487,7 +488,9 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(H.c, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
     const m = new THREE.Mesh(g, hedgeMat); m.position.set(H.cx, y, H.cz); m.castShadow = true; m.receiveShadow = true; m.name = 'gw:hedge'; m.matrixAutoUpdate = false; m.updateMatrix(); group.add(m); statics.push(m);
   }
-  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron; // walls/cheeks a shade darker than treads and copings
+  // [r5-audit-north] muted brown-grey brick for photo-matched brick treads (the wall brick reads saturated red on a flight)
+  const brickM = new THREE.MeshStandardMaterial({ map: M.brick.map || null, normalMap: M.brick.normalMap || null, roughnessMap: M.brick.roughnessMap || null, color: new THREE.Color(0.75, 1.15, 1.35), roughness: 0.92 }); // ~#6A554D brown-grey
+  const matFor = (key) => key === 'brickm' ? brickM : key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron; // walls/cheeks a shade darker than treads and copings
   for (const b of buckets.values()) {
     if (!b.geo.count) continue; const y = heightAt(b.cx, b.cz);
     const mesh = new THREE.Mesh(b.geo.geometry([b.cx, y, b.cz]), matFor(b.key)); mesh.position.set(b.cx, y, b.cz);

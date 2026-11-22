@@ -18,7 +18,7 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.6);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
-  const CON = new THREE.MeshStandardMaterial({ color: 0xa9b6ad, roughness: 0.88, /* [r5-audit-north] was 0xc4c6b8, which the warm concrete map rendered as sand beige (#C9BEA6); photos read cool grey-green (#A2A392 overcast) */ map: M.concrete.map, normalMap: M.concrete.normalMap, roughnessMap: M.concrete.roughnessMap });
+  const CON = new THREE.MeshStandardMaterial({ color: 0xaebdc4, roughness: 0.88, /* [r5-audit-north] was 0xc4c6b8: the warm concrete map + afternoon sun rendered it sand/olive (#A3A280); photos read cool grey-green (#A2A392 overcast), so the albedo is biased blue to land there */ map: M.concrete.map, normalMap: M.concrete.normalMap, roughnessMap: M.concrete.roughnessMap });
   const CAP = new THREE.MeshStandardMaterial({ color: 0xc0705a, roughness: 0.85 });
   const GL = M.windowNight, FR = B.alumDark;
   const colliders = [], walkables = [];

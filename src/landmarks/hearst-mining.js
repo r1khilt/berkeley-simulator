@@ -167,16 +167,15 @@ export async function build(ctx) {
     F.box(dark, sA, sB, yF, top, 0, D0);
     for (let i = 0; i < nS; i++) F.box(dark, sA, sB, gF - 1.0, top - ((i + 1) * (top - gF)) / nS, D0 + i * tr, D0 + (i + 1) * tr);
     const D1 = D0 + nS * tr;
-    for (const [a0, a1] of [[sA - 1.3, sA], [sB, sB + 1.3]]) { F.box(stone, a0, a1, gF - 1.0, top + 0.95, 0, D1); F.box(stone, a0 - 0.08, a1 + 0.08, top + 0.95, top + 1.12, -0.08, D1 + 0.08);
-      const c = (a0 + a1) / 2; F.geom(M.lampGreen, new THREE.CylinderGeometry(0.07, 0.09, 3.0, 10).translate(c, top + 1.12 + 1.5, D1 - 0.65), { detail: true });
-      F.geom(M.lampGlow, new THREE.SphereGeometry(0.24, 12, 8).scale(1, 1.25, 1).translate(c, top + 1.12 + 3.25, D1 - 0.65), { detail: true }); }
-    { // [r5-audit-north] forecourt apron: bright rust-red brick paving with light concrete edge bands (photos), not the dark wall brick
-      const pave = new THREE.MeshStandardMaterial({ color: 0xf2cbb8, roughness: 0.9, map: M.brick.map, normalMap: M.brick.normalMap, roughnessMap: M.brick.roughnessMap });
+    for (const [a0, a1] of [[sA - 1.3, sA], [sB, sB + 1.3]]) { F.box(stone, a0, a1, gF - 1.0, top + 0.95, 0, D0 + 1.2); F.box(stone, a0 - 0.08, a1 + 0.08, top + 0.95, top + 1.12, -0.08, D0 + 1.28);
+      for (let q = 1; q <= 2; q++) { const ya = gF + 0.75 + (top - gF) * (1 - q / 3); F.box(stone, a0, a1, gF - 1.0, ya, D0 + 1.2 + (D1 - D0 - 1.2) * (q - 1) / 2, D0 + 1.2 + (D1 - D0 - 1.2) * q / 2); }   // [r5-audit-north] cheek walls step down with the raised flight
+      const c = (a0 + a1) / 2; F.geom(M.lampGreen, new THREE.CylinderGeometry(0.07, 0.09, 3.0, 10).translate(c, top + 1.12 + 1.5, D0 + 0.6), { detail: true });
+      F.geom(M.lampGlow, new THREE.SphereGeometry(0.24, 12, 8).scale(1, 1.25, 1).translate(c, top + 1.12 + 3.25, D0 + 0.6), { detail: true }); }
+    { // [r5-audit-north] forecourt apron: bright rust-red brick paving (photos), not the dark wall brick
+      const pave = new THREE.MeshStandardMaterial({ color: new THREE.Color(1.27, 1.1, 1.1) /* lifts the wall brick (~#8E4A39) to rust red ~#B5523F */, roughness: 0.9, map: M.brick.map, normalMap: M.brick.normalMap, roughnessMap: M.brick.roughnessMap });
       // laid in 1 m strips that follow the forecourt's grade (a flat slab at the stair foot sank under the rising lawn)
       for (let t = D1; t < D1 + 6.99; t += 1.0) { const gy = Math.max(gF, k.ground(CTR, P.v1 + t + 0.5)), t1 = Math.min(D1 + 7.0, t + 1.0);
-        F.box(pave, sA - 4, sB + 4, gy - 0.4, gy + 0.04, t, t1);
-        for (const [a0, a1] of [[sA - 4.45, sA - 4], [sB + 4, sB + 4.45]]) F.box(M.concrete, a0, a1, gy - 0.4, gy + 0.06, t, t1, { detail: true }); }
-      { const gy = Math.max(gF, k.ground(CTR, P.v1 + D1 + 7.2)); F.box(M.concrete, sA - 4.45, sB + 4.45, gy - 0.4, gy + 0.06, D1 + 7.0, D1 + 7.45, { detail: true }); } }
+        F.box(pave, sA - 4, sB + 4, gy - 0.4, gy + 0.04, t, t1); } }
     walkables.push({ type: 'poly', pts: k.polyLocal([[sA, P.v1 - 0.9], [sB, P.v1 - 0.9], [sB, P.v1 + D0], [sA, P.v1 + D0]]), y: top });
     { const steps = (x, z) => { const [u, v] = k.uv(x, z); if (u < sA || u > sB || v < P.v1 + D0 - 0.05 || v > P.v1 + D1 + 0.05) return null; const i = Math.min(nS - 1, Math.max(0, Math.floor((v - P.v1 - D0) / tr))); return top - ((i + 1) * (top - gF)) / nS; };
       const cs = [[sA, P.v1 + D0], [sB, P.v1 + D0], [sB, P.v1 + D1], [sA, P.v1 + D1]].map(([u, v]) => k.xz(u, v)); walkables.push({ type: 'fn', bounds: [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1])), Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))], heightAt: steps }); }

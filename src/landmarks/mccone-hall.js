@@ -17,7 +17,7 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.8);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
-  const CREAM = panelMat('mcconePanel2', { pw: 3.05, ph: 3.05, span: 6.1, base: 0xe8dfc8, joint: 0xd6ccb4, vary: 0.01, grain: 0.01, stagger: false }); // [r5-audit-north] smooth painted concrete (was a 1.5 m stone-joint grid) const GL = M.windowNight;
+  const CREAM = panelMat('mcconePanel2', { pw: 3.05, ph: 3.05, span: 6.1, base: 0xe8dfc8, joint: 0xd6ccb4, vary: 0.01, grain: 0.01, stagger: false }); const GL = M.windowNight; // [r5-audit-north] smooth painted concrete (was a 1.5 m stone-joint grid)
   const FR = new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.5, metalness: 0.2 }); const FASC = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.6 });
   const colliders = [];
   const u0 = -13.7, u1 = 14.4, v0 = -37.3, v1 = 37.7, ROOF = 24.2, TOPF = 20.3;
