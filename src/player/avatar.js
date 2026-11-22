@@ -71,23 +71,28 @@ export class Avatar {
     P.spine.rotation.x = -0.12 * b.run - 0.05 * b.walk + idle - 0.45 * b.bike;
     P.spine.rotation.y = s * 0.12 * b.walk * (1 - b.bike);
     P.head.rotation.x = 0.1 * b.run + 0.35 * b.bike;
+    // r4-people: limb x-rotations use the rig's real convention (avatar faces -z, so +x swings a hanging limb
+    // FORWARD). The old cycle assumed the opposite, which bent knees and elbows backwards and pointed the
+    // bike/jump thighs behind the body. Knees now flex the shin back, elbows flex the forearm forward.
     for (const sd of [-1, 1]) {
       const ss = sd === 1 ? s : -s; const cc = sd === 1 ? c : -c;
-      // legs
-      let hipX = ss * amp, knee = Math.max(0, cc) * (0.5 + 0.7 * b.run) * b.walk * (1 - b.bike);
-      // air pose
-      hipX = hipX * (1 - b.air) + (-0.5 + sd * 0.2) * b.air; knee = knee * (1 - b.air) + 0.9 * b.air;
-      // bike pose: pedaling
+      // legs: thigh swings with the phase; the knee flexes during swing (thigh moving forward), ~0 in stance
+      let hipX = ss * amp, knee = Math.max(0, cc) * (0.55 + 0.75 * b.run) * b.walk * (1 - b.bike) + 0.06 * b.walk * (1 - b.bike);
+      // air pose: knees tucked up (thighs forward, shins back), slightly asymmetric
+      hipX = hipX * (1 - b.air) + (0.55 + sd * 0.15) * b.air; knee = knee * (1 - b.air) + 0.95 * b.air;
+      // bike pose: hip and knee flex together as the pedal comes over the top
       const pa = this.pedal + (sd === 1 ? 0 : Math.PI);
-      const bikeHip = -1.15 + Math.sin(pa) * 0.32, bikeKnee = 1.45 + Math.cos(pa) * 0.42;
+      const bikeHip = 1.05 + Math.sin(pa) * 0.36, bikeKnee = 1.35 + Math.sin(pa - 0.35) * 0.42;
       P['hip' + sd].rotation.x = hipX * (1 - b.bike) + bikeHip * b.bike;
-      P['kn' + sd].rotation.x = knee * (1 - b.bike) + bikeKnee * b.bike;
-      P['ft' + sd].rotation.x = -knee * 0.3 * (1 - b.bike) - 0.3 * b.bike;
-      // arms
-      const armAmp = (0.35 + 0.5 * b.run) * b.walk * (1 - b.bike) * (1 - b.air);
-      P['sh' + sd].rotation.x = -ss * armAmp * 1.0 + (-0.9) * b.bike + (-0.3) * b.air;
+      P['kn' + sd].rotation.x = -(knee * (1 - b.bike) + bikeKnee * b.bike);
+      // foot: partly cancels the shin's tilt so the sole stays near level (toes dip a little in swing)
+      P['ft' + sd].rotation.x = knee * 0.45 * (1 - b.bike) + (bikeKnee - bikeHip + 0.05) * 0.8 * b.bike;
+      // arms: swing opposite the same-side leg; forward reach on the bike, up/forward in the air
+      const armAmp = (0.32 + 0.5 * b.run) * b.walk * (1 - b.bike) * (1 - b.air);
+      P['sh' + sd].rotation.x = -ss * armAmp + 0.08 * b.run * (1 - b.bike) + 0.85 * b.bike + 0.35 * b.air;
       P['sh' + sd].rotation.z = sd * (0.08 + 0.4 * b.air) * (1 - b.bike) + sd * 0.12 * b.bike;
-      P['el' + sd].rotation.x = -(0.25 + 0.9 * b.run) * b.walk * (1 - b.bike) - 0.5 * b.bike - 0.4 * b.air;
+      // elbows flex the forearm forward: relaxed in a walk, ~90 degrees when running
+      P['el' + sd].rotation.x = (0.22 + 0.12 * b.walk + 1.05 * b.run) * (1 - b.bike) * (1 - b.air) + 0.45 * b.bike + 0.5 * b.air;
     }
   }
 }
