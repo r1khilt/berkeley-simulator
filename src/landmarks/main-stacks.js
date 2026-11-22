@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { Kit, tint, solid, rect, orient, inPoly } from './lib/b02-kit.js';
 import { balustrade } from './lib/classic-kit.js';
-import { band } from './lib/r5-site.js';
+import { band, basketweave } from './lib/r5-site.js';
 export const info = {
   id: 'main-stacks', name: 'Main Stacks', subtitle: 'Esherick Homsey Dodge & Davis · 1994',
   blurb: 'The Gardner (Main) Stacks hold most of the library\'s collection in four storeys built underground between Doe and Moffitt libraries; the roof is a landscaped terrace.',
@@ -18,9 +18,9 @@ export const info = {
 };
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
-  const STONE = tint(M.stuccoWhite, 0xe4dfd4), STONE_D = tint(M.concrete, 0xc4beb3), BRICK = tint(M.brick, 0xb06a5e), BANDM = tint(M.concrete, 0xd2cbbf);
-  const WALK = tint(M.concrete, 0xc2bdb3), GLASS = M.glassLight, FRAME = solid(0xb9bcbe, 0.4, 0.6), LAMP = solid(0x2f4a3c, 0.5, 0.3);
-  const JUNIPER = solid(0x3f5a2e, 0.95, 0), JUNIPER2 = solid(0x56702f, 0.95, 0), SOIL = tint(M.soil, 0x5a4634);
+  const STONE = tint(M.stuccoWhite, 0xe4dfd4), STONE_D = tint(M.concrete, 0xc4beb3), BRICK = basketweave(), BANDM = tint(M.concrete, 0xc9c2b6);
+  const WALK = tint(M.concrete, 0xc2bdb3), GLASS = solid(0x8e9ba6, 0.12, 0.65), FRAME = solid(0xb9bcbe, 0.4, 0.6), LAMP = solid(0x2f4a3c, 0.5, 0.3);
+  const JUNIPER = solid(0x587553, 0.95, 0), JUNIPER2 = solid(0x6f8a5e, 0.95, 0), SOIL = tint(M.soil, 0x5a4634); // bluish sage juniper
   const fp = ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z));
   const poly = orient(fp); const Y = 4.9; const n = poly.length;
   const g0 = Math.min(...poly.map(([u, v]) => K.g(u, v))) - 1.5;
@@ -43,8 +43,8 @@ export async function build(ctx) {
     const { R, L } = e; if (e.doe) continue;
     // panelled cast-stone retaining wall face (+ cap) and joint reveals every ~3.2 m
     K.rbox(R, STONE, 0, g0, -0.02, L, Y - 0.2, 0.04);
-    if (Y - e.gOut > 1.0 && L > 2) for (let s = 3.2; s < L - 1; s += 3.2) K.rbox(R, STONE_D, s - 0.05, e.gOut - 0.3, 0.04, s + 0.05, Y - 0.45, 0.07, { detail: true });
-    if (Y - e.gOut > 1.6 && L > 2) K.rbox(R, STONE_D, 0, Y - 1.05, 0.04, L, Y - 0.95, 0.07, { detail: true });
+    if (Y - e.gOut > 1.0 && L > 2) for (let s = 3.2; s < L - 1; s += 3.2) K.rbox(R, STONE_D, s - 0.09, e.gOut - 0.3, 0.04, s + 0.09, Y - 0.38, 0.1, { detail: true }); // panel pilaster strips
+    if (Y - e.gOut > 1.6 && L > 2) { K.rbox(R, STONE_D, 0, Y - 1.1, 0.04, L, Y - 0.92, 0.12, { detail: true }); K.rbox(R, STONE, -0.05, Y - 0.38, 0.04, L + 0.05, Y - 0.2, 0.16); } // panel head band + coping under the parapet
     // parapet: balustrade panels between solid dies on the Glade sides, solid coped parapet elsewhere
     if (e.glade && L > 3) {
       for (const [r0, r1] of e.gap ? [[0, e.gap[0]], [e.gap[1], L]] : [[0, L]]) {
@@ -91,7 +91,7 @@ export async function build(ctx) {
   for (const [u, v] of [[-14.5, 15.0], [9.2, 15.0], [12.5, -18.6]]) K.cyl(STONE, u, Y, v, 0.3, 0.3, 0.9, 12, { detail: true });
   // ---- skylight pavilions: cast-stone curb + low hipped glass roof with aluminium hips and frames
   for (const [u0, v0, u1, v1] of [[-8.5, -16.5, -1.5, -8.5], [-1.5, 6.5, 5.5, 13.5]]) {
-    const yC = Y + 1.35, rise = Math.min(u1 - u0, v1 - v0) / 2 * 0.45;
+    const yC = Y + 1.2, rise = Math.min(u1 - u0, v1 - v0) / 2 * 0.5;
     K.box(STONE, u0, Y - 0.1, v0, u1, yC, v1); K.box(STONE, u0 - 0.08, yC, v0 - 0.08, u1 + 0.08, yC + 0.1, v1 + 0.08);
     colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], Y - 0.1, yC + rise + 0.2));
     const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, hw = (u1 - u0) / 2, hd = (v1 - v0) / 2, r0 = Math.min(hw, hd);
@@ -103,7 +103,9 @@ export async function build(ctx) {
     if (gg.attributes.normal.getY(0) < 0) { const q = gg.attributes.position.array; for (let t = 0; t < q.length; t += 9) for (let c = 0; c < 3; c++) { const tmp = q[t + 3 + c]; q[t + 3 + c] = q[t + 6 + c]; q[t + 6 + c] = tmp; } gg.computeVertexNormals(); }
     K.add(GLASS, gg, { uvMode: 'roof' });
     for (let i = 0; i < 4; i++) { const a = C[i], ra = Rg[i]; const L = Math.hypot(ra[0] - a[0], yt - yb, ra[1] - a[1]); const g = new THREE.BoxGeometry(0.08, 0.08, L); g.lookAt(new THREE.Vector3(ra[0] - a[0], yt - yb, ra[1] - a[1])); g.translate((a[0] + ra[0]) / 2, (yb + yt) / 2, (a[1] + ra[1]) / 2); K.add(FRAME, g, { detail: true }); }
-    for (let t = 1; t < 6; t++) { const u = u0 + (u1 - u0) * t / 6; K.box(FRAME, u - 0.03, yb, v0 - 0.02, u + 0.03, yb + 0.06, v1 + 0.02, { detail: true }); }
+    for (let i = 0; i < 4; i++) { const a = C[i], b = C[(i + 1) % 4], ra = Rg[i], rb = Rg[(i + 1) % 4]; // glazing bars (rafters) on each roof face
+      for (let t = 0.2; t < 0.85; t += 0.2) { const p0 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], p1 = [ra[0] + (rb[0] - ra[0]) * t, ra[1] + (rb[1] - ra[1]) * t];
+        const L = Math.hypot(p1[0] - p0[0], yt - yb, p1[1] - p0[1]); const g = new THREE.BoxGeometry(0.05, 0.05, L); g.lookAt(new THREE.Vector3(p1[0] - p0[0], yt - yb, p1[1] - p0[1])); g.translate((p0[0] + p1[0]) / 2, (yb + yt) / 2 + 0.03, (p0[1] + p1[1]) / 2); K.add(FRAME, g, { detail: true }); } }
     if (ru > 0.05 || rv > 0.05) K.box(FRAME, cu - ru - 0.05, yt - 0.03, cv - rv - 0.05, cu + ru + 0.05, yt + 0.05, cv + rv + 0.05, { detail: true });
   }
   // ---- dark-green lamps on square cast-stone pedestals: a row along the walk and one inside the north parapet

@@ -22,6 +22,9 @@ export async function build(ctx) {
   // shaded granite for the deep gallery recess (fakes the ambient occlusion of the loggia)
   const GS = M.granite.clone(); GS.color = new THREE.Color(0x9c978e);
   const FL = 1.4;            // ground-floor / terrace level
+  const r5cols = []; // [r5-audit-central] planter colliders (pushed after the main collider list is built)
+  const NOSE = new THREE.MeshStandardMaterial({ color: 0x5f5c57, roughness: 0.9 }); NOSE.name = 'wheelerNosingShadow'; // [r5-audit-central]
+  const PLANTER = M.concrete, AGA = new THREE.MeshStandardMaterial({ color: 0x3f6a33, roughness: 0.9 }), AGAF = new THREE.MeshStandardMaterial({ color: 0x6f86d6, roughness: 0.7 }), DRYG = new THREE.MeshStandardMaterial({ color: 0xb8a878, roughness: 1 });
   const EAVE = 17.0, DECK = 20.0;
   // outline calibrated to the 2021 LiDAR (the OSM way is offset ~1 m west/north of the real walls)
   const vN = -27.2, vS = 27.7;
@@ -221,17 +224,34 @@ export async function build(ctx) {
     if (!Number.isFinite(gl)) gl = Math.min(K.g(u, tV1 + 2.5), K.g(u1, tV1 + 2.5));
     const n = Math.round((FL + 0.17 - gl) / 0.155); if (n < 1) continue;
     walkables.push(K.stairs(GD, u, tV1, u1, tV1 + n * 0.38, gl, FL + 0.17, '-v', n));
+    // [r5-audit-central] crisp step lines: a dark shadow strip under every nosing (seen from the plaza the flight
+    // otherwise reads as a smooth wedge in flat sun)
+    const rise = (FL + 0.17 - gl) / n;
+    for (let i = 0; i < n; i++) { const top = gl + rise * (i + 1), vf = tV1 + n * 0.38 - 0.38 * i; K.box(NOSE, u, top - 0.05, vf - 0.002, u1, top - 0.012, vf + 0.006, { detail: true }); }
   }
   // [r5-audit-central] one massive plain ashlar cheek block at the WEST end only (photos: ~1.6 m wide, running the full
   // depth of the flight, ~2.7 m above the low plaza; LiDAR top +1.75); at the east end the flight simply runs out into the
   // rising plaza, so the old thin east cheek wall is gone.
   { const u0 = tU0 - 1.6, u1 = tU0, v1 = tV1 + 6.6, yTop = FL + 0.35;
-    K.box(GD, u0, -2.0, vS, u1, yTop, v1); K.box(G, u0 - 0.06, yTop, vS, u1 + 0.06, yTop + 0.16, v1 + 0.06);
-    for (const y of [FL - 0.55, FL - 1.55]) K.box(GD, u0 - 0.02, y - 0.02, vS, u1 + 0.02, y + 0.02, v1 + 0.02, { detail: true }); // ashlar courses
+    K.box(GD, u0, -2.0, tV1, u1, yTop, v1); K.box(G, u0 - 0.06, yTop, tV1 - 0.06, u1 + 0.06, yTop + 0.16, v1 + 0.06); // the block beside the flight
+    K.box(GD, u0, -2.0, vS, u1, FL + 0.5, tV1); // lower parapet along the terrace end
+    for (const y of [FL - 0.55, FL - 1.55]) K.box(GD, u0 - 0.02, y - 0.02, tV1, u1 + 0.02, y + 0.02, v1 + 0.02, { detail: true }); // ashlar courses
+    // raised board-formed concrete planters on the plaza: agapanthus + shrubs in front of the block, dry grasses to the east
+    for (const [pu0, pv0, pu1, pv1, kind] of [[-27.6, 41.6, -21.8, 44.8, 'aga'], [15.5, 43.2, 21.5, 46.0, 'grass']]) {
+      const gp = Math.min(K.g(pu0, pv0), K.g(pu1, pv0), K.g(pu0, pv1), K.g(pu1, pv1)), yP = Math.max(K.g(pu0, pv0), K.g(pu1, pv0), K.g(pu0, pv1), K.g(pu1, pv1)) + 0.62;
+      K.box(PLANTER, pu0, gp - 0.4, pv0, pu1, yP, pv1); K.box(M.soil, pu0 + 0.18, yP - 0.08, pv0 + 0.18, pu1 - 0.18, yP - 0.06, pv1 - 0.18);
+      r5cols.push(K.colPoly([[pu0, pv0], [pu1, pv0], [pu1, pv1], [pu0, pv1]], gp - 0.4, yP));
+      for (let pu = pu0 + 0.55; pu < pu1 - 0.3; pu += 0.75) for (let pv = pv0 + 0.55; pv < pv1 - 0.3; pv += 0.7) {
+        const j = ((pu * 13.7 + pv * 7.3) % 1 + 1) % 1;
+        K.add(kind === 'aga' ? AGA : DRYG, new THREE.SphereGeometry(0.34 + j * 0.12, 6, 4).scale(1, kind === 'aga' ? 0.8 : 1.3, 1).translate(pu, yP + 0.18, pv), { detail: true });
+        if (kind === 'aga' && j > 0.45) K.add(AGAF, new THREE.SphereGeometry(0.11, 5, 3).translate(pu + 0.1, yP + 0.72, pv), { detail: true });
+      }
+    }
   }
 
   // ---------- colliders ----------
   const colliders = [K.colPoly(outline, -2, 21)];
+  colliders.push(...r5cols);
   colliders.push(K.colPoly([[uE0, vS], [uC0, vS], [uC0, vEB], [uE0, vEB]], -2, 21));
   colliders.push(K.colPoly([[uC1, vS], [uE1, vS], [uE1, vEB], [uC1, vEB]], -2, 21));
   colliders.push(K.colPoly([[uC0, vS], [uC1, vS], [uC1, vEB], [uC0, vEB]], -2, 21));

@@ -52,3 +52,20 @@ export function bandOnGround(K, mat, a, b, w = 0.32, lift = 0.015) {
   for (let i = 0; i < n; i++) { const p = [a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n], q = [a[0] + (b[0] - a[0]) * (i + 1) / n, a[1] + (b[1] - a[1]) * (i + 1) / n];
     const y = Math.max(K.g(p[0], p[1]), K.g(q[0], q[1]), K.g((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)); band(K, mat, p, q, y + lift - 0.012, w); }
 }
+
+// Flat basketweave brick paving (Doe north terrace photos: modules of three bricks alternating direction, muted
+// salmon-brown, light mortar). One texture tile = TEX_M (2 m) of box-projected UVs = 4 x 4 modules of 0.5 m.
+export function basketweave() {
+  return local('basketweave', () => {
+    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+    g.fillStyle = '#b8a996'; g.fillRect(0, 0, 512, 512);
+    const cols = ['#a4625a', '#9a5a50', '#ad6b5f', '#8f5249', '#a7685a', '#b07262'];
+    let k = 0; const m = 128, b = m / 3, j = 3;
+    for (let i = 0; i < 4; i++) for (let jj = 0; jj < 4; jj++) for (let r = 0; r < 3; r++) {
+      g.fillStyle = cols[(k++ * 7 + i * 3 + jj) % cols.length];
+      if ((i + jj) % 2 === 0) g.fillRect(i * m + j / 2, jj * m + r * b + j / 2, m - j, b - j); else g.fillRect(i * m + r * b + j / 2, jj * m + j / 2, b - j, m - j);
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const mat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.92 }); mat.name = 'r5-basketweave'; return mat;
+  });
+}

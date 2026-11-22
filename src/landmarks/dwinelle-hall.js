@@ -15,7 +15,7 @@ export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16.5)); const M = ctx.M;
   // refine-central: smooth off-white stucco (the textured cream stucco tinted again read as tan brick), muted tile, larger
   // multi-light steel sash, real entrances where the footpaths arrive, foundation planting, lamps and rooftop plant.
-  const ST = tint(M.stuccoWhite, 0xf8ecd8) /* [r5-audit-central] warmer cream (photos #E6DFCB) */, BASE = tint(M.concrete, 0xd2c8b8), FR = solid(0xe4e1da, 0.5, 0.1), SOF = tint(M.woodDark, 0x9a8064);
+  const ST = tint(M.stuccoWhite, 0xf5e4cc) /* [r5-audit-central] warmer cream (photos #E6DFCB) */, BASE = tint(M.concrete, 0xd2c8b8), FR = solid(0xe4e1da, 0.5, 0.1), SOF = tint(M.woodDark, 0x9a8064);
   const TILE = tint(M.redTile, 0xfaece4);
   const win = { w: 1.6, h: 2.3, sill: 0.85, mull: 1, muntins: 3 };
   const lv = (top, h = 4.2) => { const a = [1.5]; while (a[a.length - 1] + h < top - 0.4) a.push(a[a.length - 1] + h); a.push(top - 0.3); return a; };
@@ -29,7 +29,7 @@ export async function build(ctx) {
     P(rect(-41.0, -17.7, 15.5, -4.5), 20.4, 0.42),
     P(rect(15.1, -21.9, 43.4, -2.2), 18.4, 0.36),
     P(rect(-15.6, -4.6, 7.0, 36.0), 14.6, 0.3),
-    P(rect(7.0, -4.6, 20.6, 39.9), 22.4, 0.5),
+    P(rect(7.0, -4.6, 20.6, 39.9), 22.4, 0.62), // [r5-audit-central] steeper tile hip (LiDAR eave->ridge ~0.3-0.5) so it reads from the plaza
     P([[-27.0, 38.8], [-28.9, 53.9], [37.6, 62.2], [39.2, 47.0], [19.0, 39.9]], 18.0, 0.36),
   ], D);
   // [r5-audit-central] The plaza entrance faces EAST, not south. Photos (Commons PD "Dwinelle hall uc berkeley", Flickr
@@ -102,12 +102,11 @@ function dwinellePlaza(K, ctx, { BASE, ST, colliders, walkables }) {
   for (const v of [vU0 + (vU1 - vU0) / 3, vU0 + 2 * (vU1 - vU0) / 3]) tubeRail(K, [uT - 0.3, v], yT, [uU + 0.35, v], yL);
   // three recessed door bays + plaques on the east face, continuous iron balcony over them at the next floor
   const E = K.run([uF, 39.9], [uF, -4.6]); const sOf = (v) => 39.9 - v;
-  for (const dv of [-4.8, 0, 4.8]) entry(K, E, sOf(vc + dv), yT + 0.02, { w: 2.5, h: 2.75, transom: 0.85, rec: 0.42, surround: BASE, surroundW: 0.45, steps: false, lamps: false, glass: M.windowNight, signText: dv === 0 ? 'DWINELLE HALL' : null, signOpts: { bg: '#e9e1d2', fg: '#4a4036', h: 0.36 } });
+  for (const dv of [-4.8, 0, 4.8]) entry(K, E, sOf(vc + dv), yT + 0.02, { w: 2.5, h: 2.75, transom: 0.85, rec: 0.42, surround: ST, surroundW: 0.32, cap: false, steps: false, lamps: false, glass: M.windowNight, frame: M.darkBronze, signText: dv === 0 ? 'DWINELLE HALL' : null, signOpts: { bg: '#e9e1d2', fg: '#4a4036', h: 0.36 } });
   const b0 = sOf(38.4), b1 = sOf(-0.6), yB = yT + 4.75; // the railing runs nearly the whole plaza front
-  K.rbox(E, BASE, b0, yB - 0.22, 0, b1, yB, 0.95);
-  for (const yy of [yB + 1.0, yB + 0.08]) K.rbox(E, castIron(), b0, yy, 0.86, b1, yy + 0.05, 0.91, { detail: true });
-  for (let s = b0; s <= b1 + 1e-3; s += 0.13) K.rbox(E, castIron(), s, yB, 0.875, s + 0.022, yB + 1.0, 0.895, { detail: true });
-  for (let s = b0 + 1.2; s < b1 - 0.6; s += 2.4) K.rbox(E, castIron(), s, yB - 0.62, 0.1, s + 0.06, yB - 0.22, 0.75, { detail: true }); // brackets
+  K.rbox(E, ST, b0, yB - 0.12, 0, b1, yB, 0.85); // slim slab, light rail (photos)
+  for (const yy of [yB + 0.98, yB + 0.08]) K.rbox(E, castIron(), b0, yy, 0.78, b1, yy + 0.035, 0.81, { detail: true });
+  for (let s = b0; s <= b1 + 1e-3; s += 0.14) K.rbox(E, castIron(), s, yB, 0.785, s + 0.016, yB + 0.98, 0.8, { detail: true });
   const isEast = (r) => Math.abs(r.n[0] - 1) < 0.05 && Math.abs(r.a[0] - uF) < 0.6;
   return { isEast, plaza, yT, yL };
 }

@@ -146,41 +146,74 @@ export async function build(ctx) {
   for (const [u, v] of [[-0.6, -3.6], [3.2, -6.2], [0.0, 5.8], [3.4, 7.0]]) chim(u, v, 1.1, 0.8, 17, 22.6);
   for (const [u, v] of [[-1.5, -17.5], [2.5, 17.8]]) chim(u, v, 0.9, 0.7, 17, 19.2);
 
-  // ---------- east entrance porch: segmental arcade (glazed), balustrade with urn finials, stairs right and left ----------
+  // ---------- east entrance porch ----------
+  // [r5-audit-central] Rebuilt from photos (Commons "South Hall UC Berkeley", "South Hall - University of California,
+  // Berkeley - DSC04888") + LiDAR: a solid painted-stone stair mass with three recessed panels (not a glazed arcade),
+  // a landing at ~2.5 m above the walk (LiDAR +3.0, not the 3.9 m main floor, which made each flight ~6 m long),
+  // two short flights parallel to the facade with raking turned-baluster balustrades, newel pedestals with urns, black
+  // lanterns outboard, and the two-storey portico on the landing: panelled piers with pilasters carrying a round arch
+  // over the arched doorway, an entablature, and a balustraded balcony with corner urns.
   {
-    const pu0 = uE, pu1 = 13.6, pv0 = -2.6, pv1 = 3.7, top = BASE; const sw = 2.0;
-    // arcaded base: three segmental arches on square piers (painted, glazed behind)
-    const RE = K.run([pu1, pv1], [pu1, pv0]); const gp = K.g(pu1, 0.5);
-    const aw = (RE.L - 4 * 0.55) / 3; const ars = [0, 1, 2].map((i) => ({ s0: 0.55 + i * (aw + 0.55), s1: 0.55 + i * (aw + 0.55) + aw, y0: gp + 0.1, y1: top - 0.45, arch: 'seg', rise: 0.5, sill: false }));
-    K.wall(RE, TR, 0, RE.L, -1.2, top, ars, 0.45); for (const o of ars) { K.fill(RE, o, { frame: TR, rev: 0.4, mull: 1, sill: false }); K.rbox(RE, TR, (o.s0 + o.s1) / 2 - 0.16, top - 0.62, 0, (o.s0 + o.s1) / 2 + 0.16, top - 0.2, 0.1); }
-    for (let i = 0; i < 4; i++) { const s = 0.275 + i * (aw + 0.55); K.rbox(RE, TR, s - 0.33, gp - 0.5, 0, s + 0.33, top - 0.5, 0.12); }
-    for (const [a, b] of [[[pu1, pv0], [pu0, pv0]], [[pu0, pv1], [pu1, pv1]]]) {
-      const R = K.run(a, b); const o = { s0: 0.5, s1: R.L - 0.5, y0: 0.5, y1: top - 0.5, arch: 'seg', rise: 0.4, sill: false };
-      K.wall(R, TR, 0, R.L, -1.2, top, [o], 0.45); K.fill(R, o, { frame: TR, rev: 0.4, mull: 2, sill: false });
-    }
-    K.box(M.concreteDark, pu0, -1.2, pv0 + 0.4, pu1 - 0.4, top - 0.1, pv1 - 0.4);
-    K.box(TR, pu0 - 0.05, top - 0.25, pv0 - 0.1, pu1 + 0.1, top, pv1 + 0.1);
-    K.box(M.paving, pu0, top, pv0, pu1, top + 0.02, pv1);
-    // square corner supports + balustrade with urn-like finials
-    for (const [u, v] of [[pu1 - 0.25, pv0 + 0.25], [pu1 - 0.25, pv1 - 0.25]]) { K.box(TR, u - 0.3, top, v - 0.3, u + 0.3, top + 1.15, v + 0.3); urn(K, TR, u, top + 1.15, v, 0.75); }
-    balustrade(K, K.run([pu1 - 0.2, pv1 - 0.55], [pu1 - 0.2, pv0 + 0.55]), TR, 0, pv1 - pv0 - 1.1, top, 1.0);
-    for (const [a, b] of [[[pu0 + 0.1, pv0 + 0.2], [pu1 - sw, pv0 + 0.2]], [[pu1 - sw, pv1 - 0.2], [pu0 + 0.1, pv1 - 0.2]]]) { const R = K.run(a, b); balustrade(K, R, TR, 0, R.L, top, 1.0); }
+    const pu0 = uE, pu1 = 13.6, pv0 = -2.6, pv1 = 3.7, gp = Math.min(K.g(pu1 + 2, 0.5), K.g(pu1 + 2, -5), K.g(pu1 + 2, 6)), top = Math.min(BASE, gp + 2.55);
+    const cv = (pv0 + pv1) / 2, sw = 1.9, PNL = TR.clone(); PNL.color.offsetHSL(0, 0, -0.06);
+    // solid stair mass under the landing + paving
+    K.box(TR, pu0, -1.2, pv0, pu1, top - 0.02, pv1); K.box(TR, pu0 - 0.05, top - 0.25, pv0 - 0.1, pu1 + 0.1, top, pv1 + 0.1); K.box(M.paving, pu0, top, pv0, pu1, top + 0.02, pv1);
+    // three recessed panels on the front (east) face + base course
+    for (const [a, b] of [[pv0 + 0.35, pv0 + 1.35], [cv - 1.4, cv + 1.4], [pv1 - 1.35, pv1 - 0.35]]) { K.box(PNL, pu1, gp + 0.45, a, pu1 + 0.03, top - 0.55, b); for (const [y0, y1] of [[gp + 0.33, gp + 0.45], [top - 0.55, top - 0.43]]) K.box(TR, pu1, y0, a - 0.12, pu1 + 0.08, y1, b + 0.12); for (const vv of [a - 0.12, b]) K.box(TR, pu1, gp + 0.33, vv, pu1 + 0.08, top - 0.43, vv + 0.12); }
+    K.box(TR, pu1 - 0.02, gp - 0.3, pv0 - 0.05, pu1 + 0.14, gp + 0.2, pv1 + 0.05);
     walkables.push(K.walkPoly([[pu0, pv0], [pu1, pv0], [pu1, pv1], [pu0, pv1]], top + 0.02));
-    // two flights descending north and south along the outer edge
-    const gN = K.g(pu1 - sw / 2, pv0 - 6.5), gS = K.g(pu1 - sw / 2, pv1 + 6.5);
-    const nN = Math.round((top - gN) / 0.16), nS = Math.round((top - gS) / 0.16);
-    walkables.push(K.stairs(ST, pu1 - sw, pv0 - nN * 0.28, pu1, pv0, gN, top + 0.02, '+v', nN));
-    walkables.push(K.stairs(ST, pu1 - sw, pv1, pu1, pv1 + nS * 0.28, gS, top + 0.02, '-v', nS));
-    // stair cheek walls with iron rails
-    for (const [v0, v1, g] of [[pv0 - nN * 0.28, pv0, gN], [pv1, pv1 + nS * 0.28, gS]]) {
-      { const n2 = Math.max(1, Math.round((v1 - v0) / 0.28)); const north = v1 <= pv0 + 0.01; // low stepped stringer instead of a solid wall
-        for (let i = 0; i < n2; i++) { const a0 = v0 + (v1 - v0) * i / n2, a1 = v0 + (v1 - v0) * (i + 1) / n2; const t = north ? (i + 1) / n2 : 1 - i / n2; K.box(TR, pu1 - 0.02, -1.2, a0, pu1 + 0.22, g + (top - g) * t + 0.22, a1); } }
-      const R = K.run([pu1 + 0.12, v0], [pu1 + 0.12, v1]); const L = R.L; const north = v1 <= pv0 + 0.01;
-      const g2 = new THREE.BoxGeometry(L + 0.2, 0.06, 0.06); const ang = Math.atan2(top - g, L) * (north ? 1 : -1);
-      g2.rotateZ(ang); g2.translate(L / 2, (top + g) / 2 + 0.95, 0); K.addRun(R, M.iron, g2, { detail: true });
-      colliders.push(K.colPoly([[pu1 - 0.02, v0], [pu1 + 0.25, v0], [pu1 + 0.25, v1], [pu1 - 0.02, v1]], -1.2, top + 1));
-    }
     colliders.push(K.colPoly([[pu0, pv0], [pu1, pv0], [pu1, pv1], [pu0, pv1]], -1.2, top - 0.05));
+    // landing balustrade along the front edge, corner pedestals with urns
+    for (const [u, v] of [[pu1 - 0.3, pv0 + 0.3], [pu1 - 0.3, pv1 - 0.3]]) { K.box(TR, u - 0.3, top, v - 0.3, u + 0.3, top + 1.05, v + 0.3); K.box(TR, u - 0.35, top + 1.05, v - 0.35, u + 0.35, top + 1.13, v + 0.35); urn(K, TR, u, top + 1.13, v, 0.6); }
+    balustrade(K, K.run([pu1 - 0.3, pv1 - 0.6], [pu1 - 0.3, pv0 + 0.6]), TR, 0, pv1 - pv0 - 1.2, top, 0.98);
+    colliders.push(K.colPoly([[pu1 - 0.55, pv0], [pu1, pv0], [pu1, pv1], [pu1 - 0.55, pv1]], top, top + 1.1));
+    // the two short flights descending north and south along the outer edge, with raking balustrades and newels
+    const nN = Math.max(1, Math.round((top - K.g(pu1 - sw / 2, pv0 - 4)) / 0.165)), nS = Math.max(1, Math.round((top - K.g(pu1 - sw / 2, pv1 + 4)) / 0.165));
+    const gN = top - nN * 0.165, gS = top - nS * 0.165;
+    walkables.push(K.stairs(ST, pu1 - sw, pv0 - nN * 0.3, pu1, pv0, gN, top + 0.02, '+v', nN));
+    walkables.push(K.stairs(ST, pu1 - sw, pv1, pu1, pv1 + nS * 0.3, gS, top + 0.02, '-v', nS));
+    for (const [vFoot, vTop, g, sgn] of [[pv0 - nN * 0.3, pv0, gN, -1], [pv1 + nS * 0.3, pv1, gS, 1]]) {
+      const uR = pu1 - 0.13, L = Math.abs(vTop - vFoot), H = top - g; // outer (east) edge rail
+      // raking stringer wall under the balusters, sloped coping, turned balusters
+      const nb = Math.max(2, Math.floor(L / 0.28));
+      for (let i = 0; i < nb; i++) { const t = (i + 0.5) / nb, v = vFoot + (vTop - vFoot) * t, yb = g + H * t + 0.12;
+        K.box(TR, uR - 0.13, -1.0, v - L / nb / 2, uR + 0.13, yb, v + L / nb / 2);
+        K.lathe(TR, [[0.07, 0], [0.05, 0.06], [0.1, 0.25], [0.11, 0.36], [0.05, 0.55], [0.045, 0.6], [0.07, 0.66]], uR, yb, v, 6, { detail: true }); }
+      const cap = new THREE.BoxGeometry(0.3, 0.12, Math.hypot(L, H) + 0.1); cap.rotateX(sgn * Math.atan2(H, L)); cap.translate(uR, g + H / 2 + 0.84, (vFoot + vTop) / 2); K.add(TR, cap);
+      colliders.push(K.colPoly([[uR - 0.15, Math.min(vFoot, vTop)], [uR + 0.15, Math.min(vFoot, vTop)], [uR + 0.15, Math.max(vFoot, vTop)], [uR - 0.15, Math.max(vFoot, vTop)]], -1.0, top + 1.0));
+      // newel pedestal + urn at the foot, black lantern outboard
+      const vn = vFoot + sgn * 0.3; K.box(TR, uR - 0.32, g - 0.3, vn - 0.32, uR + 0.32, g + 1.15, vn + 0.32); K.box(TR, uR - 0.37, g + 1.15, vn - 0.37, uR + 0.37, g + 1.23, vn + 0.37); urn(K, TR, uR, g + 1.23, vn, 0.55);
+      colliders.push(K.colCyl(uR, vn, 0.42, g - 0.3, g + 1.8));
+      const lv = vn + sgn * 1.0, lu = uR + 0.2, gl = K.g(lu, lv); const LM = M.blackPaint || M.iron;
+      K.cyl(LM, lu, gl, lv, 0.14, 0.11, 0.45, 8, { detail: true }); K.cyl(LM, lu, gl + 0.45, lv, 0.06, 0.05, 2.25, 8, { detail: true });
+      K.box(LM, lu - 0.2, gl + 2.7, lv - 0.2, lu + 0.2, gl + 2.75, lv + 0.2, { detail: true }); K.box(M.lampGlow, lu - 0.16, gl + 2.75, lv - 0.16, lu + 0.16, gl + 3.15, lv + 0.16, { detail: true }); K.cyl(LM, lu, gl + 3.15, lv, 0.26, 0.04, 0.25, 4, { detail: true });
+    }
+    // the portico on the landing: projecting 1.6 m from the brick face, ~4.6 m wide
+    { const pf = pu0 + 1.6, w2 = 2.3, yA = top + 3.0, yE = top + 5.0, yD = top + 5.7;
+      for (const sv of [-1, 1]) { const v = cv + sv * (w2 - 0.45);
+        K.box(TR, pf - 0.9, top, v - 0.45, pf, yE, v + 0.45); // panelled pier
+        K.box(PNL, pf, top + 0.4, v - 0.24, pf + 0.06, yA - 0.2, v + 0.24, { detail: true }); // applied pilaster
+        K.box(TR, pf - 0.95, yA - 0.2, v - 0.5, pf + 0.08, yA, v + 0.5); }                   // impost
+      // round arch between the piers (extruded ring segment), keystone
+      const sh = new THREE.Shape(); const r0 = w2 - 0.9, r1 = r0 + 0.38; sh.absarc(0, 0, r1, 0, Math.PI, false); sh.lineTo(-r0, 0); sh.absarc(0, 0, r0, Math.PI, 0, true); sh.lineTo(r1, 0);
+      const ag = new THREE.ExtrudeGeometry(sh, { depth: 0.9, bevelEnabled: false, curveSegments: 12 }); ag.rotateY(Math.PI / 2); ag.translate(pf - 0.9, yA, cv); K.add(TR, ag);
+      K.box(TR, pf - 0.05, yA + r0 - 0.05, cv - 0.22, pf + 0.1, yA + r1 + 0.12, cv + 0.22);
+      { const sp = new THREE.Shape(); sp.moveTo(-r1, 0); sp.lineTo(-r1, yE - yA); sp.lineTo(r1, yE - yA); sp.lineTo(r1, 0); sp.absarc(0, 0, r1, 0, Math.PI, false); // spandrels over the arch
+        const sg = new THREE.ExtrudeGeometry(sp, { depth: 0.9, bevelEnabled: false, curveSegments: 12 }); sg.rotateY(Math.PI / 2); sg.translate(pf - 0.9, yA, cv); K.add(TR, sg); }
+      K.box(TR, pf - 0.95, yE, cv - w2 - 0.1, pf + 0.12, yE + 0.45, cv + w2 + 0.1);             // entablature
+      K.box(TR, pf - 1.0, yE + 0.45, cv - w2 - 0.2, pf + 0.28, yE + 0.6, cv + w2 + 0.2);         // cornice
+      K.box(TR, pu0, yE + 0.6, cv - w2, pf + 0.1, yD - 0.05, cv + w2); K.box(M.paving, pu0, yD - 0.05, cv - w2, pf + 0.1, yD, cv + w2); // balcony deck
+      balustrade(K, K.run([pf - 0.15, cv + w2 - 0.4], [pf - 0.15, cv - w2 + 0.4]), TR, 0, 2 * w2 - 0.8, yD, 0.9);
+      for (const sv of [-1, 1]) { const v = cv + sv * (w2 - 0.2); K.box(TR, pf - 0.45, yD, v - 0.22, pf + 0.05, yD + 1.0, v + 0.22); urn(K, TR, pf - 0.2, yD + 1.0, v, 0.6); }
+      // arched doorway set back under the arch: timber doors + fanlight
+      const DOOR = new THREE.MeshStandardMaterial({ color: 0x6b3226, roughness: 0.7 }), dw = 1.0;
+      K.box(DOOR, pu0 + 0.02, top, cv - dw, pu0 + 0.1, top + 2.55, cv + dw);
+      K.box(M.windowNight, pu0 + 0.02, top + 2.55, cv - dw, pu0 + 0.09, top + 3.2, cv + dw);
+      K.box(TR, pu0 + 0.03, top, cv - 0.04, pu0 + 0.12, top + 2.55, cv + 0.04, { detail: true });
+      K.box(TR, pu0, top - 0.02, cv - w2, pf - 0.9, yE, cv - dw - 0.05); K.box(TR, pu0, top - 0.02, cv + dw + 0.05, pf - 0.9, yE, cv + w2); // reveal walls
+      K.box(TR, pu0, top + 3.2, cv - dw, pf - 0.9, yE, cv + dw);
+      colliders.push(K.colPoly([[pf - 0.9, cv - w2], [pf, cv - w2], [pf, cv - w2 + 0.9], [pf - 0.9, cv - w2 + 0.9]], top, yE), K.colPoly([[pf - 0.9, cv + w2 - 0.9], [pf, cv + w2 - 0.9], [pf, cv + w2], [pf - 0.9, cv + w2]], top, yE));
+    }
     // west door: three steps up from the path
     const gw = K.g(uWc - 2.2, 1.1);
     walkables.push(K.stairs(ST, uWc - 1.4, -0.4, uWc, 2.6, gw, gw + 0.45, '+u', 3));
