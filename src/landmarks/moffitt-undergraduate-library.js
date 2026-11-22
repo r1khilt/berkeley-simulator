@@ -55,8 +55,8 @@ let _ivy = null;
 function ivyMat() {
   if (_ivy) return _ivy;
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
-  g.fillStyle = '#22331a'; g.fillRect(0, 0, S, S); let sd = 5; const r = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
-  for (let k = 0; k < 1400; k++) { const x = r() * S, y = r() * S, w = 5 + r() * 9; const l = r(); g.fillStyle = l < 0.35 ? '#2f4a22' : l < 0.75 ? '#3d5c2a' : '#56743a'; g.beginPath(); g.ellipse(x, y, w, w * 0.7, r() * 3, 0, 7); g.fill(); }
+  g.fillStyle = '#1a2614'; g.fillRect(0, 0, S, S); let sd = 5; const r = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 2600; k++) { const x = r() * S, y = r() * S, w = 3 + r() * 6; const l = r(); g.fillStyle = l < 0.3 ? '#2b4320' : l < 0.7 ? '#40612b' : '#628341'; g.beginPath(); g.ellipse(x, y, w, w * 0.7, r() * 3, 0, 7); g.fill(); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
   _ivy = new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, roughness: 0.9 }); _ivy.name = 'mfIvy'; return _ivy;
 }
@@ -269,7 +269,7 @@ export async function build(ctx) {
     }
     K.rbox(R, GLD, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
     K.rbox(R, C, dA - 0.3, 7.3, -0.25, dB + 0.3, F4 - 0.32, 0.08);     // recessed fascia (~1.2 m) over the doors
-    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#57432c', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
+    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#3a3129', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
     // continuous concrete sidewalk in front of the doors (flush threshold)
     const SW = tint(M.concrete, 0xfaf7f1, 'mfWalk');
     const ga = Math.max(F3, K.gMax(2.5, GS, 16, GS + 9, 8)) + 0.02;
@@ -449,7 +449,7 @@ export async function build(ctx) {
     K.box(CT, u0, g0, v0, u1, yT - 0.6, v1);
     const IVY = ivyMat(); const ring = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); const nb = Math.max(2, Math.round(R.L / 0.9));
-      for (let k = 0; k < nb; k++) { const a0 = R.L * k / nb - 0.02, a1 = R.L * (k + 1) / nb + 0.02, top = yT - 0.7 - 0.55 * Math.abs(Math.sin(k * 2.3 + i)); K.rbox(R, IVY, a0, g0 + 0.4, 0, a1, top, 0.12); } }
+      for (let k = 0; k < nb; k++) { const a0 = R.L * k / nb - 0.02, a1 = R.L * (k + 1) / nb + 0.02, top = g0 + 1.2 + (yT - g0 - 2.2) * (0.35 + 0.6 * Math.abs(Math.sin(k * 2.3 + i * 1.7))); K.rbox(R, IVY, a0, g0 + 0.4, 0, a1, top, 0.12); } }
     for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); for (let y = yT - 0.55; y < yT - 0.2; y += 0.14) K.rbox(R, FR, 0.15, y, -0.12, R.L - 0.15, y + 0.06, 0.0, { detail: true }); }
     K.box(CD, u0 + 0.1, yT - 0.6, v0 + 0.1, u1 - 0.1, yT - 0.2, v1 - 0.1); K.box(C, u0 - 0.1, yT - 0.2, v0 - 0.1, u1 + 0.1, yT, v1 + 0.1);
     colliders.push(rectCol(u0, v0, u1, v1, g0, yT));
