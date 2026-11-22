@@ -82,7 +82,7 @@ wild = np.zeros((WZ, WX), np.uint8)
 for n in vec['named']:
     if n['kind'] in ('wood', 'nature_reserve', 'scrub', 'heath', 'forest') and len(n['poly']) >= 3: fill(wild, n['poly'])
 for w in vec['water']:
-    if w['type'] in ('stream', 'river'): polyline(wild, w['pts'], 18.0)          # creek banks (~9 m each side)
+    if w['type'] in ('stream', 'river'): polyline(wild, w['pts'], 8.0)           # creek banks only (~4 m each side)
 # hills east of Gayley Road / Piedmont Avenue (stadium, Strawberry Canyon, Panoramic Hill)
 gz_ = np.array([-2000, -382, -226, -161, -52, 31, 275, 300]); gx_ = np.array([89, 89, 199, 240, 360, 438, 497, 497])
 zz = Z0 + (np.arange(WZ) + 0.5) * R; xx = X0 + (np.arange(WX) + 0.5) * R

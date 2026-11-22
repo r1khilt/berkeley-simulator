@@ -82,26 +82,46 @@ void groundShadePBR(vec2 w, float dist) {
     l.c *= (0.84 + 0.3 * n0.g) * (0.9 + 0.2 * n2.r);   // r4-ground: + ~0.7 m clumping so mid-distance turf isn't a flat carpet
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
     // r4-ground: crisp edges. A thin spade-cut line where lawn meets a planted bed and a faint shadow line along paving
-    float cut = bedK * (1.0 - smoothstep(0.03, 0.11, -dD)) * step(dD, 0.0) * det;
+    float cut = bedK * (1.0 - smoothstep(0.04, 0.12, -dD)) * step(dD, 0.0) * det;
     float pe = (1.0 - smoothstep(0.06, 0.16, -dP)) * step(dP, 0.0) * det;
-    l.c *= (1.0 - 0.55 * cut) * (1.0 - 0.22 * pe);
+    l.c *= (1.0 - 0.65 * cut) * (1.0 - 0.22 * pe);
     col += wG * l.c; rough += wG * l.r; g += wG * l.g; bump += wG;
   }
   // ---- forest floor / dirt: eucalyptus + oak litter over packed dirt
   if (wD > 0.001) {
     PS a;
     if (bedK > 0.5) {
-      // r4-ground: maintained planting bed = dark shredded-bark mulch under patchy low evergreen groundcover
-      // (ivy / star jasmine / agapanthus), instead of bare brown dirt
+      // r4-ground: maintained planting bed = dark shredded-bark mulch with planted clumps (low shrubs / groundcover) on a
+      // jittered ~1.1 m grid, plus patches of dense ivy, so it reads as a designed bed rather than bare or worn dirt
       PS mu = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
       float lmu = dot(mu.c, vec3(0.2126, 0.7152, 0.0722));
-      mu.c = mix(vec3(lmu), mu.c, 0.5) * vec3(1.0, 0.78, 0.6) * 0.8;
-      PS gc = gTapT(w, gWP, 0.55, 2.0, L_LAWN, 1.0 - kIso, near);   // leafy set at ~2x scale reads as broad-leaf cover
-      gc.c *= vec3(0.66, 0.84, 0.62) * (0.8 + 0.4 * n2.g);
-      float cov = n1.g * 0.5 + n0.g * 0.3 + n2.r * 0.2 + 0.08 * (1.0 - fade);
-      float kc = smoothstep(0.4, 0.52, cov + (gc.h - mu.h) * 0.3) * smoothstep(0.0, 0.35, dD);  // mulch shows along the cut edge
-      a = pbrMix(mu, gc, kc);
-      a.c *= 0.9 + 0.2 * n0.b;
+      mu.c = mix(vec3(lmu), mu.c, 0.45) * vec3(0.95, 0.72, 0.55) * 0.62;          // darker, redder, flatter bark mulch
+      mu.c = mix(vec3(0.05, 0.032, 0.022), mu.c, 0.55);
+      PS gc = gTapT(w, gWP, 0.33, 2.0, L_LAWN, 1.0 - kIso, near);                  // leafy set at 3x scale -> broad leaves
+      vec3 gm = vec3(0.0743, 0.1139, 0.0376);
+      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(1.5)) * vec3(0.62, 0.78, 0.7); // more contrast, deeper blue-green
+      gc.r = 0.62;
+      float plantK = 1.0 - smoothstep(35.0, 80.0, dist);
+      vec2 pc = w / 1.1; vec2 pci = floor(pc); float best = 1e3; float hsel = 0.0; vec2 bdir = vec2(0.0);
+      if (plantK > 0.0) {
+        for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+          vec2 cc = pci + vec2(float(dx), float(dy)); vec2 o = vec2(hq12(cc), hq12(cc + 7.7));
+          vec2 dv = (pc - cc - o) * 1.1; float d = length(dv) - (0.3 + 0.24 * hq12(cc + 3.3));
+          if (d < best) { best = d; hsel = hq12(cc + 1.9); bdir = dv; }
+        }
+      }
+      float ivy = smoothstep(0.56, 0.64, n0.g * 0.65 + n1.r * 0.35);                 // some beds are solid ivy
+      float clump = (1.0 - smoothstep(-0.03, 0.03, best)) * plantK;
+      float dome = smoothstep(0.0, -0.3, best);
+      vec3 pv = hsel < 0.6 ? vec3(1.0) : hsel < 0.85 ? vec3(1.25, 1.2, 0.8) : vec3(0.85, 0.9, 1.15);  // a few plant varieties
+      PS pl = gc; pl.c *= pv * (0.55 + 0.6 * dome);
+      pl.g += normalize(bdir + 1e-4) * (1.0 - dome) * 0.6 * clump;
+      mu.c *= 0.7 + 0.3 * smoothstep(0.0, 0.22, best);                                 // contact shade round each plant
+      float kc = max(clump, ivy) * smoothstep(0.0, 0.3, dD);                         // a clean mulch strip along the bed edge
+      kc = mix(kc, 0.5 * smoothstep(0.0, 0.3, dD) + 0.4 * ivy, 1.0 - plantK);        // far: average cover
+      PS iv = gc; iv.c *= 0.75 + 0.35 * n2.g;
+      a = pbrMix(mu, pbrMix(pl, iv, smoothstep(0.3, 0.8, ivy)), kc);
+      a.c *= 0.92 + 0.16 * n0.b;
     } else {
       a = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
       float kd = smoothstep(0.5, 0.7, n1.g + (n2.r - 0.5) * 0.3);
