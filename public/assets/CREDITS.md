@@ -21,3 +21,6 @@ All CC0 (public domain). Downloaded at 1K, then de-tiled, colour-calibrated and 
 - `fonts/inter-latin-wght.woff2`: Inter (variable, Latin subset) by Rasmus Andersson, SIL Open Font License 1.1. https://github.com/rsms/inter (via @fontsource-variable/inter)
 - UI icons in `src/ui/icons.js`: mostly derived from Lucide (ISC licence, https://lucide.dev); movement glyphs drawn for this project.
 - `horse/horse.glb` — "Horse" from the Ultimate Animated Animal Pack by Quaternius (https://quaternius.com, via https://poly.pizza/m/qvTrSG9pZF), CC0 1.0 (public domain). Unused animations pruned with glTF-Transform; recoloured, re-shaded and fitted with procedural tack at runtime (src/player/modes/horse-rig.js).
+
+## Sculptures (r4-props)
+- `sculpt/lion-*.bin`: Durant Hall guardian lions, an original procedural SDF sculpt baked by `tools/sculpt/guardian-lion.mjs` (no third-party mesh or texture). Modelled from the reference photo "Durant Hall lion statues - 2015-07-25" by James Lin (CC BY-SA 4.0, Wikimedia Commons), used for reference only and not shipped.

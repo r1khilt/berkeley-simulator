@@ -29,7 +29,7 @@ let tris = 0;
 const geos = await Promise.all(names.map((n) => loadSculpt(n)));
 geos.forEach((g, i) => {
   const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.5), M.granite); plinth.position.set((i - (geos.length - 1) / 2) * 2.2, 0.5, 0); plinth.castShadow = plinth.receiveShadow = true; group.add(plinth);
-  const m = new THREE.Mesh(g, sculptMaterial(M.granite, { color: 0xf2eee6 })); m.position.set(plinth.position.x, 1.0, 0); m.castShadow = m.receiveShadow = true; group.add(m);
+  const m = new THREE.Mesh(g, qs.get('ao') ? new THREE.MeshBasicMaterial({ vertexColors: true }) : sculptMaterial(M.granite, { color: 0xd9d5cc })); m.position.set(plinth.position.x, 1.0, 0); m.castShadow = m.receiveShadow = true; group.add(m);
   tris += g.attributes.position.count / 3;
 });
 info.textContent = names.join(', ') + '  tris ' + tris;

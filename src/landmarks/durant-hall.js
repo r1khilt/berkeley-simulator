@@ -34,7 +34,7 @@ export async function build(ctx) {
   const FL = 2.4, F2 = 7.3, TOP = 12.2, EAVE = 14.6;
   const colliders = [], walkables = [];
   // r4-props: baked lion sculpts [[male, female] hi, [male, female] lo]; null -> old primitive lions
-  const lionGeo = await Promise.all([['lion-m', 'lion-f'], ['lion-m-lo', 'lion-f-lo']].map((l) => Promise.all(l.map((n) => loadSculpt(n))))).catch((e) => { console.warn('durant lions:', e.message); return null; });
+  const lionGeo = await Promise.all([['lion-m', 'lion-f'], ['lion-m-lo', 'lion-f-lo']].map((l) => Promise.all(l.map((n) => loadSculpt(n, { uvScale: 0.5 }))))).catch((e) => { console.warn('durant lions:', e.message); return null; });
 
   // façade runs (outer face on the footprint line)
   const runs = {

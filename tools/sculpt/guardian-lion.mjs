@@ -204,7 +204,7 @@ function lionSDF(kind, s) {
       }
       const bx = x, by = y - 0.83, bz = z - 0.36;
       let b = ell(bx, by, bz, 0.066, 0.062, 0.058);
-      b = smax(b, -rbox(bx, by + 0.014, bz - 0.052, 0.052, 0.006, 0.03, 0.003), 0.004);
+      b = smin(b, torusAx(bx, by, bz, [0, -0.012, 0], [0, 1, 0], 0.062, 0.008), 0.004); // bell lip ring (no slot: read as a black slit in game)
       b = smin(b, torusY(bx, by - 0.072, bz, 0.024, 0.009), 0.006);
       d = smin(d, b, 0.01);
       for (const sx of [-1, 1]) {
@@ -360,12 +360,12 @@ function write(name, f, pos, sidx) {
       const u1 = (r + 0.5) / NR, u2 = (r * 0.618034 + v * 0.1373) % 1; const rad = sqrt(u1), phi = 2 * PI * u2, cz = sqrt(1 - u1);
       const dx = t1[0] * rad * cos(phi) + t2[0] * rad * sin(phi) + n[0] * cz, dy = t1[1] * rad * cos(phi) + t2[1] * rad * sin(phi) + n[1] * cz, dz = t1[2] * rad * cos(phi) + t2[2] * rad * sin(phi) + n[2] * cz;
       let t = 0.012, occl = 0;
-      for (let k = 0; k < 40 && t < 0.3; k++) { const dist = f(x + dx * t, y + dy * t, z + dz * t); if (dist < 0.002) { occl = 1 - t / 0.3; break; } t += max(dist * 0.9, 0.004); }
+      for (let k = 0; k < 40 && t < 0.3; k++) { const dist = f(x + dx * t, y + dy * t, z + dz * t); if (dist < 0.002) { occl = 1 - 0.6 * sm(0.12, 0.3, t); break; } t += max(dist * 0.9, 0.004); }
       hit += occl; tot++;
     }
-    let ao = 1 - 0.85 * hit / tot;
-    { const gl = gradLen(f, x, y, z); let occ = 0, w = 1; for (const t of [0.008, 0.016, 0.028]) { occ += w * max(0, t - max(0, f(x + n[0] * t, y + n[1] * t, z + n[2] * t)) / gl) / t; w *= 0.7; } ao *= clamp(1 - 0.3 * occ, 0.5, 1); }
-    ao = clamp(ao, 0.2, 1);
+    let ao = (1 - 0.92 * hit / tot) ** 2; // squared: vertex colours are linear, so this reads as a natural cavity falloff
+    { const gl = gradLen(f, x, y, z); let occ = 0, w = 1; for (const t of [0.008, 0.016, 0.028]) { occ += w * max(0, t - max(0, f(x + n[0] * t, y + n[1] * t, z + n[2] * t)) / gl) / t; w *= 0.7; } ao *= clamp(1 - 0.45 * occ, 0.4, 1); }
+    ao = clamp(ao, 0.12, 1);
     ao *= 0.9 + 0.1 * sm(0.0, 0.25, y);              // soil splash / grime near the base
     ao *= 1 - 0.05 * max(0, -n[1]);                    // undersides a touch darker
     AO[v] = ao;
