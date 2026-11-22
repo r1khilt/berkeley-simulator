@@ -21,7 +21,7 @@ export async function build(ctx) {
   const W = new THREE.MeshStandardMaterial({ color: 0xdad6c7, roughness: 0.85, map: M.marble.map, normalMap: M.marble.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) });                                                  // buff concrete
   // r4-sweep: the window walls read as flat dark-green slabs (dark-green muntins on near-black custom glass, no interiors).
   // Lighter verdigris bronze so the muntin grid reads, and the shared window glass (rooms behind it, lit at night).
-  const BR = new THREE.MeshStandardMaterial({ color: 0x5d6f61, roughness: 0.45, metalness: 0.5 }); // verdigris bronze
+  const BR = new THREE.MeshStandardMaterial({ color: 0x5f6a63, roughness: 0.45, metalness: 0.5 }); // verdigris bronze (duller patina)
   const GL = M.windowNight;
   const GLS = new THREE.MeshStandardMaterial({ color: 0x2b3436, roughness: 0.18, metalness: 0.3, envMapIntensity: 0.8 }); // roof skylights keep the plain glass
   const VOID = new THREE.MeshStandardMaterial({ color: 0x1d201f, roughness: 0.95 });
