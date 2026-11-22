@@ -51,7 +51,7 @@ export async function build(ctx) {
   const alu = tinted(M.iron, 0xb8bbbc, { metalness: 0.7, roughness: 0.35 });
   const mesh = tinted(M.iron, 0x9c9fa0, { metalness: 0.75, roughness: 0.4, transparent: true, opacity: 0.55 });
   const champ = tinted(M.iron, 0xc9b98f, { metalness: 0.7, roughness: 0.4 });
-  const blueGlass = tinted(M.windowNight, 0x2c4672);
+  const blueGlass = tinted(M.windowNight, 0x46566a); // r4-sweep: was saturated navy 0x2c4672 (read as flat blue paint next to the terracotta)
   const wingGlass = tinted(M.windowNight, 0x5d6a72); // r4-sweep: west wing upper glazing (photo: mid-grey, rooms visible)
   const pv = tinted(M.glass, 0x1d2a3d, { metalness: 0.5, roughness: 0.25 });
   const sGlass = tinted(M.glassLight, 0x55666e, { opacity: 0.5 });
