@@ -550,6 +550,7 @@ export function augmentR5Trees(trees, heightAt) {
       const y = heightAt(x, z); if (y < low + 0.45) continue;                       // up the bank, never in the channel
       if (paved(x, z) || nearTree(x, z, 1.6)) continue;
       if ((PLANS || []).some((p) => p && p.deckAt(x, z, 2.5) != null)) continue;
+      if (Math.hypot(x + 563.6, z - 50.2) < 9 || Math.hypot(x + 678.9, z - 186.8) < 7) continue;   // keep the culvert mouths in view
       add.push([x, z, y, 1.3 + rnd() * 1.7, 0.9 + rnd() * 1.1, rnd()]);
       const k = key(x, z); let l = cell.get(k); if (!l) cell.set(k, (l = [])); l.push([x, z]);
     }
