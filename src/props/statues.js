@@ -6,7 +6,7 @@
 //   cal-bear         Douglas Van Howd's 10 ft bronze "California Golden Bear" (1996), outside Memorial Stadium
 //   bench-1920       Class of 1920 WWI memorial bench by the Sather Tower entrance, Jo Mora's two mourning bears on its piers
 //   bench-1955       Class of 1955 "Beneficiary to Benefactor" bench beside it
-//   laughing-pelican Frances Rich's bronze "Laughing Pelican" (1958) outside Anthony Hall, the Pelican Building
+//   (the baked Laughing Pelican is placed by src/landmarks/anthony-hall.js, replacing its primitive bird; laughingPelican() is for /dev/statues.html)
 //   mining-pool      the round pool at the centre of Hearst Mining Circle with Bruce Beasley's "Rondo II" (2013) on it
 // installStatues() is called once from main.js; ?nostatues=1 skips it.
 import * as THREE from 'three';
@@ -240,7 +240,6 @@ export const PLACEMENTS = [
   // "the stone bench at the Campanile entrance": north face, beside the 1960s canopy
   { id: 'bench-1920', build: bench1920, at: towerPt(4.35, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, level: 'max', clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
   { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, level: 'max', clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
-  { id: 'laughing-pelican', build: laughingPelican, x: -25.2, z: 164.7, rot: 1.99, r: 1.2, clearTrees: 1.6, col: (P, x, y, z) => P.addCircle(x, z, 1.0, y - 1, y + 2.4, 'statue') },
   { id: 'mining-pool', build: () => miningPool(7.0), x: 75.0, z: -178.2, rot: 0, r: 7.6, level: 'max', clearTrees: 7.8, col: (P, x, y, z) => P.addCircle(x, z, 7.5, y - 1, y + 0.32, 'statue') },
 ];
 function obb(P, x, y, z, rot, hx, hz, h, oz = 0) { // oriented box collider (local half-sizes hx, hz, centred oz along local z)
