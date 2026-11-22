@@ -4,7 +4,7 @@
 // Visual language: neutral translucent "material" panels, Inter, inline SVG icons (icons.js), Berkeley blue and gold
 // used sparingly. Light/dark follows the scene's day/night unless Settings > Appearance says otherwise.
 // Movement modes are generic: built-ins (walk/bike/fly) plus any player.plugins entry with a key, label or icon.
-import { LOOKS } from '../player/avatar.js';
+import { LOOKS, AVATARS } from '../player/avatar.js'; // r5-avatar: AVATARS = realistic player looks (Rocketbox)
 import { icon, LOGO } from './icons.js';
 import { pacificHour } from '../time.js';
 import { PRESETS, sunEvents, fmtHour, fmtDay, dayGradient, pacificDay, presetHour } from './timeofday.js';
@@ -488,6 +488,7 @@ export class UI {
         <div class="row"><span>Look sensitivity</span>${range('sens', 0.3, 2.5, 0.05, s.sens)}</div>
         <div class="row"><span>Invert vertical look</span>${sw('invertY', s.invertY)}</div>
         <div class="row"><span>Field of view</span>${range('fov', 50, 90, 1, s.fov)}</div></section>
+      <section><h3>Player</h3><div class="row"><span>Avatar</span><button class="btn secondary" data-x="look">${icon('user')}Change</button></div></section>
       <section><h3>Sound</h3><div class="row"><span>Volume</span>${range('volume', 0, 1, 0.05, s.volume)}</div></section>
       <section><h3>Display</h3>
         <div class="row"><span>Minimap</span>${seg('north', !!s.north, [[false, 'Heading up'], [true, 'North up']])}</div>
@@ -500,6 +501,7 @@ export class UI {
       p.querySelectorAll('input[type=range][data-k]').forEach((el) => { const out = el.nextElementSibling; fillRange(el); el.addEventListener('input', () => { out.textContent = fmts[el.dataset.k](el.value); fillRange(el); const v = parseFloat(el.value); set(el.dataset.k, el.dataset.k === 'flySpeed' ? Math.round(fromLog(v) * 10) / 10 : v); }); });
       p.querySelectorAll('input[type=checkbox][data-k]').forEach((el) => el.addEventListener('change', () => set(el.dataset.k, el.checked)));
       p.querySelector('[data-x=help]').onclick = () => this.help();
+      p.querySelector('[data-x=look]').onclick = () => this.cb.look?.(); // r5-avatar
     });
   }
   // Time & weather popover (anchored under the HUD time chip). st = main's timeSt; onChange(k, v) mutates it:
@@ -546,6 +548,23 @@ export class UI {
   }
   customize(look, onChange) {
     const sw = (k, arr) => `<div class="swatches" data-k="${k}">${arr.map((c, i) => `<button class="sw${look[k] === i ? ' on' : ''}" data-i="${i}" style="--c:${c}" aria-label="${k} ${i + 1}"></button>`).join('')}</div>`;
+    // r5-avatar: with realistic avatars the clothes, skin and hair come with the person: pick a person (live preview), keep the backpack switch
+    if (AVATARS.length) {
+      let i = Math.max(0, AVATARS.findIndex((a) => a.id === look.rb)); if (!look.rb) i = Math.max(0, AVATARS.findIndex((a) => a.id === 'male_12'));
+      const label = () => `${i + 1} of ${AVATARS.length}`;
+      this.panel(`${this._head('Avatar', 'How you appear in third person')}
+      <section>
+        <div class="row"><span>Character</span><div class="seg av-pick"><button data-d="-1" aria-label="Previous character">‹</button><button class="on av-n" disabled>${label()}</button><button data-d="1" aria-label="Next character">›</button></div></div>
+        <div class="row"><span>Backpack</span><label class="switch"><input type="checkbox" data-k="backpack" ${look.backpack ? 'checked' : ''}><i></i></label></div>
+        <p class="row-note">Your avatar is one of the realistic campus people.</p>
+      </section>
+      <footer class="sheet-f"><button class="btn primary" data-x="close">Done</button></footer>`, (p) => {
+        p.classList.add('side'); document.documentElement.classList.remove('has-modal');
+        p.querySelector('.av-pick').addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b) return; i = (i + +b.dataset.d + AVATARS.length) % AVATARS.length; p.querySelector('.av-n').textContent = label(); onChange('rb', AVATARS[i].id); });
+        p.querySelector('[data-k=backpack]').addEventListener('change', (e) => onChange('backpack', e.target.checked));
+      });
+      return;
+    }
     this.panel(`${this._head('Avatar', 'How you appear in third person')}
       <section>
         <div class="row"><span>Skin tone</span>${sw('skin', LOOKS.skin)}</div>

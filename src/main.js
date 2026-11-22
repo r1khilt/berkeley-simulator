@@ -190,6 +190,7 @@ async function boot() {
   // ---- player
   const physicsPlayer = new Player({ scene, camera, physics, dom: canvas, look: store.get('look', {}) });
   const player = physicsPlayer; BS.player = player;
+  player.avatar.setup = setupMaterials; // r5-avatar: the skinned player body loads async; give it the CSM/AO material setup
   player.sens = settings.sens; player.invertY = settings.invertY;
   // r5-controls: adjustable walk / fly speed (Settings, + / - keys, wheel in fly mode) and camera follow, saved with the settings
   player.speedScale = settings.walkSpeed ?? 1; if (settings.flySpeed) player.flySpeed = settings.flySpeed; player.camFollow = settings.camFollow !== false;

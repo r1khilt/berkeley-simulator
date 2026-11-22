@@ -1,5 +1,14 @@
 // Procedural student avatar (faces -z) with walk/run/idle/jump/bike animation, plus a rideable bike.
+// r5-avatar: what you SEE is now a skinned, mocap-animated person (avatar-body.js) built from the same people pipeline as the
+// NPCs. The procedural figure below stays as an invisible proxy rig (av.p): mode plugins (scooter, hoverboard, horse,
+// grapple) keep posing it and the body retargets that pose. ?avatar=old shows the old figure again.
 import * as THREE from 'three';
+import { PlayerBody, loadPlayerClips, scalePelvis } from './avatar-body.js';
+const AV_QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const SKINNED = AV_QS.get('avatar') !== 'old';
+const RB_BASE = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/people/rb/';
+const DEFAULT_RB = AV_QS.get('rbid') || 'male_12'; // default player look (Settings > Avatar picks another)
+export const AVATARS = []; // Rocketbox avatars the player can be (filled from the manifest; empty = procedural people body)
 const mats = {};
 function mat(hex, rough = 0.8, metal = 0) { const k = hex + ':' + rough + ':' + metal; return mats[k] || (mats[k] = new THREE.MeshStandardMaterial({ color: hex, roughness: rough, metalness: metal })); }
 function capsule(r, len, m, seg = 8) { const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - 2 * r), 4, seg); g.translate(0, -len / 2, 0); return new THREE.Mesh(g, m); }
@@ -11,15 +20,91 @@ export const LOOKS = {
   pants: ['#2b3a52', '#1d1f24', '#6b6255', '#3b4e3a', '#9a8f7a', '#4a3a2e'],
   hairStyle: ['short', 'long', 'bun', 'cap', 'buzz'],
 };
+const isUnder = (o, top) => { for (let p = o; p; p = p.parent) if (p === top) return true; return false; };
 export class Avatar {
   constructor(look = {}) {
     this.look = Object.assign({ skin: 1, hair: 1, top: 0, pants: 0, hairStyle: 0, backpack: true }, look);
     this.root = new THREE.Group(); this.root.name = 'avatar';
     this.build();
     this.phase = 0; this.blend = { walk: 0, run: 0, air: 0, bike: 0 }; this.pedal = 0;
+    // r5-avatar: skinned body (async); the proxy figure shows until it is ready
+    this.body = null; this._setup = null; this._finSeen = false; this.onBody = null;
+    if (SKINNED) this._loadBody().catch((e) => console.warn('player body failed, keeping the procedural avatar', e));
+  }
+  // r5-avatar: main.js hands over its material setup (CSM shadows, contact AO) for the async body
+  set setup(fn) { this._setup = fn; if (fn && this.body) fn(this.body.root); }
+  get setup() { return this._setup; }
+  async _loadBody() {
+    const [{ loadPeopleAssets }, { Character }, life] = await Promise.all([import('../people/assets.js'), import('../people/character.js'), import('../life/people.js')]);
+    const [A, extra] = await Promise.all([loadPeopleAssets(), loadPlayerClips()]);
+    A.palette = A.palette || { SKIN: life.SKIN, HAIR: life.HAIR, SHOE: life.SHOE };
+    // Rocketbox avatars (src/people/rocketbox.js, r4-people3) when present: the same realistic people as the near NPCs
+    let RB = null; const mods = import.meta.glob('../people/rocketbox.js');
+    if (AV_QS.get('rb') !== '0' && mods['../people/rocketbox.js']) {
+      try { RB = await mods['../people/rocketbox.js'](); const man = await fetch(RB_BASE + 'manifest.json').then((r) => (r.ok ? r.json() : null));
+        if (!RB.prepAvatar || !man || !man.avatars || !man.avatars.length) RB = null; else { AVATARS.length = 0; for (const e of man.avatars) AVATARS.push({ id: e.id, sex: e.sex, file: e.file, name: e.name }); } }
+      catch (e) { console.warn('rocketbox player avatar unavailable', e); RB = null; }
+    }
+    this._people = { A, extra, Character, life, RB, rbCache: {} };
+    await this._buildBody();
+  }
+  // one Rocketbox avatar, loaded and prepared on its own (cached per id; loadRocketbox doesn't cache {only} loads)
+  _rbAvatar(id) {
+    const P = this._people; if (P.rbCache[id]) return P.rbCache[id];
+    return (P.rbCache[id] = (async () => {
+      let r = null; for (let i = 0; i < 100 && !(r = window.BSIM && (window.BSIM.renderer || (window.BSIM.composer && window.BSIM.composer.renderer))); i++) await new Promise((res) => setTimeout(res, 100)); // KTX2 textures need the renderer
+      const list = await P.RB.loadRocketbox(P.A, { only: [id], renderer: r }); if (!list || !list[0]) throw new Error('rocketbox avatar ' + id + ' missing'); return list[0];
+    })());
+  }
+  async _buildBody() {
+    const P = this._people; if (!P) return; const ticket = (this._ticket = (this._ticket || 0) + 1);
+    let body = null;
+    if (P.RB && AVATARS.length) {
+      const e = AVATARS.find((a) => a.id === this.look.rb) || AVATARS.find((a) => a.id === DEFAULT_RB) || AVATARS[0];
+      if (this.body && this.body.rbId === e.id) { this._dress(); return; }
+      try {
+        const av = await this._rbAvatar(e.id); if (ticket !== this._ticket) return;
+        const ch = new P.RB.RBCharacter(av, true);
+        const k = P.A.bodies[av.sex].legLen / (0.4003 + 0.4295); const fitted = {};
+        for (const [n, c] of Object.entries(P.extra)) fitted[n] = av.R ? P.RB.retargetClip(scalePelvis(c, k), av.R, av.yFix || 0) : null;
+        for (const n in fitted) if (!fitted[n]) delete fitted[n];
+        body = new PlayerBody(ch, fitted); body.rbId = e.id; body.rbLook = av.look;
+      } catch (err) { console.warn('rocketbox player avatar failed, using the procedural people body', err); P.RB = null; }
+    }
+    if (!body) {
+      const sex = this.look.sex === 'f' ? 'f' : 'm';
+      if (this.body && !this.body.rbId && this.body.sex === sex) { this._dress(); return; }
+      const ch = new P.Character(P.A, sex, true);
+      const k = P.A.bodies[sex].legLen / (0.4003 + 0.4295); const fitted = {}; for (const [n, c] of Object.entries(P.extra)) fitted[n] = scalePelvis(c, k);
+      body = new PlayerBody(ch, fitted); body.sex = sex;
+    }
+    if (ticket !== this._ticket) return;
+    if (this.body) this.root.remove(this.body.root);
+    this.body = body; this.root.add(body.root);
+    this._dress(); this._showProxy(false);
+    if (this._setup) this._setup(body.root);
+    if (typeof window !== 'undefined' && window.BSIM) window.BSIM.avatarBody = body;
+    this.onBody && this.onBody(body);
+  }
+  // look -> body: Rocketbox avatars wear their own clothes (only the backpack is ours); the procedural people body takes
+  // the player's colours as a campus-life crowd look (people/character.js expands it into garments, shoes and hair)
+  _dress() {
+    const L = this.look, life = this._people.life, c = this.body.c;
+    if (this.body.rbId) { c.setLook(Object.assign({}, this.body.rbLook || {}, { flags: ((this.body.rbLook && this.body.rbLook.flags) || 0) | (L.backpack ? life.FLAG.BACKPACK : 0) }), 0, 0.31); this.body.packOn = !!L.backpack; return; }
+    const lin = (hex) => { const col = new THREE.Color(hex); return [col.r, col.g, col.b]; }; // THREE.Color is linear
+    const HS = { short: 1, long: 2, bun: 4, cap: 6, buzz: 0 };
+    const look = { fem: L.sex === 'f' ? 1 : 0, skin: L.skin | 0, hairC: [0, 1, 2, 3, 4, 6, 5][L.hair | 0] ?? 1, hair: HS[LOOKS.hairStyle[L.hairStyle | 0]] ?? 1,
+      top: lin(LOOKS.top[L.top | 0]), bot: lin(LOOKS.pants[L.pants | 0]), shoe: 0, flags: life.FLAG.SLEEVE | life.FLAG.PANTS | (L.backpack ? life.FLAG.BACKPACK : 0), h: 1, w: 1 };
+    c.setLook(look, 0, L.seed ?? 0.11);
+  }
+  _showProxy(on) { this.root.traverse((o) => { if (o.isMesh && !(this.body && isUnder(o, this.body.root))) o.visible = on; }); }
+  // r5-avatar: called by the controller after mode plugins have posed the proxy (player.js update)
+  finalize(dt, player) {
+    this._finSeen = true; if (!this.body) return;
+    this.body.update(dt, { mode: player.mode, onGround: player.onGround, airTime: player.airTime, proxy: this.p, avRoot: this.root, player, view: player.view });
   }
   build() {
-    const L = this.look; this.root.clear();
+    const L = this.look; for (const o of [...this.root.children]) if (!(this.body && o === this.body.root)) this.root.remove(o); // r5-avatar: keep the skinned body
     const skin = mat(LOOKS.skin[L.skin]), hair = mat(LOOKS.hair[L.hair], 0.6), top = mat(LOOKS.top[L.top], 0.9), pants = mat(LOOKS.pants[L.pants], 0.9), shoe = mat('#e8e6e0', 0.7), shoeSole = mat('#2a2a2a', 0.9);
     const g = (name, parent, x, y, z) => { const o = new THREE.Group(); o.name = name; o.position.set(x, y, z); parent.add(o); return o; };
     const P = this.p = {};
@@ -56,9 +141,10 @@ export class Avatar {
     if (L.backpack) { const bp = box(0.3, 0.38, 0.14, mat('#2a3440', 0.85)); bp.position.set(0, 0.32, 0.17); P.spine.add(bp); const strap = box(0.32, 0.03, 0.02, mat('#1a1f26')); strap.position.set(0, 0.48, 0.1); P.spine.add(strap); }
     this.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   }
-  setLook(l) { Object.assign(this.look, l); this.build(); }
+  setLook(l) { Object.assign(this.look, l); this.build(); if (this.body) this._showProxy(false); if (this._people) this._buildBody(); }
   // speed m/s, onGround, mode ('walk'|'bike'|'fly'), dt
   animate(dt, speed, onGround, mode) {
+    if (this.body && !this._finSeen) this.body.update(dt, { mode, onGround, airTime: onGround ? 0 : 1, proxy: this.p, avRoot: this.root, player: null }); // r5-avatar
     const P = this.p; const t = (k, v) => { this.blend[k] += (v - this.blend[k]) * Math.min(1, dt * 8); };
     t('bike', mode === 'bike' ? 1 : 0); t('air', !onGround && mode !== 'bike' ? 1 : 0);
     const run = Math.min(1, Math.max(0, (speed - 4.5) / 3)); const walk = Math.min(1, speed / 1.5);
