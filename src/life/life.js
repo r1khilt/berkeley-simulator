@@ -20,6 +20,7 @@ import { bikeGeometry, scooterGeometry, vehicleMaterial, VehicleMesh } from './v
 import { buildTabling } from './tabling.js';
 import { pacificParts } from '../time.js';
 
+const WALKFIX = typeof location === 'undefined' || new URLSearchParams(location.search).get('walkfix') !== '0'; // r4-people2: forward-only steering for walkers (?walkfix=0 = old lane-following)
 const PEOPLE_PLUGIN = import.meta.glob('../people/index.js'); // optional (r4-people); empty object when absent
 const TAU = Math.PI * 2;
 const QL = { // per quality level: walkers, riders, static-spot share, draw distance, near-LOD distance, instance caps
@@ -333,11 +334,20 @@ export class CampusLife {
       // r4-people2: speed eases (people decelerate/accelerate instead of stopping dead), the body faces the way it is
       // actually moving (sidesteps and corner cuts included, no crab-walking) and turns at a human rate
       w.sm = w.sm ?? w.speedMul; w.sm += Math.max(-dt * 2.2, Math.min(dt * 1.4, w.speedMul - w.sm));
-      const ox = w.vx, oz = w.vz;
-      w.vx += (p[0] + (w.sx || 0) - w.vx) * k; w.vz += (p[1] + (w.sz || 0) - w.vz) * k;
-      const kv = 1 - Math.exp(-dt * 5); w.mvx = (w.mvx || 0) + ((w.vx - ox) / Math.max(dt, 1e-4) - (w.mvx || 0)) * kv; w.mvz = (w.mvz || 0) + ((w.vz - oz) / Math.max(dt, 1e-4) - (w.mvz || 0)) * kv;
-      const msp = Math.hypot(w.mvx, w.mvz); let want = p[2]; if (msp > 0.2) { const mh = Math.atan2(-w.mvx, -w.mvz); let dm = mh - p[2]; dm = Math.atan2(Math.sin(dm), Math.cos(dm)); want = p[2] + dm * Math.min(1, (msp - 0.2) / 0.4); }
-      let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = (w.jog ? 3.6 : 2.6) * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 6)));
+      const tx = p[0] + (w.sx || 0), tz = p[1] + (w.sz || 0), vm = w.speed * w.sm; let want = p[2];
+      if (WALKFIX && vm > 0.08) {
+        // steer like a person: aim at a point 1.5 m ahead on the lane, turn at a human rate, and only ever move forward
+        // (sidesteps and corners become curved paths; no crab-walking, no sliding)
+        const ax = tx - Math.sin(p[2]) * 1.5, az = tz - Math.cos(p[2]) * 1.5; want = Math.atan2(-(ax - w.vx), -(az - w.vz));
+        let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = (w.jog ? 3.4 : 2.4) * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 5)));
+        const ex = tx - w.vx, ez = tz - w.vz; const along = ex * -Math.sin(w.hd) + ez * -Math.cos(w.hd); // + = behind the lane point: catch up a little
+        const sp = vm * (1 + Math.max(-0.35, Math.min(0.35, along * 0.5))); w.vx += -Math.sin(w.hd) * sp * dt; w.vz += -Math.cos(w.hd) * sp * dt;
+        const err = Math.hypot(tx - w.vx, tz - w.vz); if (err > 2.2) { const c = 1 - 2.2 / err; w.vx += (tx - w.vx) * c; w.vz += (tz - w.vz) * c; } // never drift far off the lane
+      } else {
+        w.vx += (tx - w.vx) * k; w.vz += (tz - w.vz) * k;
+        if (w.faceHd != null) want = w.faceHd; // stopped and facing someone (people plugin)
+        let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = 2.4 * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 5)));
+      }
       const v = w.speed * w.sm; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
     }
     // ---- riders

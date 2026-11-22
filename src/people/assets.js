@@ -26,6 +26,8 @@ async function _load() {
     // relaxed hand = a third of the way from the flat rest hand to UAL's fist: fingers together, gently curled
     const relaxed = {}; bodies[k].scene.traverse((o) => { if (o.isBone && fist[o.name]) relaxed[o.name] = o.quaternion.clone().slerp(fist[o.name], /^thumb/.test(o.name) ? 0.3 : 0.5).toArray(); }); // r4-people2: more curl (claw hands read as mannequins)
     bodies[k].relaxed = relaxed;
+    // rest + fist per finger bone, for per-person hand curl (and riders' grip)
+    const restQ = {}, fistQ = {}; bodies[k].scene.traverse((o) => { if (o.isBone && fist[o.name]) { restQ[o.name] = o.quaternion.clone(); fistQ[o.name] = fist[o.name].clone(); } }); bodies[k].restQ = restQ; bodies[k].fistQ = fistQ;
   }
   return { bodies, hair: prepHair(hair, bodies) };
 }

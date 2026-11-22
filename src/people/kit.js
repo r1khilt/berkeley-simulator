@@ -136,10 +136,8 @@ export function kitFor(B) {
     const zip = new THREE.TorusGeometry(0.15, 0.004, 3, 20, Math.PI); zip.scale(1, 1.25, 1); zip.translate(0, J.spine_02.y + 0.08, back - 0.152); K.add(zip, KP.backpack, KS.strap, 'spine_03');
     const handle = new THREE.TorusGeometry(0.03, 0.007, 4, 10, Math.PI); handle.translate(0, J.spine_02.y + 0.27, back - 0.06); K.add(handle, KP.backpack, KS.strap, 'spine_03');
     // messenger bag at the left hip with a strap across the chest
-    const bag = new RoundedBoxGeometry(0.3, 0.24, 0.085, 2, 0.03); bag.translate(0.21, J.pelvis.y - 0.02, J.pelvis.z - 0.01); K.add(bag, KP.bag, KS.bag, 'pelvis');
-    const flap = new RoundedBoxGeometry(0.3, 0.14, 0.012, 1, 0.005); flap.translate(0.21, J.pelvis.y + 0.035, J.pelvis.z + 0.038); K.add(flap, KP.bag, KS.strap, 'pelvis');
-    const sp = [new THREE.Vector3(0.2, J.pelvis.y + 0.09, J.pelvis.z + 0.03), new THREE.Vector3(0.0, J.spine_02.y + 0.03, frontZ + 0.01), new THREE.Vector3(-0.12, shY - 0.02, (back + frontZ) * 0.5 + 0.03), new THREE.Vector3(-0.08, shY + 0.02, back + 0.02), new THREE.Vector3(0.1, J.spine_02.y - 0.05, back - 0.01), new THREE.Vector3(0.2, J.pelvis.y + 0.09, J.pelvis.z - 0.05)];
-    K.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sp), 24, 0.01, 4, false), KP.bag, KS.strap, (q) => (q.y > J.spine_01.y ? [['spine_03', 1]] : [['pelvis', 1]]));
+    const bag = new RoundedBoxGeometry(0.3, 0.24, 0.085, 2, 0.03); bag.translate(0.195, J.pelvis.y - 0.02, J.pelvis.z - 0.015); K.add(bag, KP.bag, KS.bag, 'pelvis');
+    const flap = new RoundedBoxGeometry(0.3, 0.14, 0.012, 1, 0.005); flap.translate(0.195, J.pelvis.y + 0.035, J.pelvis.z + 0.033); K.add(flap, KP.bag, KS.strap, 'pelvis');
     // hood lying on the upper back + drawstrings (hoodies)
     const nk = B.neckR; const roll = new THREE.TorusGeometry(nk * 1.38, 0.025, 8, 20, Math.PI * 1.25); roll.rotateX(Math.PI / 2); roll.rotateY(Math.PI * 0.5 - Math.PI * 0.125 + Math.PI); roll.scale(1.08, 1.5, 1); roll.rotateX(-0.25); roll.translate(J.neck_01.x, B.collarY - 0.022, J.neck_01.z - 0.012); K.add(roll, KP.hood, KS.hood, 'spine_03');
     const bagH = new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62); bagH.rotateX(-Math.PI / 2 - 0.25); bagH.scale(0.13, 0.15, 0.055); bagH.translate(0, B.collarY - 0.09, tb.min.z - 0.008); K.add(bagH, KP.hood, KS.hood, 'spine_03');
@@ -159,11 +157,11 @@ export function kitFor(B) {
     const lw = fem ? 0.024 : 0.026, lh = 0.017;
     for (const [sd, E] of [['l', H.eyes.l], ['r', H.eyes.r]]) {
       const pts = []; for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; const cx = Math.cos(a), cy = Math.sin(a); pts.push(new THREE.Vector3(E.x + Math.sign(cx) * Math.pow(Math.abs(cx), 0.6) * lw, E.y + 0.002 + Math.sign(cy) * Math.pow(Math.abs(cy), 0.7) * lh, H.front + 0.014 - Math.abs(E.x) * 0.08)); }
-      K.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 24, 0.0022, 4, true), KP.glasses, KS.frame, 'Head');
+      K.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 24, 0.0034, 5, true), KP.glasses, KS.frame, 'Head');
       const lens = new THREE.CircleGeometry(1, 16); lens.scale(lw * 0.95, lh * 0.95, 1); lens.translate(E.x, E.y + 0.002, H.front + 0.0135 - Math.abs(E.x) * 0.08); K.add(lens, KP.lens, KS.lens, 'Head');
-      const sx = Math.sign(E.x); const tp = taperTube([new THREE.Vector3(E.x + sx * lw, E.y + 0.008, H.front + 0.01 - Math.abs(E.x) * 0.08), new THREE.Vector3(sx * (hw + 0.004), E.y + 0.01, H.front - 0.03), new THREE.Vector3(sx * (hw + 0.002), E.y + 0.004, c.z - 0.005)], 0.0018, 0.0016, 4); K.add(tp, KP.glasses, KS.frame, 'Head');
+      const sx = Math.sign(E.x); const tp = taperTube([new THREE.Vector3(E.x + sx * lw, E.y + 0.008, H.front + 0.01 - Math.abs(E.x) * 0.08), new THREE.Vector3(sx * (hw + 0.004), E.y + 0.01, H.front - 0.03), new THREE.Vector3(sx * (hw + 0.002), E.y + 0.004, c.z - 0.005)], 0.0028, 0.0024, 4); K.add(tp, KP.glasses, KS.frame, 'Head');
     }
-    const br = taperTube([new THREE.Vector3(H.eyes.r.x + lw * 0.7, H.eyes.r.y + 0.008, H.front + 0.013), new THREE.Vector3(0, H.eyes.r.y + 0.011, H.front + 0.016), new THREE.Vector3(H.eyes.l.x - lw * 0.7, H.eyes.l.y + 0.008, H.front + 0.013)], 0.002, 0.002, 4); K.add(br, KP.glasses, KS.frame, 'Head');
+    const br = taperTube([new THREE.Vector3(H.eyes.r.x + lw * 0.7, H.eyes.r.y + 0.008, H.front + 0.013), new THREE.Vector3(0, H.eyes.r.y + 0.011, H.front + 0.016), new THREE.Vector3(H.eyes.l.x - lw * 0.7, H.eyes.l.y + 0.008, H.front + 0.013)], 0.003, 0.003, 4); K.add(br, KP.glasses, KS.frame, 'Head');
     // over-ear headphones
     const band = new THREE.TorusGeometry(hw + 0.016, 0.009, 6, 20, Math.PI); band.scale(1, 1.05, 1.6); band.translate(c.x, H.eyeY - 0.005, c.z - 0.012); K.add(band, KP.phones, KS.phones, 'Head');
     for (const s of [-1, 1]) { const cup = new THREE.CylinderGeometry(0.037, 0.04, 0.03, 16); cup.rotateZ(Math.PI / 2); cup.translate(s * (hw + 0.012), H.eyeY - 0.02, c.z - 0.008); K.add(cup, KP.phones, KS.phones, 'Head');
@@ -206,7 +204,7 @@ export function kitFor(B) {
 export function kitMaterial() {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0, name: 'people:kit', side: THREE.DoubleSide });
   const cols = Array.from({ length: 14 }, () => new THREE.Color(0.5, 0.5, 0.5)); const rough = new Float32Array(14).fill(0.75);
-  rough[KS.lens] = 0.08; rough[KS.frame] = 0.35; rough[KS.phones] = 0.4; rough[KS.sole] = 0.85; rough[KS.hair] = 0.5; rough[KS.upper] = 0.62;
+  rough[KS.lens] = 0.08; rough[KS.frame] = 0.35; rough[KS.phones] = 0.4; rough[KS.sole] = 0.85; rough[KS.hair] = 0.68; rough[KS.upper] = 0.62;
   const u = { uMask: { value: 0 }, uCols: { value: cols }, uRough: { value: rough } }; m.userData.u = u;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);

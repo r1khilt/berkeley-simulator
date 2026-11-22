@@ -52,9 +52,9 @@ class People {
     const tStart = performance.now(); // r4-people2: CPU cost of the near-LOD layer (stats.ms, smoothed)
     const cam = camera.position; this.pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); this.fr.setFromProjectionMatrix(this.pm);
     for (const c of this.pool) if (c.hideNext) { c.hideNext = false; if (!c.agent) c.root.visible = false; }
-    // pick the K nearest people in view (riders stay instanced: their bikes are campus life's meshes)
+    // pick the K nearest people in view (riders included: campus life keeps drawing their bike when the person is hidden)
     const maxD2 = this.maxD * this.maxD, cand = this._cand || (this._cand = []); cand.length = 0;
-    for (const a of agents) { if (a.kind === 'rider') continue; const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a);
+    for (const a of agents) { const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a); if (a.kind === 'rider' && d2 > 22 * 22 * (keep ? 1.25 : 1)) continue; // r4-people2: riders get skinned people too (on campus life's bikes)
       if (d2 > maxD2 * (keep ? 1.25 : 1)) continue; if (d2 > 25 && !this._inView(a)) continue; cand.push([d2 * (keep ? 0.8 : 1), a]); }
     cand.sort((p, q) => p[0] - q[0]);
     const want = this._want || (this._want = new Set()); want.clear(); let nf = 0, nm = 0; const half = this.K / 2;
@@ -135,12 +135,15 @@ class People {
     const look = player.camYaw != null ? player.camYaw : player.yaw; const toW = Math.atan2(-(w.vx - px), -(w.vz - pz));
     const staring = d < 10 && d > 0.8 && Math.abs(wrap(look - toW)) < 0.1; S.stare = staring ? S.stare + dt : Math.max(0, S.stare - dt * 1.5);
     let gaze = 0; const relP = wrap(Math.atan2(-dx, -dz) - w.hd);
-    if ((S.stare > 0.9 || S.glance > 0) && Math.abs(relP) < 2.3) { gaze = relP; if (S.stare > 2.2 && w.stateT <= 0 && !w.jog && w.speedMul > 0.5) { w.speedMul = 0; w.state = 'idle'; w.stateT = 1.8; } }
+    S.stareCd = (S.stareCd || 0) - dt;
+    if ((S.stare > 0.9 || S.glance > 0) && Math.abs(relP) < 2.3) { gaze = relP; if (S.stare > 2.0 && w.stateT <= 0 && !w.jog && S.stareCd <= 0) { w.speedMul = 0; w.state = 'idle'; w.stateT = 1.6 + this.rand() * 1.4; S.stareCd = 9; S.faceT = w.stateT; } }
     else if (d < 2.4 && Math.abs(relP) < 1.4 && ((w.id * 7) % 3 === 0)) gaze = relP * 0.8; // some glance at whoever passes close
     S.glance -= dt;
     // -- walking with a friend: turn to them now and then while talking
     const friend = w.buddy || (nb.find((o) => o.buddy === w));
     if (!gaze && friend && w.speedMul > 0.05) { S.chat -= dt; if (S.chat < 0) S.chat = 4 + this.rand() * 6; if (S.chat < 2.2) { const fy = Math.atan2(-(friend.vx - w.vx), -(friend.vz - w.vz)); gaze = wrap(fy - w.hd) * 0.85; } }
+    S.faceT = (S.faceT || 0) - dt; if (S.react) S.faceT = Math.max(S.faceT, 1.2);
+    w.faceHd = S.faceT > 0 && w.speedMul < 0.05 ? Math.atan2(-dx, -dz) : null; if (w.faceHd != null) gaze = gaze * 0.4; // body turns, head follows less
     w.gaze = gaze;
     // -- phone checks: now and then someone stops dead to read a text
     S.phoneCd -= dt;

@@ -8,7 +8,8 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { REG } from './assets.js';
 import { buildOutfit, outfitMaterial, TOP, BOT } from './garments.js'; // r4-people2: modelled clothes
-import { kitFor, kitMaterial, kitGeometry, KP, KS } from './kit.js'; // r4-people2: shoes, bags, hats, glasses, hair in one skinned mesh
+import { kitFor, kitMaterial, kitGeometry, headFrame, KP, KS } from './kit.js';
+const faceFrame = (B) => { const H = headFrame(B); return { eyeY: H.eyeY, front: H.front, eyeX: Math.abs(H.eyes.l.x - H.eyes.r.x) / 2 }; }; // r4-people2: shoes, bags, hats, glasses, hair in one skinned mesh
 
 const TAU = Math.PI * 2;
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion(), m1 = new THREE.Matrix4();
@@ -19,7 +20,7 @@ const FL = { SLEEVE: 1, PANTS: 2, BACKPACK: 4, SKIRT: 8, BAG: 16, PHONE: 32, BOO
 function bodyMaterial(base, B) {
   const m = base.clone(); m.name = 'people:body'; m.roughness = 0.62; m.metalness = 0; m.normalMap = null; // the superhero muscle-striation normal map reads as scaly skin at game scale
   const u = { uTop: { value: new THREE.Color(0.1, 0.15, 0.3) }, uBot: { value: new THREE.Color(0.1, 0.1, 0.12) }, uShoe: { value: new THREE.Color(0.8, 0.8, 0.8) }, uSkin: { value: new THREE.Color(0.7, 0.5, 0.4) },
-    uSkinRef: { value: new THREE.Vector3(B.skinRef.r, B.skinRef.g, B.skinRef.b) }, uCut: { value: new THREE.Vector4(0.45, 1, B.shoeY, B.waistY) }, uCollar: { value: B.collarY }, uNeck: { value: new THREE.Vector3(B.J.neck_01.x, B.J.neck_01.z, B.neckR) }, uAnkL: { value: B.J.foot_l.clone() }, uAnkR: { value: B.J.foot_r.clone() }, uSock: { value: new THREE.Vector4(1, 1, 1, 0) }, uTights: { value: 0 } }; // r4-people2: socks / tights
+    uSkinRef: { value: new THREE.Vector3(B.skinRef.r, B.skinRef.g, B.skinRef.b) }, uCut: { value: new THREE.Vector4(0.45, 1, B.shoeY, B.waistY) }, uCollar: { value: B.collarY }, uNeck: { value: new THREE.Vector3(B.J.neck_01.x, B.J.neck_01.z, B.neckR) }, uAnkL: { value: B.J.foot_l.clone() }, uAnkR: { value: B.J.foot_r.clone() }, uSock: { value: new THREE.Vector4(1, 1, 1, 0) }, uTights: { value: 0 }, uFace: { value: new THREE.Vector4(1.65, 0.07, 0, 0) }, uFaceCol: { value: new THREE.Color(0.05, 0.04, 0.03) }, uEyeX: { value: 0.034 } }; // r4-people2: socks / tights, face detail
   m.userData.u = u;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
@@ -34,7 +35,7 @@ attribute vec2 aCloth; flat varying float vReg; varying float vLimbT; varying ve
    transformed += normal * inf * 0.3; // r4-people2: real garment shells carry the cloth volume now
    if (aCloth.x > 3.5 && position.y < uCut.z + 0.01) { vec3 an = position.x > 0.0 ? uAnkL : uAnkR; transformed = an + (position - an) * vec3(0.72, 0.8, 0.82); } } // bare foot tucked inside the sneaker`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform vec3 uTop, uBot, uShoe, uSkin, uSkinRef, uNeck; uniform vec4 uCut, uSock; uniform float uCollar, uTights;
+uniform vec3 uTop, uBot, uShoe, uSkin, uSkinRef, uNeck, uFaceCol; uniform vec4 uCut, uSock, uFace; uniform float uCollar, uTights, uEyeX;
 flat varying float vReg; varying float vLimbT; varying vec3 vBind;
 float pHash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }`)
       .replace('#include <map_fragment>', `#include <map_fragment>
@@ -47,6 +48,19 @@ float pHash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.
  cc *= 1.0 - 0.25 * hem * (1.0 - shoeK);
  float sl = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)) / max(dot(uSkinRef, vec3(0.299, 0.587, 0.114)), 0.04);
  vec3 skinC = uSkin * 0.9 * mix(1.0, clamp(sl, 0.6, 1.2), 0.45); // the face keeps its painted lips/brows/eye shading
+ if (vReg > 2.5 && vReg < 3.5) skinC *= 0.86; // r4-people2: hands read chalky next to the face
+ // r4-people2 face detail (bind space; uFace = eye height, face front z, stubble, makeup): lash line, lip tint, cheek warmth, stubble shadow
+ if (vReg < 0.5 && vBind.z > uFace.y - 0.07) {
+   float fy = vBind.y - uFace.x; float ax = abs(vBind.x);
+   float lash = smoothstep(0.016, 0.0, length(vec2((ax - uEyeX) * 0.75, (fy - 0.008) * 2.2))) * step(0.0, vBind.z - uFace.y + 0.02);
+   skinC *= 1.0 - (0.35 + 0.35 * uFace.w) * lash;
+   float lip = smoothstep(0.011, 0.0, length(vec2(vBind.x * 0.42, (fy + 0.066) * 1.3))) * step(uFace.y - 0.005, vBind.z);
+   skinC = mix(skinC, skinC * vec3(1.05, 0.62, 0.62), lip * (0.45 + 0.35 * uFace.w));
+   float cheek = smoothstep(0.024, 0.0, length(vec2(ax - 0.042, fy + 0.03)));
+   skinC = mix(skinC, skinC * vec3(1.08, 0.86, 0.84), cheek * (0.25 + 0.3 * uFace.w));
+   float jaw = smoothstep(-0.045, -0.06, fy) * smoothstep(-0.13, -0.095, fy) * smoothstep(0.065, 0.03, ax) * (1.0 - lip) + smoothstep(0.006, 0.0, abs(fy + 0.052)) * smoothstep(0.022, 0.008, ax);
+   skinC = mix(skinC, uFaceCol, clamp(jaw, 0.0, 1.0) * uFace.z * (0.75 + 0.25 * sin(vBind.x * 900.0) * sin(vBind.y * 800.0)));
+ }
  diffuseColor.rgb = mix(skinC, cc, clothK);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
  roughnessFactor = mix(roughnessFactor, mix(0.88, 0.55, shoeK), clothK);`)
@@ -183,7 +197,7 @@ export class Character {
     if (f & FL.PANTS) { bk = blue ? (r2 < 0.88 ? BOT.jeans : BOT.chinos) : warm ? BOT.chinos : (r2 < 0.36 ? BOT.jeans : r2 < 0.68 ? BOT.joggers : fem ? BOT.leggings : BOT.chinos); leg = bk === BOT.jeans ? 0.985 : bk === BOT.joggers ? 0.965 : 0.975; }
     else if (f & FL.SKIRT) { bk = BOT.skirt; leg = 0.2 + fr(4.3) * 0.22; }
     else { bk = BOT.shorts; leg = 0.34 + fr(5.1) * 0.1; }
-    const out = buildOutfit(this.B, { top: tk, sleeve, bot: bk, leg, straps: !!(f & FL.BACKPACK) }); this.outfit.geometry = out.geometry; this.body.geometry = out.body; this.outfitInfo = { tk, bk, tris: out.tris + out.bodyTris };
+    const out = buildOutfit(this.B, { top: tk, sleeve, bot: bk, leg, straps: !!(f & FL.BACKPACK), sash: !(f & FL.BACKPACK) && !!(f & FL.BAG) }); this.outfit.geometry = out.geometry; this.body.geometry = out.body; this.outfitInfo = { tk, bk, tris: out.tris + out.bodyTris };
     const ou = this.ou; ou.uTopA.value.setRGB(...top); ou.uBotA.value.setRGB(...bot);
     const inner = [[0.85, 0.85, 0.82], [0.03, 0.03, 0.035], [0.35, 0.36, 0.38], [0.6, 0.52, 0.4]][Math.floor(fr(6.7) * 4)];
     if (tk === TOP.flannel) { const k = fr(7.9); ou.uTopB.value.setRGB(...(k < 0.5 ? [0.02, 0.02, 0.025] : k < 0.75 ? [top[0] * 0.35, top[1] * 0.35, top[2] * 0.35] : [0.5, 0.48, 0.42])); }
@@ -191,8 +205,10 @@ export class Character {
     const lum = top[0] * 0.3 + top[1] * 0.59 + top[2] * 0.11; ou.uPrintCol.value.setRGB(...(top[2] > top[0] * 1.4 && fr(9.7) < 0.7 ? [0.98, 0.46, 0.008] : lum > 0.45 ? [0.0, 0.03, 0.14] : [0.92, 0.92, 0.9]));
     ou.uKind.value.set(tk, bk, print, seed);
     // ---- body paint under / between the clothes (inner shirt of open jackets, leggings, socks or tights)
-    u.uTop.value.setRGB(...(tk === TOP.jacket || tk === TOP.flannel ? inner : top)); u.uBot.value.setRGB(...(bk === BOT.leggings ? [bot[0] * 0.5, bot[1] * 0.5, bot[2] * 0.5] : bot));
+    u.uTop.value.setRGB(...top); u.uBot.value.setRGB(...(bk === BOT.leggings ? [bot[0] * 0.5, bot[1] * 0.5, bot[2] * 0.5] : bot));
     u.uSkin.value.setRGB(...(S.SKIN[L.skin | 0] || S.SKIN[2]));
+    { const H = this.faceRef || (this.faceRef = faceFrame(this.B)); const hcF = S.HAIR[L.hairC | 0] || S.HAIR[1]; const beardUBC = !fem && seed > 0.72 && (L.hair | 0) !== 6;
+      u.uFace.value.set(H.eyeY, H.front, !fem && !beardUBC && fr(25.3) < 0.45 ? 0.35 + fr(25.9) * 0.4 : 0, fem ? fr(26.3) * 0.9 : 0); u.uFaceCol.value.setRGB(hcF[0] * 0.8, hcF[1] * 0.8, hcF[2] * 0.8); u.uEyeX.value = H.eyeX; }
     u.uCut.value.x = tk === TOP.tee ? sleeve - 0.03 : 0.95; u.uCut.value.y = bk === BOT.leggings ? 1.02 : (bk === BOT.skirt ? 0 : bk === BOT.shorts ? leg - 0.03 : 0.95);
     const bare = bk === BOT.shorts || bk === BOT.skirt; const tights = bk === BOT.skirt && fr(10.3) < 0.55;
     if (u.uSock) { const sc = fr(11.1) < 0.7 ? [0.86, 0.86, 0.84] : [0.03, 0.03, 0.035]; u.uSock.value.set(sc[0], sc[1], sc[2], bare ? 0.07 + fr(11.9) * 0.05 : 0.0); u.uTights.value = tights ? 0.82 : 0; }
@@ -246,7 +262,10 @@ export class Character {
     // r4-people2: desync the looping idles (the pool was created at once, so everyone breathed and swayed in unison)
     for (const [n, act] of Object.entries(this.actions)) { if (n.startsWith('Walk') || n.startsWith('Jog')) continue; act.time = fr(30 + n.length) * act.getClip().duration; }
     this.lookT = fr(31.7) * 3; this.lookYaw = 0; this.lookPitch = 0;
+    this.curl = 0.28 + fr(33.1) * 0.3; this.setHands(this.curl);
   }
+  setHands(k) { // finger curl: 0 flat .. 1 fist (thumb curls less so it never closes into an OK sign)
+    const R = this.B.restQ, F = this.B.fistQ; if (!R) return; for (const n in R) { const b = this.bones[n]; if (b) b.quaternion.copy(R[n]).slerp(F[n], /^thumb/.test(n) ? k * 0.45 : k); } this.handK = k; }
   setShadow(on) { if (this._sh === on) return; this._sh = on; this.root.traverse((o) => { if (o.isMesh && o !== this.eyes && o !== this.brows) o.castShadow = on; }); }
   // ---------------------------------------------------------------- per frame
   fade(name, k) { this.wt[name] = k; }
@@ -283,8 +302,9 @@ export class Character {
     if (mode === 'sit') { const so = B.sitOffset; this.inner.position.set(0, (a.aux || 0.46) - so.seat, 0.05 - so.back); }
     else if (mode === 'ground') { const so = B.sitOffset; this.inner.position.set(0, -so.seat + 0.03, 0.05 - so.back); }
     else if (mode === 'lie') { this.inner.rotation.set(-Math.PI / 2, Math.PI, 0); this.inner.position.set(0, 0.12, -0.85); }
-    else if (mode === 'cycle') { const so = B.sitOffset; this.inner.position.set(0, 0.95 - so.seat, 0.26 - so.back); }
-    else if (mode === 'scoot') this.inner.position.set(0, 0.105, 0.04);
+    else if (mode === 'cycle') { const so = B.sitOffset; this.inner.position.set(0, 0.93 - so.seat, 0.24 - so.back); }
+    else if (mode === 'scoot') this.inner.position.set(0, 0.07, 0.03);
+    if (mode === 'cycle' || mode === 'scoot') this.setHands(0.85); else if (mode !== 'sit' && mode !== 'ground' && Math.abs((this.handK ?? 0) - this.curl) > 0.01) this.setHands(this.curl); // riders grip the bars (every frame: the sitting clip keys the fingers)
     if (mode === 'stand' && !this.speaking) { // weight shift: slow hip sway (each person on their own rhythm)
       const ws = Math.sin(this.t * 0.45 + this.idleOff * 3.1); this.inner.position.x += ws * 0.018; this.inner.rotation.z = -ws * 0.012; }
     this.model.updateMatrixWorld(true);
@@ -332,7 +352,7 @@ export class Character {
     }
   }
   _scootPose(a) { // scooter deck top y 0.135; bar grips (+-0.25, 1.08, -0.47); one foot ahead of the other
-    const b = this.bones; this.root.updateMatrixWorld(true); this._lean(0.08);
+    const b = this.bones; this.root.updateMatrixWorld(true); this._lean(0.14);
     const fwd = this.dirW(0, 0, -1, new THREE.Vector3()), down = this.dirW(0, -1, 0, new THREE.Vector3());
     const feet = { l: [-0.05, 0.215, -0.17], r: [0.05, 0.215, 0.16] };
     for (const [s, sx] of [['l', -1], ['r', 1]]) { const F = feet[s]; this.ik2(b['thigh_' + s], b['calf_' + s], b['foot_' + s], this.cw(F[0], F[1], F[2]), fwd); this.aim(b['foot_' + s], b['ball_' + s], this.dirW(sx * 0.2, -0.35, -1, new THREE.Vector3()), 0.8);

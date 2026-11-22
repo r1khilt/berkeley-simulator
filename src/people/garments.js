@@ -71,6 +71,9 @@ function shell(B, part, fit, snap, opts = {}) {
   }
   // snap boundary vertices onto their cut (straight hems)
   for (let i = 0; i < N; i++) if (bnd[i] && used[i] && snap) snap(cur.get(i), CL.getX(i), CL.getY(i), base.get(i), i);
+  // then relax every open edge along itself (necklines and anything unsnapped become clean curves, not sawtooth)
+  { const bn = new Map(); for (let e = 0; e < bEdges.length; e += 3) { const a = canon[bEdges[e]], b = canon[bEdges[e + 1]]; if (!bn.has(a)) bn.set(a, []); if (!bn.has(b)) bn.set(b, []); bn.get(a).push(b); bn.get(b).push(a); }
+    for (let it = 0; it < (opts.edgeRelax ?? 4); it++) { const nx = new Map(); for (const [i, l] of bn) { if (l.length !== 2) continue; const a = cur.get(l[0]), b = cur.get(l[1]), c = cur.get(i); nx.set(i, c.clone().multiplyScalar(0.5).addScaledVector(a, 0.25).addScaledVector(b, 0.25)); } for (const [i, q] of nx) cur.get(i).copy(q); } }
   // ring distance from the boundary (for hiding the body underneath, and ribbing masks)
   const ring = new Map(); let front = []; for (const [i] of cur) if (bnd[i]) { ring.set(i, 0); front.push(i); }
   for (let r = 1; r < 4 && front.length; r++) { const nf = []; for (const i of front) for (const j of I.nb[i]) if (cur.has(j) && !ring.has(j)) { ring.set(j, r); nf.push(j); } front = nf; }
@@ -111,7 +114,7 @@ function topFit(B, kind, sleeve) {
   const fit = (i, p, n, reg, t) => {
     if (reg === REG.TRUNK) {
       if (p.y < hemY) return -1;
-      const neckDrop = kind === TOP.tee || kind === TOP.long ? 0.045 : kind === TOP.hoodie ? 0.0 : 0.02; // crew necks dip at the front
+      const neckDrop = kind === TOP.tee || kind === TOP.long ? 0.026 : kind === TOP.hoodie ? 0.0 : 0.016; // crew necks dip at the front
       const front = Math.max(0, p.z - J.neck_01.z);
       if (p.y > nY - front * (neckDrop > 0 ? 0.55 : 0.25) - (front > 0.02 ? neckDrop * Math.min(1, front / 0.06) : 0) && Math.hypot(p.x - J.neck_01.x, p.z - J.neck_01.z) < nk * (kind === TOP.hoodie || kind === TOP.puffer ? 1.18 : 1.05)) return -1;
       if (open && p.z > J.spine_02.z + 0.02 && Math.abs(p.x) < (kind === TOP.flannel ? 0.05 : 0.03) + Math.max(0, p.y - chestY) * 0.5) return -1; // open front shows the shirt underneath
@@ -164,15 +167,22 @@ function bottomShell(B, kind, leg) {
 function strapShell(B, kind, sleeve) {
   const J = B.J; const { fit } = topFit(B, kind, sleeve); const fem = B.sex === 'f'; const xs = fem ? 0.085 : 0.095; const zMid = J.spine_03.z; const packTop = J.spine_02.y + 0.24;
   const f = (i, p, n, reg, t) => {
-    if (reg !== REG.TRUNK && !(reg === REG.ARM && t < 0.08)) return -1;
+    if (reg !== REG.TRUNK) return -1;
     const s = p.x > 0 ? 1 : -1; const front = p.z > zMid;
     const cx = front ? xs : xs + Math.max(0, packTop - p.y) * 0.3; if (Math.abs(Math.abs(p.x) - cx) > 0.021) return -1;
     if (front ? p.y < J.spine_02.y - 0.02 : p.y < packTop) return -1;
-    const o = Math.max(0, fit(i, p, n, REG.TRUNK, 0)); return o + 0.008;
+    const o = Math.max(0, fit(i, p, n, REG.TRUNK, 0)); return o + 0.011;
   };
   const snap = (c, reg, t, b) => { const s = b.x > 0 ? 1 : -1; const front = b.z > zMid; const cx = front ? xs : xs + Math.max(0, packTop - b.y) * 0.3; const e = Math.abs(b.x) - cx;
-    if (front && b.y < J.spine_02.y + 0.005) c.y = J.spine_02.y - 0.02; else if (!front && b.y < packTop + 0.02) c.y = packTop; else if (Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
+    if (Math.abs(b.z - zMid) < 0.06 && b.y > J.spine_03.y + 0.05) return; if (front && b.y < J.spine_02.y + 0.005) c.y = J.spine_02.y - 0.02; else if (!front && b.y < packTop + 0.02) c.y = packTop; else if (Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
   const r = shell(B, 3, f, snap, { minK: 0.85, relax: 3 }); r.hide = new Set(); return r;
+}
+// messenger-bag strap: a diagonal band from the left hip over the right shoulder, front and back
+function sashShell(B, kind, sleeve) {
+  const J = B.J; const { fit } = topFit(B, kind, sleeve); const A = [0.17, J.pelvis.y + 0.06], C = [-0.115, J.spine_03.y + 0.16]; const dx = C[0] - A[0], dy = C[1] - A[1], L = Math.hypot(dx, dy);
+  const f = (i, p, n, reg, t) => { if (reg !== REG.TRUNK) return -1; const u = ((p.x - A[0]) * dx + (p.y - A[1]) * dy) / (L * L); if (u < 0 || u > 1.15) return -1;
+    const dist = Math.abs((p.x - A[0]) * dy - (p.y - A[1]) * dx) / L; if (dist > 0.019) return -1; return Math.max(0, fit(i, p, n, REG.TRUNK, 0)) + 0.01; };
+  const r = shell(B, 3, f, null, { minK: 0.85, relax: 3, edgeRelax: 6 }); r.hide = new Set(); return r;
 }
 // lathed skirt hanging from the hips; soft weights to the thighs so it follows the stride
 function skirtShell(B, len) {
@@ -205,12 +215,12 @@ function skirtShell(B, len) {
 
 // ---------------------------------------------------------------- outfits (cached per body + key)
 const _outfits = new Map();
-export function outfitKey(o) { return `${o.top}:${o.sleeve.toFixed(2)}:${o.bot}:${o.leg.toFixed(2)}:${o.straps ? 1 : 0}`; }
+export function outfitKey(o) { return `${o.top}:${o.sleeve.toFixed(2)}:${o.bot}:${o.leg.toFixed(2)}:${o.straps ? 1 : 0}${o.sash ? 1 : 0}`; }
 export function buildOutfit(B, o) {
   const key = B.sex + '|' + outfitKey(o); let R = _outfits.get(key); if (R) return R;
   const parts = [topShell(B, o.top, o.sleeve)];
   if (o.bot === BOT.skirt) parts.push(skirtShell(B, o.leg)); else if (o.bot !== BOT.leggings) parts.push(bottomShell(B, o.bot, o.leg));
-  if (o.straps) parts.push(strapShell(B, o.top, o.sleeve));
+  if (o.straps) parts.push(strapShell(B, o.top, o.sleeve)); else if (o.sash) parts.push(sashShell(B, o.top, o.sleeve));
   const pos = [], nor = [], sIdx = [], sWt = [], gat = [], idx = []; const hide = new Set();
   for (const p of parts) { const b = pos.length / 3; pos.push(...p.pos); nor.push(...p.nor); sIdx.push(...p.sIdx); sWt.push(...p.sWt); gat.push(...p.gat); for (const i of p.idx) idx.push(i + b); for (const h of p.hide) hide.add(h); }
   const g = new THREE.BufferGeometry();
@@ -263,7 +273,7 @@ float foldH(vec3 p, float part, float reg, float t, float kT, float kB){
   if (part < 0.5) {
     if (reg > 1.5) { // sleeves
       h += 0.0035 * sin(t * 95.0 + n * 4.0 + p.x * 20.0) * exp(-pow((t - 0.5) / 0.09, 2.0));
-      h += 0.0028 * sin(t * 140.0 + n * 5.0) * smoothstep(0.66, 0.86, t);
+      h += 0.0015 * sin(t * 120.0 + n * 7.0 + p.y * 30.0) * smoothstep(0.66, 0.86, t);
     } else { // torso
       float loose = (kT > 2.5) ? 1.0 : 0.6;
       h += loose * 0.003 * sin(p.y * 120.0 + n * 5.0 + sin(p.x * 30.0) * 1.5) * (1.0 - smoothstep(uJ.x - 0.02, uJ.y, p.y)); // waist wrinkles
@@ -273,7 +283,6 @@ float foldH(vec3 p, float part, float reg, float t, float kT, float kB){
     if (reg > 3.5) {
       h += 0.0035 * sin(t * 110.0 + n * 5.0 + p.x * 25.0) * exp(-pow((t - 0.5) / 0.08, 2.0));
       h += (kB < 1.5 ? 0.004 : 0.0025) * sin(t * 160.0 + n * 6.0) * smoothstep(0.8, 0.95, t);
-      h += 0.002 * sin(t * 60.0 + p.z * 40.0 + n * 3.0) * (1.0 - smoothstep(0.0, 0.35, t));
     } else h += 0.0015 * sin(p.y * 160.0 + n * 6.0);
   } else { // skirt: soft vertical drape / pleats
     float a = atan(p.x, p.z - uJ2.w); h += 0.004 * sin(a * (kB > 0.0 ? 22.0 : 14.0) + n * 2.0) * smoothstep(0.0, 0.5, t);
@@ -292,15 +301,14 @@ float foldH(vec3 p, float part, float reg, float t, float kT, float kB){
      col *= 1.0 - 0.35 * pk * max(gLine(abs(p.x) - pw, 0.0018), gLine(p.y - (uJ.x + 0.15), 0.0018) * step(abs(p.x), pw)); }
    else if (kT == 6.0) { rough = 0.48; col *= 0.9 + 0.12 * n2; sheen = 0.4; }
    else if (kT == 5.0) { rough = 0.62; col *= 0.95 + 0.06 * n2; // zip jacket: zipper tape + teeth down the centre front, pocket welts
-     float fz = step(uJ2.x + 0.02, p.z) * step(reg, 1.5); col = mix(col, vec3(0.03), fz * gLine(p.x, 0.004)); col = mix(col, vec3(0.6), fz * gLine(p.x, 0.0012) * step(0.5, fract(p.y * 220.0)));
-     col *= 1.0 - 0.4 * fz * gLine(abs(p.x) - 0.1 - (p.y - uJ.x) * 0.25, 0.0025) * step(abs(p.y - uJ.x - 0.06), 0.06); }
+     float fz = step(uJ2.x + 0.02, p.z) * step(reg, 1.5); col = mix(col, vec3(0.03), fz * gLine(p.x, 0.004)); col = mix(col, vec3(0.6), fz * gLine(p.x, 0.0012) * step(0.5, fract(p.y * 220.0))); }
    else if (kT == 7.0) { // flannel plaid
      float sx = fract(p.x * 9.0 + 0.5 * step(0.0, p.x)), sy = fract(p.y * 9.0); float bx = step(sx, 0.32), by = step(sy, 0.32); float lx = step(abs(sx - 0.66), 0.04), ly = step(abs(sy - 0.66), 0.04);
      col = mix(uTopA, uTopB, 0.5 * (bx + by)); col *= 1.0 - 0.35 * bx * by; col = mix(col, vec3(0.9, 0.88, 0.8), 0.6 * max(lx, ly) * (1.0 - bx * by)); col *= 0.94 + 0.08 * n1;
      float fz = step(uJ2.x + 0.02, p.z) * step(reg, 1.5); col *= 1.0 - 0.3 * fz * gLine(abs(p.x) - 0.013, 0.0012); // button placket
      col = mix(col, vec3(0.85, 0.82, 0.75), fz * (1.0 - smoothstep(0.003, 0.0045, length(vec2(p.x, (fract(p.y * 11.0) - 0.5) / 11.0))))); }
    else { col *= 0.95 + 0.06 * n1; }
-   if (rib > 0.0) { col *= reg > 1.5 ? 0.9 : 0.88 + 0.12 * (0.5 + 0.5 * sin(p.x * 700.0)); }
+   if (rib > 0.0) { col *= reg > 1.5 ? 0.92 : 0.93 + 0.05 * (0.5 + 0.5 * sin(p.x * 450.0)); }
    // chest print
    if (uKind.z >= 0.0 && reg < 1.5 && p.z > 0.0 && kT != 5.0 && kT != 7.0) {
      vec2 c = vec2((p.x) / 0.28 + 0.5, (p.y - (uJ.y - 0.03)) / 0.14 + 0.5); float pi = uKind.z;
@@ -319,8 +327,8 @@ float foldH(vec3 p, float part, float reg, float t, float kT, float kB){
    else if (kB == 3.0) { col *= 0.9 + 0.14 * gN(p * 140.0); sheen = 0.15; if (lt > 0.93) col *= 0.85 + 0.15 * sin(atan(p.z, p.x) * 50.0); }
    else { col *= 0.95 + 0.06 * n1; }
  } else if (part < 2.5) { col = uBotA * (0.95 + 0.07 * n1); rough = 0.85; }
- else { col = uStrap * (0.9 + 0.1 * sin(p.y * 700.0)); rough = 0.7; }
- if (!gl_FrontFacing) col *= 0.45; // inside of the garment (looking up a sleeve)
+ else { col = uStrap * (0.92 + 0.08 * sin(p.y * 500.0)) * (ring < 0.5 ? 0.6 : 1.0); rough = 0.7; }
+ if (!gl_FrontFacing) col *= 0.7; // inside of the garment (looking up a sleeve)
  diffuseColor.rgb = col;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
  roughnessFactor = rough;`)
