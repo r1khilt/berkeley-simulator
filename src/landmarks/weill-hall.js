@@ -34,7 +34,7 @@ export async function build(ctx) {
   const BAND = bandMat(M);                                                     // banded precast concrete
   const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xdbd3c4);         // smooth concrete (frame, mouldings)
   const CD = M.stuccoWhite.clone(); CD.color = new THREE.Color(0xc6c0b4);       // plinth / shadowed concrete
-  const TILE = M.slate.clone(); TILE.color = new THREE.Color(0x9a8a80);       // weathered clay tile
+  const TILE = M.redTile;                                                       // [r5a] red Mission clay tile (photo: #b85a3e sunlit), was a grey-mauve slate tint
   const FR = P.trimWhite, GL = M.windowNight;
   const colliders = [], walkables = [];
   let poly = ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z));

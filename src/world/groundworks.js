@@ -76,6 +76,8 @@ function along(P, C, s) {
   const dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, dx, dz];
 }
 
+// [r5a] OSM stairs a landmark builds itself, skipped here: Haviland Hall's west brick flight (224673580, 1411037931)
+const R5A_OWN_STAIRS = new Set([224673580, 1411037931]);
 // =====================================================================================================================
 // pass 1: terrain grading
 export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) {
@@ -153,6 +155,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const stairs = [];
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2) continue;
+    if (R5A_OWN_STAIRS.has(p.id)) continue; // [r5a] flights a landmark module models itself (would double up)
     const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
     const w = Math.max(1.2, Math.min(14, p.w || 2.6));
