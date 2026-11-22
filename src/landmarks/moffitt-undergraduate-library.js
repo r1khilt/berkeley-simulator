@@ -179,8 +179,9 @@ export async function build(ctx) {
   for (const [R, sf] of [[RS, sS], [RN, sN]]) {
     for (const [s0, s1] of balBays(R, sf)) {
       const stubS = R === RS && s0 <= 0.01, stubN = R === RN && s1 >= R.L - 0.01;
-      if (!(R === RS && s0 > 5 && s0 < 20)) glassStorey(R, s0, s1, F3, F4 - 0.4); // south middle bay at F3 = entrance (below)
-      glassStorey(R, s0, s1, F4, F5 - 0.4); glassStorey(R, s0, s1, F5, SOF);
+      const go = R === RN ? { glass: GLP } : {}; // r4: the north side is in shade all day; its glass keeps the lit-room shader so it still reads as glazing
+      if (!(R === RS && s0 > 5 && s0 < 20)) glassStorey(R, s0, s1, F3, F4 - 0.4, go); // south middle bay at F3 = entrance (below)
+      glassStorey(R, s0, s1, F4, F5 - 0.4, go); glassStorey(R, s0, s1, F5, SOF, go);
       for (const y of [F4, F5]) { const P = y > F4 + 1 ? BP5 : BP4; balcony(R, s0, s1, y, { e0: stubS ? P - 0.34 : 0, e1: stubN ? P - 0.34 : 0 }); }
     }
     // flush end bay toward the east face (u 28..31.5)
@@ -227,8 +228,9 @@ export async function build(ctx) {
     const ops = [];
     // r4: tall narrow stair slots in one stacked column (the old square punched windows read as an apartment block);
     // the SE tower beside the entrance stays blank, as in the photos
-    const pat = south ? (u0 > 0 ? [[], [], []] : [[], [0.26], [0.26]]) : [[0.24], [0.24], [0.24]];
-    [F3, F4, F5].forEach((yF, k) => { for (const f of pat[k]) { const c = R.L * f; ops.push({ s0: c - 0.24, s1: c + 0.24, y0: yF + 0.55, y1: yF + 3.75 }); } });
+    const pat = south ? (u0 > 0 ? [[], [], []] : [[], [0.26], [0.26]]) : [[0.24, 0.76], [0.24, 0.76], [0.24, 0.76]];
+    const hw = south ? 0.24 : 0.32; // north towers: two slot columns, a little wider (they face University Drive)
+    [F3, F4, F5].forEach((yF, k) => { for (const f of pat[k]) { const c = R.L * f; ops.push({ s0: c - hw, s1: c + hw, y0: yF + 0.55, y1: yF + 3.75 }); } });
     K.wall(R, CT, 0, R.L, yb - 1.5, TP, ops, 0.55);
     for (const o of ops) K.fill(R, o, { rev: 0.42, mull: 0, glass: GL, frame: FR });
     K.rbox(R, CT, -0.05, TP - 0.02, -0.6, R.L + 0.05, TP + 0.08, 0.05);
