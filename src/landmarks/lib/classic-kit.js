@@ -215,9 +215,13 @@ export class Kit {
   }
   // Flat horizontal polygon (with optional holes) at height y, facing up (or down if down=true)
   flat(mat, poly, y, holes = [], down = false, opts) {
-    const s = new THREE.Shape(); s.setFromPoints(poly.map(([u, v]) => new THREE.Vector2(u, -v)));
-    for (const h of holes) { const p = new THREE.Path(); p.setFromPoints(h.map(([u, v]) => new THREE.Vector2(u, -v))); s.holes.push(p); }
-    const g = new THREE.ShapeGeometry(s); g.rotateX(-Math.PI / 2); if (down) g.rotateX(Math.PI); g.translate(0, y, 0);
+    // [r4-ground] down=true used to rotate the up-facing shape by PI about X, which mirrored it across v=0: every
+    // kit soffit/ceiling built this way floated outside its building (e.g. the brown slab by Durant Hall). Build the
+    // down-facing shape from (u, v) and rotate +PI/2 instead: same footprint, normal -y.
+    const sv = down ? 1 : -1;
+    const s = new THREE.Shape(); s.setFromPoints(poly.map(([u, v]) => new THREE.Vector2(u, sv * v)));
+    for (const h of holes) { const p = new THREE.Path(); p.setFromPoints(h.map(([u, v]) => new THREE.Vector2(u, sv * v))); s.holes.push(p); }
+    const g = new THREE.ShapeGeometry(s); g.rotateX(down ? Math.PI / 2 : -Math.PI / 2); g.translate(0, y, 0);
     return this.add(mat, g, opts);
   }
   // Generic story-banded façade along run R from s0..s1 with nb equal bays.
