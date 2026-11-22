@@ -30,6 +30,22 @@ export async function build(ctx) {
   const cream = M.stuccoWhite.clone(); cream.color = new THREE.Color(0xeee2c0);
   const soffit = M.wood.clone(); soffit.color = new THREE.Color(0xb89a6c);
   const tan = new THREE.MeshStandardMaterial({ color: 0xc98a3e, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 });
+  // [r4-sweep-outer] Art Deco screen-wall articulation for the outer walls (ref: NRHP / Wikimedia photos): projecting
+  // pilasters every ~6 m with cap blocks, a stepped-frame recessed panel in each bay, a base course and a frieze band.
+  // The walls used to read as one flat beige slab from Fulton St / Bancroft Way.
+  const wallPanel = M.concrete.clone(); wallPanel.color = new THREE.Color(0xc9c0ab); // recessed fields read a shade darker
+  const wallBase = M.concrete.clone(); wallBase.color = new THREE.Color(0xbfb6a1);
+  const offs = (vF, out, a, b) => [Math.min(vF + out * a, vF + out * b), Math.max(vF + out * a, vF + out * b)];
+  const pilaster = (u, gg, top, vF, out) => { const [p0, p1] = offs(vF, out, 0, 0.34), [c0, c1] = offs(vF, out, 0, 0.44);
+    K.box(wallBuff, u - 0.42, gg - 0.5, p0, u + 0.42, top - 0.02, p1); K.box(wallBuff, u - 0.52, top - 0.8, c0, u + 0.52, top - 0.02, c1); };
+  const decoBay = (ua, ub, gg, top, vF, out) => {
+    const y0 = gg + 1.6, y1 = top - 1.15, a = ua + 0.75, b = ub - 0.75; if (y1 - y0 < 1.6 || b - a < 1.6) return;
+    for (const [d, o, w] of [[0.1, 0, 0.3], [0.05, 0.3, 0.14]]) { const [f0, f1] = offs(vF, out, 0, d);
+      K.box(wallBuff, a + o, y0 + o, f0, b - o, y0 + o + w, f1); K.box(wallBuff, a + o, y1 - o - w, f0, b - o, y1 - o, f1);
+      K.box(wallBuff, a + o, y0 + o + w, f0, a + o + w, y1 - o - w, f1); K.box(wallBuff, b - o - w, y0 + o + w, f0, b - o, y1 - o - w, f1); }
+    const [q0, q1] = offs(vF, out, 0, 0.03); K.box(wallPanel, a + 0.44, y0 + 0.44, q0, b - 0.44, y1 - 0.44, q1);
+  };
+  const baseCourse = (ua, ub, gg, vF, out) => { const [b0, b1] = offs(vF, out, 0, 0.15); K.box(wallBase, ua, gg - 0.6, b0, ub, gg + 1.1, b1); };
 
   // ---------- grandstands ----------
   const stands = [
@@ -92,13 +108,16 @@ export async function build(ctx) {
       const top = kmax >= W.rows ? wallTop : W.res.yk(kmax) + 0.3;
       const gg = Math.min(K.g(ua, wOutV - 0.4), K.g(ub, wOutV - 0.4));
       K.box(wallBuff, ua, gg - 1.0, wOutV, ub, top, wOutV + 0.55);
+      baseCourse(ua, ub, gg, wOutV, -1); // [r4-sweep-outer]
       if (kmax < W.rows) K.box(conc, ua, yF, wOutV + 0.55, ub, W.res.yk(Math.max(1, kmax)) - 0.2, wTopV);
     }
     K.box(wallBuff, uA, wallTop, wOutV - 0.15, uB, wallTop + 0.22, wOutV + 0.7); // coping
     K.box(conc, uA - 0.3, yTopW + 0.25, wTopV - 0.2, uA, yTopW + 1.5, wOutV + 0.5);
     K.box(conc, uB, yTopW + 0.25, wTopV - 0.2, uB + 0.3, yTopW + 1.5, wOutV + 0.5);
-    // board-form texture lines: shallow pilaster strips every 8 m on the Fulton wall
-    for (let u = W.u0 + 6; u < W.u1 - 4; u += 6) { const gg = K.g(u, wOutV - 0.4); let kmax = W.rows; while (kmax > 0 && (u < W.res.uS(kmax - 1) || u > W.res.uN(kmax - 1))) kmax--; const top = kmax >= W.rows ? wallTop : W.res.yk(kmax) + 0.3; K.box(wallBuff, u - 0.45, gg - 0.5, wOutV - 0.18, u + 0.45, top, wOutV); }
+    // [r4-sweep-outer] pilasters every 6 m on the Fulton wall with stepped-frame panels between them, frieze under the coping
+    { const pu = []; for (let u = W.u0 + 6; u < W.u1 - 4; u += 6) { const gg = K.g(u, wOutV - 0.4); let kmax = W.rows; while (kmax > 0 && (u < W.res.uS(kmax - 1) || u > W.res.uN(kmax - 1))) kmax--; const top = kmax >= W.rows ? wallTop : W.res.yk(kmax) + 0.3; pilaster(u, gg, top, wOutV, -1); pu.push([u, gg, top]); }
+      for (let k = 0; k + 1 < pu.length; k++) { const [ua, ga, ta] = pu[k], [ub, gb, tb] = pu[k + 1]; decoBay(ua, ub, Math.max(ga, gb), Math.min(ta, tb), wOutV, -1); }
+      K.box(wallBuff, uA, wallTop - 0.6, wOutV - 0.08, uB, wallTop - 0.12, wOutV); }
     colliders.push(K.colPoly([[W.u0, wOutV], [W.u1, wOutV], [W.u1, wTopV], [W.u0, wTopV]], -5, yTopW - 0.6));
     // press box: board-and-batten cabin with a dark window band and a cantilevered flat roof
     const p0 = cu - 39, p1 = cu + 19, pv0 = wTopV - 0.2, pv1 = wOutV + 0.6; const yb = yTopW + 0.25;
@@ -126,6 +145,7 @@ export async function build(ctx) {
       const top = kmax >= E.rows ? E.res.yTop + 1.2 : E.res.yk(kmax) + 0.3;
       const vb = E.res.vv(Math.max(1, kmax)); const gg = Math.min(K.g(ua, vb + 0.6), K.g(ub, vb + 0.6));
       K.box(wallBuff, ua, gg - 1.0, Math.min(vb, vb + 0.5), ub, top, Math.max(vb, vb + 0.5));
+      { const vO = Math.max(vb, vb + 0.5); baseCourse(ua, ub, gg, vO, 1); pilaster(ua, gg, top, vO, 1); if (i === 23) pilaster(ub, gg, top, vO, 1); decoBay(ua, ub, gg, top, vO, 1); } // [r4-sweep-outer]
       if (kmax < E.rows) K.box(conc, ua, yF, E.res.vv(Math.max(1, kmax)) - 0.01, ub, E.res.yk(Math.max(1, kmax)) - 0.2, vB);
     }
     K.box(S.galv, uA, E.res.yTop + 1.15, vB + 0.2, uB, E.res.yTop + 1.2, vB + 0.3, { detail: true });
@@ -141,7 +161,12 @@ export async function build(ctx) {
       for (let k = 0; k < 8; k++) { const d = -w * 0.7 + (1.4 * w) * (k + 0.5) / 8; for (const [du, dv] of [[d, -w * 0.62], [d, w * 0.62], [-w * 0.62, d], [w * 0.62, d]]) K.box(wallBuff, u + du - 0.06, g0 + 2.75, v + dv - 0.06, u + du + 0.06, g0 + 2.9, v + dv + 0.06, { detail: true }); }
       K.box(wallBuff, u - w * 0.7, g0 + 2.6, v - w * 0.7, u + w * 0.7, g0 + 3.4, v + w * 0.7);             // decorative band
       for (const [du, dv] of [[0, -w * 0.71], [0, w * 0.71], [-w * 0.71, 0], [w * 0.71, 0]]) K.cyl(M.concreteDark, u + du, g0 + 2.8, v + dv, 0.22, 0.22, 0.42, 10, { detail: true });
-      const sh = new THREE.CylinderGeometry(w * 0.42, w * 0.6, H - 3.4, 4, 1); sh.rotateY(Math.PI / 4); sh.translate(u, g0 + 3.4 + (H - 3.4) / 2, v); K.add(wallBuff, sh);
+      // [r4-sweep-outer] ziggurat setbacks with rolled bolsters (the real pylons step in twice before the fluted shaft)
+      const tiers = [[w * 0.66, 3.4, 4.75], [w * 0.55, 4.75, 5.8]];
+      for (const [hs, ya, yb] of tiers) { K.box(wallBuff, u - hs, g0 + ya, v - hs, u + hs, g0 + yb, v + hs);
+        for (const [du, dv, alongU] of [[0, -hs, true], [0, hs, true], [-hs, 0, false], [hs, 0, false]]) { const bg = new THREE.CylinderGeometry(0.16, 0.16, hs * 2 + 0.1, 10, 1); bg.rotateZ(Math.PI / 2); if (!alongU) bg.rotateY(Math.PI / 2); bg.translate(u + du, g0 + yb - 0.12, v + dv); K.add(wallBuff, bg, { detail: true }); } }
+      const sh = new THREE.CylinderGeometry(w * 0.42, w * 0.52, H - 5.8, 4, 1); sh.rotateY(Math.PI / 4); sh.translate(u, g0 + 5.8 + (H - 5.8) / 2, v); K.add(wallBuff, sh);
+      for (const [hs, yy] of [[w * 0.33, H - 1.2], [w * 0.34, H - 0.55]]) K.box(wallBuff, u - hs, g0 + yy - 0.12, v - hs, u + hs, g0 + yy + 0.12, v + hs); // collar rings under the cap
       const cap = new THREE.ConeGeometry(w * 0.42 * Math.SQRT2 * 0.72, 1.1, 4); cap.rotateY(Math.PI / 4); cap.translate(u, g0 + H + 0.55, v); K.add(wallBuff, cap);
       colliders.push(K.colCyl(u, v, w * 0.85, g0 - 1, g0 + H));
     };
