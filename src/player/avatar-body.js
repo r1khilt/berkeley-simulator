@@ -152,7 +152,7 @@ export class PlayerBody {
     if (!freezeLegs) this.phase = (this.phase + f * dt) % 1;
     // weights: locomotion scaled by groundK (air) and by how much on-foot movement is in charge
     const footK = groundK * (1 - this.flyK) * (1 - this.bikeK) * (1 - this.proxyK);
-    const runAir = this.jumpT >= 0 ? (this.jumpRun || 0) * 0.45 : 0; // stride kept under a running jump
+    const runAir = this.jumpT >= 0 ? (this.jumpRun || 0) * 0.6 : 0; // stride kept under a running jump (a leap, not a tuck)
     this.fade('Idle_Loop', wI * footK + (this.proxyK) * (1 - this.flyK));
     this.fade('Walk_Loop', wW * (footK + this.airK * runAir));
     this.fade('Jog_Fwd_Loop', wJ * (footK + this.airK * runAir));
@@ -167,9 +167,10 @@ export class PlayerBody {
     // fly: hover (tread water) when slow, glide when fast
     if (this.flyK > 0.001) {
       const fs = sstep(4, 14, hs); this.flyFast += (fs - this.flyFast) * damp(4, dt);
-      if (A.Swim_Idle_Loop && A.Swim_Fwd_Loop) { this.fade('Swim_Idle_Loop', this.flyK * (1 - this.flyFast)); this.fade('Swim_Fwd_Loop', this.flyK * this.flyFast);
-        A.Swim_Idle_Loop.time = (this.t * 0.9) % A.Swim_Idle_Loop.getClip().duration; A.Swim_Fwd_Loop.time = (this.t * 0.45) % A.Swim_Fwd_Loop.getClip().duration; }
-      else this.fade('Idle_Loop', this.flyK);
+      // hover: a calm float (idle upper body, the fall loop's loose legs); the treading-water clip read as a T-pose
+      const hov = this.flyK * (1 - this.flyFast);
+      this.fade('Idle_Loop', hov);
+      if (A.Swim_Fwd_Loop) { this.fade('Swim_Fwd_Loop', this.flyK * this.flyFast); A.Swim_Fwd_Loop.time = (this.t * 0.45) % A.Swim_Fwd_Loop.getClip().duration; } else this.fade('Jump_Loop', this.flyK * this.flyFast);
     }
     // bike: seated base clip, legs and arms by IK below
     if (this.bikeK > 0) this.fade('Sitting_Idle_Loop', this.bikeK);
@@ -196,19 +197,38 @@ export class PlayerBody {
     // middle toward the flight path (Swim_Fwd is already horizontal; the controller also pitches avatar.root)
     if (this.flyK > 0.001) {
       const rootPitch = avRoot.rotation.x || 0, fk = this.flyK, ff = this.flyFast;
-      const want = -0.12 * (1 - ff) - 1.32 * ff, clipPitch = -Math.PI / 2 * ff;
-      const pivot = 1.0 * fk; frame.position.y += pivot; frame.quaternion.setFromAxisAngle(X, (want - clipPitch - rootPitch) * fk);
-      c.inner.position.y += -pivot + (1.28 * (1 - ff) + 1.08 * ff) * fk * this.k;
+      // glide at ~65 deg from upright (the chase camera sits above and behind: it should see the back, not just soles)
+      const want = -0.12 * (1 - ff) - 1.05 * ff, clipPitch = -Math.PI / 2 * ff;
+      const pivot = (1.0 + 0.45 * ff) * fk; frame.position.y += pivot; frame.quaternion.setFromAxisAngle(X, (want - clipPitch - rootPitch) * fk);
+      c.inner.position.y += -pivot + (0.25 * (1 - ff) + (1.08 * this.k) * ff) * fk + Math.sin(this.t * 1.7) * 0.035 * fk * (1 - ff); // feet hang ~25 cm above the root when hovering
     }    c.root.updateMatrixWorld(true);
     // ---- procedural layers
+    if (footK > 0.5 && this.c._armsIn) this._armsIn(this.spd > 3 ? 'jog' : 'walk'); // people code: pull hanging arms in toward the body
     if ((footK > 0.01 || this.airK > 0.01) && !DBG.includes('nolean')) this._lean(dt, yawRate, footK + this.airK * 0.5);
     if (this.flyK > 0.5 && this.flyFast > 0.3) this._superman(this.flyFast * this.flyK);
+    if (this.flyK > 0.05 && this.flyFast < 0.7) this._hover(this.flyK * (1 - this.flyFast));
     if (this.bikeK > 0 && pl) this._bike(pl);
     if (this.proxyK > 0.5 && st.proxy) this._retarget(st.proxy);
     if (onFoot && ground && pl && pl.ph && footK > 0.3 && !DBG.includes('nofoot')) this._footIK(dt, pl, footK); else { this.footOff.l = this.footOff.r = this.pelvisOff = 0; }
     if (!DBG.includes('nolook')) this._look(dt, st, mode);
     this.dbg = { v, wI, wW, wJ, wS, f, phase: this.phase, lean: this.lean, pitch: this.pitch, air: this.airK, land: landK, headYaw: this.headYaw };
     this.setGrip(mode === 'bike' || mode === 'scooter' || mode === 'horse' ? 1 : 0);
+    if (this.c.pack) this._pack(); // Rocketbox characters carry a rigid backpack placed after the pose
+  }
+  _armsIn(mode) { const c = this.c; if (c.phoneK == null) c.phoneK = 0; c._armsIn(mode); }
+  // RBCharacter's backpack (same placement as rocketbox.js, which only runs inside the NPC update)
+  _pack() {
+    const c = this.c, b = this.b; const on = !!this.packOn; c.pack.visible = on; for (const s of c.straps) s.visible = on; if (!on) return;
+    const S = b.spine_03.getWorldPosition(new THREE.Vector3()), N = b.neck_01.getWorldPosition(new THREE.Vector3()); const up = N.clone().sub(S).normalize();
+    c.root.getWorldQuaternion(q1); const back = new THREE.Vector3(0, 0, 1).applyQuaternion(q1); back.addScaledVector(up, -back.dot(up)).normalize();
+    const right = new THREE.Vector3().crossVectors(up, back).normalize();
+    const P = S.clone().addScaledVector(back, ((c.av && c.av.backDepth) || 0.12) + 0.07).addScaledVector(up, -0.1);
+    m1.makeBasis(right, up, back); const q = new THREE.Quaternion().setFromRotationMatrix(m1);
+    c.root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(c.root.matrixWorld).invert(); const rq = q1.clone().invert();
+    c.pack.position.copy(P).applyMatrix4(inv); c.pack.quaternion.copy(rq).multiply(q);
+    for (let i = 0; i < 2; i++) { const s = i ? 'r' : 'l'; const cl = b['upperarm_' + s].getWorldPosition(new THREE.Vector3()).lerp(b['clavicle_' + s].getWorldPosition(new THREE.Vector3()), 0.45);
+      const top = cl.clone().addScaledVector(up, 0.035); const st = c.straps[i]; const mid = top.clone().addScaledVector(back, -0.03).addScaledVector(up, -0.12);
+      st.position.copy(mid).applyMatrix4(inv); const dir = top.clone().sub(mid).normalize(); st.quaternion.copy(rq).multiply(q2.setFromUnitVectors(Y, dir)); st.scale.set(1, 1, 1); }
   }
   // ---------------------------------------------------------------- helpers
   setWorldQ(bone, qWorld) { bone.parent.getWorldQuaternion(q3).invert(); bone.quaternion.copy(q3.multiply(qWorld)); bone.updateMatrixWorld(true); }
@@ -239,34 +259,53 @@ export class PlayerBody {
     if (Math.abs(this.headYaw) > 0.005) { this.rotWorld(b.spine_03, up, this.headYaw * 0.18); this.rotWorld(b.neck_01, up, this.headYaw * 0.35); this.rotWorld(b.Head, up, this.headYaw * 0.47); }
     if (Math.abs(this.headPitch) > 0.005) { const right = this.dw(1, 0, 0, v4); this.rotWorld(b.neck_01, right, this.headPitch * 0.4); this.rotWorld(b.Head, right, this.headPitch * 0.6); }
   }
-  // feet onto steps and slopes: per-foot ground offset from the root plane, pelvis drops for the lower foot, legs re-solved
+  // feet onto steps and slopes: each foot's animated lift is kept above the local ground under it (the higher of heel and
+  // toe), targets are smoothed in WORLD space (the root snaps down a step at a time), and the pelvis drops for the lower foot
   _footIK(dt, pl, k) {
     const b = this.b; const ph = pl.ph; this.root.updateMatrixWorld(true); const base = this.root.getWorldPosition(v5).y;
-    const offs = {};
-    for (const s of ['l', 'r']) { b['foot_' + s].getWorldPosition(v1); b['ball_' + s].getWorldPosition(v2); const px = (v1.x + v2.x) / 2, pz = (v1.z + v2.z) / 2;
-      const g = ph.groundAt(px, pz, base + 0.6).y; offs[s] = clamp(g - base, -0.45, 0.45); }
-    for (const s of ['l', 'r']) this.footOff[s] += (offs[s] - this.footOff[s]) * damp(18, dt);
-    const drop = Math.min(0, this.footOff.l, this.footOff.r) * 0.95; this.pelvisOff += (drop - this.pelvisOff) * damp(14, dt);
-    if (Math.abs(this.footOff.l) + Math.abs(this.footOff.r) + Math.abs(this.pelvisOff) < 0.004) return;
-    const up = this.dw(0, 1, 0, v3);
-    // pelvis down (world up axis): move the inner group, so the whole skeleton follows
-    this.c.inner.position.y += this.pelvisOff * k; this.c.inner.updateMatrixWorld(true);
+    const fy = this.footY || (this.footY = { l: null, r: null }); const need = {}; const T = {};
     for (const s of ['l', 'r']) {
-      const T = b['foot_' + s].getWorldPosition(new THREE.Vector3()).addScaledVector(up, (this.footOff[s] - this.pelvisOff) * k);
+      const A0 = b['foot_' + s].getWorldPosition(new THREE.Vector3()), B0 = b['ball_' + s].getWorldPosition(new THREE.Vector3());
+      const heelX = A0.x + (A0.x - B0.x) * 0.25, heelZ = A0.z + (A0.z - B0.z) * 0.25;
+      const g = Math.max(ph.groundAt(heelX, heelZ, base + 0.55).y, ph.groundAt(B0.x, B0.z, base + 0.55).y);
+      const lift = A0.y - base; // the clip's ankle height above the floor plane
+      let ty = clamp(g - base, -0.5, 0.5) + base + lift;
+      if (fy[s] == null || Math.abs(fy[s] - ty) > 0.6) fy[s] = ty; else fy[s] += (ty - fy[s]) * damp(lift < this.ankleH + 0.04 ? 30 : 16, dt);
+      T[s] = A0; need[s] = fy[s] - A0.y; }
+    const drop = Math.min(0, need.l, need.r); this.pelvisOff += (drop - this.pelvisOff) * damp(12, dt);
+    this.footOff.l = need.l; this.footOff.r = need.r;
+    if (Math.abs(need.l) + Math.abs(need.r) + Math.abs(this.pelvisOff) < 0.004) return;
+    const up = this.dw(0, 1, 0, v3);
+    this.c.inner.position.y += this.pelvisOff * k; this.c.inner.updateMatrixWorld(true); // pelvis down: the whole skeleton follows
+    for (const s of ['l', 'r']) {
+      const Tw = b['foot_' + s].getWorldPosition(new THREE.Vector3()); Tw.y = Tw.y + (fy[s] - (T[s].y + this.pelvisOff * k)) * k; // lowered ankle -> its target
       const knee = b['calf_' + s].getWorldPosition(new THREE.Vector3()), hip = b['thigh_' + s].getWorldPosition(new THREE.Vector3());
-      const pole = knee.sub(hip.lerp(T, 0.5)); if (pole.lengthSq() < 1e-6) pole.copy(this.dw(0, 0, -1, v4)); pole.normalize();
+      const pole = knee.sub(hip.lerp(Tw, 0.5)); if (pole.lengthSq() < 1e-6) pole.copy(this.dw(0, 0, -1, v4)); pole.normalize();
       const fq = b['foot_' + s].getWorldQuaternion(new THREE.Quaternion());
-      this.c.ik2(b['thigh_' + s], b['calf_' + s], b['foot_' + s], T, pole, 1);
+      this.c.ik2(b['thigh_' + s], b['calf_' + s], b['foot_' + s], Tw, pole, 1);
       this.setWorldQ(b['foot_' + s], fq); // keep the animated foot angle
     }
   }
-  // Superman glide: right fist forward past the head, left arm back along the body, legs long
+  // Superman glide: right fist forward past the head, left arm back along the side, legs long -- in the BODY's axes (the
+  // swim clip lies the body down inside the frame, so frame axes would point the fist at the sky)
   _superman(k) {
     const c = this.c, b = this.b; const d = new THREE.Vector3();
-    // body frame axes: in the glide the body's "up" points along the flight path
-    c.aim(b.upperarm_r, b.lowerarm_r, this.dw(0.12, 0.98, -0.12, d), k); c.aim(b.lowerarm_r, b.hand_r, this.dw(0.05, 1, -0.05, d), k);
-    c.aim(b.upperarm_l, b.lowerarm_l, this.dw(-0.28, -0.95, 0.12, d), k); c.aim(b.lowerarm_l, b.hand_l, this.dw(-0.18, -0.97, 0.1, d), k);
-    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; c.aim(b['thigh_' + s], b['calf_' + s], this.dw(sx * 0.05, -1, 0.1, d), k * 0.6); c.aim(b['calf_' + s], b['foot_' + s], this.dw(sx * 0.03, -1, 0.22, d), k * 0.6); }
+    const P0 = b.pelvis.getWorldPosition(new THREE.Vector3()), N0 = b.neck_01.getWorldPosition(new THREE.Vector3());
+    const head = N0.sub(P0).normalize(); const right = this.dw(1, 0, 0, new THREE.Vector3()); right.addScaledVector(head, -right.dot(head)).normalize();
+    const back = new THREE.Vector3().crossVectors(right, head).normalize(); // dorsal side (toward the sky in a glide)
+    const B = (x, y, z) => d.set(0, 0, 0).addScaledVector(right, x).addScaledVector(head, y).addScaledVector(back, z).normalize();
+    c.aim(b.upperarm_r, b.lowerarm_r, B(0.1, 1, -0.12), k); c.aim(b.lowerarm_r, b.hand_r, B(0.02, 1, -0.05), k);
+    c.aim(b.upperarm_l, b.lowerarm_l, B(-0.25, -1, 0.15), k); c.aim(b.lowerarm_l, b.hand_l, B(-0.15, -1, 0.2), k);
+    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; c.aim(b['thigh_' + s], b['calf_' + s], B(sx * 0.05, -1, 0.04), k * 0.7); c.aim(b['calf_' + s], b['foot_' + s], B(sx * 0.03, -1, 0.15), k * 0.7); c.aim(b['foot_' + s], b['ball_' + s], B(0, -1, -0.25), k * 0.6); }
+    c.aim(b.neck_01, b.Head, B(0, 0.75, 0.66), k * 0.8); // look ahead, not at the ground
+  }
+  // hover: upright float, legs together and a little bent, toes down, arms loose off the sides
+  _hover(k) {
+    const c = this.c, b = this.b; const d = new THREE.Vector3(); const D = (x, y, z) => this.dw(x, y, z, d);
+    const sw = Math.sin(this.t * 1.3) * 0.06;
+    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1;
+      c.aim(b['thigh_' + s], b['calf_' + s], D(sx * 0.07, -1, -0.22 - (s === 'l' ? 0.16 : 0) + sw), k); c.aim(b['calf_' + s], b['foot_' + s], D(sx * 0.03, -1, 0.3 + (s === 'l' ? 0.22 : 0)), k); c.aim(b['foot_' + s], b['ball_' + s], D(0, -0.8, -0.6), k);
+      c.aim(b['upperarm_' + s], b['lowerarm_' + s], D(sx * 0.38, -0.92, 0.12), k * 0.8); c.aim(b['lowerarm_' + s], b['hand_' + s], D(sx * 0.25, -0.75, -0.6), k * 0.8); }
   }
   // bike (src/player/avatar.js Bike): saddle top (0, 0.905, 0.24); grips (+-0.2, 0.94, -0.36); cranks r 0.17 about (0, 0.3, 0.05)
   _bike(pl) {

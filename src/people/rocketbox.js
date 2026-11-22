@@ -115,7 +115,7 @@ async function _load(A, opts) {
 }
 const idle = () => new Promise((r) => (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(() => r(), { timeout: 400 }) : setTimeout(r, 16)));
 
-function prepAvatar(e, gltf, A) {
+export function prepAvatar(e, gltf, A) { // (exported for the player avatar, r5-avatar)
   const scene = gltf.scene; scene.updateMatrixWorld(true);
   const by = bonesOf(scene);
   // UE-like hierarchy: clavicles under the upper spine (Biped hangs them off the neck, so head turns would swing the
@@ -153,7 +153,7 @@ function prepAvatar(e, gltf, A) {
         if (Math.abs(v.x - sp.x) < 0.08 && Math.abs(v.y - sp.y) < 0.12) mx2 = Math.max(mx2, sp.z - v.z); } }
     if (mx2 > 0.05 && mx2 < 0.3) backDepth = mx2; }
   const B = { sex: e.sex, clips, restQ, fistQ, id: e.id, e, yaw: scene.rotation.y };
-  const av = { id: e.id, sex: e.sex, e, scene, meshes, B, backDepth };
+  const av = { id: e.id, sex: e.sex, e, scene, meshes, B, backDepth, R, yFix }; // R / yFix: the player retargets its extra clips (r5-avatar)
   try { av.look = measureLook(av); } catch (err) { console.warn('rocketbox look', e.id, err); av.look = null; }
   return av;
 }
