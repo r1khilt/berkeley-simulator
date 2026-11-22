@@ -14,11 +14,19 @@ export const info = {
   replaces: ['w/24024671'],
 };
 
+function seamTexture() { // 2 m tile (box/roof UVs are metres / 2): four seams, each a dark groove with a lit edge
+  const c = document.createElement('canvas'); c.width = 128; c.height = 32; const g = c.getContext('2d');
+  g.fillStyle = '#5e4b3c'; g.fillRect(0, 0, 128, 32);
+  for (let i = 0; i < 4; i++) { const x = i * 32; g.fillStyle = '#3e3128'; g.fillRect(x, 0, 3, 32); g.fillStyle = '#7a6552'; g.fillRect(x + 3, 0, 2, 32); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
 export async function build(ctx) {
   const K = new Kit(ctx, deg(-9)); const M = ctx.M; const X = mats(M);
   const W = new THREE.MeshStandardMaterial({ color: 0xfcf5e6, roughness: 0.92, map: M.stuccoWhite.map, normalMap: M.stuccoWhite.normalMap }); // refine-central: smooth painted concrete (was tan textured stucco)
   const BAT = new THREE.MeshStandardMaterial({ color: 0xf2e9d8, roughness: 0.9, map: M.stuccoWhite.map });
-  const ROOF = new THREE.MeshStandardMaterial({ color: 0x5e4b3c, roughness: 0.78, metalness: 0.12 }); // r4-sweep: less glare (was 0.6 / 0.3: blown-out sheen on the low gable)
+  // r4-sweep: standing-seam roof texture (seams run up the slope every 0.5 m; roofUV: u along the eave) and less glare
+  // (was a flat untextured slab with a blown-out sheen, roughness 0.6 / metalness 0.3)
+  const ROOF = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: 0.12, map: seamTexture() });
   const SOFF = new THREE.MeshStandardMaterial({ color: 0x8a7560, roughness: 0.85 });
   const MUL = new THREE.MeshStandardMaterial({ color: 0xe3dccd, roughness: 0.5 });
   const GL = new THREE.MeshStandardMaterial({ color: 0x2c3540, roughness: 0.08, metalness: 0.35 });
@@ -26,7 +34,8 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const u0 = -10.6, u1 = 20.2, v0 = -24.0, v1 = 26.6, EAVE = 11.0, RISE = 4.0, um = (u0 + u1) / 2;
   const gm = K.gMin(u0, v0, u1, v1), base = gm - 1.2, gS = K.g(um, v1 + 2);
-  const battens = (R, s0, s1, y0, y1, step = 0.6, skip = []) => { for (let s = s0 + step / 2; s < s1; s += step) { if (skip.some(([a, b]) => s > a && s < b)) continue; K.rbox(R, BAT, s - 0.045, y0, 0, s + 0.045, y1, 0.06, { detail: true }); } };
+  // r4-sweep: battens twice as far apart and wider/deeper: 9 cm strips every 0.6 m aliased into vertical streaks at any distance
+  const battens = (R, s0, s1, y0, y1, step = 0.6, skip = []) => { step *= 2; for (let s = s0 + step / 2; s < s1; s += step) { if (skip.some(([a, b]) => s > a && s < b)) continue; K.rbox(R, BAT, s - 0.07, y0, 0, s + 0.07, y1, 0.08, { detail: true }); } };
   // ---------- side walls of the hall (east/west) with battens and a few tall windows ----------
   for (const [a, b] of [[[u1, v1], [u1, v0]], [[u0, v0], [u0, v1]]]) {
     const R = K.run(a, b); const ops = [0.2, 0.4, 0.6, 0.8].map((t) => ({ s0: R.L * t - 0.6, s1: R.L * t + 0.6, y0: 5.4, y1: 9.8, mull: 0, tran: [7.6], frame: MUL, noFill: false }));
