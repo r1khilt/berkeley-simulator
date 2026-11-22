@@ -16,6 +16,8 @@ export function decodeTrees(buf) {
 // city street trees are left alone). Done at decode so the leaf-litter map and colliders agree with what is drawn.
 function remapSpecies(t) {
   const DEC = 8, OAK = 0, BAY = 11;
+  // r4-trees: the London planes lining Sproul Plaza (Sather Gate to Bancroft) are pollarded, like the Campanile esplanade's
+  for (let i = 0; i < t.n; i++) { if (t.sp[i] !== 1) continue; const x = t.x[i] / 10, z = t.z[i] / 10; if (x >= -170 && x <= -95 && z >= 232 && z <= 334) t.sp[i] = 2; }
   for (let i = 0; i < t.n; i++) {
     if (t.sp[i] !== DEC) continue;
     const x = t.x[i] / 10, z = t.z[i] / 10;

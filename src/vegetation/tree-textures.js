@@ -66,7 +66,7 @@ const BARK = {
     const ridge = Math.pow(1 - Math.abs(s * 2 - 1), 1.4);
     const f = pnoise(u * 96, v * 6, 96, 6, 35);
     const k = 0.5 + 0.5 * ridge + (f - 0.5) * 0.22;
-    return [cl(150 * k + 12), cl(80 * k + 8), cl(56 * k + 6), ridge * 0.8 + f * 0.2];
+    return [cl(136 * k + 12), cl(80 * k + 8), cl(60 * k + 6), ridge * 0.8 + f * 0.2]; // r4-trees: a step less orange (read as a painted pole in sun)
   },
   euc: (u, v) => { // blue gum: smooth cream-grey with long tan strips peeling away
     const n = pfbm(u * 4, v * 8, 4, 8, 4, 41);
@@ -462,12 +462,13 @@ export function leafTexture(kind, S = 2048) {
 // channel encoding as the leaf cards (R shade, G per-leaf random, B twig mask, A coverage) and colours identically.
 // 2:1 atlas, two variants (u 0-0.5, 0.5-1); the ball fills a disc of radius ~0.49 cell around the cell centre.
 const _puff = {};
-export function puffTexture(kind, S = 1024, ballM = 3) {
+export function puffTexture(kind, S = 1024, ballM = 3, srcS = S) {
   const key = kind + ':' + S + ':' + ballM;
   if (_puff[key]) return _puff[key];
-  const src = leafTexture(kind, S); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1;
-  const sc = document.createElement('canvas'); sc.width = W; sc.height = H;
-  sc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(src.image.data.buffer.slice(0)), W, H), 0, 0);
+  // source = the (cached) leaf atlas the cards already use, so no second atlas is drawn
+  const src = leafTexture(kind, srcS); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1, ss = srcS / 2;
+  const sc = document.createElement('canvas'); sc.width = srcS; sc.height = srcS / 2;
+  sc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(src.image.data.buffer.slice(0)), srcS, srcS / 2), 0, 0);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d', { willReadFrequently: true });
   const rnd = mulberry32(hashStr('puff:' + kind));
@@ -483,20 +484,32 @@ export function puffTexture(kind, S = 1024, ballM = 3) {
       for (let k = 0; k < cnt; k++) {
         // the leafy middle of each shoot lands uniformly inside the ball; shoots point outward (inner ones any way),
         // so the centre is solid and the rim thins out into individual leaves instead of a hard circle
-        const a = rnd() * TAU, u = Math.sqrt(rnd()), rr = u * R * 0.78 * lobe(a);
+        const a = rnd() * TAU, u = Math.sqrt(rnd()), rr = u * R * 0.66 * lobe(a);
         const out = Math.atan2(Math.sin(a), Math.cos(a)), th = (u < 0.35 ? rnd() * TAU : out + (rnd() - 0.5) * 1.2) - Math.PI / 2;
         const bx = cx + Math.cos(a) * rr - Math.cos(th + Math.PI / 2) * reach * 0.5, by = cy + Math.sin(a) * rr - Math.sin(th + Math.PI / 2) * reach * 0.5;
         g.save(); g.translate(bx, by); g.rotate(th);
-        g.filter = dark < 1 ? `brightness(${dark})` : 'none';
         const ww = w * (0.85 + 0.3 * rnd());
-        g.drawImage(sc, (k + cell) % 2 * cs, 0, cs, cs, -ww / 2, -ww * 0.04, ww, ww);
+        g.drawImage(sc, (k + cell) % 2 * ss, 0, ss, ss, -ww / 2, -ww * 0.04, ww, ww);
         g.restore();
+      }
+      if (dark < 1) { // darken what is drawn so far (deeper layers = self-shadowed core); alpha untouched
+        g.save(); g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(0,0,0,${1 - (dark < 0.7 ? 0.75 : 0.85)})`; g.fillRect(cell * cs, 0, cs, cs); g.restore();
       }
     }
     g.restore();
   }
-  g.filter = 'none';
   const img = g.getImageData(0, 0, W, H); const d = img.data;
+  // lobed round silhouette: fade alpha out past a wavy rim radius, so clipped shoot-cell edges never show as straight
+  // lines and every puff reads as a ball (rim leaves thin out over the last ~15%)
+  for (let cell = 0; cell < 2; cell++) {
+    const p0 = rnd() * TAU, p1 = rnd() * TAU, p2 = rnd() * TAU, ccx = cell * cs + cs / 2, ccy = cs / 2, R = cs * 0.485;
+    for (let y = 0; y < H; y++) for (let x = cell * cs; x < (cell + 1) * cs; x++) {
+      const dx = x + 0.5 - ccx, dy = y + 0.5 - ccy, th = Math.atan2(dy, dx), r = Math.hypot(dx, dy) / R;
+      const rl = 0.86 + 0.07 * Math.sin(3 * th + p0) + 0.05 * Math.sin(5 * th + p1) + 0.03 * Math.sin(9 * th + p2);
+      const m = r <= rl * 0.84 ? 1 : r >= rl ? 0 : 1 - (r - rl * 0.84) / (rl * 0.16);
+      const i = (y * W + x) * 4 + 3; d[i] = d[i] * m * m;
+    }
+  }
   let sr = 0, sgr = 0, nn = 0;
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 220 && d[i + 2] < 128) { sr += d[i]; sgr += d[i + 1]; nn++; }
   const mr = nn ? sr / nn : 170, mg = nn ? sgr / nn : 128;

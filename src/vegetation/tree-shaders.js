@@ -170,7 +170,9 @@ export function patchLeaf(mat, uni) {
   diffuseColor.rgb *= lc * lt.r * vAO;
   diffuseColor.a *= lt.a * leafMipBoost( vMapUv );
 #ifdef TREE_CARDN
-  diffuseColor.a *= vFade;
+  // r4-trees: cards turning edge-on drop whole leaves (per-leaf random in G) instead of fading to a ghostly,
+  // dithered half-transparent plane
+  if ( lt.g >= vFade * 1.02 ) discard;
 #endif
 #endif
 `)
@@ -183,7 +185,7 @@ export function patchLeaf(mat, uni) {
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
-  mat.customProgramCacheKey = () => 'tree-leaf-5';
+  mat.customProgramCacheKey = () => 'tree-leaf-6';
   return mat;
 }
 
@@ -278,7 +280,7 @@ export function makeDepthMaterials(uni, leafy) {
 // of the near LOD (faded out when the camera gets close, where the real cards and branches take over).
 const PUFF_VERT = /* glsl */`
 attribute vec4 aPuff;
-uniform vec4 uPuffP; // x: near fade start (in radii), y: sphere-normal weight, z: depth pull (radii), w: unused
+uniform vec4 uPuffP; // x: near fade start (in radii), y: sphere-normal weight, z: depth pull (radii), w: horizontal aspect
 varying vec2 vCorner;
 varying vec3 vSphN;  // view-space normal of the ball at this corner (corner directions are not unit: interpolates linearly)
 varying float vNearFade;
@@ -296,8 +298,9 @@ void treePuff(vec3 c) {
   float a = aPuff.w * 6.2832, ca = cos(a), sa = sin(a);
   vec2 k = vec2(ca * aPuff.x - sa * aPuff.y, sa * aPuff.x + ca * aPuff.y);
   vCorner = aPuff.xy;
+  float asp = uPuffP.w > 0.0 ? uPuffP.w : 1.0; // horizontal stretch (conifer tiers)
   vSphN = mat3(viewMatrix) * (rt * k.x + up * k.y); // the rotated corner direction in view space (z added per pixel)
-  treePuffW = cw + (rt * k.x + up * k.y) * r + tc * min(r * uPuffP.z, dist * 0.5);
+  treePuffW = cw + (rt * k.x * asp + up * k.y) * r + tc * min(r * uPuffP.z, dist * 0.5);
   vNearFade = uPuffP.x > 0.0 ? smoothstep(uPuffP.x * 0.55, uPuffP.x, dist / max(r, 1e-3)) : 1.0;
 }
 `;
@@ -329,15 +332,16 @@ export function patchPuff(mat, uni, puffP) {
   float q = lt.g + ( vInst - 0.5 ) * uRamp.z + ( vRnd - 0.5 ) * uRamp.w;
   vec3 lc = mix( leafRamp( q ) * vTint, uTwigCol, lt.b );
   float ball = 0.66 + 0.26 * sqrt( max( 0.0, 1.0 - pr2 ) ); // rim of the ball a little darker (leaves seen edge-on, gaps); x0.92 overall to match the card crowns' value
-  diffuseColor.rgb *= lc * lt.r * vAO * ball;
-  diffuseColor.a *= lt.a * vNearFade;
+  diffuseColor.rgb *= lc * lt.r * vAO * ball * ( 0.86 + 0.28 * vRnd ); // per-puff value variation: crowns are lumpy masses, not uniform blobs
+  diffuseColor.a *= lt.a;
+  if ( lt.g >= vNearFade * 1.02 ) discard; // near core puffs dissolve leaf by leaf as the camera closes in (no ghosting)
 #endif
 `)
       .replace('#include <color_fragment>', '')
       .replace('#include <normal_fragment_begin>', NORMAL_NOFLIP + `
   {
     // ball normal: in-plane part from the (rotated) corner direction, out-of-plane part toward the viewer
-    vec3 sn = normalize( vSphN + vec3( 0.0, 0.0, sqrt( max( 0.0, 1.0 - dot( vCorner, vCorner ) ) ) + 0.2 ) );
+    vec3 sn = normalize( vSphN * vec3( 1.0, 0.6, 1.0 ) + vec3( 0.0, 0.0, sqrt( max( 0.0, 1.0 - dot( vCorner, vCorner ) ) ) + 0.2 ) ); // y damped: ball tops don't catch blue sky light
     normal = normalize( mix( normal, sn, uPuffP.y ) );
   }
 `)
@@ -347,7 +351,7 @@ export function patchPuff(mat, uni, puffP) {
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
-  mat.customProgramCacheKey = () => 'tree-puff-2';
+  mat.customProgramCacheKey = () => 'tree-puff-4';
   return mat;
 }
 // shadow-pass materials for puffs: the billboard faces the shadow camera (i.e. the sun), so each puff casts a round,
@@ -364,10 +368,10 @@ export function makePuffDepthMaterials(uni, puffP) {
         .replace('#include <worldpos_vertex>', PUFF_WORLDPOS);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec2 vCorner;\nvarying vec3 vSphN;\nvarying float vNearFade;\n')
-        .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n#include <alphatest_fragment>');
+        .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n if ( fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < 0.2 ) discard; // dappled: real crowns let some sun through\n#include <alphatest_fragment>');
     };
     m.customProgramCacheKey = () => key;
     return m;
   };
-  return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-1'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-1') };
+  return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-3'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-3') };
 }
