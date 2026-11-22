@@ -20,8 +20,8 @@ export const info = {
 // r4-sweep: expanded-metal mesh (diamond strands, see-through gaps); mipmaps average it to a light, ~60 % opaque grey
 function meshPanelMat() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-  g.fillStyle = 'rgba(165,170,174,0.42)'; g.fillRect(0, 0, 64, 64); // softer contrast: less moire in motion
-  g.strokeStyle = 'rgba(212,216,219,1)'; g.lineWidth = 7; g.lineCap = 'square';
+  g.fillStyle = 'rgba(178,183,187,0.55)'; g.fillRect(0, 0, 64, 64); // low strand/gap contrast: no checkerboard aliasing at distance
+  g.strokeStyle = 'rgba(204,208,211,1)'; g.lineWidth = 6; g.lineCap = 'square';
   for (const [x0, y0, x1, y1] of [[0, 32, 32, 0], [32, 0, 64, 32], [64, 32, 32, 64], [32, 64, 0, 32]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return new THREE.MeshStandardMaterial({ map: t, color: 0xb9bdc0, metalness: 0.35, roughness: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide, name: 'mlkMesh' });
