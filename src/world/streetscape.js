@@ -78,7 +78,7 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   // could land inside a landmark's footprint (lamp posts poking through buildings). Skip spots inside (or within 0.6 m of) a
   // hand-built landmark footprint. Open-air or roof-plaza landmarks (fields, courts, parks, Main Stacks, garages) keep theirs;
   // OSM-mapped props are left alone (they are real positions).
-  const inLm = (landmarks && landmarks.length) ? landmarkTester(landmarks.filter((l) => !/field|courts|schoolyard|diamond|park|main-stacks|garage|parking|structure/.test(l.id)).flatMap((l) => l.footprints || []), 0.6) : () => false;
+  const inLm = (landmarks && landmarks.length) ? landmarkTester(landmarks.filter((l) => !/field|courts|schoolyard|diamond|park|main-stacks|garage|parking|structure/.test(l.id)).flatMap((l) => [...(l.footprints || []), ...(l.clearProps ? l.clear || [] : [])]), 0.6) : () => false; // [r5-audit-central] + `clear` site polygons of landmarks flagged clearProps (Dwinelle Plaza terrace)
   const scatters = [];
   const S = (name, maxD, cast = false) => { const f = PR && PR[name]; const s = new Scatter(name, f ? () => f() : null, maxD, cast); scatters.push(s); return s; };
   const lamps = S('campusLamp', 420, true), street = S('streetLight', 520, true), bench = S('bench', 220), trash = S('trashCan', 160), recyc = S('recyclingBin', 140), rack = S('bikeRack', 160), bike = S('parkedBike', 140),

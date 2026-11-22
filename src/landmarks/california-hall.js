@@ -30,6 +30,7 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.805);
   const K = new Kit(ctx, ANG); const M = ctx.M; const G = M.granite, GD = M.graniteDark, A = M.ashlar;
   const uW = -11.4, uE = 11.2, vN = -31.4, vS = 30.8, vMid = (vN + vS) / 2;
+  const SHRUB = new THREE.MeshStandardMaterial({ color: 0x2c4a24, roughness: 0.95 }), SHRUB2 = new THREE.MeshStandardMaterial({ color: 0x355a2b, roughness: 0.95 }), LANT = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.55, metalness: 0.3 }); // [r5-audit-central]
   const B = 2.6, F1 = 2.9, F2 = 7.7, ENT = 11.4, EAVE = 13.0;
   const colliders = [], walkables = [];
   const stories = [
@@ -140,8 +141,13 @@ export async function build(ctx) {
     const c = vMid + 0.0; const sw = 6.0; const gw = K.g(uW - 7.5, c);
     const n = Math.round((F1 - gw) / 0.165);
     walkables.push(K.stairs(GD, uW - n * 0.36, c - sw / 2, uW, c + sw / 2, gw, F1, '+u', n));
-    // cheek walls of the steps (granite), stepping down
-    for (const v of [c - sw / 2 - 0.5, c + sw / 2]) { K.box(GD, uW - n * 0.36, -1.2, v, uW, F1 + 0.15, v + 0.5); colliders.push(K.colPoly([[uW - n * 0.36, v], [uW, v], [uW, v + 0.5], [uW - n * 0.36, v + 0.5]], -1.2, F1 + 0.2)); }
+    // cheek walls of the steps (granite), stepping down  [r5-audit-central: really stepped, 4 blocks following the flight]
+    for (const v of [c - sw / 2 - 0.5, c + sw / 2]) {
+      const L = n * 0.36; for (let k = 0; k < 4; k++) { const ua = uW - L + L * k / 4, ub = uW - L + L * (k + 1) / 4; K.box(GD, ua, -1.2, v, ub, gw + (F1 - gw) * (k + 1) / 4 + 0.35, v + 0.5); K.box(GD, ua - 0.04, gw + (F1 - gw) * (k + 1) / 4 + 0.35, v - 0.04, ub + 0.04, gw + (F1 - gw) * (k + 1) / 4 + 0.43, v + 0.54); }
+      colliders.push(K.colPoly([[uW - L, v], [uW, v], [uW, v + 0.5], [uW - L, v + 0.5]], -1.2, F1 + 0.2));
+      // [r5-audit-central] black post lanterns flanking the door at terrace level (photo), on the top cheek blocks
+      const lv = v + 0.25, lu = uW - 0.7, ly = F1 + 0.43; K.cyl(LANT, lu, ly, lv, 0.13, 0.11, 0.4, 8, { detail: true }); K.cyl(LANT, lu, ly + 0.4, lv, 0.06, 0.05, 2.3, 8, { detail: true }); K.cyl(M.lampGlow, lu, ly + 2.7, lv, 0.13, 0.18, 0.45, 8, { detail: true }); K.cyl(LANT, lu, ly + 3.15, lv, 0.22, 0.04, 0.2, 8, { detail: true });
+    }
     // landing at the door
     K.box(GD, uW - 0.8, -1.2, c - sw / 2, uW + 0.05, F1, c + sw / 2);
     // grassy berm along the west façade (slopes from 1.5 m at the wall to grade)
@@ -155,6 +161,12 @@ export async function build(ctx) {
       K.add(lawnMat(), g); // r4-moffitt: textured lawn instead of the flat neon M.turf
       for (const vv of [v0, v1]) { const s = [[uW, -0.5, vv], [uW, h0, vv], [uW - w, -0.5, vv]]; const gg = new THREE.BufferGeometry(); const q = vv === v0 ? [...s[0], ...s[2], ...s[1]] : [...s[0], ...s[1], ...s[2]]; gg.setAttribute('position', new THREE.Float32BufferAttribute(q, 3)); gg.computeVertexNormals(); K.add(lawnMat(), gg); }
       walkables.push(K.walkFn(uW - w, v0, uW, v1, (u, v) => (u < uW - w || u > uW || v < v0 || v > v1) ? null : Math.max(K.g(u, v), -0.3 + (h0 + 0.3) * (u - (uW - w)) / w)));
+      // [r5-audit-central] the photos show no lawn bank here: a continuous belt of clipped, cloud-pruned mounding shrubs
+      // (juniper/yew, 1-1.8 m tall, 4-6 m deep) masks the whole base on both sides of the stair
+      let q = 0; for (let u = uW - w + 0.5; u < uW - 0.2; u += 0.8) for (let vv = v0 + 0.5; vv < v1 - 0.3; vv += 0.95) {
+        q++; const j = ((q * 7919) % 17) / 17; const ys = -0.3 + (h0 + 0.3) * (u - (uW - w)) / w; const r = 0.85 + j * 0.4;
+        K.add(j > 0.6 ? SHRUB2 : SHRUB, new THREE.SphereGeometry(r, 8, 6).scale(1.2, 0.8 + j * 0.3, 1.15).translate(u + (j - 0.5) * 0.35, ys + 0.5 + j * 0.3, vv + (j - 0.5) * 0.45));
+      }
     };
     berm(vN + 0.5, c - sw / 2 - 0.5); berm(c + sw / 2 + 0.5, vS - 0.5);
     // flagpole in the gravel circle

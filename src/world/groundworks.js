@@ -19,6 +19,10 @@ const EDGE_W = 0.12;      // path/plaza edging width
 const TILE = 128;         // kerb/edging tile size (m)
 const KERB_R = 170;       // kerbs/edging drawn within this radius
 const CAMPUS = (x, z) => x > -760 && x < 520 && z > -560 && z < 420;
+// [r5-audit-central] OSM step ways whose flights the landmark modules now model as part of a larger composition (a lone
+// 2.6 m groundworks flight with cheek walls and handrails would cut through them): Wheeler's grand south stair, and the
+// two-tier Dwinelle Plaza stair.
+const MODULE_STEPS = new Set([1364194341, 1318022263, 1318022265]);
 
 // ---------- samplers over the decoded arrays
 class HGrid {
@@ -77,6 +81,8 @@ function along(P, C, s) {
   const dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, dx, dz];
 }
 
+// [r5a] OSM stairs a landmark builds itself, skipped here: Haviland Hall's west brick flight (224673580, 1411037931)
+const R5A_OWN_STAIRS = new Set([224673580, 1411037931]);
 // =====================================================================================================================
 // pass 1: terrain grading
 export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) {
@@ -161,7 +167,10 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
   const OWNED_STEPS = new Set([
     // (262173805 at Grimes' SW corner used to be doubled by the Grimes module's brick stair; that copy is now disabled)
+    ...MODULE_STEPS, ...R5A_OWN_STAIRS, // [r5 integration] one skip list: r5-audit-central's Wheeler/Dwinelle flights + r5a's Haviland flights
   ]);
+  // [r5 integration] a flight is either photo-styled here or owned by a landmark/rebuild module, never both
+  for (const id in STAIR_STYLE) if (OWNED_STEPS.has(+id)) console.warn('groundworks: OSM stair', id, 'is in both STAIR_STYLE and OWNED_STEPS');
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2 || OWNED_STEPS.has(p.id)) continue;
     if (sproulStepsCovers(p.pts)) continue; // [r5-sproul] rebuilt by r5sproul.js
@@ -238,7 +247,11 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const fit = (a) => { const m = a.length; let sx = 0, sy = 0, sxx = 0, sxy = 0; a.forEach((v, k) => { sx += k; sy += v; sxx += k * k; sxy += k * v; }); const den = m * sxx - sx * sx || 1; const bb = (m * sxy - sx * sy) / den, aa = (sy - bb * sx) / m; return a.map((_, k) => aa + bb * k); };
     const rawH = sgn > 0 ? hl : hr; const spanH = Math.max(...rawH) - Math.min(...rawH);
     const H = spanH < 0.8 ? fit(rawH) : sm(rawH, 4), Lo = sm(sgn > 0 ? hr : hl, 2);
-    const defaultH = Math.abs(b.h - 1.4) < 1e-6; // bake default for untagged walls: campus walls are mostly seat height
+    // [r5-audit-central] retaining_wall ways carry the bake default h = 1.2 too; when the ground is level on both sides they
+    // are low seat/planter walls (LiDAR along the Memorial Glade south edge: ~0.5 m tops, not 1.2 m walls hiding the lawn).
+    // Limited to the central/west core, where it was checked against the LiDAR.
+    const r5core = P[0][0] > -760 && P[0][0] < -30 && P[0][1] > -240 && P[0][1] < 240;
+    const defaultH = Math.abs(b.h - 1.4) < 1e-6 || (r5core && b.type === 'retaining_wall' && Math.abs(b.h - 1.2) < 1e-6); // bake default for untagged walls: campus walls are mostly seat height
     const hFree = defaultH ? (CAMPUS(P[0][0], P[0][1]) ? 0.55 : 1.1) : Math.max(0.4, Math.min(2.5, b.h));
     walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h, hlS: sm(hl, 2), hrS: sm(hr, 2) });
   }

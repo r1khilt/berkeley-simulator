@@ -19,6 +19,7 @@ import { UI, buildMapCanvas } from './ui/ui.js';
 import { Audio } from './audio.js';
 import { PLACES } from './places.js';
 import { installBigGame, BIG_GAME_PLACES } from './props/bigGame.js'; // Big Game easter egg (permanent)
+import { gradeR5West, installR5West, augmentR5Trees } from './world/r5-west.js'; // [r5b] west creek bridges, culverts, Oxford gateway (?nor5w=1 disables)
 import { installWater } from './world/water.js'; // r4-campanile: Strawberry Creek water, Mining Circle pool, water sounds (?nowater=1 disables)
 import { installCampanile } from './props/campanile.js'; // r4-campanile: elevator ride, carillon recitals + hourly toll (?nobells=1 disables)
 import { buildStreetscape } from './world/streetscape.js';
@@ -91,6 +92,7 @@ async function boot() {
   const farH = decodePlanar(new Int16Array(farRes.buffer, farRes.byteOffset, ff.nx * ff.nz), ff.nx, ff.nz, new Float32Array(ff.nx * ff.nz), 0.1);
   // [r4-ground] grade the core heightfield (road kerbs, stair beds, retaining-wall terraces) before anything samples it
   let gwPlan = null; if (!qs.get('nogw')) try { gwPlan = gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }); } catch (e) { console.warn('groundworks grade failed', e); }
+  try { BS.r5westGrade = gradeR5West({ heights, c, gt, sdf }); } catch (e) { console.warn('r5-west grade failed', e); } // [r5b] re-open the creek under the Octagon/car bridges, creek bank under decks
   const core = new Grid(heights, c.x0 + 0.5, c.z0 + 0.5, c.step, c.nx, c.nz), mid = new Grid(midH, mm.x0, mm.z0, mm.step, mm.nx, mm.nz), far = new Grid(farH, ff.x0, ff.z0, ff.step, ff.nx, ff.nz);
   const hf = new HeightField(core, mid, far); BS.hf = hf;
   const heightAt = (x, z) => hf.heightAt(x, z);
@@ -125,6 +127,7 @@ async function boot() {
   // ---- trees
   const trees = decodeTrees(treeBin);
   if (gwPlan) reseatTrees(gwPlan, trees); // [r4-ground] trees follow the graded terrain
+  try { BS.r5shrubs = augmentR5Trees(trees, heightAt); } catch (e) { console.warn('r5-west shrubs failed', e); } // [r5b] riparian understory along the west creek
   let treeSys = null;
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
@@ -159,7 +162,7 @@ async function boot() {
     near.sort((a, b) => a[0] - b[0]);
     lampLights.forEach((L, i) => { const q = near[i]; if (!q) { L.userData.k = 0; L.intensity = 0; return; } const [x, z, k] = q[1]; const hh = k > 1 ? 7.5 : 3.8; L.position.set(x, heightAt(x, z) + hh, z); L.userData.k = k > 1 ? 60 : 32; L.intensity = L.userData.k * night; L.userData.ok = true; });
   };
-  scene.add(buildSigns(signsData).group);
+  scene.add(buildSigns((signsData || []).filter((s) => s.n !== 'Social Research Library')).group); // [r5a] no storefront board on Haviland Hall's Beaux-Arts west front (the library is inside)
   if (midData.length) scene.add(buildMidCity(midData, heightAt));
   scene.add(buildSkyline(skylineData, heightAt));
   const bridges = buildBridges(); scene.add(bridges.group); phase('far');
@@ -206,6 +209,7 @@ async function boot() {
   const audio = new Audio(); audio.setVolume(settings.volume); BS.audio = audio;
   player.onStep = (k) => audio.step(k, player.speed);
   let water = null; if (!qs.get('nowater')) try { water = installWater({ scene, heightAt, vectors, terrain, physics, audio, quality: settings.quality, lm }); BS.water = water; setupMaterials(water.group); } catch (e) { console.warn('water failed', e); } // r4-campanile
+  try { BS.r5west = installR5West({ scene, heightAt, physics, water, setupMaterials, quality: settings.quality }); } catch (e) { console.warn('r5-west failed', e); } // [r5b]
   // ---- map + places
   const places = [...PLACES, ...(qs.get('nobg') ? [] : BIG_GAME_PLACES)].map((p) => ({ ...p })); // + Big Game easter egg places
   for (const l of manifest.landmarks) {

@@ -23,6 +23,7 @@ function band(line, hw) {
 
 // ---- Moffitt Library site (anchor -265.33, -52.4; frame -16 deg), from the 2023 aerial + OSM footways + site photos
 const MF = frame(-265.33, -52.4, -16);
+const WF = frame(-116.9, 85.7, -16.122); // [r5-audit-central] Wheeler Hall frame
 const rect = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
 export const SITES = [
   // irrigated lawns where the bake left forest-floor dirt and dry ground: east of the plaza deck (toward Memorial
@@ -61,6 +62,11 @@ export const SITES = [
   // [r5-sproul] the Sproul Plaza entrance from Bancroft/Telegraph is paving, not road: the OSM footway is tagged asphalt,
   // so the bake drew a street running on from Telegraph into the plaza (keeps any brick/granite special underneath)
   { type: 'paved', keepSpecial: true, pts: [[-131.5, 352.0], [-106.0, 348.0], [-106.0, 366.8], [-131.5, 369.2]] },
+  // [r5-audit-central] Wheeler Plaza (Wheeler frame: anchor -116.9, 85.7; -16.122 deg): photos show one grey paved plaza
+  // rising eastward along the whole foot of the grand south stair (the bake left lawn there, wrapping the bottom steps),
+  // with the big south-east tree in a planting bed.
+  { type: 'paved', pts: WF(rect(-27.5, 38.0, 28, 61.5)) },
+  { type: 'dirt', pts: WF(rect(5.6, 42.0, 10.6, 47.0)) }, // mulched pit round the big LiDAR oak (u 8.1, v 44.5)
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
