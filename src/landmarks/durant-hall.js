@@ -8,6 +8,8 @@ import * as THREE from 'three';
 import { siteDress } from './lib/rc-finish.js';
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 import { campusLamp, drapeStrip, shrubRow, paleGlass } from './lib/b05a-kit.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { loadSculpt, sculptMaterial } from '../props/sculpt.js'; // r4-props: baked guardian lions
 
 export const info = {
   id: 'durant-hall',
@@ -27,6 +29,8 @@ export async function build(ctx) {
   const G = M.marble, GD = M.graniteDark, A = M.marble, FR = M.whitePaint;
   const FL = 2.4, F2 = 7.3, TOP = 12.2, EAVE = 14.6;
   const colliders = [], walkables = [];
+  // r4-props: baked lion sculpts [[male, female] hi, [male, female] lo]; null -> old primitive lions
+  const lionGeo = await Promise.all([['lion-m', 'lion-f'], ['lion-m-lo', 'lion-f-lo']].map((l) => Promise.all(l.map((n) => loadSculpt(n))))).catch((e) => { console.warn('durant lions:', e.message); return null; });
 
   // façade runs (outer face on the footprint line)
   const runs = {
@@ -157,13 +161,38 @@ export async function build(ctx) {
     walkables.push(K.stairs(GD, -2.6, v1, 2.6, v1 + depth, gl, FL, '-v', n));
     // landing in front of the door
     K.box(GD, -2.6, FL - 1.2, v1 - 0.05, 2.6, FL, v1 + 0.02);
+    // r4-props: guardian-lion pedestals rebuilt after photos: a moulded lower block with a sunk panel, and a waisted
+    // xumizuo-style upper tier (cyma mouldings top and bottom). The lions themselves are baked sculpts (see lions below).
     for (const sx of [-1, 1]) {
-      const u = sx * 3.9, v = v1 + 1.3; const g0 = K.g(u, v);
-      K.box(M.granite, u - 0.75, g0 - 0.5, v - 1.0, u + 0.75, g0 + 0.7, v + 1.0); // two-tier plinth
-      K.box(M.granite, u - 0.85, g0 + 0.6, v - 1.1, u + 0.85, g0 + 0.72, v + 1.1);
-      K.box(M.granite, u - 0.6, g0 + 0.72, v - 0.8, u + 0.6, g0 + 1.15, v + 0.8);
-      lion(u, g0 + 1.15, v, sx);
-      colliders.push(K.colPoly([[u - 0.8, v - 1.0], [u + 0.8, v - 1.0], [u + 0.8, v + 1.0], [u - 0.8, v + 1.0]], g0 - 0.5, g0 + 3));
+      const u = sx * 3.9, v = v1 + 1.3; const g0 = K.g(u, v); const P = M.granite;
+      K.box(P, u - 0.765, g0 - 0.5, v - 0.915, u + 0.765, g0 + 0.12, v + 0.915);              // plinth band
+      K.box(P, u - 0.72, g0 + 0.12, v - 0.87, u + 0.72, g0 + 0.68, v + 0.87);                 // die
+      K.loop(P, [[u - 0.72, v - 0.87], [u + 0.72, v - 0.87], [u + 0.72, v + 0.87], [u - 0.72, v + 0.87]], [[0, 0.64 + g0], [0.03, 0.665 + g0], [0.06, 0.68 + g0]]); // bed mould
+      K.box(P, u - 0.8, g0 + 0.68, v - 0.95, u + 0.8, g0 + 0.79, v + 0.95);                   // cap
+      // sunk panels with a raised fillet on the three visible faces
+      for (const [a0, a1, face] of [[u - 0.56, u + 0.56, 'S'], [v - 0.7, v + 0.7, 'E'], [v - 0.7, v + 0.7, 'W']]) {
+        const y0 = g0 + 0.22, y1 = g0 + 0.58, w = 0.05, d = 0.018;
+        if (face === 'S') { for (const [b0, b1, c0, c1] of [[a0, a1, y0, y0 + w], [a0, a1, y1 - w, y1], [a0, a0 + w, y0, y1], [a1 - w, a1, y0, y1]]) K.box(P, b0, c0, v + 0.87, b1, c1, v + 0.87 + d, { detail: true }); }
+        else { const uu = face === 'E' ? u + 0.72 : u - 0.72 - d; for (const [b0, b1, c0, c1] of [[a0, a1, y0, y0 + w], [a0, a1, y1 - w, y1], [a0, a0 + w, y0, y1], [a1 - w, a1, y0, y1]]) K.box(P, uu, c0, b0, uu + d, c1, b1, { detail: true }); }
+      }
+      // waisted upper tier
+      const T = g0 + 0.79; const core = [[u - 0.5, v - 0.62], [u + 0.5, v - 0.62], [u + 0.5, v + 0.62], [u - 0.5, v + 0.62]];
+      K.box(P, u - 0.62, T, v - 0.74, u + 0.62, T + 0.07, v + 0.74);
+      K.box(P, u - 0.5, T + 0.07, v - 0.62, u + 0.5, T + 0.32, v + 0.62);
+      K.loop(P, core, [[0.12, T + 0.07], [0.11, T + 0.095], [0.085, T + 0.125], [0.05, T + 0.15], [0, T + 0.165]]);
+      K.loop(P, core, [[0, T + 0.235], [0.05, T + 0.25], [0.085, T + 0.275], [0.1, T + 0.3]]);
+      K.box(P, u - 0.6, T + 0.3, v - 0.72, u + 0.6, T + 0.39, v + 0.72);
+      if (!lionGeo) lion(u, T + 0.39, v, sx); // fallback when the baked sculpt failed to load
+      colliders.push(K.colPoly([[u - 0.8, v - 0.95], [u + 0.8, v - 0.95], [u + 0.8, v + 0.95], [u - 0.8, v + 0.95]], g0 - 0.5, g0 + 3));
+    }
+    if (lionGeo) { // r4-props: baked SDF sculpts (tools/sculpt/guardian-lion.mjs): male with the ball west, female with the cub east
+      const lod = new THREE_.LOD(); lod.name = 'guardian-lions'; lod.userData.keep = true; // keep: mergeStatic must not fuse the LOD levels
+      const mat = sculptMaterial(M.granite, { color: 0xd9d5cc }); // same Sierra granite as the pedestals, a shade darker against the wall
+      for (const [lvl, dist] of [[0, 0], [1, 45]]) {
+        const parts = [-1, 1].map((sx) => { const u = sx * 3.9, v = v1 + 1.3; const g = lionGeo[lvl][sx < 0 ? 0 : 1].clone(); g.scale(1.08, 1.08, 1.08); g.translate(u, K.g(u, v) + 1.18, v); return g; });
+        const mesh = new THREE_.Mesh(mergeGeometries(parts, false), mat); mesh.castShadow = mesh.receiveShadow = true; lod.addLevel(mesh, dist);
+      }
+      K.extra.push(lod);
     }
     campusLamp(K, u0 - 4.5, v1 + 4.5, { h: 4.2 }); campusLamp(K, u1 + 4.5, v0 - 4.0, { h: 4.2 });
     const ring = [[u0, v0], [u0, v1], [u1, v1], [u1, v0]];
