@@ -55,10 +55,10 @@ function textDecal(w, h, lines, { font = 'Georgia, serif', color = 'rgba(70,60,4
 // ------------------------------------------------------------------ materials
 function chipTex() { // bark-mulch wood chips
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
-  g.fillStyle = '#4a3322'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#3b2c22'; g.fillRect(0, 0, 256, 256);
   let s = 7; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 2600; i++) { const l = 40 + r() * 50; g.fillStyle = `hsl(${22 + r() * 14},${35 + r() * 25}%,${l * 0.42}%)`; g.save(); g.translate(r() * 256, r() * 256); g.rotate(r() * 6.3); g.fillRect(-4 - r() * 5, -1.2, 8 + r() * 9, 2.4 + r() * 2); g.restore(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 1); t.anisotropy = 4; return t;
+  for (let i = 0; i < 2600; i++) { const l = 40 + r() * 50; g.fillStyle = `hsl(${24 + r() * 12},${18 + r() * 18}%,${l * 0.4}%)`; g.save(); g.translate(r() * 256, r() * 256); g.rotate(r() * 6.3); g.fillRect(-4 - r() * 5, -1.2, 8 + r() * 9, 2.4 + r() * 2); g.restore(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.6, 1.6); t.anisotropy = 4; return t;
 }
 let _m = null;
 function mats() {
@@ -68,7 +68,7 @@ function mats() {
   const ao = (m) => { m.vertexColors = true; return m; }; // baked cavity AO rides in the sculpt's vertex colours
   _m = {
     pillar: tint(M.stucco, 0xd9c7a2, { name: 'statue:pillar', roughness: 0.92 }),
-    gold: new THREE.MeshStandardMaterial({ color: 0xd8a445, metalness: 0.9, roughness: 0.42, vertexColors: true, name: 'statue:goldLeaf' }),
+    gold: new THREE.MeshStandardMaterial({ color: 0xdcaa4a, metalness: 1, roughness: 0.34, vertexColors: true, name: 'statue:goldLeaf' }),
     granite: ao(tint(M.granite, 0xb3b2ac, { name: 'statue:greyGranite', roughness: 0.92 })),
     plinth: tint(M.granite, 0xa9a8a3, { name: 'statue:plinth', roughness: 0.9 }),
     rock: ao(tint(M.granite, 0x9d9584, { name: 'statue:rock', roughness: 0.97 })),
@@ -103,6 +103,7 @@ export async function goldenBear() { // Lower Sproul: chamfered concrete pillar 
   const sh = new THREE.Shape(); sh.moveTo(-a + c, -a); sh.lineTo(a - c, -a); sh.lineTo(a, -a + c); sh.lineTo(a, a - c); sh.lineTo(a - c, a); sh.lineTo(-a + c, a); sh.lineTo(-a, a - c); sh.lineTo(-a, -a + c); sh.closePath();
   const shaft = new THREE.ExtrudeGeometry(sh, { depth: H - 0.45 + 0.6, bevelEnabled: false }); shaft.rotateX(-Math.PI / 2); shaft.translate(0, -0.6, 0);
   B.add(K.pillar, shaft);
+  B.add(K.pillar, box(1.05, 0.22, 1.05, 0, -0.2, 0)); B.add(K.pillar, new THREE.CylinderGeometry(0.43 * Math.SQRT2, 0.525 * Math.SQRT2, 0.12, 4, 1).rotateY(Math.PI / 4).translate(0, 0.08, 0)); // chamfered base block
   // cap: 2.4 m square slab, 0.2 m at the edge, inverted-pyramid soffit down onto the shaft
   B.add(K.pillar, box(2.4, 0.22, 2.4, 0, H - 0.07, 0));
   B.add(K.pillar, new THREE.ConeGeometry(1.2 * Math.SQRT2, 0.5, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.25, 0));
@@ -124,8 +125,8 @@ export async function calBear() { // Memorial Stadium: rearing bronze grizzly in
   const W = 2.6, D = 2.0, r = 0.7; // bed half-size + corner radius
   const rr = (w, d, rad) => { const s = new THREE.Shape(); s.moveTo(-w + rad, -d); s.lineTo(w - rad, -d); s.absarc(w - rad, -d + rad, rad, -Math.PI / 2, 0); s.lineTo(w, d - rad); s.absarc(w - rad, d - rad, rad, 0, Math.PI / 2); s.lineTo(-w + rad, d); s.absarc(-w + rad, d - rad, rad, Math.PI / 2, Math.PI); s.lineTo(-w, -d + rad); s.absarc(-w + rad, -d + rad, rad, Math.PI, Math.PI * 1.5); return s; };
   const ring = rr(W + 0.16, D + 0.16, r + 0.16); ring.holes.push(rr(W, D, r));
-  B.add(K.pad, new THREE.ExtrudeGeometry(ring, { depth: 0.6, bevelEnabled: false, curveSegments: 8 }).rotateX(-Math.PI / 2).translate(0, -0.45, 0));
-  const bed = new THREE.ShapeGeometry(rr(W, D, r), 8).rotateX(-Math.PI / 2).translate(0, 0.07, 0);
+  B.add(K.pad, new THREE.ExtrudeGeometry(ring, { depth: 0.53, bevelEnabled: false, curveSegments: 8 }).rotateX(-Math.PI / 2).translate(0, -0.45, 0)); // curb ~8 cm proud
+  const bed = new THREE.ShapeGeometry(rr(W, D, r), 8).rotateX(-Math.PI / 2).translate(0, 0.05, 0);
   B.add(K.mulch, bed);
   B.flush(g, { name: 'cal-bear' });
   const bear = await sculpt('bear-rear', K.patina, { s: 1.22, near: 45, ao: 0.8 }); bear.position.set(0.12, 0.04, -0.15); g.add(bear);

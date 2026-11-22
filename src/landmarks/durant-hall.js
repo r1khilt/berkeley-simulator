@@ -5,7 +5,7 @@
 // scrolled consoles, flanked by a pair of Chinese guardian lions.
 // LiDAR: eaves ~14.7 m above the lowest ground, flat roof deck ~18.3 m.
 import * as THREE from 'three';
-import { siteDress } from './lib/rc-finish.js';
+import { siteDress, baseShrubs } from './lib/rc-finish.js';
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 import { campusLamp, drapeStrip, shrubRow, paleGlass } from './lib/b05a-kit.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -227,7 +227,10 @@ export async function build(ctx) {
     K.cyl(M.iron, u, g0 + 4.2, v, 0.08, 0.02, 0.18, 8, { detail: true });
   }
   // refine-central: planted beds, lamps and a bike rack where the paths arrive
-  siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0, gap: 5.6 }); // r4-props2: wider gap at the entrance so the base shrubs stop short of the lion pedestals (u = ±3.9)
+  siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0, skipSides: ['S'] });
+  { // r4-props2: the south (entrance) face is planted here instead, so the foundation shrubs stop short of the stairs and the lion pedestals (|u| < 5.4)
+    const R = K.run([u0, v1], [u1, v1]); baseShrubs(K, R, 1.2, R.L - 1.2, { skip: [[-u0 - 5.4, -u0 + 5.4]], d: 1.0 });
+  }
   const object3d = K.finish(); object3d.name = 'durant-hall';
   return { object3d, colliders, walkables };
 }

@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { materials, boxUV, U, nightGlow } from '../materials.js';
+import { CAMPUS_MAP } from './campusMapData.js'; // r4-props2: real campus outline for the kiosk map
 
 const TAU = Math.PI * 2;
 export const PROP_NAMES = ['campusLamp', 'streetLight', 'bench', 'trashCan', 'recyclingBin', 'bikeRack', 'parkedBike', 'bollard',
@@ -518,20 +519,31 @@ export function newsRack() { // coin-op newspaper box on a pedestal
   return { ...P.build(), collider: { type: 'box', min: [-0.26, 0, -0.24], max: [0.26, 1.15, 0.24] } };
 }
 
-function mapTex() {
+function mapTex() { // r4-props2: drawn from the real campus outline (CAMPUS_MAP) instead of random blobs
   return texCache('map', () => canvasTex(512, 640, (g, w, h) => {
     g.fillStyle = '#f2ecd9'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#003262'; g.fillRect(0, 0, w, 86);
     g.fillStyle = '#fdb515'; g.fillRect(0, 86, w, 8);
     g.fillStyle = '#ffffff'; g.font = 'bold 34px Georgia, serif'; g.textAlign = 'left'; g.fillText('UC Berkeley', 22, 44); g.font = '22px Georgia, serif'; g.fillText('Campus Map', 22, 74);
-    const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-    g.fillStyle = '#b9d39a'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(40 + rnd() * 430, 130 + rnd() * 470, 30 + rnd() * 60, 20 + rnd() * 40, rnd() * 3, 0, TAU); g.fill(); }
-    g.strokeStyle = '#ffffff'; g.lineWidth = 9; g.beginPath(); g.moveTo(0, 360); g.bezierCurveTo(150, 330, 330, 400, w, 350); g.moveTo(250, 100); g.lineTo(270, h); g.stroke();
-    g.fillStyle = '#9a8f80'; for (let i = 0; i < 26; i++) g.fillRect(30 + rnd() * 440, 120 + rnd() * 480, 18 + rnd() * 46, 14 + rnd() * 34);
-    g.fillStyle = '#c1121f'; g.beginPath(); g.arc(262, 372, 11, 0, TAU); g.fill();
-    g.fillStyle = '#003262'; g.font = 'bold 18px sans-serif'; g.fillText('You are here', 280, 378);
+    const S = 0.6, X0 = -470, Z0 = -470, top = 100; const P = ([x, z]) => [(x - X0) * S, top + (z - Z0) * S];
+    const poly = (pts) => { g.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); };
+    const line = (pts) => { g.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); };
+    g.save(); g.beginPath(); g.rect(0, top, w, h - top - 46); g.clip();
+    g.fillStyle = '#bcd59e'; for (const l of CAMPUS_MAP.l) { poly(l); g.fill(); }
+    g.strokeStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 4; for (const l of CAMPUS_MAP.w) { line(l); g.stroke(); }
+    g.strokeStyle = '#6aa7d8'; g.lineWidth = 3; for (const l of CAMPUS_MAP.c) { line(l); g.stroke(); }
+    g.fillStyle = '#b3a48e'; g.strokeStyle = '#7d6f5c'; g.lineWidth = 1; for (const b of CAMPUS_MAP.b) { poly(b); g.fill(); g.stroke(); }
+    const [cx, cy] = P([2, 2]); g.fillStyle = '#003262'; g.beginPath(); g.arc(cx, cy, 6, 0, TAU); g.fill(); // Sather Tower
+    g.fillStyle = '#1d2a3c'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center';
+    for (const [t, x, z] of [['Sather Tower', 2, 18], ['Memorial Glade', -136, -112], ['Sproul Plaza', -123, 300], ['Evans Hall', 0, -150], ['Faculty Glade', 118, 96], ['Strawberry Creek', -300, 175], ['Doe Library', -150, -40]]) { const [px, py] = P([x, z]); g.fillText(t, px, py); }
+    g.restore();
+    // footer: north arrow, scale bar, legend
+    g.fillStyle = '#003262'; g.fillRect(0, h - 46, w, 46);
+    g.fillStyle = '#ffffff'; g.font = '15px sans-serif'; g.textAlign = 'left'; g.fillText('Visitor Services  ·  Restrooms  ·  Bike Parking', 16, h - 18);
+    g.beginPath(); g.moveTo(w - 30, h - 38); g.lineTo(w - 38, h - 12); g.lineTo(w - 22, h - 12); g.closePath(); g.fillStyle = '#fdb515'; g.fill();
   }));
 }
+
 export function infoKiosk() { // r4-props2: UC Berkeley wayfinding monolith: Berkeley Blue frame, gold cap band, "UC Berkeley" header, lit map both faces
   const M = materials(), Lm = L(), P = new Parts();
   const W = 1.2, H = 2.3, T = 0.16;
