@@ -174,7 +174,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     let worstCut = 0, worstFill = 0;
     for (let s2 = 0; s2 <= L; s2 += 0.7) { const [x, z] = along(P, C, s2); const sl = up ? s2 : L - s2; const ramp = lo + (hi - lo) * (sl / L); const dz = G.at(x, z) - ramp; worstCut = Math.max(worstCut, dz); worstFill = Math.max(worstFill, -dz); }
     if (worstCut > 1.1 || worstFill > 1.4) continue;
-    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : (p.surface === 'brick' ? 'brick' : 'concrete'), cheeks: w <= 5.5 && rise >= 0.45 });
+    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45 });
   }
   // landings first (blend toward the landing heights), then beds (only ever lowered, so treads always cover terrain)
   for (const st of stairs) {
@@ -215,7 +215,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const hl = [], hr = [];
     for (let k = 0; k < P.length; k++) { const [, , dx, dz] = along(P, C, Math.min(L, C[k] + 0.01)); const nx = -dz, nz = dx; hl.push(G.at(P[k][0] + nx * 2.3, P[k][1] + nz * 2.3)); hr.push(G.at(P[k][0] - nx * 2.3, P[k][1] - nz * 2.3)); }
     const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
-    const dH = mean(hl) - mean(hr); const ret = Math.abs(dH) >= 0.35 && Math.abs(dH) <= 4.0 && b.type !== 'city_wall'; // > 4 m: smoothed cliffs/structures, leave the ground alone
+    const dH = mean(hl) - mean(hr); const ret = Math.abs(dH) >= (b.type === 'retaining_wall' ? 0.35 : 0.8) && Math.abs(dH) <= 4.0 && b.type !== 'city_wall'; // plain walls on gentle slopes stay freestanding seat walls; > 4 m: smoothed cliffs/structures, leave the ground alone
     const sgn = dH >= 0 ? 1 : -1; // +1: high side on the left normal
     const sm = (a, r) => a.map((_, k) => { let s = 0, n = 0; for (let o = -r; o <= r; o++) { const v = a[k + o]; if (v != null) { s += v; n++; } } return s / n; });
     // terrace tops read as level runs: a straight fit when the high ground varies little along the wall, else a wide average

@@ -178,7 +178,7 @@ export function shrubAt(K, u, v, y = null, { size = 0.55, h = 0.8, i = 0 } = {})
   // follows the ground. With an explicit y (planters, terraces) the base stays flat at that height.
   const yc = y ?? K.g(u, v); const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
   const gAt = y != null ? () => y : (x, z) => K.g(x, z);
-  const g = new THREE.IcosahedronGeometry(r, 2); const P = g.attributes.position; const cache = new Map();
+  const g = new THREE.IcosahedronGeometry(r, 1); const P = g.attributes.position; const cache = new Map(); // detail 1: 80 tris (flat-shaded anyway)
   for (let k = 0; k < P.count; k++) { // deterministic lumps + flattened, flared base (local y from 0 at the base to ~h)
     const x = P.getX(k), yv = P.getY(k), z = P.getZ(k); const n = 1 + 0.1 * Math.sin(x * 9.1 + i * 1.3) * Math.cos(z * 8.3 - i) + 0.07 * Math.sin(yv * 11.7 + i * 2.1);
     const flare = yv < 0 ? 1.08 : 1; P.setXYZ(k, x * n * flare, ((yv < 0 ? yv * 0.32 : yv * n) + 0.32 * r) * h / (1.32 * r), z * n * flare);
@@ -256,7 +256,7 @@ export function autoEntries(K, ctx, runs, { y0 = 0.3, max = 3, minLen = 8, exclu
 export function baseShrubs(K, R, s0, s1, { skip = [], d = 0.9, size = 0.5, clear = [] } = {}) {
   let segs = [[s0, s1]];
   for (const [a, b] of skip) { const ns = []; for (const [p, q] of segs) { if (b <= p || a >= q) { ns.push([p, q]); continue; } if (a > p) ns.push([p, a]); if (b < q) ns.push([b, q]); } segs = ns; }
-  let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); if (clear.some(([cu, cv, cr]) => (u - cu) ** 2 + (v - cv) ** 2 < cr * cr)) continue; shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
+  let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); if (clear.some(([cu, cv, cr]) => (u - cu) ** 2 + (v - cv) ** 2 < cr * cr) || (K._stairs || []).some(([a0, b0, a1, b1]) => u > a0 - 0.8 && u < a1 + 0.8 && v > b0 - 0.8 && v < b1 + 0.8)) continue; shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
 }
 
 // Finish a rectangular/polygonal building's surroundings: foundation planting along every face (gaps where packet paths

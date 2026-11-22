@@ -198,7 +198,7 @@ export async function build(ctx) {
     K.cyl(M.iron, u, g0 + 4.2, v, 0.08, 0.02, 0.18, 8, { detail: true });
   }
   // refine-central: planted beds, lamps and a bike rack where the paths arrive
-  siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0, clear: [[-3.9, v1 + 1.3, 1.9], [3.9, v1 + 1.3, 1.9]] }); // [r4-ground] keep foundation shrubs off the lion plinths
+  siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0, clear: [[-3.9, v1 + 1.3, 1.9], [3.9, v1 + 1.3, 1.9], [0, v1 + 1.0, 3.3], [0, v0 - 1.0, 2.9]] }); // [r4-ground] keep foundation shrubs off the lion plinths and both entrance stairs
   const object3d = K.finish(); object3d.name = 'durant-hall';
   return { object3d, colliders, walkables };
 }
