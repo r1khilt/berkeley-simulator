@@ -266,8 +266,14 @@ export function reseatTrees(plan, trees) {
 }
 function inRing(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c; } return c; }
 function bbox(P, m) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0 - m, z0 - m, x1 + m, z1 + m]; }
-// nearest point on polyline: s = arc length (may run past the ends along the end tangents), d = signed (left +)
+// nearest point on polyline: s = arc length (may run past the ends along the end tangents), d = signed (left +).
+// Long polylines get a 4 m segment hash (built on first use, margin 4 m) so grading loops stay linear.
 function project(P, C, x, z) {
+  if (P.length > 6) {
+    let H = P._hash; if (!H) { H = P._hash = new Map(); for (let k = 0; k < P.length - 1; k++) { const a = P[k], b = P[k + 1]; for (let i = Math.floor((Math.min(a[0], b[0]) - 4) / 4); i <= Math.floor((Math.max(a[0], b[0]) + 4) / 4); i++) for (let j = Math.floor((Math.min(a[1], b[1]) - 4) / 4); j <= Math.floor((Math.max(a[1], b[1]) + 4) / 4); j++) { const key = i * 65536 + j; let l = H.get(key); if (!l) H.set(key, (l = [])); l.push(k); } } }
+    const l = H.get(Math.floor(x / 4) * 65536 + Math.floor(z / 4)); if (!l) return { dd: 1e9, s: -1e9, d: 1e9 };
+    let best = null; for (const k of l) { const r = projSeg(P, C, k, x, z); if (!best || r.dd < best.dd) best = r; } return best;
+  }
   let best = null;
   for (let k = 0; k < P.length - 1; k++) {
     const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1e-9; const L = Math.sqrt(L2);
@@ -277,6 +283,12 @@ function project(P, C, x, z) {
     if (!best || dd < best.dd) { const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L; best = { dd, s: C[k] + tc * L, d: -cr }; }
   }
   return best; // left normal = (-dz, dx): d > 0 on that side
+}
+function projSeg(P, C, k, x, z) {
+  const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1e-9; const L = Math.sqrt(L2);
+  const t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; const tc = Math.max(k === 0 ? -1e9 : 0, Math.min(k === P.length - 2 ? 1e9 : 1, t));
+  const px = a[0] + dx * tc, pz = a[1] + dz * tc; const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L;
+  return { dd: Math.hypot(x - px, z - pz), s: C[k] + tc * L, d: -cr };
 }
 
 // =====================================================================================================================
@@ -606,9 +618,9 @@ function orientQuad(geo, a, b, c, d, want) {
 function makeGrates(items, M) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
   // weathered cast iron (sunlit mid grey-brown), dark slots showing soil, mulch ring around the trunk
-  x.fillStyle = '#857e74'; x.fillRect(0, 0, 128, 128);
-  x.fillStyle = '#5e4a37'; x.beginPath(); x.arc(64, 64, 21, 0, 7); x.fill();
-  x.strokeStyle = '#3b352f'; x.lineWidth = 1.6; for (let r = 30; r < 62; r += 7) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
+  x.fillStyle = '#958d81'; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = '#6a5440'; x.beginPath(); x.arc(64, 64, 18, 0, 7); x.fill();
+  x.strokeStyle = '#4a433b'; x.lineWidth = 1.4; for (let r = 30; r < 62; r += 7) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
   x.lineWidth = 2.0; for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; x.beginPath(); x.moveTo(64 + Math.cos(t) * 23, 64 + Math.sin(t) * 23); x.lineTo(64 + Math.cos(t) * 90, 64 + Math.sin(t) * 90); x.stroke(); }
   x.strokeStyle = '#948c80'; x.lineWidth = 5; x.strokeRect(2.5, 2.5, 123, 123);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -622,13 +634,13 @@ function makeGrates(items, M) {
   const inst = new THREE.Group(); inst.name = 'gw:grates';
   const cap = Math.min(items.length, 900);
   const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); return m; };
-  const meshes = [mk(g, grateMat), mk(fg.geometry(), M.graniteDark)]; inst.add(...meshes);
+  const meshes = [mk(g, grateMat), mk(fg.geometry(), M.concrete)]; inst.add(...meshes); // frame in the paving's concrete tone
   const mats = new Float32Array(items.length * 16); { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const qy = new THREE.Quaternion();
     items.forEach(([px, py, pz, r, s, nrm], k) => { q.setFromUnitVectors(up, nrm).multiply(qy.setFromAxisAngle(up, r)); m4.compose(new THREE.Vector3(px, py, pz), q, new THREE.Vector3(s, 1, s)); m4.toArray(mats, k * 16); }); }
   inst.count = items.length;
-  // only grates within ~160 m are drawn (refilled as the camera moves)
-  inst.userData.update = (cp) => { let k = 0; const R2 = 160 * 160;
+  // only grates within ~90 m are drawn (refilled as the camera moves): beyond that they only read as dark specks
+  inst.userData.update = (cp) => { let k = 0; const R2 = 90 * 90;
     for (let n = 0; n < items.length && k < cap; n++) { const dx = items[n][0] - cp.x, dz = items[n][2] - cp.z; if (dx * dx + dz * dz > R2) continue; for (const m of meshes) m.instanceMatrix.array.set(mats.subarray(n * 16, n * 16 + 16), k * 16); k++; }
     for (const m of meshes) { m.count = k; m.instanceMatrix.needsUpdate = true; } };
   return inst;
