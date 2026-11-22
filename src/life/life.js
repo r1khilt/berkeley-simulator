@@ -20,6 +20,7 @@ import { bikeGeometry, scooterGeometry, vehicleMaterial, VehicleMesh } from './v
 import { buildTabling } from './tabling.js';
 import { pacificParts } from '../time.js';
 
+const WALKFIX = typeof location === 'undefined' || new URLSearchParams(location.search).get('walkfix') !== '0'; // r4-people2: forward-only steering for walkers (?walkfix=0 = old lane-following)
 const PEOPLE_PLUGIN = import.meta.glob('../people/index.js'); // optional (r4-people); empty object when absent
 const TAU = Math.PI * 2;
 const QL = { // per quality level: walkers, riders, static-spot share, draw distance, near-LOD distance, instance caps
@@ -235,7 +236,7 @@ export class CampusLife {
   }
   _stepWalker(w, dt) {
     const G = this.walkG; const E = G.edges[w.e];
-    const ds = (w.speed * w.speedMul * dt) / E.len; w.t += w.dir ? ds : -ds;
+    const ds = (w.speed * (w.sm ?? w.speedMul) * dt) / E.len; w.t += w.dir ? ds : -ds; // r4-people2: eased speed (w.sm)
     if (w.t > 1 || w.t < 0) {
       const node = w.dir ? E.b : E.a; const nb = G.adj[node];
       if (nb.length <= 1) return false; // dead end: walked into a building
@@ -246,7 +247,7 @@ export class CampusLife {
       if (!cand.length) return false;
       let x = this.rand() * tot, pick = cand[0][0]; for (const [ne, wg] of cand) { x -= wg; if (x <= 0) { pick = ne; break; } }
       if (this.plugin?.pickEdge) { try { const ix = this.plugin.pickEdge(w, node, cand.map((c) => c[0])); if (ix != null && ix >= 0 && ix < cand.length) pick = cand[ix][0]; } catch (e) { console.warn('pickEdge failed', e); } }
-      const N = G.edges[pick]; w.e = pick; w.dir = N.a === node; w.t = w.dir ? 0 : 1; w.off = this._offFor(w, N);
+      const N = G.edges[pick]; w.e = pick; w.dir = N.a === node; w.t = w.dir ? 0 : 1; w.offT = this._offFor(w, N); // r4-people2: eased toward offT below
     }
     return true;
   }
@@ -326,12 +327,28 @@ export class CampusLife {
         try { plugin.steer(w, nb, player, dt); } catch (e) { console.warn('steer failed', e); this.plugin = null; }
       } else if (w.sx || w.sz) { w.sx *= 0.9; w.sz *= 0.9; if (Math.abs(w.sx) + Math.abs(w.sz) < 0.01) w.sx = w.sz = 0; }
       if (w.buddy) { const L = w.buddy; if (!live.has(L)) { w.buddy = null; w.groupId = 0; } else { w.e = L.e; w.dir = L.dir; w.t = L.t; w.speed = L.speed; w.speedMul = L.speedMul; w.off = L.off + 0.62 * (this.walkG.edges[L.e].hw > 1.2 ? 1 : 0.9); } }
+      if (w.offT != null && !w.buddy) { const d = w.offT - w.off; w.off += Math.max(-0.6 * dt, Math.min(0.6 * dt, d)); if (Math.abs(d) < 0.01) w.offT = null; } // r4-people2
       const alive = w.buddy ? true : this._stepWalker(w, dt);
       const p = alive ? this._walkPos(w) : null;
       if (!alive || (p[0] - cx) ** 2 + (p[1] - cz) ** 2 > far2 * 1.15) { const n = this._spawnWalker(cx, cz, true); if (n) { this.walkers[i] = n; live.add(n); } else this.walkers.splice(i, 1); continue; }
-      w.vx += (p[0] + (w.sx || 0) - w.vx) * k; w.vz += (p[1] + (w.sz || 0) - w.vz) * k;
-      let dh = p[2] - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); w.hd += dh * Math.min(1, dt * 6);
-      const v = w.speed * w.speedMul; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
+      // r4-people2: speed eases (people decelerate/accelerate instead of stopping dead), the body faces the way it is
+      // actually moving (sidesteps and corner cuts included, no crab-walking) and turns at a human rate
+      w.sm = w.sm ?? w.speedMul; w.sm += Math.max(-dt * 2.2, Math.min(dt * 1.4, w.speedMul - w.sm));
+      const tx = p[0] + (w.sx || 0), tz = p[1] + (w.sz || 0), vm = w.speed * w.sm; let want = p[2];
+      if (WALKFIX && vm > 0.08) {
+        // steer like a person: aim at a point 1.5 m ahead on the lane, turn at a human rate, and only ever move forward
+        // (sidesteps and corners become curved paths; no crab-walking, no sliding)
+        const ax = tx - Math.sin(p[2]) * 1.5, az = tz - Math.cos(p[2]) * 1.5; want = Math.atan2(-(ax - w.vx), -(az - w.vz));
+        let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = (w.jog ? 3.4 : 2.4) * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 5)));
+        const ex = tx - w.vx, ez = tz - w.vz; const along = ex * -Math.sin(w.hd) + ez * -Math.cos(w.hd); // + = behind the lane point: catch up a little
+        const sp = vm * (1 + Math.max(-0.35, Math.min(0.35, along * 0.5))); w.vx += -Math.sin(w.hd) * sp * dt; w.vz += -Math.cos(w.hd) * sp * dt;
+        const err = Math.hypot(tx - w.vx, tz - w.vz); if (err > 2.2) { const c = 1 - 2.2 / err; w.vx += (tx - w.vx) * c; w.vz += (tz - w.vz) * c; } // never drift far off the lane
+      } else {
+        w.vx += (tx - w.vx) * k; w.vz += (tz - w.vz) * k;
+        if (w.faceHd != null) want = w.faceHd; // stopped and facing someone (people plugin)
+        let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = 2.4 * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 5)));
+      }
+      const v = w.speed * w.sm; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
     }
     // ---- riders
     const wantR = Math.round(this.Q.ride * T.ride);
@@ -358,8 +375,8 @@ export class CampusLife {
     };
     for (const w of this.walkers) {
       if ((w.vx - cam.x) ** 2 + (w.vz - cam.z) ** 2 > far2) continue;
-      w.x = w.vx; w.z = w.vz; w.y = this._groundY(w.vx, w.vz); w.heading = w.hd + (w.gaze ? 0 : 0); w.speed_ = w.speed * w.speedMul;
-      const stopped = w.speedMul < 0.05;
+      w.x = w.vx; w.z = w.vz; w.y = this._groundY(w.vx, w.vz); w.heading = w.hd + (w.gaze ? 0 : 0); w.speed_ = w.speed * (w.sm ?? w.speedMul);
+      const stopped = (w.sm ?? w.speedMul) < 0.05; // r4-people2: eased
       if (stopped) { w.pose = POSE.STAND; w.vari = STAND_VARI[w.state] ?? 0; } else { w.pose = POSE.WALK; w.vari = w.state === 'phone' ? 1 : w._vari0 ?? (w._vari0 = w.vari); }
       w.aux = w.jog; agents.push(w); draw(w);
     }

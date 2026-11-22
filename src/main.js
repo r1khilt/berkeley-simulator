@@ -336,7 +336,7 @@ async function boot() {
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
     bridges.update(U.uNight.value);
-    if (life) life.update(dt, { camera, focus: state === 'play' ? player.pos : camera.position, date, player: state === 'play' ? player : null }); // r4-campus-life
+    if (life) { const lp = state === 'play' || BS.lifePlayer; life.update(dt, { camera, focus: lp ? player.pos : camera.position, date, player: lp ? player : null }); } // r4-campus-life (r4-people2: BS.lifePlayer lets headless tests drive the player without play())
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
     // HUD (throttled)
