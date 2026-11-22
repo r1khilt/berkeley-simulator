@@ -21,7 +21,10 @@ export async function build(ctx) {
   const lap = hmat(ctx, 'clap', '#d0d3d2'); const siding = lap.clone(); siding.map = lap.map.clone(); siding.map.center.set(0.5, 0.5); siding.map.rotation = Math.PI / 2; siding.map.needsUpdate = true;
   if (lap.bumpMap) { siding.bumpMap = lap.bumpMap.clone(); siding.bumpMap.center.set(0.5, 0.5); siding.bumpMap.rotation = Math.PI / 2; siding.bumpMap.needsUpdate = true; }
   const stucco = hmat(ctx, 'stucco', '#c4c6c2'), fascia = siding, soffit = hmat(ctx, 'paint', '#d9d6cc');
-  const dark = hmat(ctx, 'paint', '#2a2c2e'), frame = hmat(ctx, 'paint', '#6f7478'), glass = M.windowNight, pier = M.concrete;
+  // r4-sweep-outer2: piers and recessed walls in the photo's grey-green stucco (were bright concrete sticks in a black void),
+  // a mid-grey fascia band, sparser battens, the street-side core set back under the cantilever with its glazed bay.
+  const dark = hmat(ctx, 'paint', '#6e726e'), frame = hmat(ctx, 'paint', '#6f7478'), glass = M.windowNight, pier = hmat(ctx, 'stucco', '#8c918a');
+  const band = hmat(ctx, 'paint', '#9a9e9e');
   const colliders = [], walkables = [];
   const U0 = -10.7, U1 = 10.7, V0 = -13.8, V1 = 13.8;
   const YB = 2.7, YT = 9.5, ST = 3.05;              // cantilever underside, roof, storey height
@@ -32,9 +35,13 @@ export async function build(ctx) {
   walkables.push(K.walkPoly([[U0 + 0.2, V0 + 0.2], [U1 - 0.2, V0 + 0.2], [U1 - 0.2, V1 - 0.2], [U0 + 0.2, V1 - 0.2]], slabY));
   K.box(dark, U0 + IN, slabY, V0 + IN, 4.5, YB, V0 + IN + 0.25); // dark recessed back walls (shadow)
   K.box(dark, U0 + IN, slabY, V0 + IN, U0 + IN + 0.25, YB, V1 - IN);
-  K.box(stucco, 4.5, slabY - 0.5, V0 + 2.6, U1, YB, V1 - 0.6); // enclosed core / retaining base on the uphill side, set back under the overhang
+  K.box(stucco, 4.5, slabY - 0.5, V0 + 2.6, U1 - 1.8, YB, V1 - 0.6); // enclosed core on the uphill side, set back under the overhang
+  K.box(stucco, U1 - 1.8, slabY - 0.5, V0 + 2.6, U1 - 0.3, slabY + 0.15, V1 - 0.6); // its plinth runs out to the street wall line
+  { // glazed bay projecting from the core under the cantilever; its flat top is a small railed deck (photo)
+    const b0 = -2.2, b1 = 2.2, bx = U1 - 0.7, yb = YB - 0.25; K.box(glass, U1 - 1.8, slabY + 0.15, b0, bx, yb, b1); K.box(frame, bx - 0.02, slabY + 0.15, b0 - 0.06, bx + 0.05, yb + 0.12, b1 + 0.06);
+    for (const v of [b0, -0.75, 0.75, b1]) K.box(frame, bx - 0.04, slabY + 0.15, v - 0.04, bx + 0.06, yb, v + 0.04, { detail: true }); }
   K.box(soffit, U0 + 0.05, YB - 0.12, V0 + 0.05, U1 - 0.05, YB - 0.02, V1 - 0.05); // lit soffit under the cantilever
-  colliders.push(K.colPoly([[4.5, V0 + 2.6], [U1, V0 + 2.6], [U1, V1 - 0.6], [4.5, V1 - 0.6]], slabY - 1, YT + 1));
+  colliders.push(K.colPoly([[4.5, V0 + 2.6], [U1 - 0.6, V0 + 2.6], [U1 - 0.6, V1 - 0.6], [4.5, V1 - 0.6]], slabY - 1, YB));
   // square stucco piers carrying the cantilever
   for (const u of [U0 + 0.5, -4.0, 1.5]) for (const v of [V0 + 0.5, V1 - 0.5]) { K.box(pier, u - 0.25, slabY - 0.5, v - 0.25, u + 0.25, YB, v + 0.25); colliders.push(K.colCyl(u, v, 0.36, slabY - 1, YB)); }
   for (const v of [V0 + 0.5, -4.6, 4.6, V1 - 0.5]) { const u = U0 + 0.5; K.box(pier, u - 0.25, slabY - 0.5, v - 0.25, u + 0.25, YB, v + 0.25); colliders.push(K.colCyl(u, v, 0.36, slabY - 1, YB)); }
@@ -64,8 +71,8 @@ export async function build(ctx) {
       for (const ss of [o.s0 - 0.1, o.s1]) K.rbox(R, frame, ss, o.y0, -0.02, ss + 0.1, o.y1, 0.08);
     }
     // vertical battens (board-and-batten rhythm) between openings
-    for (let s = 0.3; s < L - 0.2; s += 0.3) { if (ops.some((o) => s > o.s0 - 0.05 && s < o.s1 + 0.05)) continue; K.rbox(R, siding, s - 0.025, YB + 0.35, 0, s + 0.025, YT - 0.4, 0.03, { detail: true }); }
-    K.rbox(R, fascia, -0.05, YT - 0.4, -0.05, L + 0.05, YT - 0.1, 0.06); // thin fascia in the wall colour
+    for (let s = 0.4; s < L - 0.2; s += 0.4) { if (ops.some((o) => s > o.s0 - 0.05 && s < o.s1 + 0.05)) continue; K.rbox(R, siding, s - 0.02, YB + 0.35, 0, s + 0.02, YT - 0.55, 0.018, { detail: true }); }
+    K.rbox(R, band, -0.05, YT - 0.55, -0.05, L + 0.05, YT - 0.1, 0.09); // mid-grey fascia band (photo)
   }
   K.box(M.concreteDark, U0 + 0.2, YB, V0 + 0.2, U1 - 0.2, YT - 0.45, V1 - 0.2); // core
   K.box(hmat(ctx, 'paint', '#55585a'), U0 + 0.25, YT - 0.42, V0 + 0.25, U1 - 0.25, YT - 0.3, V1 - 0.25); // roof membrane
@@ -76,7 +83,7 @@ export async function build(ctx) {
     K.rbox(R, M.lampGlow, s + 0.7, slabY + 1.7, 0.03, s + 0.82, slabY + 1.95, 0.12, { detail: true }); }
   // ---- low grey stucco retaining wall along the Warring sidewalk with a planter bed, dark shrubs and a yucca ----
   { const fol = hmat(ctx, 'paint', '#2f4a2c'), trunk = hmat(ctx, 'wood', '#8a7560');
-    const u = U1 + 1.4; for (let v = -9.0; v < 0.5; v += 1.5) { const gy = Math.max(K.g(u, v), K.g(u, v + 1.5)); K.box(stucco, u - 0.15, Math.min(K.g(u, v), K.g(u, v + 1.5)) - 0.5, v, u + 0.15, gy + 1.0, v + 1.5); K.box(M.concreteDark, u - 0.2, gy + 1.0, v - 0.02, u + 0.2, gy + 1.08, v + 1.52); }
+    const u = U1 + 1.4; for (let v = -9.0; v < 0.5; v += 1.5) { const gy = Math.max(K.g(u, v), K.g(u, v + 1.5)); K.box(stucco, u - 0.15, Math.min(K.g(u, v), K.g(u, v + 1.5)) - 0.5, v, u + 0.15, gy + 1.0, v + 1.5); K.box(hmat(ctx, 'paint', '#a5553f'), u - 0.2, gy + 1.0, v - 0.02, u + 0.2, gy + 1.08, v + 1.52); } // red tile coping (photo)
     for (let v = -8.6; v < 0.2; v += 1.1) { const gy = K.g(U1 + 0.6, v); K.box(fol, U1 + 0.1, gy - 0.1, v, U1 + 1.2, gy + 1.5 + ((v * 13) % 3 + 3) % 3 * 0.4, v + 1.0); }
     const pu = U1 + 1.8, pv = 7.5, pg = K.g(pu, pv); for (const [du, dv, h] of [[0, 0, 4.6], [0.4, 0.3, 3.8], [-0.3, 0.35, 3.2]]) { K.cyl(trunk, pu + du, pg, pv + dv, 0.13, 0.1, h, 7); for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; const g = new THREE.ConeGeometry(0.12, 1.1, 4); g.rotateZ(Math.PI / 2 - 0.9); g.rotateY(a); g.translate(pu + du + Math.cos(a) * 0.35, pg + h + 0.1, pv + dv - Math.sin(a) * 0.35); K.add(fol, g); } } }
   const object3d = K.finish(); object3d.name = 'kappa-sigma';

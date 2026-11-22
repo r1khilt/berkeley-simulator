@@ -10,7 +10,9 @@ export const info = {
   replaces: ['w/109192581'],
 };
 
-const P = { ...{"ang": -10.123, "u0": -20.47, "u1": 21.03, "v0": -5.94, "v1": 5.46, "roof": 32.0, "pent": {"u0": 3.78, "u1": 14.78, "v0": -4.49, "v1": 0.51, "top": 35.8}, "entrance": {"face": "S", "u": 7.34}, "style": "u12", "nb": 10, "floors": 8, "seed": "cunningham-hall", "ring": 33.2, "endWinEdge": true}, tint: { span: 0xc3c8bb, wall: 0xa9b2a2, base: 0x7f866c, brace: 0xa0694c } };
+// r4-sweep-outer2: tints follow the value ladder (light pier frame, recessed spandrels ~10% darker, braces darker or rust)
+// with colour-blocked end walls, from the 2022 Sather Tower photo of Units 1/2.
+const P = { ...{"ang": -10.123, "u0": -20.47, "u1": 21.03, "v0": -5.94, "v1": 5.46, "roof": 32.0, "pent": {"u0": 3.78, "u1": 14.78, "v0": -4.49, "v1": 0.51, "top": 35.8}, "entrance": {"face": "S", "u": 7.34}, "style": "u12", "nb": 10, "floors": 8, "seed": "cunningham-hall", "ring": 33.2, "endWinEdge": true}, tint: { span: 0x9ca08e, wall: 0xaeb2a0, base: 0x7f866c, brace: 0xa0694c, end: 0xd2bc96 } };
 
 export async function build(ctx) {
   const r = tower(ctx, P);
