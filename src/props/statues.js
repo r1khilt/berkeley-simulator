@@ -69,7 +69,7 @@ function mats() {
   _m = {
     pillar: tint(M.stucco, 0xd9c7a2, { name: 'statue:pillar', roughness: 0.92 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xd8a445, metalness: 0.9, roughness: 0.42, vertexColors: true, name: 'statue:goldLeaf' }),
-    granite: ao(tint(M.granite, 0xa6a6a1, { name: 'statue:greyGranite', roughness: 0.92 })),
+    granite: ao(tint(M.granite, 0xb3b2ac, { name: 'statue:greyGranite', roughness: 0.92 })),
     plinth: tint(M.granite, 0xa9a8a3, { name: 'statue:plinth', roughness: 0.9 }),
     rock: ao(tint(M.granite, 0x9d9584, { name: 'statue:rock', roughness: 0.97 })),
     patina: new THREE.MeshStandardMaterial({ color: 0x5d4c37, metalness: 0.6, roughness: 0.52, vertexColors: true, name: 'statue:bronzePatina' }),
@@ -104,10 +104,10 @@ export async function goldenBear() { // Lower Sproul: chamfered concrete pillar 
   const shaft = new THREE.ExtrudeGeometry(sh, { depth: H - 0.45 + 0.6, bevelEnabled: false }); shaft.rotateX(-Math.PI / 2); shaft.translate(0, -0.6, 0);
   B.add(K.pillar, shaft);
   // cap: 2.4 m square slab, 0.2 m at the edge, inverted-pyramid soffit down onto the shaft
-  B.add(K.pillar, box(2.2, 0.22, 2.2, 0, H - 0.07, 0));
-  B.add(K.pillar, new THREE.ConeGeometry(1.1 * Math.SQRT2, 0.5, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.25, 0));
+  B.add(K.pillar, box(2.4, 0.22, 2.4, 0, H - 0.07, 0));
+  B.add(K.pillar, new THREE.ConeGeometry(1.2 * Math.SQRT2, 0.5, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.25, 0));
   B.flush(g, { name: 'golden-bear' });
-  const bear = await sculpt('bear-hardy', K.gold, { s: 1.15, ao: 0.5 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
+  const bear = await sculpt('bear-hardy', K.gold, { s: 1.3, ao: 0.5 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
   return g;
 }
 
@@ -121,14 +121,14 @@ export async function grizzlyBear() { // by Strawberry Creek: smooth granite gri
 
 export async function calBear() { // Memorial Stadium: rearing bronze grizzly in a mulch bed with a concrete curb; plaque boulder in front
   const K = mats(), B = new Bag(), g = new THREE.Group();
-  const W = 2.3, D = 1.8, r = 0.6; // bed half-size + corner radius
+  const W = 2.6, D = 2.0, r = 0.7; // bed half-size + corner radius
   const rr = (w, d, rad) => { const s = new THREE.Shape(); s.moveTo(-w + rad, -d); s.lineTo(w - rad, -d); s.absarc(w - rad, -d + rad, rad, -Math.PI / 2, 0); s.lineTo(w, d - rad); s.absarc(w - rad, d - rad, rad, 0, Math.PI / 2); s.lineTo(-w + rad, d); s.absarc(-w + rad, d - rad, rad, Math.PI / 2, Math.PI); s.lineTo(-w, -d + rad); s.absarc(-w + rad, -d + rad, rad, Math.PI, Math.PI * 1.5); return s; };
   const ring = rr(W + 0.16, D + 0.16, r + 0.16); ring.holes.push(rr(W, D, r));
   B.add(K.pad, new THREE.ExtrudeGeometry(ring, { depth: 0.6, bevelEnabled: false, curveSegments: 8 }).rotateX(-Math.PI / 2).translate(0, -0.45, 0));
   const bed = new THREE.ShapeGeometry(rr(W, D, r), 8).rotateX(-Math.PI / 2).translate(0, 0.07, 0);
   B.add(K.mulch, bed);
   B.flush(g, { name: 'cal-bear' });
-  const bear = await sculpt('bear-rear', K.patina, { s: 1.12, near: 45, ao: 0.8 }); bear.position.set(0, 0.04, -0.15); g.add(bear);
+  const bear = await sculpt('bear-rear', K.patina, { s: 1.22, near: 45, ao: 0.8 }); bear.position.set(0.12, 0.04, -0.15); g.add(bear);
   const stone = await sculpt('rock-slab', K.rock, { s: 0.42, near: 25 }); stone.position.set(0.2, 0, D + 1.1); stone.rotation.y = 0.15; g.add(stone);
   const pl = new THREE.Mesh(box(0.42, 0.03, 0.32, 0, -0.015), K.plaque); pl.rotation.x = 0.45; pl.position.set(0.2, 0.19, D + 1.12); pl.castShadow = true; g.add(pl);
   return g;
@@ -218,9 +218,9 @@ export const PLACEMENTS = [
   { id: 'golden-bear', build: goldenBear, x: -223.2, z: 305.1, face: [-205, 326], r: 0.45, clearTrees: 1.6, col: (P, x, y, z) => P.addBox(x - 0.4, y - 1, z - 0.4, x + 0.4, y + 5.5, z + 0.4, 'statue') },
   { id: 'grizzly-bear', build: grizzlyBear, x: -241.7, z: 236.1, rot: Math.PI / 2, r: 1.1, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.62, 1.3) },
   { id: 'cal-bear', build: calBear, x: 464.5, z: 54.5, face: [440, 54], r: 1.4, clearTrees: 2.6, col: (P, x, y, z) => P.addCircle(x, z, 0.9, y - 1, y + 3, 'statue') },
-  { id: 'bench-1920', build: bench1920, at: towerPt(0, TOWER.hw + 0.75), rot: TOWER.rot, r: 1.2, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
-  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
-  { id: 'mining-pool', build: miningPool, x: 74.0, z: -178.5, rot: 0, r: 8.0, level: 'max', clearTrees: 8.2, col: (P, x, y, z) => P.addCircle(x, z, 7.9, y - 1, y + 0.32, 'statue') },
+  { id: 'bench-1920', build: bench1920, at: towerPt(0, TOWER.hw + 0.75), rot: TOWER.rot, r: 1.2, clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
+  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
+  { id: 'mining-pool', build: () => miningPool(7.0), x: 75.0, z: -178.2, rot: 0, r: 7.6, level: 'max', clearTrees: 7.8, col: (P, x, y, z) => P.addCircle(x, z, 7.5, y - 1, y + 0.32, 'statue') },
 ];
 function obb(P, x, y, z, rot, hx, hz, h, oz = 0) { // oriented box collider (local half-sizes hx, hz, centred oz along local z)
   const c = Math.cos(rot), s = Math.sin(rot); const pt = (u, v) => [x + u * c + v * s, z - u * s + v * c];

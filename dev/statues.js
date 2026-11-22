@@ -24,7 +24,12 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI /
 const info = document.getElementById('info');
 window.__st = { ready: false, errors: [] };
 window.addEventListener('error', (e) => window.__st.errors.push(String(e.message)));
-const obj = await S[id](); scene.add(obj);
+let obj;
+if (qs.get('prop')) { // street-furniture props from src/props/props.js, laid out in a row
+  const P = await import('../src/props/props.js'); obj = new THREE.Group(); const names = qs.get('prop').split(',');
+  names.forEach((n, i) => { const b = P.PROPS[n](); const g = new THREE.Group(); for (const part of b.parts) { const m = new THREE.Mesh(part.geometry, part.material); m.castShadow = m.receiveShadow = true; g.add(m); } g.position.x = (i - (names.length - 1) / 2) * 5; obj.add(g); });
+} else obj = await S[id]();
+scene.add(obj);
 let tris = 0; obj.traverse((o) => { if (o.isMesh && o.visible) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
 info.textContent = id + '  tris(all levels) ' + Math.round(tris);
 window.__st.view = (az, el, dist, ty = 1.0, tx = 0, tz = 0) => {
