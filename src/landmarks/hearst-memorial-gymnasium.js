@@ -19,8 +19,11 @@ export const info = {
 export async function build(ctx) {
   const K = new Kit(ctx, deg(-16.6)); const M = ctx.M; const X = mats(M);
   const W = new THREE.MeshStandardMaterial({ color: 0xdad6c7, roughness: 0.85, map: M.marble.map, normalMap: M.marble.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) });                                                  // buff concrete
-  const BR = new THREE.MeshStandardMaterial({ color: 0x3d463e, roughness: 0.5, metalness: 0.6 }); // verdigris bronze
-  const GL = new THREE.MeshStandardMaterial({ color: 0x2b3436, roughness: 0.18, metalness: 0.3, envMapIntensity: 0.8 });
+  // r4-sweep: the window walls read as flat dark-green slabs (dark-green muntins on near-black custom glass, no interiors).
+  // Lighter verdigris bronze so the muntin grid reads, and the shared window glass (rooms behind it, lit at night).
+  const BR = new THREE.MeshStandardMaterial({ color: 0x5d6f61, roughness: 0.45, metalness: 0.5 }); // verdigris bronze
+  const GL = M.windowNight;
+  const GLS = new THREE.MeshStandardMaterial({ color: 0x2b3436, roughness: 0.18, metalness: 0.3, envMapIntensity: 0.8 }); // roof skylights keep the plain glass
   const VOID = new THREE.MeshStandardMaterial({ color: 0x1d201f, roughness: 0.95 });
   const PIL = new THREE.MeshStandardMaterial({ color: 0xe6e2d4, roughness: 0.85, map: M.marble.map, normalMap: M.marble.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) });
   const FLUTE = new THREE.MeshStandardMaterial({ color: 0xb9b19e, roughness: 0.9 });
@@ -155,7 +158,7 @@ export async function build(ctx) {
     block({ u0, u1, v0: 3.2, v1: 25.0, top: 12.6, faces: { E: false, W: false, N: { corner: 1.6, winW: 2.6 }, S: { corner: 1.5 } } });
   };
   mid(-28.6, -10.4); mid(7.4, 28.4);
-  for (const [u0, u1, v0, v1, y] of [[-46, -32, 10, 24, 15.6], [31, 46, 10, 24, 15.6], [-25, -14, 11, 21, 12.6], [11, 24, 11, 21, 12.6], [-6, 3, 12, 24, 16.4]]) { K.box(M.concreteDark, u0, y, v0, u1, y + 0.9, v1); K.box(GL, u0 + 0.3, y + 0.9, v0 + 0.3, u1 - 0.3, y + 1.25, v1 - 0.3); }
+  for (const [u0, u1, v0, v1, y] of [[-46, -32, 10, 24, 15.6], [31, 46, 10, 24, 15.6], [-25, -14, 11, 21, 12.6], [11, 24, 11, 21, 12.6], [-6, 3, 12, 24, 16.4]]) { K.box(M.concreteDark, u0, y, v0, u1, y + 0.9, v1); K.box(GLS, u0 + 0.3, y + 0.9, v0 + 0.3, u1 - 0.3, y + 1.25, v1 - 0.3); }
 
   function aedicule(R, z) {
     const c = R.L / 2, yb = DECK + 1.6; const w = 3.6, h = 6.0;
