@@ -6,9 +6,15 @@
 //   - steer(): pedestrians sidestep the player and each other (keep-right, passing), stop to check their phone, glance at
 //     walking buddies, flinch and stop when bumped, and look back when stared at;
 //   - pickEdge(): walkers have a real destination (a building door or a busy spot) and route toward it at each node.
+// r4-people2: the skinned people wear modelled clothes (garments.js: skinned cloth shells, straps) and one accessory mesh
+// (kit.js: shoes, bags, hats, glasses, headphones, hair), riders get skinned people posed on campus life's bikes and
+// scooters (IK), each near person casts a soft contact shadow, and steering adds yielding to crossing traffic, a hard
+// push-out from the player, and 'stop and face the player' when stared at or bumped. Walkers in campus life steer
+// forward-only (life.js, ?walkfix=0 for the old lane following). BSIM.people.stats: active, ms (CPU), tris, draws.
 import * as THREE from 'three';
 import { loadPeopleAssets } from './assets.js';
 import { Character } from './character.js';
+import { prebuildParts } from './garments.js'; // r4-people2
 import { SKIN, HAIR, SHOE } from '../life/people.js';
 
 const TAU = Math.PI * 2;
@@ -29,6 +35,12 @@ class People {
     this.group = new THREE.Group(); this.group.name = 'people'; ctx.scene.add(this.group);
     this.fr = new THREE.Frustum(); this.pm = new THREE.Matrix4(); this.sph = new THREE.Sphere(new THREE.Vector3(), 1.2);
     this.rand = mulberry(777); this.stats = {};
+    // r4-people2: soft contact shadow under every near person (one instanced draw): grounds them on any lighting
+    { const c = typeof document !== 'undefined' ? document.createElement('canvas') : null; let tex = null;
+      if (c) { c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); tex = new THREE.CanvasTexture(c); }
+      const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+      const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xffffff, name: 'people:blob' });
+      this.blobs = new THREE.InstancedMesh(g, m, Math.max(1, this.K)); this.blobs.count = 0; this.blobs.frustumCulled = false; this.blobs.renderOrder = 1; this.blobs.name = 'people:blobs'; this.group.add(this.blobs); this._bm = new THREE.Matrix4(); this._bq = new THREE.Quaternion(); this._bs = new THREE.Vector3(); this._bp = new THREE.Vector3(); }
     if (this.K > 0 && qs.get('people') !== '0') loadPeopleAssets().then((A) => this._build(A)).catch((e) => console.warn('people assets failed', e));
   }
   _build(A) {
@@ -36,10 +48,11 @@ class People {
     const shadow = this.ctx.quality !== 'low';
     for (let i = 0; i < this.K; i++) { const c = new Character(A, i % 2 ? 'm' : 'f', shadow); this.pool.push(c); this.group.add(c.root); }
     for (const sex of ['f', 'm']) calibrate(this.pool.find((c) => c.sex === sex));
+    for (const sex of ['f', 'm']) prebuildParts(A.bodies[sex]); // garments for the common outfits, in idle slices
     const setup = this.ctx.setupMaterials; if (setup) for (const c of this.pool) setup(c.root);
     // compile the character programs up front so the first person to walk up doesn't hitch the frame
     try { const r = window.BSIM && window.BSIM.composer && window.BSIM.composer.renderer; const c0 = this.pool[0];
-      if (r && r.compileAsync && c0) { c0.root.visible = true; for (const h of Object.values(c0.hair)) h.mesh.visible = true; for (const o of [c0.phone, c0.cup, c0.book, c0.cap, c0.beanie, c0.backpack, c0.bag]) o.visible = true;
+      if (r && r.compileAsync && c0) { c0.root.visible = true; for (const h of Object.values(c0.hair)) h.mesh.visible = true; for (const o of [c0.phone, c0.cup, c0.book]) o.visible = true;
         r.compileAsync(c0.root, this.ctx.camera, this.ctx.scene).catch(() => {}).finally(() => { c0.root.visible = false; for (const h of Object.values(c0.hair)) h.mesh.visible = false; }); } } catch (e) { /* optional */ }
     this.ready = true; if (this.life.enabled === false) this.setEnabled(false);
   }
@@ -49,11 +62,12 @@ class People {
   // ---------------------------------------------------------------- per frame (after campus life has moved everyone)
   update(dt, { camera, player, agents }) {
     if (!this.ready || !this.enabled) return;
+    const tStart = performance.now(); // r4-people2: CPU cost of the near-LOD layer (stats.ms, smoothed)
     const cam = camera.position; this.pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); this.fr.setFromProjectionMatrix(this.pm);
     for (const c of this.pool) if (c.hideNext) { c.hideNext = false; if (!c.agent) c.root.visible = false; }
-    // pick the K nearest people in view (riders stay instanced: their bikes are campus life's meshes)
+    // pick the K nearest people in view (riders included: campus life keeps drawing their bike when the person is hidden)
     const maxD2 = this.maxD * this.maxD, cand = this._cand || (this._cand = []); cand.length = 0;
-    for (const a of agents) { if (a.kind === 'rider') continue; const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a);
+    for (const a of agents) { const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a); if (a.kind === 'rider' && d2 > 22 * 22 * (keep ? 1.25 : 1)) continue; // r4-people2: riders get skinned people too (on campus life's bikes)
       if (d2 > maxD2 * (keep ? 1.25 : 1)) continue; if (d2 > 25 && !this._inView(a)) continue; cand.push([d2 * (keep ? 0.8 : 1), a]); }
     cand.sort((p, q) => p[0] - q[0]);
     const want = this._want || (this._want = new Set()); want.clear(); let nf = 0, nm = 0; const half = this.K / 2;
@@ -72,7 +86,14 @@ class People {
       if (c.w0) { for (const k in c.w) c.w[k] = 0; c.w0 = false; c.update(0.001, a, camera); for (const k in c.w) c.w[k] = c.wt[k]; }
       c.update(dt, a, camera);
     }
-    this.stats = { active: n, pool: this.pool.length, cand: cand.length };
+    if (this.blobs) { let bi = 0; const up = new THREE.Vector3(0, 1, 0);
+      for (const c of this.pool) { const a = c.agent; if (!a || bi >= this.blobs.instanceMatrix.count) continue; const m = c.mode; if (m === 'lie') continue;
+        const sc = m === 'cycle' ? [0.55, 1.5] : m === 'scoot' ? [0.45, 1.1] : m === 'sit' || m === 'ground' ? [0.9, 0.9] : m === 'walk' || m === 'jog' ? [0.62, 0.95] : [0.62, 0.62];
+        this._bq.setFromAxisAngle(up, a.heading); this._bp.set(a.x, a.y + 0.012, a.z); this._bs.set(sc[0], 1, sc[1]); this._bm.compose(this._bp, this._bq, this._bs); this.blobs.setMatrixAt(bi++, this._bm); }
+      this.blobs.count = bi; this.blobs.instanceMatrix.needsUpdate = true; }
+    const ms = performance.now() - tStart; this._ms = this._ms == null ? ms : this._ms + (ms - this._ms) * 0.05;
+    let tris = 0, draws = 0; if ((this._sf = (this._sf || 0) + 1) % 30 === 1) { for (const c of this.pool) if (c.agent) c.root.traverse((o) => { if (o.isMesh && o.visible && o.parent.visible) { const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; draws++; } }); this._tris = tris; this._draws = draws; }
+    this.stats = { active: n, pool: this.pool.length, cand: cand.length, ms: +this._ms.toFixed(2), tris: this._tris, draws: this._draws };
   }
   _spotNotice(a, player, dt) {
     const S = a._s || (a._s = { stare: 0, react: 0, near: 0 }); const dx = player.pos.x - a.x, dz = player.pos.z - a.z; const d = Math.hypot(dx, dz);
@@ -96,10 +117,27 @@ class People {
     let tca = vv > 1e-4 ? -(dx * vx + dz * vz) / vv : 0; tca = Math.max(0, Math.min(3, tca));
     const cx = dx + vx * tca, cz = dz + vz * tca, dmin = Math.hypot(cx, cz);
     const along = dx * fx + dz * fz, lat = dx * rx + dz * rz;
-    if (dmin < 1.3 && (tca < 2.6 || (along > -0.5 && along < 4)) && d < 9) { const latC = cx * rx + cz * rz; const side = latC > 0.05 ? -1 : latC < -0.05 ? 1 : (lat >= 0 ? -1 : 1); want += side * (1.35 - dmin); }
+    if (dmin < 1.7 && (tca < 3.2 || (along > -0.5 && along < 5)) && d < 12) { const latC = cx * rx + cz * rz;
+      // pick a side once and stick to it (no dithering), preferring the side away from the player's predicted path
+      if (!S.side || S.sideT <= 0) S.side = latC > 0.05 ? -1 : latC < -0.05 ? 1 : (lat >= 0 ? -1 : 1); S.sideT = 1.2;
+      want += S.side * (1.75 - dmin) * (d < 4 ? 1.15 : 1); // personal space: pass the player with ~1 m between shoulders
+      if (along > 0 && along < 2.2 && Math.abs(lat) < 0.75 && w.stateT <= 0) w.speedMul = Math.min(w.speedMul, 0.35 + 0.25 * along); } // boxed in: slow down too
+    S.sideT = (S.sideT || 0) - dt;
     // -- bumped: flinch, stop, look at the player, then carry on
     S.bumpCd -= dt;
     if (d < 0.6 && S.bumpCd <= 0) { S.react = 1; S.bumpCd = 4; w.speedMul = 0; w.state = 'idle'; w.stateT = 1.6 + this.rand() * 0.8; S.glance = 3.5; w.sx = (w.sx || 0) - dx / Math.max(d, 0.1) * 0.35; w.sz = (w.sz || 0) - dz / Math.max(d, 0.1) * 0.35; }
+    // -- never stand inside the player: push straight out (the player has physics, walkers don't block them)
+    if (d < 0.72 && d > 1e-3) { const push = 0.72 - d; w.vx -= dx / d * push; w.vz -= dz / d * push; w.sx = (w.sx || 0) - dx / d * push; w.sz = (w.sz || 0) - dz / d * push; }
+    // -- crossing traffic: predict the closest approach with each neighbour; the one with the higher id yields briefly
+    S.yieldT = (S.yieldT || 0) - dt;
+    for (const o of nb) {
+      if (o === w.buddy || o.buddy === w || o.id < w.id) continue; const ox = o.vx - w.vx, oz = o.vz - w.vz; const od2 = ox * ox + oz * oz; if (od2 > 16) continue;
+      const osp = o.speed * (o.sm ?? o.speedMul ?? 1); const ovx = -Math.sin(o.hd) * osp - fx * sp, ovz = -Math.cos(o.hd) * osp - fz * sp; const vv2 = ovx * ovx + ovz * ovz; if (vv2 < 0.05) continue;
+      const tc = -(ox * ovx + oz * ovz) / vv2; if (tc < 0 || tc > 1.6) continue; const mx = ox + ovx * tc, mz = oz + ovz * tc;
+      if (mx * mx + mz * mz < 0.36 && Math.abs((fx * -Math.sin(o.hd) + fz * -Math.cos(o.hd))) < 0.7) { S.yieldT = 0.7; break; }
+    }
+    if (S.yieldT > 0 && w.stateT <= 0) w.speedMul = Math.min(w.speedMul, 0.4);
+    else if (w.stateT <= 0 && w.speedMul < 1 && w.state !== 'phone') w.speedMul = Math.min(1, w.speedMul + dt * 0.8);
     // -- other walkers: keep right when meeting, pass slower people
     for (const o of nb) {
       if (o === w.buddy || o.buddy === w) continue; const ox = o.vx - w.vx, oz = o.vz - w.vz; const al = ox * fx + oz * fz; if (al < 0 || al > 4.5) continue; const la = ox * rx + oz * rz; if (Math.abs(la) > 0.9) continue;
@@ -108,19 +146,22 @@ class People {
       else if (head > 0.5 && o.speed * (o.speedMul ?? 1) < sp - 0.1) want += (la > 0 ? -0.5 : 0.5) * (1 - al / 4.5); // overtake on the clear side
     }
     if (w.buddy) want += 0.14; // walking pairs: a little more elbow room than the rail spacing
-    want = Math.max(-1.4, Math.min(1.4, want));
+    want = Math.max(-1.7, Math.min(1.7, want));
     S.off += (want - S.off) * Math.min(1, dt * (Math.abs(want) > Math.abs(S.off) ? 2.4 : 0.9));
     w.sx = (w.sx || 0) * Math.max(0, 1 - dt * 2) + rx * S.off * Math.min(1, dt * 2); w.sz = (w.sz || 0) * Math.max(0, 1 - dt * 2) + rz * S.off * Math.min(1, dt * 2);
     // -- stared at: the walker notices, looks back, slows down
     const look = player.camYaw != null ? player.camYaw : player.yaw; const toW = Math.atan2(-(w.vx - px), -(w.vz - pz));
     const staring = d < 10 && d > 0.8 && Math.abs(wrap(look - toW)) < 0.1; S.stare = staring ? S.stare + dt : Math.max(0, S.stare - dt * 1.5);
     let gaze = 0; const relP = wrap(Math.atan2(-dx, -dz) - w.hd);
-    if ((S.stare > 0.9 || S.glance > 0) && Math.abs(relP) < 2.3) { gaze = relP; if (S.stare > 2.2 && w.stateT <= 0 && !w.jog && w.speedMul > 0.5) { w.speedMul = 0; w.state = 'idle'; w.stateT = 1.8; } }
+    S.stareCd = (S.stareCd || 0) - dt;
+    if ((S.stare > 0.9 || S.glance > 0) && Math.abs(relP) < 2.3) { gaze = relP; if (S.stare > 2.0 && w.stateT <= 0 && !w.jog && S.stareCd <= 0) { w.speedMul = 0; w.state = 'idle'; w.stateT = 1.6 + this.rand() * 1.4; S.stareCd = 9; S.faceT = w.stateT; } }
     else if (d < 2.4 && Math.abs(relP) < 1.4 && ((w.id * 7) % 3 === 0)) gaze = relP * 0.8; // some glance at whoever passes close
     S.glance -= dt;
     // -- walking with a friend: turn to them now and then while talking
     const friend = w.buddy || (nb.find((o) => o.buddy === w));
     if (!gaze && friend && w.speedMul > 0.05) { S.chat -= dt; if (S.chat < 0) S.chat = 4 + this.rand() * 6; if (S.chat < 2.2) { const fy = Math.atan2(-(friend.vx - w.vx), -(friend.vz - w.vz)); gaze = wrap(fy - w.hd) * 0.85; } }
+    S.faceT = (S.faceT || 0) - dt; if (S.react) S.faceT = Math.max(S.faceT, 1.2);
+    w.faceHd = S.faceT > 0 && w.speedMul < 0.05 ? Math.atan2(-dx, -dz) : null; if (w.faceHd != null) gaze = gaze * 0.4; // body turns, head follows less
     w.gaze = gaze;
     // -- phone checks: now and then someone stops dead to read a text
     S.phoneCd -= dt;
