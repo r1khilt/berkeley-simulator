@@ -15,7 +15,7 @@ const FL = { SLEEVE: 1, PANTS: 2, BACKPACK: 4, SKIRT: 8, BAG: 16, PHONE: 32, BOO
 
 // ---------------------------------------------------------------- materials
 function bodyMaterial(base, B) {
-  const m = base.clone(); m.name = 'people:body'; m.roughness = 0.62; m.metalness = 0;
+  const m = base.clone(); m.name = 'people:body'; m.roughness = 0.62; m.metalness = 0; m.normalMap = null; // the superhero muscle-striation normal map reads as scaly skin at game scale
   const u = { uTop: { value: new THREE.Color(0.1, 0.15, 0.3) }, uBot: { value: new THREE.Color(0.1, 0.1, 0.12) }, uShoe: { value: new THREE.Color(0.8, 0.8, 0.8) }, uSkin: { value: new THREE.Color(0.7, 0.5, 0.4) },
     uSkinRef: { value: new THREE.Vector3(B.skinRef.r, B.skinRef.g, B.skinRef.b) }, uCut: { value: new THREE.Vector4(0.45, 1, B.shoeY, B.waistY) }, uCollar: { value: B.collarY }, uNeck: { value: new THREE.Vector3(B.J.neck_01.x, B.J.neck_01.z, B.neckR) }, uAnkL: { value: B.J.foot_l.clone() }, uAnkR: { value: B.J.foot_r.clone() } };
   m.userData.u = u;
@@ -26,9 +26,9 @@ attribute vec2 aCloth; flat varying float vReg; varying float vLimbT; varying ve
       .replace('#include <begin_vertex>', `#include <begin_vertex>
  vReg = aCloth.x; vLimbT = aCloth.y; vBind = position;
  { float inf = 0.0; // clothes stand a little off the skin
-   if (aCloth.x > 0.5 && aCloth.x < 1.5) inf = position.y < uCut.w ? 0.011 : ((position.y < uCollar || length(position.xz - uNeck.xy) > uNeck.z) ? 0.012 : 0.0);
+   if (aCloth.x > 0.5 && aCloth.x < 1.5) inf = position.y < uCut.w ? 0.011 : ((position.y < uCollar || length(position.xz - uNeck.xy) > uNeck.z) ? 0.013 + 0.014 * smoothstep(0.07, 0.0, position.y - uCut.w) : 0.0);
    else if (aCloth.x > 1.5 && aCloth.x < 2.5) inf = aCloth.y < uCut.x ? 0.009 : 0.0;
-   else if (aCloth.x > 3.5) inf = position.y < uCut.z ? 0.017 : (aCloth.y < uCut.y ? 0.008 : 0.0);
+   else if (aCloth.x > 3.5) inf = position.y < uCut.z ? 0.017 : (aCloth.y < uCut.y ? 0.009 + (uCut.y > 1.0 ? 0.012 * smoothstep(0.75, 1.0, aCloth.y) : 0.006 * smoothstep(uCut.y - 0.1, uCut.y, aCloth.y)) : 0.0);
    transformed += normal * inf;
    if (aCloth.x > 3.5 && position.y < uCut.z + 0.01) { vec3 an = position.x > 0.0 ? uAnkL : uAnkR; transformed = an + (position - an) * vec3(0.72, 0.8, 0.82); } } // bare foot tucked inside the sneaker`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
@@ -44,7 +44,7 @@ float pHash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.
  float hem = (vReg > 1.5 && vReg < 2.5) ? smoothstep(0.03, 0.0, uCut.x - vLimbT) : (vReg > 3.5 ? smoothstep(0.03, 0.0, uCut.y - vLimbT) : 0.0);
  cc *= 1.0 - 0.25 * hem * (1.0 - shoeK);
  float sl = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)) / max(dot(uSkinRef, vec3(0.299, 0.587, 0.114)), 0.04);
- vec3 skinC = uSkin * mix(1.0, clamp(sl, 0.4, 1.4), 0.55);
+ vec3 skinC = uSkin * 0.9 * mix(1.0, clamp(sl, 0.45, 1.35), vReg < 0.5 ? 0.85 : 0.35); // the face keeps its painted lips/brows/eye shading
  diffuseColor.rgb = mix(skinC, cc, clothK);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
  roughnessFactor = mix(roughnessFactor, mix(0.88, 0.55, shoeK), clothK);`)
@@ -75,8 +75,8 @@ function propsFor(B) {
   const straps = [];
   for (const s of [-1, 1]) {
     const x = s * Math.min(0.1, w * 0.28);
-    for (const [a, b] of [[[x, shY - 0.06, back - 0.03], [x, shY + 0.035, (back + front) * 0.5 - 0.02]], [[x, shY + 0.035, (back + front) * 0.5 - 0.02], [x * 1.05, shY - 0.2, front + 0.012]], [[x * 1.05, shY - 0.2, front + 0.012], [x * 1.12, J.spine_01.y + 0.06, front - 0.01]]]) {
-      const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b); const L = A.distanceTo(Bv); const st = new THREE.BoxGeometry(0.045, L, 0.012);
+    for (const [a, b] of [[[x, shY - 0.06, back - 0.045], [x, shY + 0.05, (back + front) * 0.5 - 0.02]], [[x, shY + 0.05, (back + front) * 0.5 - 0.02], [x * 1.04, shY - 0.09, front + 0.03]]]) {
+      const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b); const L = A.distanceTo(Bv); const st = new THREE.BoxGeometry(0.05, L, 0.022);
       st.applyQuaternion(q1.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v1.subVectors(Bv, A).normalize())); st.translate((A.x + Bv.x) / 2, (A.y + Bv.y) / 2, (A.z + Bv.z) / 2); straps.push(st);
     }
   }
@@ -86,23 +86,30 @@ function propsFor(B) {
   P.bag = bag;
   // cap and beanie (Head space)
   const hc = hb.getCenter(new THREE.Vector3()), hs = hb.getSize(new THREE.Vector3());
-  const crown = new THREE.SphereGeometry(hs.x * 0.56, 16, 8, 0, TAU, 0, Math.PI * 0.5); crown.scale(1, 0.72, (hs.z / hs.x) * 1.04); crown.translate(hc.x, hb.max.y - hs.y * 0.3, hc.z - hs.z * 0.02);
-  const brim = new THREE.CylinderGeometry(hs.x * 0.42, hs.x * 0.42, 0.012, 16, 1, false, -Math.PI / 2, Math.PI); brim.scale(1, 1, 1.55); brim.translate(hc.x, hb.max.y - hs.y * 0.29, hc.z + hs.z * 0.38);
+  const R0 = hs.z * 0.5; const crown = new THREE.SphereGeometry(R0 * 1.04, 16, 8, 0, TAU, 0, Math.PI * 0.5); crown.scale(0.92, 0.72, 1.02); crown.translate(hc.x, hb.max.y - hs.y * 0.3, hc.z - hs.z * 0.02);
+  const brim = new THREE.CylinderGeometry(R0 * 0.8, R0 * 0.8, 0.012, 16, 1, false, -Math.PI / 2, Math.PI); brim.scale(1, 1, 1.55); brim.translate(hc.x, hb.max.y - hs.y * 0.29, hc.z + hs.z * 0.36);
   P.cap = [crown, brim];
-  const beanie = new THREE.SphereGeometry(hs.x * 0.585, 16, 10, 0, TAU, 0, Math.PI * 0.56); beanie.scale(1, 0.95, (hs.z / hs.x) * 1.02); beanie.translate(hc.x, hb.max.y - hs.y * 0.36, hc.z - hs.z * 0.03);
-  const cuff = new THREE.TorusGeometry(hs.x * 0.57, 0.018, 6, 20); cuff.rotateX(Math.PI / 2); cuff.scale(1, 1, (hs.z / hs.x) * 1.02); cuff.translate(hc.x, hb.max.y - hs.y * 0.36, hc.z - hs.z * 0.03);
+  const beanie = new THREE.SphereGeometry(R0 * 1.08, 16, 10, 0, TAU, 0, Math.PI * 0.56); beanie.scale(0.94, 1.0, 1.02); beanie.translate(hc.x, hb.max.y - hs.y * 0.38, hc.z - hs.z * 0.04);
+  const cuff = new THREE.TorusGeometry(R0 * 1.06, 0.018, 6, 20); cuff.rotateX(Math.PI / 2); cuff.scale(0.94, 1, 1.02); cuff.translate(hc.x, hb.max.y - hs.y * 0.38, hc.z - hs.z * 0.04);
   P.beanie = [beanie, cuff];
   // sneakers (foot space): upper + white midsole, toe box tapered; the body foot shrinks inside (shader)
   P.shoe = {};
   for (const sd of ['l', 'r']) {
-    const A = J['foot_' + sd], Bl = J['ball_' + sd]; const len = 0.27, back = 0.075; const up = new RoundedBoxGeometry(0.1, 0.085, len, 3, 0.035);
-    const pa = up.attributes.position; for (let i = 0; i < pa.count; i++) { const z = pa.getZ(i) / len + 0.5; const k = 1 - Math.max(0, z - 0.6) * 0.55; pa.setX(i, pa.getX(i) * k); if (pa.getY(i) > 0) pa.setY(i, pa.getY(i) * (1 - Math.max(0, z - 0.55) * 0.9)); }
-    up.computeVertexNormals(); up.translate(A.x + (sd === 'l' ? 0.006 : -0.006), 0.05, A.z - back + len / 2);
-    const sole = new RoundedBoxGeometry(0.106, 0.026, len + 0.008, 2, 0.011); sole.translate(A.x + (sd === 'l' ? 0.006 : -0.006), 0.013, A.z - back + len / 2);
+    const A = J['foot_' + sd]; const len = 0.275, back = 0.07, xo = A.x + (sd === 'l' ? 0.006 : -0.006);
+    const up = new THREE.SphereGeometry(0.5, 20, 12); const pa = up.attributes.position;
+    for (let i = 0; i < pa.count; i++) { let x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i); const fz = z + 0.5; // 0 heel .. 1 toe
+      x *= 0.104 * (1 - Math.max(0, fz - 0.7) * 0.5); y = y < 0 ? y * 0.03 : y * 0.13 * (1 - Math.max(0, fz - 0.45) * 0.75); z *= len; pa.setXYZ(i, x, y, z); }
+    up.computeVertexNormals(); up.translate(xo, 0.026, A.z - back + len / 2);
+    const sole = new RoundedBoxGeometry(0.108, 0.026, len + 0.01, 2, 0.011); const ps = sole.attributes.position; for (let i = 0; i < ps.count; i++) { const fz = ps.getZ(i) / (len + 0.01) + 0.5; ps.setX(i, ps.getX(i) * (1 - Math.max(0, fz - 0.72) * 0.6)); }
+    sole.computeVertexNormals(); sole.translate(xo, 0.013, A.z - back + len / 2);
+    // midsole: a thin oval just proud of the upper's footprint
+    const mid = new THREE.SphereGeometry(0.5, 20, 6); const pm = mid.attributes.position;
+    for (let i = 0; i < pm.count; i++) { const fz = pm.getZ(i) + 0.5; pm.setXYZ(i, pm.getX(i) * 0.108 * (1 - Math.max(0, fz - 0.7) * 0.5), pm.getY(i) * 0.03, pm.getZ(i) * len * 1.015); }
+    mid.computeVertexNormals(); mid.translate(xo, 0.012, A.z - back + len / 2); P.shoeMid = P.shoeMid || {}; P.shoeMid[sd] = mid;
     P.shoe[sd] = [up, sole];
   }
   // hand props (character-root space, placed per frame)
-  const phone = new RoundedBoxGeometry(0.072, 0.148, 0.009, 2, 0.006); P.phone = phone; const screen = new THREE.PlaneGeometry(0.064, 0.136); screen.translate(0, 0, 0.0052); P.screen = screen;
+  const phone = new RoundedBoxGeometry(0.078, 0.16, 0.01, 2, 0.0045); P.phone = phone; const screen = new THREE.PlaneGeometry(0.07, 0.148); screen.translate(0, 0, 0.0056); P.screen = screen;
   const cup = new THREE.CylinderGeometry(0.043, 0.034, 0.13, 12); const lid = new THREE.CylinderGeometry(0.046, 0.046, 0.016, 12); lid.translate(0, 0.072, 0); P.cup = [cup, lid];
   const book = new RoundedBoxGeometry(0.17, 0.24, 0.035, 1, 0.004); P.book = book;
   return (_props[B.sex] = P);
@@ -136,14 +143,14 @@ export class Character {
     const P = propsFor(B);
     this.bpMat = propMat('#2a3440', 0.8).clone();
     const bpGeo = P.backpack.body.map((g) => boneSpace(g, B, 'spine_03')); const stGeo = P.backpack.straps.map((g) => boneSpace(g, B, 'spine_03'));
-    this.backpack = new THREE.Group(); for (const g of bpGeo) this.backpack.add(new THREE.Mesh(g, this.bpMat)); for (const g of stGeo) this.backpack.add(new THREE.Mesh(g, propMat('#15181c', 0.9)));
+    this.backpack = new THREE.Group(); for (const g of bpGeo) this.backpack.add(new THREE.Mesh(g, this.bpMat)); for (const g of stGeo) this.backpack.add(new THREE.Mesh(g, propMat('#2b2f36', 0.9)));
     this.bones.spine_03.add(this.backpack);
     this.bag = new THREE.Mesh(boneSpace(P.bag, B, 'pelvis'), this.bpMat); this.bones.pelvis.add(this.bag);
     this.capMat = propMat('#003262', 0.75).clone();
     this.cap = new THREE.Group(); for (const g of P.cap) this.cap.add(new THREE.Mesh(boneSpace(g, B, 'Head'), this.capMat)); this.bones.Head.add(this.cap);
     this.beanie = new THREE.Group(); for (const g of P.beanie) this.beanie.add(new THREE.Mesh(boneSpace(g, B, 'Head'), this.capMat)); this.bones.Head.add(this.beanie);
     this.shoeMat = propMat('#dddddd', 0.6).clone();
-    for (const sd of ['l', 'r']) { const [up, sole] = P.shoe[sd]; const g2 = new THREE.Group(); g2.add(new THREE.Mesh(boneSpace(up, B, 'foot_' + sd), this.shoeMat)); g2.add(new THREE.Mesh(boneSpace(sole, B, 'foot_' + sd), propMat('#f2f0ea', 0.7))); g2.traverse((m) => { if (m.isMesh) { m.castShadow = castShadow; m.receiveShadow = true; } }); this.bones['foot_' + sd].add(g2); }
+    for (const sd of ['l', 'r']) { const [up] = P.shoe[sd]; const g2 = new THREE.Group(); g2.add(new THREE.Mesh(boneSpace(up, B, 'foot_' + sd), this.shoeMat)); g2.add(new THREE.Mesh(boneSpace(P.shoeMid[sd], B, 'foot_' + sd), propMat('#efede6', 0.75))); g2.traverse((m) => { if (m.isMesh) { m.castShadow = castShadow; m.receiveShadow = true; } }); this.bones['foot_' + sd].add(g2); }
     // relaxed hands (idle/walk clips leave the fingers to this pose)
     for (const [bn, q] of Object.entries(B.relaxed || {})) if (this.bones[bn]) this.bones[bn].quaternion.fromArray(q);
     // everyday shoulders: the superhero rig's shoulder joints sit wide; pull them in a little (bone rest offsets)
@@ -183,6 +190,7 @@ export class Character {
     this.walkClip = seed > 0.8 ? 'Walk_Formal_Loop' : 'Walk_Loop';
     this.idleOff = seed * 10;
   }
+  setShadow(on) { if (this._sh === on) return; this._sh = on; this.root.traverse((o) => { if (o.isMesh && o !== this.eyes && o !== this.brows) o.castShadow = on; }); }
   // ---------------------------------------------------------------- per frame
   fade(name, k) { this.wt[name] = k; }
   update(dt, a, cam) {
@@ -216,6 +224,8 @@ export class Character {
     else if (mode === 'lie') { this.inner.rotation.set(-Math.PI / 2, Math.PI, 0); this.inner.position.set(0, 0.12, -0.85); }
     this.model.updateMatrixWorld(true);
     // ---- procedural layers
+    if (mode === 'stand' || mode === 'walk' || mode === 'jog') this._armsIn(mode);
+    if (mode === 'walk') this._widen();
     if (mode === 'stand') this._standFix();
     if (mode === 'ground') this._groundPose(a);
     if (mode === 'lie') this._liePose(a);
@@ -241,6 +251,16 @@ export class Character {
     // look down at the screen
     this.root.getWorldQuaternion(q2); v3.set(1, 0, 0).applyQuaternion(q2);
     q1.setFromAxisAngle(v3, -0.42 * k); b.neck_01.getWorldQuaternion(q2); q1.multiply(q2); b.neck_01.parent.getWorldQuaternion(q3); q3.invert().multiply(q1); b.neck_01.quaternion.copy(q3); b.neck_01.updateMatrixWorld(true);
+  }
+  _armsIn(mode) {
+    const b = this.bones; const rq = this.root.getWorldQuaternion(new THREE.Quaternion()); const inv = rq.clone().invert(); const d = new THREE.Vector3();
+    for (const s of ['l', 'r']) { if (s === 'r' && this.phoneK > 0.05) continue;
+      b['upperarm_' + s].getWorldPosition(v1); b['lowerarm_' + s].getWorldPosition(v2); d.subVectors(v2, v1).normalize().applyQuaternion(inv);
+      const sx = s === 'l' ? -1 : 1; if (d.x * sx > 0.05) { d.x = sx * (0.05 + (d.x * sx - 0.05) * (mode === 'jog' ? 0.6 : 0.45)); d.normalize().applyQuaternion(rq); this.aim(b['upperarm_' + s], b['lowerarm_' + s], d, 1); } }
+  }
+  _widen() {
+    const b = this.bones; const rq = this.root.getWorldQuaternion(new THREE.Quaternion()); const inv = rq.clone().invert(); const d = new THREE.Vector3();
+    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; b['thigh_' + s].getWorldPosition(v1); b['calf_' + s].getWorldPosition(v2); d.subVectors(v2, v1).normalize().applyQuaternion(inv); d.x += sx * 0.045; d.normalize().applyQuaternion(rq); this.aim(b['thigh_' + s], b['calf_' + s], d, 1); }
   }
   _standFix() {
     const b = this.bones; const d = new THREE.Vector3(); const k = 0.6;
@@ -276,7 +296,7 @@ export class Character {
   _props(a, mode) {
     const b = this.bones; const ex = this.extra; const toLocal = (wv) => this.root.worldToLocal(wv);
     // phone in the right hand while texting
-    const ph = this.phoneK > 0.3 || (ex & FL.PHONE && mode !== 'jog' && mode !== 'lie' && this.phoneK > 0.3);
+    const ph = this.phoneK > 0.3; // (three only skips objects whose visible === false, so keep these strictly boolean)
     this.phone.visible = ph;
     if (ph) { b.hand_r.getWorldPosition(v1); b.middle_01_r.getWorldPosition(v2); v2.sub(v1); const fd = v2.clone().normalize(); v1.addScaledVector(fd, 0.05);
       b.Head.getWorldPosition(v3); const head = v3.clone(); this.phone.position.copy(toLocal(v1.clone())); this.phone.lookAt(head); }

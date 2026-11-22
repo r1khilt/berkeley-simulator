@@ -20,11 +20,11 @@ async function webpify(doc, sizes) {
   }
 }
 // ---- bodies
-for (const [tag, file, light] of (process.env.BODIES ? [] : null) || [['female', 'Superhero_Female_FullBody', 'T_Superhero_Female_Light_BaseColor.png'], ['male', 'Superhero_Male_FullBody', 'T_Superhero_Male_Ligh.png']]) {
+for (const [tag, file, light] of [['female', 'Superhero_Female_FullBody', 'T_Superhero_Female_Light_BaseColor.png'], ['male', 'Superhero_Male_FullBody', 'T_Superhero_Male_Ligh.png']]) {
   const doc = await io.read(`${UBC}/Base Characters/Godot - UE/${file}.gltf`);
   for (const m of doc.getRoot().listMaterials()) {
     const n = m.getName();
-    if (/Superhero/i.test(n)) { m.getBaseColorTexture().setImage(png(`${UBC}/Base Characters/Textures/${light}`)); m.setMetallicRoughnessTexture(null); m.setRoughnessFactor(0.62); m.setMetallicFactor(0); }
+    if (/Superhero/i.test(n)) { m.getBaseColorTexture().setImage(png(`${UBC}/Base Characters/Textures/${light}`)); m.setMetallicRoughnessTexture(null); m.setNormalTexture(null); m.setRoughnessFactor(0.62); m.setMetallicFactor(0); }
     if (/Hair/i.test(n)) { m.setMetallicRoughnessTexture(null); }
   }
   // drop extra uv/color sets the shader never reads
@@ -35,7 +35,7 @@ for (const [tag, file, light] of (process.env.BODIES ? [] : null) || [['female',
   console.log(tag, fs.statSync(`${OUT}/${tag}.glb`).size);
 }
 // ---- hair (static, model space at the source body's rest pose)
-{
+if (!process.env.ONLYBODIES) {
   const docs = []; const names = ['Hair_Buns', 'Hair_BuzzedFemale', 'Hair_Long', 'Hair_Buzzed', 'Hair_SimpleParted', 'Hair_Beard', 'Eyebrows_Female', 'Eyebrows_Regular'];
   const doc = await io.read(`${UBC}/Hairstyles/Origin at 0/glTF (Godot)/${names[0]}.gltf`);
   const { mergeDocuments } = await import('@gltf-transform/functions');
@@ -52,7 +52,7 @@ for (const [tag, file, light] of (process.env.BODIES ? [] : null) || [['female',
   console.log('hair', fs.statSync(`${OUT}/hair.glb`).size, root.listNodes().map((n) => n.getName()).join(','));
 }
 // ---- animations
-{
+if (!process.env.ONLYBODIES) {
   const doc = await io.read(UAL);
   const keep = new Set(['Idle_Loop', 'Idle_Talking_Loop', 'Walk_Loop', 'Walk_Formal_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop', 'Sitting_Idle_Loop', 'Sitting_Talking_Loop', 'Sitting_Enter', 'Sitting_Exit', 'Hit_Chest', 'Interact', 'PickUp_Table', 'Crouch_Idle_Loop', 'Dance_Loop', 'Push_Loop', 'Driving_Loop']);
   const root = doc.getRoot();

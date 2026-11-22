@@ -13,6 +13,14 @@ scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x6b5b45, 1.4)); const sun = new T
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 const bench = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.45), new THREE.MeshStandardMaterial({ color: 0x6b4a2b })); bench.castShadow = true; bench.receiveShadow = true; scene.add(bench); bench.visible = false;
 const camera = new THREE.PerspectiveCamera(+(qs.get('fov') || 35), W / H, 0.05, 200);
+if (qs.get('avatar')) { // player avatar walk check (src/player/avatar.js)
+  const { Avatar } = await import('/src/player/avatar.js'); const av = new Avatar({}); scene.add(av.root); av.root.rotation.y = +(qs.get('yaw') || Math.PI / 2);
+  const sp = +(qs.get('speed') || 1.4); for (let i = 0; i < +(qs.get('fr') || 20); i++) av.animate(1 / 30, sp, true, qs.get('mode') || 'walk');
+  const cam = (qs.get('cam') || '0,1.1,3.2,0,0.9,0').split(',').map(Number); camera.position.set(cam[0], cam[1], cam[2]); camera.lookAt(cam[3], cam[4], cam[5]);
+  renderer.render(scene, camera); window.ready = true; window.av = av;
+  window.step = (dt, n = 1) => { for (let k = 0; k < n; k++) av.animate(dt, sp, true, qs.get('mode') || 'walk'); renderer.render(scene, camera); };
+  throw new Error('avatar mode');
+}
 const A = await loadPeopleAssets(); A.palette = { SKIN, HAIR, SHOE };
 let seed = +(qs.get('seed') || 7); const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 const states = (qs.get('states') || 'walk,walk,idle,talk,phone,sit,lawn,lie,jog,walk').split(',');

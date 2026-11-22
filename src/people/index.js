@@ -12,7 +12,7 @@ import { Character } from './character.js';
 import { SKIN, HAIR, SHOE } from '../life/people.js';
 
 const TAU = Math.PI * 2;
-const QK = { low: { k: 4, d: 14 }, medium: { k: 10, d: 22 }, high: { k: 18, d: 30 }, ultra: { k: 28, d: 40 } };
+const QK = { low: { k: 4, d: 14 }, medium: { k: 8, d: 20 }, high: { k: 14, d: 28 }, ultra: { k: 24, d: 38 } }; // skinned people near the camera (?npcK= ?npcD= override, ?people=0 off)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export function install(life, ctx) {
@@ -41,7 +41,7 @@ class People {
     try { const r = window.BSIM && window.BSIM.composer && window.BSIM.composer.renderer; const c0 = this.pool[0];
       if (r && r.compileAsync && c0) { c0.root.visible = true; for (const h of Object.values(c0.hair)) h.mesh.visible = true; for (const o of [c0.phone, c0.cup, c0.book, c0.cap, c0.beanie, c0.backpack, c0.bag]) o.visible = true;
         r.compileAsync(c0.root, this.ctx.camera, this.ctx.scene).catch(() => {}).finally(() => { c0.root.visible = false; for (const h of Object.values(c0.hair)) h.mesh.visible = false; }); } } catch (e) { /* optional */ }
-    this.ready = true;
+    this.ready = true; if (this.life.enabled === false) this.setEnabled(false);
   }
   setEnabled(on) { this.enabled = !!on; if (!on) this._releaseAll(); this.group.visible = this.enabled; }
   _releaseAll() { for (const c of this.pool) { if (c.agent) c.agent.hidden = false; c.agent = null; c.root.visible = false; } this.byAgent.clear(); }
@@ -63,7 +63,8 @@ class People {
       c.agent = a; this.byAgent.set(a, c); c.setLook(a.look, a.extra, a.seed || 0.5); a.hidden = true; c.root.visible = true; c.react = 0; c.gazeYaw = a.gaze || 0; c.phoneK = a.state === 'phone' ? 1 : 0; c.w0 = true; }
     // spots (seated / standing people) notice the player too: they aren't steered by campus life, so do it here
     const pp = player && player.pos;
-    let n = 0;
+    let n = 0; const shadowN = this.ctx.quality === 'ultra' ? 12 : this.ctx.quality === 'high' ? 8 : this.ctx.quality === 'medium' ? 4 : 0; let rank = 0;
+    for (const [, a] of cand) { const c = this.byAgent.get(a); if (!c) continue; c.setShadow(rank++ < shadowN); }
     for (const c of this.pool) {
       const a = c.agent; if (!a) continue; n++;
       if (pp && a.kind !== 'walker') this._spotNotice(a, player, dt);
@@ -106,6 +107,7 @@ class People {
       if (head < -0.3) want += 0.35 * (1 - al / 4.5); // oncoming: drift right
       else if (head > 0.5 && o.speed * (o.speedMul ?? 1) < sp - 0.1) want += (la > 0 ? -0.5 : 0.5) * (1 - al / 4.5); // overtake on the clear side
     }
+    if (w.buddy) want += 0.14; // walking pairs: a little more elbow room than the rail spacing
     want = Math.max(-1.4, Math.min(1.4, want));
     S.off += (want - S.off) * Math.min(1, dt * (Math.abs(want) > Math.abs(S.off) ? 2.4 : 0.9));
     w.sx = (w.sx || 0) * Math.max(0, 1 - dt * 2) + rx * S.off * Math.min(1, dt * 2); w.sz = (w.sz || 0) * Math.max(0, 1 - dt * 2) + rz * S.off * Math.min(1, dt * 2);
