@@ -118,6 +118,12 @@ sm &= np.isin(lab, 1 + np.nonzero(sizes >= 25.0)[0])
 holes = ~sm & open_; lab, nl = ndi.label(holes); sizes = ndi.sum(holes, lab, range(1, nl + 1)) * R * R
 sm |= np.isin(lab, 1 + np.nonzero(sizes < 20.0)[0]) & open_
 bed = sm & maint
+# foundation planting: a ~1.5 m bed along building walls where the ground is lawn (the band continues under the building
+# so the 1.6 m SDF keeps a clean edge; the building covers the inside)
+dist_b = ndi.distance_transform_edt(~bm) * R
+found = maint & (bm | (open_ & (dist_b <= 1.5)))
+print('foundation beds', float((found & open_ & ~bed).mean()))
+bed = bed | found
 lawn_new = maint & ~bed                              # everything else in the maintained zone is lawn ...
 # ... including under the paving, so the visible lawn edge is the (vector, crisp) paving edge: no dry fringe
 G_new = np.where(maint, lawn_new, mG | (dG > 0))

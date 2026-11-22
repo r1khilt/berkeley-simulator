@@ -3,12 +3,12 @@ import * as THREE from 'three';
 import { U } from '../materials.js';
 function bladeClump() {
   const pos = [], col = [];
-  // r4-ground: mown campus lawn -> short (3-7 cm) blades spread over the whole cell instead of tall 10-20 cm tufts,
+  // r4-ground: mown campus lawn -> short (4-10 cm) blades spread over the whole cell instead of tall 10-20 cm tufts,
   // which read as an unmown field and aliased into vertical streaks / a 'hedge band' at mid distance
   const blades = 14;
   for (let b = 0; b < blades; b++) {
     const a = (b / blades) * Math.PI * 2 + Math.random() * 0.6, r = Math.sqrt(Math.random()) * 0.2;
-    const x0 = Math.cos(a) * r, z0 = Math.sin(a) * r, h = 0.03 + Math.random() * 0.04, w = 0.006 + Math.random() * 0.004;
+    const x0 = Math.cos(a) * r, z0 = Math.sin(a) * r, h = 0.045 + Math.random() * 0.06, w = 0.006 + Math.random() * 0.004;
     const lean = (Math.random() - 0.5) * 0.12, dir = Math.random() * Math.PI * 2; const dx = Math.cos(dir), dz = Math.sin(dir);
     const nx = -dz * w, nz = dx * w;
     const tipx = x0 + Math.cos(a) * lean, tipz = z0 + Math.sin(a) * lean;
@@ -22,7 +22,7 @@ function bladeClump() {
   return g;
 }
 export class Grass {
-  constructor({ sdf, gt, core, heightAt, count = 22000, radius = 11 }) { // r4-ground: 26 -> 11 m (blades are sub-pixel beyond)
+  constructor({ sdf, gt, core, heightAt, count = 22000, radius = 15 }) { // r4-ground: 26 -> 15 m (short blades are sub-pixel beyond)
     this.sdf = sdf; this.gt = gt; this.core = core; this.heightAt = heightAt; this.radius = radius; this.count = count; this.last = new THREE.Vector3(1e9, 0, 0);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
@@ -34,11 +34,12 @@ export class Grass {
  transformed.y *= fade;
  float w = sin(uTime*1.8 + wpI.x*0.35 + wpI.z*0.27) * 0.5 + sin(uTime*3.1 + wpI.x*1.3) * 0.25;
  transformed.x += aTip * w * 0.05 * (0.4 + uWind); transformed.z += aTip * w * 0.03 * (0.4 + uWind);`);
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTip;').replace('#include <color_fragment>', `#include <color_fragment>
- diffuseColor.rgb *= mix(0.7, 1.15, vTip);`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTip;')
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = -1.0 - gl_FragColor.a; // r4-ground: lawn = terrain for the post AO pass').replace('#include <color_fragment>', `#include <color_fragment>
+ diffuseColor.rgb *= mix(0.55, 1.3, vTip);`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
  normal = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);`);
     };
-    mat.customProgramCacheKey = () => 'grass3';
+    mat.customProgramCacheKey = () => 'grass5';
     this.mesh = new THREE.InstancedMesh(bladeClump(), mat, count); this.mesh.frustumCulled = false; this.mesh.receiveShadow = true; this.mesh.castShadow = false; this.mesh.name = 'grass';
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3); this.mesh.count = 0;
   }

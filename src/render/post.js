@@ -146,8 +146,13 @@ void main(){
   float d = texture2D(tDepth, vUv).r;
   if (!bsIsSky(d)) {
     float z = bsViewZ(d); vec3 p = bsViewPos(vUv, z);
-    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z); float amb = src.a > 0.495 ? uUnknownAmb : src.a / 0.49; amb = 0.25 + 0.75 * amb;   // mostly ambient-only, plus a little contact darkening of direct light
-      col *= 1.0 - clamp(amb * 1.1, 0.0, 1.0) * (1.0 - ao) * uAOStrength; }
+    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z);
+      // r4-ground: terrain + lawn blades write alpha = -1 - ambientFraction (terrain.js / grass.js). GTAO on the 1 m terrain
+      // facets is mostly false occlusion (row-aligned stripes in tree shadows); the terrain has its own baked AO, so it only
+      // gets a little GTAO. MSAA edges (-0.5..0) fall back to the 'unknown' ambient fraction.
+      float terr = step(src.a, -0.5); float sa = terr > 0.5 ? -1.0 - src.a : src.a;
+      float amb = (sa > 0.495 || sa < 0.0) ? uUnknownAmb : sa / 0.49; amb = 0.25 + 0.75 * amb;   // mostly ambient-only, plus a little contact darkening of direct light
+      col *= 1.0 - clamp(amb * 1.1, 0.0, 1.0) * (1.0 - ao) * uAOStrength * (1.0 - 0.85 * terr); }
     if (uUseAP > 0.5) { vec3 wd = normalize((uViewInv * vec4(p, 0.0)).xyz); col = aerial(col, wd, length(p)); }
   }
   if (uUseBloom > 0.5) col = mix(col * uExposure, texture2D(tBloom, vUv).rgb, uBloom); else col *= uExposure;

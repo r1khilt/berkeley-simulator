@@ -79,7 +79,7 @@ void groundShadePBR(vec2 w, float dist) {
     // dry-grass texture pattern as repeated brown blotches wherever lushness was low (most re-labelled lawn).
     float dryP = smoothstep(0.62, 0.9, n0.r + (n1.b - 0.5) * 0.2) * 0.3 + smoothstep(0.75, 1.0, 1.0 - lush) * 0.12 * n0.g;
     if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP * (1.0 + (d.h - l.h) * 1.2), 0.0, 1.0)); }
-    l.c *= 0.84 + 0.3 * n0.g;
+    l.c *= (0.84 + 0.3 * n0.g) * (0.9 + 0.2 * n2.r);   // r4-ground: + ~0.7 m clumping so mid-distance turf isn't a flat carpet
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
     // r4-ground: crisp edges. A thin spade-cut line where lawn meets a planted bed and a faint shadow line along paving
     float cut = bedK * (1.0 - smoothstep(0.03, 0.11, -dD)) * step(dD, 0.0) * det;
@@ -202,10 +202,12 @@ void groundShadePBR(vec2 w, float dist) {
   else if (sp > 1.5 && sp < 2.5) { col = mix(vec3(0.20, 0.34, 0.30), vec3(0.24, 0.38, 0.33), n1.g); rough = 0.8; g = vec2(0.0); }
   else if (sp > 2.5 && sp < 3.5) { PS d = gTap(w, 3.0, L_DIRT, kIso, near); col = mix(vec3(0.66, 0.58, 0.44), vec3(0.74, 0.66, 0.50), n2.r) * (0.75 + 0.5 * d.h); rough = 1.0; g = d.g * 0.5; }
   else if (sp > 5.5 && sp < 6.5) { float stripe = step(0.5, fract(w.x / 6.0)); PS l = gTap(w, 2.0, L_LAWN, kIso, near); col = mix(vec3(0.16, 0.30, 0.09), vec3(0.19, 0.34, 0.11), stripe) * (0.65 + 0.35 * l.c.g / 0.0912); rough = 0.95; g = l.g * 0.6; }
-  // late-autumn leaf litter under deciduous trees (unchanged)
+  // late-autumn leaf litter under deciduous trees
   vec4 lf = texture(uLeaf, (w - uLampRect.xy) / uLampRect.zw);
   if (lf.a > 0.01) {
-    float dens = clamp(lf.a * 3.0, 0.0, 0.9) * (1.0 - mA * 0.9);
+    // r4-ground: campus grounds are blown/raked: sparse leaves on lawns and walks (the old 90 % carpet read as brown
+    // mud discs from a distance), a bit more in beds and natural ground
+    float dens = clamp(lf.a * 1.8, 0.0, 0.6) * (1.0 - mA * 0.9) * (1.0 - 0.45 * wG - 0.35 * wP);
     vec2 lc = w * 8.0; vec2 li = floor(lc); vec2 lr = fract(lc) - 0.5;
     float hh = fract(sin(dot(li, vec2(12.9898, 78.233))) * 43758.5453);
     float ang = hh * 6.283; vec2 rr = vec2(cos(ang) * lr.x - sin(ang) * lr.y, sin(ang) * lr.x + cos(ang) * lr.y);
@@ -214,6 +216,7 @@ void groundShadePBR(vec2 w, float dist) {
     float lodL = smoothstep(0.03, 0.12, max(fwidth(lc.x), fwidth(lc.y)));
     leaf = mix(leaf, dens * 0.3, lodL);
     vec3 leafC = mix(mix(vec3(0.70, 0.50, 0.14), vec3(0.52, 0.28, 0.09), fract(hh * 3.7)), vec3(0.78, 0.66, 0.20), step(0.8, fract(hh * 5.3)));
+    leafC = mix(vec3(dot(leafC, vec3(0.2126, 0.7152, 0.0722))), leafC, 0.8) * 0.85;   // r4-ground: less orange, a bit darker
     col = mix(col, leafC, leaf); rough = mix(rough, 0.95, leaf); g *= 1.0 - leaf;
   }
   // far: blend toward the real aerial photo colour
