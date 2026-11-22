@@ -96,25 +96,27 @@ export async function build(ctx) {
           normal = normalize(normal + (viewMatrix * vec4(g.x, 0.0, g.y, 0.0)).xyz); }`)
       // r4-sweep-central2: the env map is sky-only, so at eye level (grazing view, Fresnel ~1) the pool mirrored bright
       // horizon sky and read as a pale floor. Below ~25 deg the real pool reflects Sproul, MLK and the plaza trees, so
-      // reflections that point low are darkened to a dim green-grey (scaled from the sky radiance, so dusk/night follow).
+      // reflections that point low (below ~45 deg: buildings, trees) are darkened to a dim green-grey, scaled from the sky
+      // radiance so dusk/night follow.
       .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
         { vec3 rw = normalize((vec4(reflect(-geometryViewDir, geometryNormal), 0.0) * viewMatrix).xyz);
-          radiance *= mix(vec3(0.16, 0.19, 0.18), vec3(1.0), smoothstep(0.12, 0.5, rw.y)); }`);
+          radiance *= mix(vec3(0.16, 0.19, 0.18), vec3(1.0), smoothstep(0.2, 0.75, rw.y)); }`);
   };
-  waterMat.customProgramCacheKey = () => 'ludwigWater4';
+  waterMat.customProgramCacheKey = () => 'ludwigWater5';
   const water2 = new THREE.Mesh(new THREE.CircleGeometry(RIM_IN + 0.01, 72).rotateX(-Math.PI / 2), waterMat);
   water2.position.set(cx, WATER_Y, cz); water2.name = 'ludwig-water'; water2.receiveShadow = true; water2.renderOrder = 1;
   root.add(water2);
 
   // ring of low, white, aerated jets: a foamy column that thickens as it falls back, plus a churned foam boil on the surface
   const streak = streakTexture(); streak.repeat.set(1, 2);
-  const sprayMat = new THREE.MeshStandardMaterial({ color: 0xf4f7f6, emissive: 0x9aa4a6, emissiveIntensity: 0.25, roughness: 0.3, transparent: true, opacity: 0.6, alphaMap: streak, depthWrite: false, side: THREE.DoubleSide });
+  // r4-sweep-central2: softer, more translucent foam (against the darker water the jets read as solid white cones)
+  const sprayMat = new THREE.MeshStandardMaterial({ color: 0xf4f7f6, emissive: 0x9aa4a6, emissiveIntensity: 0.1, roughness: 0.3, transparent: true, opacity: 0.42, alphaMap: streak, depthWrite: false, side: THREE.DoubleSide });
   sprayMat.name = 'ludwigSpray';
-  const foamMat = new THREE.MeshStandardMaterial({ color: 0xeef3f2, emissive: 0x8a9496, emissiveIntensity: 0.2, roughness: 0.6, transparent: true, opacity: 0.7, depthWrite: false });
+  const foamMat = new THREE.MeshStandardMaterial({ color: 0xeef3f2, emissive: 0x8a9496, emissiveIntensity: 0.1, roughness: 0.6, transparent: true, opacity: 0.55, depthWrite: false });
   foamMat.name = 'ludwigFoam';
   const jets = new THREE.Group(); jets.userData.detail = true; jets.name = 'ludwig-jets';
   // r4-sweep: fatter, shorter aerated columns (thin 0.5 m spikes read as a ring of white candles)
-  const jetGeo = new THREE.LatheGeometry([[0.12, 0], [0.095, 0.08], [0.07, 0.2], [0.055, 0.3], [0.065, 0.36], [0.04, 0.41], [0.001, 0.44]].map(([r, y]) => new THREE.Vector2(r, y)), 12);
+  const jetGeo = new THREE.LatheGeometry([[0.12, 0], [0.095, 0.08], [0.07, 0.2], [0.055, 0.3], [0.065, 0.36], [0.04, 0.41], [0.001, 0.44]].map(([r, y]) => new THREE.Vector2(r * 0.85, y)), 12);
   const boilGeo = new THREE.SphereGeometry(0.16, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.35, 1);
   const jm2 = []; for (let i = 0; i < NJ; i++) { const a = (i / NJ) * Math.PI * 2 + 0.2; jm2.push(trs(cx + RJ * Math.cos(a), WATER_Y, cz + RJ * Math.sin(a))); }
   jets.add(instanced(jetGeo, sprayMat, jm2, null, { detail: true, shadow: false }));

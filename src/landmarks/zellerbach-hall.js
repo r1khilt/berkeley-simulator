@@ -72,16 +72,16 @@ export async function build(ctx) {
     for (let i = 0; i <= nb; i++) { const s = i * bay; K.rbox(R, conc, s - 0.45, PL - 1, -0.9, s + 0.45, LB + 0.3, 0.3); colliders.push(K.colCyl(...R.at(s, -0.3), 0.7, PL - 1, LB)); }
     // ZELLERBACH HALL in thin, wide-spaced dark-bronze capitals on the fascia, centred on the bay just right (north) of
     // centre as on the building (r4-sweep-central2: was a 5x7 pixel font that read as a game sign)
-    signText(K, R, 'ZELLERBACH HALL', L / 2 + bay / 2, LB - 0.62, 0.7, { font: 'Futura, "Century Gothic", "Trebuchet MS", Arial, sans-serif', weight: '500', spacing: 0.14, color: '#3a332c', metal: 0.4, rough: 0.5, d: 0.02 });
+    signText(K, R, 'ZELLERBACH HALL', L / 2 + bay / 2, LB - 0.66, 0.56, { font: 'Futura, "Century Gothic", "Trebuchet MS", Arial, sans-serif', weight: '600', spacing: 0.08, color: '#26211c', metal: 0.3, rough: 0.55, d: 0.02 }); // fits between the piers
     // balcony across the two central-south bays
-    const b0 = 2 * bay, b1 = 4 * bay; // r4-sweep-central2: over the middle two bays (photos)
+    const b0 = 2.5 * bay, b1 = 4.5 * bay; // r4-sweep-central2: mid-bay 3 to mid-bay 5, just right of centre (frontal photo)
     K.rbox(R, conc, b0, SB - 0.35, 0.3, b1, SB + 1.0, 1.8);
     K.rbox(R, M.concreteDark, b0 + 0.15, SB, 0.45, b1 - 0.15, SB + 1.0, 1.65);
     K.rbox(R, blue, b0, SB + 1.45, 1.6, b1, SB + 1.52, 1.78, { detail: true });
     for (let s = b0 + 0.1; s < b1; s += 1.8) K.rbox(R, blue, s, SB + 1.0, 1.66, s + 0.05, SB + 1.5, 1.72, { detail: true });
     // flagpoles on the lobby roof behind the fascia
     // r4-sweep-central2: seven poles (one per pier) flying Cal Performances' coloured flags
-    const flagCols = [0x2f4e9c, 0xc9a23a, 0x9c3a34, 0xe8e4da, 0x2f4e9c, 0xc9a23a, 0x9c3a34].map((c) => tinted(M.whitePaint, c, { roughness: 0.85 }));
+    const flagCols = [0x2c4170, 0xd2b04e, 0x8fb2d6, 0x2c4170, 0xd2b04e, 0x8fb2d6, 0x2c4170].map((c) => tinted(M.whitePaint, c, { roughness: 0.85 }));
     for (let i = 0; i <= nb; i++) { const p = R.at(i * bay, -1.2); K.cyl(M.iron, p[0], LB, p[1], 0.05, 0.035, 9.5, 6, { detail: true });
       K.rbox(R, flagCols[i % flagCols.length], i * bay + 0.06, LB + 7.9, -1.215, i * bay + 1.75, LB + 9.3, -1.185, { detail: true }); }
   }

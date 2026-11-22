@@ -37,8 +37,10 @@ export async function build(ctx) {
     K.rbox(R, conc, -0.2, GT, -3.6, L + 0.2, FT, 0.0);        // fascia
     K.rbox(R, soffit, -0.2, GT - 0.02, -3.6, L + 0.2, GT, 0.0);
     // r4-sweep-central2: paved entry apron under the cantilever (lawn ran into the glass) and a row of soffit downlights
-    K.rbox(R, concL, -0.2, GP - 1.6, -3.5, L + 0.2, GP - 0.47, 1.4);
-    walkables.push(K.walkPoly(rk ? [[U1 - 3.5, V0], [U1 + 1.4, V0], [U1 + 1.4, V1], [U1 - 3.5, V1]] : [[U0, V0 - 1.4], [U1, V0 - 1.4], [U1, V0 + 3.5], [U0, V0 + 3.5]], GP - 0.47));
+    let gA = -1e9; for (let k = 0; k <= 8; k++) for (const dd of [-2.5, 0.5]) gA = Math.max(gA, g(...R.at(L * k / 8, dd)));
+    const AT = Math.min(GP - 0.1, Math.max(GP - 0.47, gA + 0.04)); // apron top: just above the local grade so it shows
+    K.rbox(R, concL, -0.2, GP - 1.6, -3.5, L + 0.2, AT, 1.4);
+    walkables.push(K.walkPoly(rk ? [[U1 - 3.5, V0], [U1 + 1.4, V0], [U1 + 1.4, V1], [U1 - 3.5, V1]] : [[U0, V0 - 1.4], [U1, V0 - 1.4], [U1, V0 + 3.5], [U0, V0 + 3.5]], AT));
     for (let s = 1.8; s < L - 1; s += 3.6) K.rbox(R, M.lampGlow, s - 0.14, GT - 0.06, -1.9, s + 0.14, GT - 0.02, -1.62, { detail: true });
     for (let s = 3; s < L - 1; s += 7.2) { K.rbox(R, concL, s - 0.6, GP - 0.5, -3.5, s + 0.6, GT, -2.3); colliders.push(K.colCyl(...R.at(s, -2.9), 0.8, GP - 1, GT)); }
     for (let y = GT + 0.3; y < FT - 0.2; y += 0.3) K.rbox(R, M.concreteDark, 0, y - 0.01, 0.0, L, y + 0.01, 0.01, { detail: true });
