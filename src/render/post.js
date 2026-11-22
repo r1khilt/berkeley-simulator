@@ -79,6 +79,12 @@ void main(){
     vis += pnl * (i0 + i1);
   }
   vis = clamp(vis / ${slices}.0, 0.0, 1.0); if (isnan(vis)) vis = 1.0;
+  // r4-ground: fade GTAO out on surfaces seen at grazing angles (lawns/plazas beyond ~10 m at eye height): their LiDAR
+  // micro-relief self-occludes in screen space and showed up as barcode/streak bands. The terrain has its own baked AO.
+  // the fade uses a wide-stencil normal (+-4 px) so 1 m terrain facets don't re-introduce the bands
+  { vec3 r4 = vp(vUv + vec2(4.0 * px.x, 0.0)), l4 = vp(vUv - vec2(4.0 * px.x, 0.0)), u4 = vp(vUv + vec2(0.0, 4.0 * px.y)), d4 = vp(vUv - vec2(0.0, 4.0 * px.y));
+    vec3 nW = normalize(cross(abs(r4.z - p.z) < abs(p.z - l4.z) ? r4 - p : p - l4, abs(u4.z - p.z) < abs(p.z - d4.z) ? u4 - p : p - d4));
+    vis = mix(1.0, vis, smoothstep(0.1, 0.35, abs(dot(nW, V)))); }
   gl_FragColor = vec4(vis, min(dist, 6.0e4), 0.0, 1.0);
 }`;
 const FS_AOBLUR = /* glsl */`varying vec2 vUv; uniform sampler2D tAO; uniform vec2 uRes;
@@ -140,8 +146,13 @@ void main(){
   float d = texture2D(tDepth, vUv).r;
   if (!bsIsSky(d)) {
     float z = bsViewZ(d); vec3 p = bsViewPos(vUv, z);
-    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z); float amb = src.a > 0.495 ? uUnknownAmb : src.a / 0.49; amb = 0.25 + 0.75 * amb;   // mostly ambient-only, plus a little contact darkening of direct light
-      col *= 1.0 - clamp(amb * 1.1, 0.0, 1.0) * (1.0 - ao) * uAOStrength; }
+    if (uUseAO > 0.5) { float ao = aoUp(vUv, -z);
+      // r4-ground: terrain + lawn blades write alpha = -1 - ambientFraction (terrain.js / grass.js). GTAO on the 1 m terrain
+      // facets is mostly false occlusion (row-aligned stripes in tree shadows); the terrain has its own baked AO, so it only
+      // gets a little GTAO. MSAA edges (-0.5..0) fall back to the 'unknown' ambient fraction.
+      float terr = step(src.a, -0.5); float sa = terr > 0.5 ? -1.0 - src.a : src.a;
+      float amb = (sa > 0.495 || sa < 0.0) ? uUnknownAmb : sa / 0.49; amb = 0.25 + 0.75 * amb;   // mostly ambient-only, plus a little contact darkening of direct light
+      col *= 1.0 - clamp(amb * 1.1, 0.0, 1.0) * (1.0 - ao) * uAOStrength * (1.0 - 0.85 * terr); }
     if (uUseAP > 0.5) { vec3 wd = normalize((uViewInv * vec4(p, 0.0)).xyz); col = aerial(col, wd, length(p)); }
   }
   if (uUseBloom > 0.5) col = mix(col * uExposure, texture2D(tBloom, vUv).rgb, uBloom); else col *= uExposure;

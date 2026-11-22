@@ -75,31 +75,38 @@ void groundShadePBR(vec2 w, float dist) {
   // ---- lawn: irrigated turf with dry patches and faint mowing stripes
   if (wG > 0.001) {
     PS l = gTapT(w, gWP, 1.0, 2.0, L_LAWN, kIso, near);
-    float dryP = smoothstep(0.6, 0.85, n0.r + (n1.b - 0.5) * 0.2) * 0.35 + smoothstep(0.7, 0.98, 1.0 - lush) * 0.3;
-    if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
-    l.c *= 0.84 + 0.3 * n0.g;
+    // r4-ground: late-November irrigated lawn: only broad, soft dry areas. The old height-driven term stamped the 2 m
+    // dry-grass texture pattern as repeated brown blotches wherever lushness was low (most re-labelled lawn).
+    float dryP = smoothstep(0.62, 0.9, n0.r + (n1.b - 0.5) * 0.2) * 0.3 + smoothstep(0.75, 1.0, 1.0 - lush) * 0.12 * n0.g;
+    if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP * (1.0 + (d.h - l.h) * 1.2), 0.0, 1.0)); }
+    l.c *= (0.84 + 0.3 * n0.g) * (0.9 + 0.2 * n2.r);   // r4-ground: + ~0.7 m clumping so mid-distance turf isn't a flat carpet
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
     // r4-ground: crisp edges. A thin spade-cut line where lawn meets a planted bed and a faint shadow line along paving
-    float cut = bedK * (1.0 - smoothstep(0.03, 0.11, -dD)) * step(dD, 0.0) * det;
+    float cut = bedK * (1.0 - smoothstep(0.04, 0.12, -dD)) * step(dD, 0.0) * det;
     float pe = (1.0 - smoothstep(0.06, 0.16, -dP)) * step(dP, 0.0) * det;
-    l.c *= (1.0 - 0.55 * cut) * (1.0 - 0.22 * pe);
+    l.c *= (1.0 - 0.65 * cut) * (1.0 - 0.22 * pe);
     col += wG * l.c; rough += wG * l.r; g += wG * l.g; bump += wG;
   }
   // ---- forest floor / dirt: eucalyptus + oak litter over packed dirt
   if (wD > 0.001) {
     PS a;
     if (bedK > 0.5) {
-      // r4-ground: maintained planting bed = dark shredded-bark mulch under patchy low evergreen groundcover
-      // (ivy / star jasmine / agapanthus), instead of bare brown dirt
+      // r4-ground: maintained planting bed = dense low evergreen groundcover (ivy / star jasmine) with dark bark mulch
+      // showing in the gaps and along a clean cut edge, instead of bare brown dirt
       PS mu = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
       float lmu = dot(mu.c, vec3(0.2126, 0.7152, 0.0722));
-      mu.c = mix(vec3(lmu), mu.c, 0.5) * vec3(1.0, 0.78, 0.6) * 0.8;
-      PS gc = gTapT(w, gWP, 0.55, 2.0, L_LAWN, 1.0 - kIso, near);   // leafy set at ~2x scale reads as broad-leaf cover
-      gc.c *= vec3(0.66, 0.84, 0.62) * (0.8 + 0.4 * n2.g);
-      float cov = n1.g * 0.5 + n0.g * 0.3 + n2.r * 0.2 + 0.08 * (1.0 - fade);
-      float kc = smoothstep(0.4, 0.52, cov + (gc.h - mu.h) * 0.3) * smoothstep(0.0, 0.35, dD);  // mulch shows along the cut edge
+      mu.c = mix(vec3(lmu), mu.c, 0.45) * vec3(0.95, 0.72, 0.55) * 0.62;          // darker, redder, flatter bark mulch
+      mu.c = mix(vec3(0.05, 0.032, 0.022), mu.c, 0.55);
+      PS gc = gTapT(w, gWP, 0.33, 2.0, L_LAWN, 1.0 - kIso, near);                  // leafy set at 3x scale -> broad leaves
+      vec3 gm = vec3(0.0743, 0.1139, 0.0376);
+      // dark, glossy, high-contrast ivy so a bed never reads as a darker (or worn) patch of lawn
+      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(2.0)) * vec3(0.4, 0.52, 0.42) * (0.8 + 0.35 * n1.r);
+      gc.r = mix(gc.r, 0.55, 0.6);
+      float cov = n1.g * 0.45 + n2.r * 0.35 + n0.g * 0.2 + (gc.h - mu.h) * 0.25;
+      float kc = smoothstep(0.2, 0.28, cov) * smoothstep(0.05, 0.35, dD);          // ~95 % cover; clean mulch strip at the edge
+      mu.c *= 0.75 + 0.25 * (1.0 - smoothstep(0.2, 0.32, cov));                    // gaps sit in the plants' shade
       a = pbrMix(mu, gc, kc);
-      a.c *= 0.9 + 0.2 * n0.b;
+      a.c *= 0.92 + 0.16 * n0.b;
     } else {
       a = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
       float kd = smoothstep(0.5, 0.7, n1.g + (n2.r - 0.5) * 0.3);
@@ -200,10 +207,12 @@ void groundShadePBR(vec2 w, float dist) {
   else if (sp > 1.5 && sp < 2.5) { col = mix(vec3(0.20, 0.34, 0.30), vec3(0.24, 0.38, 0.33), n1.g); rough = 0.8; g = vec2(0.0); }
   else if (sp > 2.5 && sp < 3.5) { PS d = gTap(w, 3.0, L_DIRT, kIso, near); col = mix(vec3(0.66, 0.58, 0.44), vec3(0.74, 0.66, 0.50), n2.r) * (0.75 + 0.5 * d.h); rough = 1.0; g = d.g * 0.5; }
   else if (sp > 5.5 && sp < 6.5) { float stripe = step(0.5, fract(w.x / 6.0)); PS l = gTap(w, 2.0, L_LAWN, kIso, near); col = mix(vec3(0.16, 0.30, 0.09), vec3(0.19, 0.34, 0.11), stripe) * (0.65 + 0.35 * l.c.g / 0.0912); rough = 0.95; g = l.g * 0.6; }
-  // late-autumn leaf litter under deciduous trees (unchanged)
+  // late-autumn leaf litter under deciduous trees
   vec4 lf = texture(uLeaf, (w - uLampRect.xy) / uLampRect.zw);
   if (lf.a > 0.01) {
-    float dens = clamp(lf.a * 3.0, 0.0, 0.9) * (1.0 - mA * 0.9);
+    // r4-ground: campus grounds are blown/raked: sparse leaves on lawns and walks (the old 90 % carpet read as brown
+    // mud discs from a distance), a bit more in beds and natural ground
+    float dens = clamp(lf.a * 1.8, 0.0, 0.6) * (1.0 - mA * 0.9) * (1.0 - 0.45 * wG - 0.35 * wP);
     vec2 lc = w * 8.0; vec2 li = floor(lc); vec2 lr = fract(lc) - 0.5;
     float hh = fract(sin(dot(li, vec2(12.9898, 78.233))) * 43758.5453);
     float ang = hh * 6.283; vec2 rr = vec2(cos(ang) * lr.x - sin(ang) * lr.y, sin(ang) * lr.x + cos(ang) * lr.y);
@@ -212,6 +221,7 @@ void groundShadePBR(vec2 w, float dist) {
     float lodL = smoothstep(0.03, 0.12, max(fwidth(lc.x), fwidth(lc.y)));
     leaf = mix(leaf, dens * 0.3, lodL);
     vec3 leafC = mix(mix(vec3(0.70, 0.50, 0.14), vec3(0.52, 0.28, 0.09), fract(hh * 3.7)), vec3(0.78, 0.66, 0.20), step(0.8, fract(hh * 5.3)));
+    leafC = mix(vec3(dot(leafC, vec3(0.2126, 0.7152, 0.0722))), leafC, 0.8) * 0.85;   // r4-ground: less orange, a bit darker
     col = mix(col, leafC, leaf); rough = mix(rough, 0.95, leaf); g *= 1.0 - leaf;
   }
   // far: blend toward the real aerial photo colour

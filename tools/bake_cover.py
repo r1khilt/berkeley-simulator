@@ -82,7 +82,7 @@ wild = np.zeros((WZ, WX), np.uint8)
 for n in vec['named']:
     if n['kind'] in ('wood', 'nature_reserve', 'scrub', 'heath', 'forest') and len(n['poly']) >= 3: fill(wild, n['poly'])
 for w in vec['water']:
-    if w['type'] in ('stream', 'river'): polyline(wild, w['pts'], 18.0)          # creek banks (~9 m each side)
+    if w['type'] in ('stream', 'river'): polyline(wild, w['pts'], 8.0)           # creek banks only (~4 m each side)
 # hills east of Gayley Road / Piedmont Avenue (stadium, Strawberry Canyon, Panoramic Hill)
 gz_ = np.array([-2000, -382, -226, -161, -52, 31, 275, 300]); gx_ = np.array([89, 89, 199, 240, 360, 438, 497, 497])
 zz = Z0 + (np.arange(WZ) + 0.5) * R; xx = X0 + (np.arange(WX) + 0.5) * R
@@ -96,17 +96,16 @@ mA = dA > 0; mP = (dP > 0) & ~mA; hard = mA | mP
 mD = (dD > 0) & ~hard; mG = (dG > 0) & ~mD & ~hard; mN = ~(hard | mD | mG)
 open_ = ~hard & ~bm
 
-# lawn seed: mapped/NDVI lawn plus unmapped ground with some green in it
-seed = (mG | (mN & (lush > 0.22))) & open_
+# lawn seed: mapped/NDVI lawn plus any unmapped open ground (central campus open ground is lawn; the NAIP NDVI is from
+# a dry summer, so irrigated-but-browned lawns show up as 'natural')
+seed = (mG | mN) & open_
 def frac(mask, sig):
     num = ndi.gaussian_filter(mask.astype(np.float32), sig); den = ndi.gaussian_filter(open_.astype(np.float32), sig)
     return num / np.maximum(den, 1e-3)
-f6 = frac(seed, 6.0 / R)              # lawn share of the open ground within ~6 m
-lawn = seed.copy()
-# trees standing in lawn: canopy ground becomes lawn where the open ground around it is mostly lawn
-lawn |= mD & (f6 > 0.32)
-# unmapped open ground (dry 'natural'): lawn unless it is a narrow leftover strip in a mostly-bed area
-lawn |= mN & open_ & (f6 > 0.15)
+# Campus lawns run right under the trees (the aerial photo shows canopy over turf almost everywhere), so canopy ground
+# defaults to lawn; only the deep interior of big canopy-only areas (> ~7 m from any lawn) becomes a groundcover bed.
+dseed = ndi.distance_transform_edt(~seed) * R
+lawn = seed | ((mD | mN) & open_ & (dseed <= 7.0))
 bed = open_ & ~lawn & maint
 # smooth the lawn/bed boundary into clean landscaped curves and drop specks (beds < ~25 m^2, lawn holes < ~20 m^2)
 disk = lambda r: (np.hypot(*np.mgrid[-r:r + 1, -r:r + 1]) <= r)
@@ -118,6 +117,12 @@ sm &= np.isin(lab, 1 + np.nonzero(sizes >= 25.0)[0])
 holes = ~sm & open_; lab, nl = ndi.label(holes); sizes = ndi.sum(holes, lab, range(1, nl + 1)) * R * R
 sm |= np.isin(lab, 1 + np.nonzero(sizes < 20.0)[0]) & open_
 bed = sm & maint
+# foundation planting: a ~1.5 m bed along building walls where the ground is lawn (the band continues under the building
+# so the 1.6 m SDF keeps a clean edge; the building covers the inside)
+dist_b = ndi.distance_transform_edt(~bm) * R
+found = maint & (bm | (open_ & (dist_b <= 1.5)))
+print('foundation beds', float((found & open_ & ~bed).mean()))
+bed = bed | found
 lawn_new = maint & ~bed                              # everything else in the maintained zone is lawn ...
 # ... including under the paving, so the visible lawn edge is the (vector, crisp) paving edge: no dry fringe
 G_new = np.where(maint, lawn_new, mG | (dG > 0))
