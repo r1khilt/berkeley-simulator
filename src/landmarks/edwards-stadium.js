@@ -33,11 +33,11 @@ export async function build(ctx) {
   // [r4-sweep-outer] Art Deco screen-wall articulation for the outer walls (ref: NRHP / Wikimedia photos): projecting
   // pilasters every ~6 m with cap blocks, a stepped-frame recessed panel in each bay, a base course and a frieze band.
   // The walls used to read as one flat beige slab from Fulton St / Bancroft Way.
-  const wallPanel = M.concrete.clone(); wallPanel.color = new THREE.Color(0xbcb29c); // recessed fields read a shade darker
+  const wallPanel = M.concrete.clone(); wallPanel.color = new THREE.Color(0xccc3ae); // recessed fields read a shade darker
   const wallBase = M.concrete.clone(); wallBase.color = new THREE.Color(0xa99f8a);
   const offs = (vF, out, a, b) => [Math.min(vF + out * a, vF + out * b), Math.max(vF + out * a, vF + out * b)];
   const pilaster = (u, gg, top, vF, out) => { const [p0, p1] = offs(vF, out, 0, 0.45), [c0, c1] = offs(vF, out, 0, 0.58);
-    K.box(wallBuff, u - 0.42, gg - 0.5, p0, u + 0.42, top - 0.02, p1); K.box(wallBuff, u - 0.52, top - 0.8, c0, u + 0.52, top - 0.02, c1); };
+    K.box(wallBuff, u - 0.42, gg - 0.5, p0, u + 0.42, top + 0.55, p1); K.box(wallBuff, u - 0.52, top - 0.8, c0, u + 0.52, top + 0.2, c1); K.box(wallBuff, u - 0.34, top + 0.55, p0, u + 0.34, top + 0.95, p1); }; // stepped cap rises above the parapet
   const decoBay = (ua, ub, gg, top, vF, out) => {
     const y0 = gg + 1.6, y1 = top - 1.15, a = ua + 0.75, b = ub - 0.75; if (y1 - y0 < 1.6 || b - a < 1.6) return;
     for (const [d, o, w] of [[0.2, 0, 0.32], [0.1, 0.32, 0.16]]) { const [f0, f1] = offs(vF, out, 0, d);
