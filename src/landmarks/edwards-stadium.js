@@ -33,19 +33,19 @@ export async function build(ctx) {
   // [r4-sweep-outer] Art Deco screen-wall articulation for the outer walls (ref: NRHP / Wikimedia photos): projecting
   // pilasters every ~6 m with cap blocks, a stepped-frame recessed panel in each bay, a base course and a frieze band.
   // The walls used to read as one flat beige slab from Fulton St / Bancroft Way.
-  const wallPanel = M.concrete.clone(); wallPanel.color = new THREE.Color(0xc9c0ab); // recessed fields read a shade darker
-  const wallBase = M.concrete.clone(); wallBase.color = new THREE.Color(0xbfb6a1);
+  const wallPanel = M.concrete.clone(); wallPanel.color = new THREE.Color(0xbcb29c); // recessed fields read a shade darker
+  const wallBase = M.concrete.clone(); wallBase.color = new THREE.Color(0xa99f8a);
   const offs = (vF, out, a, b) => [Math.min(vF + out * a, vF + out * b), Math.max(vF + out * a, vF + out * b)];
-  const pilaster = (u, gg, top, vF, out) => { const [p0, p1] = offs(vF, out, 0, 0.34), [c0, c1] = offs(vF, out, 0, 0.44);
+  const pilaster = (u, gg, top, vF, out) => { const [p0, p1] = offs(vF, out, 0, 0.45), [c0, c1] = offs(vF, out, 0, 0.58);
     K.box(wallBuff, u - 0.42, gg - 0.5, p0, u + 0.42, top - 0.02, p1); K.box(wallBuff, u - 0.52, top - 0.8, c0, u + 0.52, top - 0.02, c1); };
   const decoBay = (ua, ub, gg, top, vF, out) => {
     const y0 = gg + 1.6, y1 = top - 1.15, a = ua + 0.75, b = ub - 0.75; if (y1 - y0 < 1.6 || b - a < 1.6) return;
-    for (const [d, o, w] of [[0.1, 0, 0.3], [0.05, 0.3, 0.14]]) { const [f0, f1] = offs(vF, out, 0, d);
+    for (const [d, o, w] of [[0.2, 0, 0.32], [0.1, 0.32, 0.16]]) { const [f0, f1] = offs(vF, out, 0, d);
       K.box(wallBuff, a + o, y0 + o, f0, b - o, y0 + o + w, f1); K.box(wallBuff, a + o, y1 - o - w, f0, b - o, y1 - o, f1);
       K.box(wallBuff, a + o, y0 + o + w, f0, a + o + w, y1 - o - w, f1); K.box(wallBuff, b - o - w, y0 + o + w, f0, b - o, y1 - o - w, f1); }
-    const [q0, q1] = offs(vF, out, 0, 0.03); K.box(wallPanel, a + 0.44, y0 + 0.44, q0, b - 0.44, y1 - 0.44, q1);
+    const [q0, q1] = offs(vF, out, 0, 0.03); K.box(wallPanel, a + 0.48, y0 + 0.48, q0, b - 0.48, y1 - 0.48, q1);
   };
-  const baseCourse = (ua, ub, gg, vF, out) => { const [b0, b1] = offs(vF, out, 0, 0.15); K.box(wallBase, ua, gg - 0.6, b0, ub, gg + 1.1, b1); };
+  const baseCourse = (ua, ub, gg, vF, out) => { const [b0, b1] = offs(vF, out, 0, 0.26); K.box(wallBase, ua, gg - 0.6, b0, ub, gg + 1.25, b1); const [t0, t1] = offs(vF, out, 0, 0.32); K.box(wallBase, ua, gg + 1.25, t0, ub, gg + 1.42, t1); // base course + water-table lip };
 
   // ---------- grandstands ----------
   const stands = [
@@ -111,7 +111,7 @@ export async function build(ctx) {
       baseCourse(ua, ub, gg, wOutV, -1); // [r4-sweep-outer]
       if (kmax < W.rows) K.box(conc, ua, yF, wOutV + 0.55, ub, W.res.yk(Math.max(1, kmax)) - 0.2, wTopV);
     }
-    K.box(wallBuff, uA, wallTop, wOutV - 0.15, uB, wallTop + 0.22, wOutV + 0.7); // coping
+    K.box(wallBuff, uA, wallTop, wOutV - 0.4, uB, wallTop + 0.36, wOutV + 0.7); // coping [r4-sweep-outer: deeper overhang for a real shadow line]
     K.box(conc, uA - 0.3, yTopW + 0.25, wTopV - 0.2, uA, yTopW + 1.5, wOutV + 0.5);
     K.box(conc, uB, yTopW + 0.25, wTopV - 0.2, uB + 0.3, yTopW + 1.5, wOutV + 0.5);
     // [r4-sweep-outer] pilasters every 6 m on the Fulton wall with stepped-frame panels between them, frieze under the coping
