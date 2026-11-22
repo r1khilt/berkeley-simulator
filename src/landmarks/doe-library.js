@@ -303,7 +303,7 @@ export async function build(ctx) {
     // LIBRARY" on the frieze band over the doorway, and a grey cast-metal lantern on a post beside the steps
     const e = F.s(5.2), lg = new THREE.PlaneGeometry(6.6, 0.56); if (F.m && F.m.determinant() < 0) lg.scale(-1, 1, 1); lg.translate(e, 8.38, 0.104); // mirrored side frames would cull/reverse the lettering
     F.box(stone, e - 3.45, e + 3.45, 8.04, 8.72, 0, 0.1); // raised frieze panel (clears the pilasters)
-    F.geom(signMat('THE BANCROFT LIBRARY', { bg: '#d8d2c3', fg: '#46423a', font: 'Georgia, serif', weight: '500', w: 1536, h: 130 }), lg);
+    F.geom(signMat('THE BANCROFT LIBRARY', { bg: '#d8d2c3', fg: '#46423a', font: 'Georgia, serif', weight: '500', w: 1536, h: 130 }), lg, { uvMode: 'keep' }); // r5-east2: keep the plane's UVs (box UVs hid the text)
     const lx = e + 4.6, ly = gBe + 0.02, metal = M.iron;
     F.box(metal, lx - 0.13, lx + 0.13, ly, ly + 0.35, 1.6, 1.86); F.box(metal, lx - 0.06, lx + 0.06, ly + 0.35, ly + 3.0, 1.67, 1.79);
     F.box(M.lampGlow || stone, lx - 0.2, lx + 0.2, ly + 3.0, ly + 3.62, 1.53, 1.93); F.box(metal, lx - 0.26, lx + 0.26, ly + 3.62, ly + 3.72, 1.47, 1.99); F.box(metal, lx - 0.12, lx + 0.12, ly + 3.72, ly + 3.92, 1.61, 1.85);
