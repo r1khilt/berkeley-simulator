@@ -74,6 +74,11 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   const pathIdx = new SegIndex(paths), roadIdx = new SegIndex(roads.filter((r) => r.hw !== 'service'));
   const allRoadIdx = new SegIndex(roads);
   const campus = (x, z) => x > -720 && x < 470 && z > -520 && z < 400;
+  // [r4-sweep-outer] landmark modules load after this runs, so the procedural lamps / street lights / utility poles below
+  // could land inside a landmark's footprint (lamp posts poking through buildings). Skip spots inside (or within 0.6 m of) a
+  // hand-built landmark footprint. Open-air or roof-plaza landmarks (fields, courts, parks, Main Stacks, garages) keep theirs;
+  // OSM-mapped props are left alone (they are real positions).
+  const inLm = (landmarks && landmarks.length) ? landmarkTester(landmarks.filter((l) => !/field|courts|schoolyard|diamond|park|main-stacks|garage|parking|structure/.test(l.id)).flatMap((l) => l.footprints || []), 0.6) : () => false;
   const scatters = [];
   const S = (name, maxD, cast = false) => { const f = PR && PR[name]; const s = new Scatter(name, f ? () => f() : null, maxD, cast); scatters.push(s); return s; };
   const lamps = S('campusLamp', 420, true), street = S('streetLight', 520, true), bench = S('bench', 220), trash = S('trashCan', 160), recyc = S('recyclingBin', 140), rack = S('bikeRack', 160), bike = S('parkedBike', 140),
@@ -103,7 +108,7 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   for (const p of paths) {
     if (!(p.w >= 2.2) || p.steps) continue; const pts = p.pts; let acc = 13;
     for (let k = 0; k < pts.length - 1; k++) { const [x0, z0] = pts[k], [x1, z1] = pts[k + 1]; const L = Math.hypot(x1 - x0, z1 - z0); const dx = (x1 - x0) / (L || 1), dz = (z1 - z0) / (L || 1);
-      for (let t = 0; t < L; t += 1) { acc += 1; if (acc < 30) continue; const x = x0 + dx * t + dz * (p.w / 2 + 0.6), z = z0 + dz * t - dx * (p.w / 2 + 0.6); if (!campus(x, z)) continue; if (near(x, z, lampPts, 14) || physicsInside(physics, x, z)) continue; acc = 0; lamps.add(x, y(x, z), z, 0); lampPts.push([x, z, 1]); } }
+      for (let t = 0; t < L; t += 1) { acc += 1; if (acc < 30) continue; const x = x0 + dx * t + dz * (p.w / 2 + 0.6), z = z0 + dz * t - dx * (p.w / 2 + 0.6); if (!campus(x, z)) continue; if (near(x, z, lampPts, 14) || physicsInside(physics, x, z) || inLm(x, z)) continue; acc = 0; lamps.add(x, y(x, z), z, 0); lampPts.push([x, z, 1]); } }
   }
   let side = 1;
   for (const r of roads) {
@@ -111,21 +116,12 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
     for (let k = 0; k < pts.length - 1; k++) { const [x0, z0] = pts[k], [x1, z1] = pts[k + 1]; const L = Math.hypot(x1 - x0, z1 - z0); const dx = (x1 - x0) / (L || 1), dz = (z1 - z0) / (L || 1);
       for (let t = 0; t < L; t += 1) { acc += 1; accP += 1;
         const off = (r.w || 8) / 2 + 1.1;
-        if (acc >= 36) { side = -side; const x = x0 + dx * t + dz * off * side, z = z0 + dz * t - dx * off * side; if (!near(x, z, lampPts, 18) && !physicsInside(physics, x, z)) { acc = 0; street.add(x, y(x, z), z, Math.atan2(-dz * side, dx * side)); lampPts.push([x, z, 1.4]); } }
-        if (!campus(x0, z0) && r.hw === 'residential' && accP >= 42) { const x = x0 + dx * t - dz * (off + 0.4), z = z0 + dz * t + dx * (off + 0.4); if (!physicsInside(physics, x, z)) { accP = 0; pole.add(x, y(x, z), z, Math.atan2(dx, dz)); } }
+        if (acc >= 36) { side = -side; const x = x0 + dx * t + dz * off * side, z = z0 + dz * t - dx * off * side; if (!near(x, z, lampPts, 18) && !physicsInside(physics, x, z) && !inLm(x, z)) { acc = 0; street.add(x, y(x, z), z, Math.atan2(-dz * side, dx * side)); lampPts.push([x, z, 1.4]); } }
+        if (!campus(x0, z0) && r.hw === 'residential' && accP >= 42) { const x = x0 + dx * t - dz * (off + 0.4), z = z0 + dz * t + dx * (off + 0.4); if (!physicsInside(physics, x, z) && !inLm(x, z)) { accP = 0; pole.add(x, y(x, z), z, Math.atan2(dx, dz)); } }
       } }
   }
   // scooters & news racks near Telegraph/Bancroft
   for (const p of (pois.named || [])) { if (Math.random() < 0.12 && (p.k === 'cafe' || p.k === 'restaurant' || p.k === 'fast_food')) { const n = allRoadIdx.nearest(p.p[0], p.p[1], 25); if (n) { const nx = -n.dz, nz = n.dx, l = Math.hypot(nx, nz) || 1; const s = Math.sign((p.p[0] - n.px) * nx + (p.p[1] - n.pz) * nz) || 1; const w = (n.L.w || 8) / 2 + 1.0; const x = n.px + nx / l * w * s, z = n.pz + nz / l * w * s; (Math.random() < 0.6 ? scoot : news).add(x, y(x, z), z, Math.random() * 6); } } }
-  // [r4-sweep-outer] landmark modules load after this runs, so lamps/poles/benches from OSM points and the procedural
-  // placement above could stand inside a landmark's footprint (lamp posts poking through Memorial Stadium, dorms, frats).
-  // Drop every scattered prop inside (or within 0.6 m of) a hand-built landmark footprint; open-space landmarks
-  // (fields, courts, schoolyards, parks) keep theirs.
-  if (landmarks && landmarks.length) {
-    const inLm = landmarkTester(landmarks.filter((l) => !/field|courts|schoolyard|diamond|park/.test(l.id)).flatMap((l) => l.footprints || []), 0.6);
-    for (const s of scatters) s.items = s.items.filter((it) => !inLm(it[0], it[2]));
-    for (let i = lampPts.length - 1; i >= 0; i--) if (inLm(lampPts[i][0], lampPts[i][1])) lampPts.splice(i, 1);
-  }
   for (const s of scatters) s.finalize(group);
   // ---------- road markings
   const markY = (x, z) => heightAt(x, z);
