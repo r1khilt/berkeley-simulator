@@ -42,6 +42,7 @@ export async function build(ctx) {
   const R = K.run([-28.9, 53.9], [37.6, 62.2]);
   const walkables = [];
   const site = dwinellePlaza(K, ctx, { BASE, ST, colliders, walkables });
+  dwinelleEastWalk(K, walkables); // [r5-audit-central] the stepped walk down the east side of the north-east wing
   walkables.push(...autoEntries(K, ctx, allRuns.filter((r) => !site.isEast(r)), { y0: 1.5, max: 4, w: 2.2, h: 2.4, surround: BASE, surroundW: 0.35 }));
   // foundation planting along the creek range, lamp posts and bike racks along its walk
   baseShrubs(K, R, 2, R.L - 2, { skip: [[R.L * 0.5 - 4, R.L * 0.5 + 4]], d: 1.0 });
@@ -109,4 +110,23 @@ function dwinellePlaza(K, ctx, { BASE, ST, colliders, walkables }) {
   for (let s = b0; s <= b1 + 1e-3; s += 0.14) K.rbox(E, castIron(), s, yB, 0.785, s + 0.016, yB + 0.98, 0.8, { detail: true });
   const isEast = (r) => Math.abs(r.n[0] - 1) < 0.05 && Math.abs(r.a[0] - uF) < 0.6;
   return { isEast, plaza, yT, yL };
+}
+
+// [r5-audit-central] Dwinelle's "levels": the walk along the east face of the north-east wing drops from the plaza (LiDAR
+// 83.6 m) down a long stepped flight to a low court at 81.2 m by the wing's lower east doors, then climbs ~1 m north toward
+// Durant Hall (OSM steps 1365834908 + 1365834905; groundworks skips flights hugging a landmark, so nothing was built and the
+// terrain just ramped). Long-tread campus steps seated on the graded terrain: each tread is lifted to clear the ground under it.
+function dwinelleEastWalk(K, walkables) {
+  const M = K.M; const STEP = tint(M.concrete, 0xd2cbbf);
+  const flight = (u0, u1, vA, vB, rise = 0.16) => { // vA = low end, vB = high end (either order along v)
+    const gA = K.g((u0 + u1) / 2, vA), gB = K.g((u0 + u1) / 2, vB); const H = gB - gA; if (H < 0.3) return;
+    const n = Math.max(2, Math.round(H / rise)), L = vB - vA, tr = L / n; const tops = []; let prev = gA;
+    for (let i = 0; i < n; i++) { const a = vA + tr * i, b = vA + tr * (i + 1); let gmax = -Infinity; for (let k = 0; k <= 4; k++) for (const uu of [u0 + 0.2, (u0 + u1) / 2, u1 - 0.2]) gmax = Math.max(gmax, K.g(uu, a + (b - a) * k / 4));
+      const top = Math.max(prev + 0.02, gA + H * (i + 1) / n, gmax + 0.03); tops.push(top); prev = top;
+      K.box(STEP, u0, Math.min(gA, gB) - 0.8, Math.min(a, b), u1, top, Math.max(a, b)); }
+    walkables.push(K.walkFn(u0, Math.min(vA, vB), u1, Math.max(vA, vB), (u, v) => { if (u < u0 - 0.05 || u > u1 + 0.05) return null; const t = (v - vA) / L; if (t < -0.02 || t > 1.02) return null; return tops[Math.max(0, Math.min(n - 1, Math.floor(t * n)))]; }));
+    const ur = u1 + 0.08; tubeRail(K, [ur, vA], tops[0], [ur, vB], tops[n - 1], { h: 0.9, mat: castIron() }); // east-side rail
+  };
+  flight(44.4, 47.3, -12.6, 0.4);    // long flight: low court (north) -> plaza (south)
+  flight(44.8, 47.5, -16.0, -21.0);  // short flight: low court -> the walk north toward Durant Hall
 }
