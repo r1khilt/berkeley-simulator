@@ -81,10 +81,10 @@ export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
-  const C = tint(M.concrete, 0xbcbfc3, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
-  const CT = tint(M.concrete, 0xbdbebf, 'mfTower');        // the stair towers read a touch warmer / board-marked
+  const C = tint(M.concrete, 0xc6c9cd, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
+  const CT = tint(M.concrete, 0xc7c8c9, 'mfTower');        // the stair towers read a touch warmer / board-marked
   for (const m of [C, CT]) { const bc = boardConc(); m.map = bc.map; if (bc.normalMap) m.normalMap = bc.normalMap; if (bc.roughnessMap) m.roughnessMap = bc.roughnessMap; } // board-formed, no panel grid
-  const CD = tint(M.concrete, 0x8d9196, 'mfConcDark');     // soffits, recesses, weathered parapets
+  const CD = tint(M.concrete, 0x989ca1, 'mfConcDark');     // soffits, recesses, weathered parapets
   const GL = nightGlow(std(0x33373b, 'mfGlass', { rough: 0.16, metal: 0.3, extra: { envMapIntensity: 1.25, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
   const FR = std(0x2a2623, 'mfBronze', { rough: 0.45, metal: 0.6 });   // dark bronze anodised frames (near black in the photos)
   GL.userData.interior = false; // r4: the glass deep behind the balconies stays dark (no lit-room shader); east/podium glass keeps it
@@ -192,8 +192,8 @@ export async function build(ctx) {
   {
     const dS0 = sE(9), dS1 = sE(5);
     glassStorey(RE, 0, dS0, F4, 12.6, { glass: GLP }); glassStorey(RE, dS1, RE.L, F4, 12.6, { glass: GLP });
-    for (let i = 0; i < 4; i++) { const a = dS0 + (dS1 - dS0) * i / 4, b = a + (dS1 - dS0) / 4; K.rbox(RE, GL, a, F4, -0.12, b, F4 + 2.6, -0.06); K.rbox(RE, FR, a, F4, -0.06, a + 0.09, F4 + 2.6, 0.04); K.rbox(RE, FR, (a + b) / 2 - 0.2, F4 + 1.0, -0.02, (a + b) / 2 + 0.2, F4 + 1.05, 0.06, { detail: true }); }
-    K.rbox(RE, FR, dS1 - 0.09, F4, -0.06, dS1, F4 + 2.6, 0.04); K.rbox(RE, FR, dS0, F4 + 2.6, -0.1, dS1, F4 + 2.75, 0.05); K.rbox(RE, GL, dS0, F4 + 2.75, -0.12, dS1, 12.6, -0.06);
+    for (let i = 0; i < 4; i++) { const a = dS0 + (dS1 - dS0) * i / 4, b = a + (dS1 - dS0) / 4; K.rbox(RE, GLD, a, F4, -0.12, b, F4 + 2.6, -0.06); K.rbox(RE, FR, a, F4, -0.06, a + 0.09, F4 + 2.6, 0.04); K.rbox(RE, FR, (a + b) / 2 - 0.2, F4 + 1.0, -0.02, (a + b) / 2 + 0.2, F4 + 1.05, 0.06, { detail: true }); }
+    K.rbox(RE, FR, dS1 - 0.09, F4, -0.06, dS1, F4 + 2.6, 0.04); K.rbox(RE, FR, dS0, F4 + 2.6, -0.1, dS1, F4 + 2.75, 0.05); K.rbox(RE, GLD, dS0, F4 + 2.75, -0.12, dS1, 12.6, -0.06);
     K.rbox(RE, FR, dS0 - 1.2, 11.7, 0, dS1 + 1.2, 11.9, 2.4);         // slim steel canopy on thin columns
     for (const s of [dS0 - 0.9, dS1 + 0.9]) K.rbox(RE, FR, s - 0.07, F4, 2.15, s + 0.07, 11.7, 2.29);
     K.rbox(RE, C, 0, 12.6, -0.2, RE.L, 13.9, 0.45); K.rbox(RE, CD, 0, 12.52, -0.2, RE.L, 12.6, 0.43); // continuous solid spandrel band, projecting ~0.45 m (terrace photos)
@@ -427,7 +427,7 @@ export async function build(ctx) {
         for (const sx of [0.7, L - 0.7]) K.rbox(R, M.iron, sx - 0.02, yF + 2.2, 0.9, sx + 0.02, yF + 2.62 + fd * Math.sin(tilt) - 0.05, 0.94, { detail: true }); }
       const LED = M.lampGlow;
       K.box(LED, a + 0.05, yF, b - 0.06, c - 0.05, yF + 0.05, b - 0.02, { detail: true }); K.box(LED, a - 0.06, yF, b, a - 0.02, yF + 0.05, d, { detail: true }); K.box(LED, c + 0.02, yF, b, c + 0.06, yF + 0.05, d, { detail: true });
-      for (const [p0, p1] of [[[c, d], [c, b]], [[a, b], [a, d]]]) { const Re = K.run(p0, p1); K.rbox(Re, WHT, 0.4, yF + 2.0, 0, Re.L - 0.4, yF + 2.8, 0.05); signText(K, Re, 'PRESS', Re.L / 2, yF + 2.4, 0.5, { color: '#151515', metal: 0.0, rough: 0.5, d: 0.07, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 }); }
+      for (const [p0, p1] of [[[c, d], [c, b]], [[a, b], [a, d]]]) { const Re = K.run(p0, p1); K.rbox(Re, WHT, 0.4, yF + 2.42, 0, Re.L - 0.4, yF + 3.18, 0.05); signText(K, Re, 'PRESS', Re.L / 2, yF + 2.8, 0.5, { color: '#151515', metal: 0.0, rough: 0.5, d: 0.07, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 }); }
       colliders.push(rectCol(a, b, c, d, yF - 1, h + 0.3));
       for (const u of [41.0, 47.9]) { K.cyl(FR, u, yF, d + 1.9, 0.09, 0.09, 0.95, 10, { detail: true }); K.cyl(LED, u, yF + 0.82, d + 1.9, 0.095, 0.095, 0.1, 10, { detail: true }); } // bollard lights
     }
