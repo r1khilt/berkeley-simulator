@@ -20,9 +20,9 @@ let _band = null;
 function bandMat(M) { // smooth pale precast with horizontal rustication grooves every 0.5 m (UVs are metres/2 → 4 grooves per tile)
   if (_band) return _band;
   const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
-  g.fillStyle = '#c9c5bb'; g.fillRect(0, 0, N, N);
+  g.fillStyle = '#b9b8af'; g.fillRect(0, 0, N, N); // [r5a] mid-grey precast (photo #a9aaa4..#b9b7ae), was a pale cream
   for (let i = 0; i < 2600; i++) { const x = Math.random() * N, y = Math.random() * N, a = Math.random() * 0.05; g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '90,85,75'},${a})`; g.fillRect(x, y, 2 + Math.random() * 6, 1 + Math.random() * 3); }
-  for (let k = 0; k < 4; k++) { const y = k * N / 4; g.fillStyle = '#6f6a62'; g.fillRect(0, y, N, 7); g.fillStyle = '#e4e0d6'; g.fillRect(0, y + 7, N, 3); }
+  for (let k = 0; k < 4; k++) { const y = k * N / 4; g.fillStyle = '#8e8c85'; g.fillRect(0, y, N, 4); g.fillStyle = '#cac8c0'; g.fillRect(0, y + 4, N, 2); } // [r5a] fine, subtle grooves (read as siding before)
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   _band = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
   return _band;
@@ -32,8 +32,8 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(73.6);
   const K = new Kit(ctx, ANG); const M = ctx.M; const P = pal(ctx);
   const BAND = bandMat(M);                                                     // banded precast concrete
-  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xdbd3c4);         // smooth concrete (frame, mouldings)
-  const CD = M.stuccoWhite.clone(); CD.color = new THREE.Color(0xc6c0b4);       // plinth / shadowed concrete
+  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xcdcac0);         // smooth concrete (frame, mouldings) [r5a] greyer
+  const CD = M.stuccoWhite.clone(); CD.color = new THREE.Color(0xa8a69e);       // plinth / shadowed concrete [r5a] greyer
   const TILE = M.redTile;                                                       // [r5a] red Mission clay tile (photo: #b85a3e sunlit), was a grey-mauve slate tint
   const FR = P.trimWhite, GL = M.windowNight;
   const colliders = [], walkables = [];
@@ -52,7 +52,7 @@ export async function build(ctx) {
     for (const h of holes) { const p = new THREE.Path();
       if (h.r) { p.absarc(h.s, h.y, h.r, 0, Math.PI * 2, true); } else { p.moveTo(h.s0, h.y0); p.lineTo(h.s1, h.y0); p.lineTo(h.s1, h.y1); p.lineTo(h.s0, h.y1); p.lineTo(h.s0, h.y0); }
       sh.holes.push(p);
-      if (h.r) { const dg = new THREE.CircleGeometry(h.r + 0.02, 20); dg.translate(h.s, h.y, -depth + 0.06); K.addRun(R, GL, dg, { uvMode: 'keep' });
+      if (h.r) { const dg = new THREE.CircleGeometry(h.r + 0.02, 20); dg.translate(h.s, h.y, -depth + 0.06); K.addRun(R, M.glass, dg, { uvMode: 'keep' }); /* [r5a] dark, so oculi read as openings */
         const tg = new THREE.TorusGeometry(h.r + 0.08, 0.1, 6, 20); tg.translate(h.s, h.y, 0.04); K.addRun(R, C, tg); }
       else { K.rbox(R, GL, h.s0, h.y0, -depth + 0.04, h.s1, h.y1, -depth + 0.07, { uvMode: 'keep' }); K.rbox(R, C, h.s0 - 0.1, h.y0 - 0.14, -0.1, h.s1 + 0.1, h.y0, 0.08); }
     }
@@ -61,7 +61,7 @@ export async function build(ctx) {
   };
   const oculus = (R, c, y, r = 0.5, d0 = 0) => {
     const tg = new THREE.TorusGeometry(r + 0.07, 0.1, 6, 20); tg.translate(c, y, d0 + 0.05); K.addRun(R, C, tg);
-    const dg = new THREE.CircleGeometry(r, 20); dg.translate(c, y, d0 - 0.38); K.addRun(R, GL, dg, { uvMode: 'keep' });
+    const dg = new THREE.CircleGeometry(r, 20); dg.translate(c, y, d0 - 0.38); K.addRun(R, M.glass, dg, { uvMode: 'keep' });
     const hg = new THREE.CylinderGeometry(r, r, 0.42, 20, 1, true); hg.rotateX(Math.PI / 2); hg.translate(c, y, d0 - 0.17); hg.scale(1, 1, 1); K.addRun(R, CD, hg.toNonIndexed().scale(1,1,1));
   };
 
@@ -72,23 +72,16 @@ export async function build(ctx) {
       const D = 4.2; const e = 0.7; // recess depth, solid end strips
       K.wall(R, BAND, 0, L, Y0, EAVE, [{ s0: e, s1: L - e, y0: FL - 0.3, y1: TOP }], 0.45);
       K.rbox(R, CD, e, Y0, -D - 0.3, L - e, TOP, -D);                                                     // atrium back
-      K.rbox(R, GL, e + 0.05, FL - 0.3, -D + 0.01, L - e - 0.05, TOP - 0.1, -D + 0.04, { uvMode: 'keep' }); // curtain wall
+      K.rbox(R, M.glass, e + 0.05, FL - 0.3, -D + 0.01, L - e - 0.05, TOP - 0.1, -D + 0.04, { uvMode: 'keep' }); // curtain wall [r5a] dark green-black glazing deep behind the frame (photo #1e2a2a)
       const nm = Math.round((L - 2 * e) / 1.5); for (let k = 1; k < nm; k++) { const s = e + (L - 2 * e) * k / nm; K.rbox(R, FR, s - 0.04, FL - 0.3, -D + 0.04, s + 0.04, TOP - 0.1, -D + 0.12, { detail: true }); }
       for (const s of [e, L - e]) K.rbox(R, BAND, s - (s === e ? 0.0 : 0.45) , Y0, -D - 0.3, s + (s === e ? 0.45 : 0), TOP, 0);
       const px = [e + 0.3, e + (L - 2 * e) / 3, e + 2 * (L - 2 * e) / 3, L - e - 0.3];
-      for (const s of px) K.rbox(R, C, s - 0.45, FL - 0.3, -0.5, s + 0.45, TOP, 0.9);                     // square piers (projecting frame)
-      // chevron bracing between the floors, set behind the frame
-      for (let f = 1; f < floors.length - 1; f++) { const y0 = floors[f] + 0.35, y1 = floors[f + 1] - 0.45;
-        for (let b = 0; b < 3; b++) { const a = px[b] + 0.45, z = px[b + 1] - 0.45, m = (a + z) / 2;
-          for (const [p, q] of [[a, m], [z, m]]) { const len = Math.hypot(q - p, y1 - y0); const g = new THREE.BoxGeometry(len, 0.32, 0.4); g.rotateZ(Math.atan2(y1 - y0, q - p)); g.translate((p + q) / 2, (y0 + y1) / 2, -1.6); K.addRun(R, C, g); } } }
-      // zig-zag stair flights glimpsed inside the atrium
-      for (let f = 1; f < floors.length - 1; f++) { const y0 = floors[f - 1] + (f === 1 ? 0 : 0.1), y1 = floors[f]; const sA = f % 2 ? e + 1.2 : L - e - 1.2, sB = f % 2 ? L * 0.55 : L * 0.45;
-        const len = Math.abs(sB - sA), ang = Math.atan2(y1 - y0, len) * (sB > sA ? 1 : -1);
-        const g = new THREE.BoxGeometry(Math.hypot(len, y1 - y0), 0.35, 1.4); g.rotateZ(ang); g.translate((sA + sB) / 2, (y0 + y1) / 2, -D + 1.1); K.addRun(R, CD, g); }
+      for (const s of px) K.rbox(R, C, s - 0.32, FL - 0.3, -0.5, s + 0.32, TOP, 0.75);                    // square piers (projecting frame) [r5a] slimmer
+      // [r5a] (chevron bracing and zig-zag stair flights removed: not on the real pavilions, they read as stray diagonals)
       for (let f = 1; f < floors.length; f++) {
         const y = floors[f];
         if (f === 1) continue;                                                                             // double-height base
-        K.rbox(R, C, e - 0.2, y - 0.45, -0.5, L - e + 0.2, y + 0.35, 0.9);                                    // deep slab-edge beams
+        K.rbox(R, C, e - 0.2, y - 0.38, -0.5, L - e + 0.2, y + 0.22, 0.75);                                   // slab-edge beams [r5a] thinner
         if (f < floors.length - 1) { K.rbox(R, CD, e, y - 0.3, -D, L - e, y + 0.05, -0.4); rail(K, R, P.frameDark, e + 0.1, L - e - 0.1, y + 0.35, -0.6, 1.0, 0.14); }
       }
       // paired round columns carrying the double-height entrance bay
