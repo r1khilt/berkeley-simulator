@@ -20,8 +20,8 @@ export const info = {
 // r4-sweep: expanded-metal mesh (diamond strands, see-through gaps); mipmaps average it to a light, ~60 % opaque grey
 function meshPanelMat() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-  g.fillStyle = 'rgba(150,155,160,0.3)'; g.fillRect(0, 0, 64, 64);
-  g.strokeStyle = 'rgba(222,225,228,1)'; g.lineWidth = 8; g.lineCap = 'square';
+  g.fillStyle = 'rgba(165,170,174,0.42)'; g.fillRect(0, 0, 64, 64); // softer contrast: less moire in motion
+  g.strokeStyle = 'rgba(212,216,219,1)'; g.lineWidth = 7; g.lineCap = 'square';
   for (const [x0, y0, x1, y1] of [[0, 32, 32, 0], [32, 0, 64, 32], [64, 32, 32, 64], [32, 64, 0, 32]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return new THREE.MeshStandardMaterial({ map: t, color: 0xb9bdc0, metalness: 0.35, roughness: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide, name: 'mlkMesh' });
@@ -52,6 +52,7 @@ export async function build(ctx) {
   const mesh = tinted(M.iron, 0x9c9fa0, { metalness: 0.75, roughness: 0.4, transparent: true, opacity: 0.55 });
   const champ = tinted(M.iron, 0xc9b98f, { metalness: 0.7, roughness: 0.4 });
   const blueGlass = tinted(M.windowNight, 0x2c4672);
+  const wingGlass = tinted(M.windowNight, 0x5d6a72); // r4-sweep: west wing upper glazing (photo: mid-grey, rooms visible)
   const pv = tinted(M.glass, 0x1d2a3d, { metalness: 0.5, roughness: 0.25 });
   const sGlass = tinted(M.glassLight, 0x55666e, { opacity: 0.5 });
   const warm = tinted(M.stucco, 0xe9d2a8);
@@ -167,7 +168,7 @@ export async function build(ctx) {
         const a = i * R.L / fins + 0.07, b = (i + 1) * R.L / fins - 0.07;
         for (const [y0, y1] of tiers) {
           const pg = new THREE.PlaneGeometry(b - a, y1 - y0); const uv = pg.attributes.uv;
-          for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * (b - a) / 0.3, uv.getY(k) * (y1 - y0) / 0.3);
+          for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * (b - a) / 0.36, uv.getY(k) * (y1 - y0) / 0.36);
           pg.translate((a + b) / 2, (y0 + y1) / 2, 0.24); K.addRun(R, meshM, pg, { uvMode: 'keep' });
           for (const [s0, q0, s1, q1] of [[a, y0, b, y0 + 0.06], [a, y1 - 0.06, b, y1], [a, y0, a + 0.05, y1], [b - 0.05, y0, b, y1]]) K.rbox(R, alu, s0, q0, 0.2, s1, q1, 0.28, { detail: true });
         }
@@ -195,7 +196,10 @@ export async function build(ctx) {
             glassBand(K, Rw, s0, Rw.L, gw, 4.6, { glass: glassIn, frame: alu, pitch: 1.5, transoms: [2.6] }); }
           K.rbox(Rw, M.whitePaint, -0.1, 4.6, -0.3, Rw.L + 0.1, 5.8, 0.05);
         }
-        if (!internal || h > 10) glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: blueGlass, frame, pitch: 1.5, rec: 0.6, transoms: h > 10 ? [9.4] : [] });
+        // r4-sweep: the wing's upper curtain wall read as one featureless dark-navy box; photo: mid-grey reflective glass
+        // with the rooms visible, thin dark mullions and a thin cantilevered sunshade at the top of the floor
+        if (!internal || h > 10) { glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: wingGlass, frame, pitch: 1.5, rec: 0.35, transoms: h > 10 ? [9.4] : [] });
+          if (!internal) { K.rbox(Rw, conc, -0.3, h - 0.62, 0.0, Rw.L + 0.3, h - 0.4, 1.25); K.rbox(Rw, M.concreteDark, -0.3, h - 0.64, 1.15, Rw.L + 0.3, h - 0.36, 1.27); } }
         // colliders: outer walls with door gaps (lintel above), the taller north block's face above the south roof
         if (internal) { if (h > 10) colliders.push(K.colPoly([a, b], NI.ceil + 0.1, h)); continue; }
         let s0 = 0; for (const d of doors) { colliders.push(K.colPoly([Rw.at(s0), Rw.at(d - 1.3)], -2, h), K.colPoly([Rw.at(d - 1.3), Rw.at(d + 1.3)], 2.65, h)); s0 = d + 1.3; }
