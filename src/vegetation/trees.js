@@ -899,7 +899,7 @@ function buildSpecies(id, d, season, opts) {
   const blobMat = patchBlob(new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 }), uni);
   leafMat.name = `tree:${id}:leaves`; barkMat.name = `tree:${id}:bark`; blobMat.name = `tree:${id}:far`;
   // r4-trees: puff materials (near-core puffs fade out as the camera closes in on them; mid/far puffs never fade)
-  const puffTex = (g0.puffs || puff1 || g2.puffs) ? puffTexture(d.leaf, Math.max(256, (opts.leafTexSize ?? 1024) / 2), d.puff?.ballM ?? 3) : null; // half-res atlas: puffs are mid/far or behind cards
+  const puffTex = (g0.puffs || puff1 || g2.puffs) ? puffTexture(d.leaf, Math.max(256, (opts.leafTexSize ?? 1024) / 2), d.puff?.ballM ?? 3, opts.leafTexSize ?? 1024) : null; // half-res atlas: puffs are mid/far or behind cards
   const asp = d.puff?.aspect ?? 1, puffP0 = { value: new THREE.Vector4(3.4, 0.42, 0.45, asp) }, puffP1 = { value: new THREE.Vector4(0, 0.45, 0.45, asp) }; // x near-fade (radii), y ball-normal weight, z pull toward viewer
   const mkPuff = (pp, nm) => { const m = patchPuff(new THREE.MeshStandardMaterial({ map: puffTex, alphaTest: 0.42, alphaToCoverage: !!opts.alphaToCoverage, side: THREE.DoubleSide, roughness: look.rough ?? 0.8, metalness: 0 }), uni, pp); m.name = nm; return m; };
   const puffMat0 = puffTex ? mkPuff(puffP0, `tree:${id}:puff0`) : null, puffMat1 = puffTex ? mkPuff(puffP1, `tree:${id}:puff`) : null;

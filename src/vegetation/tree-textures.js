@@ -462,12 +462,13 @@ export function leafTexture(kind, S = 2048) {
 // channel encoding as the leaf cards (R shade, G per-leaf random, B twig mask, A coverage) and colours identically.
 // 2:1 atlas, two variants (u 0-0.5, 0.5-1); the ball fills a disc of radius ~0.49 cell around the cell centre.
 const _puff = {};
-export function puffTexture(kind, S = 1024, ballM = 3) {
+export function puffTexture(kind, S = 1024, ballM = 3, srcS = S) {
   const key = kind + ':' + S + ':' + ballM;
   if (_puff[key]) return _puff[key];
-  const src = leafTexture(kind, S); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1;
-  const sc = document.createElement('canvas'); sc.width = W; sc.height = H;
-  sc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(src.image.data.buffer.slice(0)), W, H), 0, 0);
+  // source = the (cached) leaf atlas the cards already use, so no second atlas is drawn
+  const src = leafTexture(kind, srcS); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1, ss = srcS / 2;
+  const sc = document.createElement('canvas'); sc.width = srcS; sc.height = srcS / 2;
+  sc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(src.image.data.buffer.slice(0)), srcS, srcS / 2), 0, 0);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d', { willReadFrequently: true });
   const rnd = mulberry32(hashStr('puff:' + kind));
@@ -488,7 +489,7 @@ export function puffTexture(kind, S = 1024, ballM = 3) {
         const bx = cx + Math.cos(a) * rr - Math.cos(th + Math.PI / 2) * reach * 0.5, by = cy + Math.sin(a) * rr - Math.sin(th + Math.PI / 2) * reach * 0.5;
         g.save(); g.translate(bx, by); g.rotate(th);
         const ww = w * (0.85 + 0.3 * rnd());
-        g.drawImage(sc, (k + cell) % 2 * cs, 0, cs, cs, -ww / 2, -ww * 0.04, ww, ww);
+        g.drawImage(sc, (k + cell) % 2 * ss, 0, ss, ss, -ww / 2, -ww * 0.04, ww, ww);
         g.restore();
       }
       if (dark < 1) { // darken what is drawn so far (deeper layers = self-shadowed core); alpha untouched

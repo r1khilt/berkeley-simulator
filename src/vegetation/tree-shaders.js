@@ -368,10 +368,10 @@ export function makePuffDepthMaterials(uni, puffP) {
         .replace('#include <worldpos_vertex>', PUFF_WORLDPOS);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec2 vCorner;\nvarying vec3 vSphN;\nvarying float vNearFade;\n')
-        .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n if ( fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < 0.3 ) discard; // dappled: real crowns let ~1/3 of the sun through\n#include <alphatest_fragment>');
+        .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n if ( fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < 0.2 ) discard; // dappled: real crowns let some sun through\n#include <alphatest_fragment>');
     };
     m.customProgramCacheKey = () => key;
     return m;
   };
-  return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-2'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-2') };
+  return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-3'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-3') };
 }
