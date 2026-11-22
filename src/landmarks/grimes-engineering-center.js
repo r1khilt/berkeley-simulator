@@ -9,7 +9,7 @@
 //  4. a thin white louvred roof canopy that oversails the glass, most dramatically at the west end.
 // Slender white round columns stand outside the glass on a ~8-9 m grid, each with the signature V of two tension rods rising
 // from its foot to the canopy beams, a shape-memory-alloy cable sleeve near the top of every rod (18 columns, 36 rods). A white steel stair and a white sign box sit on the west
-// (Glade-facing) front, a red-brick stair drops toward the Glade, and a sloped walk climbs the east side.
+// (Glade-facing) front; a low planted strip runs along the flat east side.
 // Plan from 2025-26 aerial imagery (canopy ~61 x 34 m, rotated like the old Bechtel outline) plus SOM / Berkeley sources and
 // Dave Burk / SOM photos. The packet's 2021 LiDAR shows the old Bechtel and is NOT used for massing.
 import * as THREE from 'three';
@@ -252,8 +252,12 @@ export async function build(ctx) {
     sign(K, RB, 'Grimes Engineering Center', RB.L / 2, P1 - 0.1, 0.27, { color: '#3d3f41', metal: 0.2, spacing: 0.03 });
     colliders.push(K.colPoly(quad(bW - 1.4, bx.v0, bW + 0.05, bx.v1), -2, P1 + 1.1));
     // red-brick landscape stair down toward the Glade (south-west), concrete cheek walls, black handrails
+    // [r5-audit-north] disabled: this 6.8 m brick flight + ramp sat on top of OSM's short concrete flight (w/262173805, now
+    // built by groundworks) and borrowed the look of the real wide brick stair further south-west, the Glade -> McLaughlin
+    // East Patio flight (OSM w/262173804), which groundworks now builds with brick treads, landings and a centre rail.
+    const SW_BRICK_STAIR = false;
     const sv0 = 22.6, sv1 = 29.4, suTop = -36.6, suBot = -45.0; const yTop = K.g(suTop + 0.5, (sv0 + sv1) / 2), yBot = K.g(suBot - 0.5, (sv0 + sv1) / 2);
-    if (yTop - yBot > 0.45) {
+    if (SW_BRICK_STAIR && yTop - yBot > 0.45) {
       const ns = Math.round((yTop - yBot) / 0.15);
       walkables.push(K.stairs(G.slab, suBot, sv0, suTop, sv1, yBot, yTop, '+u', ns, { foot: 1.5 }));
       { const rise = (yTop - yBot) / ns, tr = (suTop - suBot) / ns; for (let i = 0; i < ns; i++) { const top = yBot + rise * (i + 1); K.box(G.brick, suBot + tr * i + 0.03, top, sv0 + 0.02, suBot + tr * (i + 1) - 0.01, top + 0.025, sv1 - 0.02); } }   // brick treads, concrete risers
@@ -273,19 +277,17 @@ export async function build(ctx) {
     }
   }
 
-  // ===================== EAST SLOPED WALK (plaza -> level-2 entry at the north-east) =====================
+  // [r5-audit-north] The old "east sloped walk" (a 3 m wide concrete wedge climbing 5.3 m along the east wall to a blank
+  // wall at the NE corner) is gone: the ground along Bechtel Drive is flat (graded terrain 102.0-102.4 m from the SE to
+  // the NE corner), so it stood on its own wall like a bridge to nowhere. Photos (SOM / Dave Burk 2025) show the east
+  // face meeting the drive's paving directly, with a low planted strip along the wall.
   {
-    const u0 = bE + 0.05, u1 = bE + 3.1, vLo = bS - 1.0, vHi = -12.0; const yLo = Math.max(K.g(u1, vLo), 0.3), yHi = P1;
-    const sh = new THREE.Shape(); const gb = gMin(u0, vHi, u1, vLo) - 1.0;
-    sh.moveTo(vLo, gb); sh.lineTo(vLo, yLo); sh.lineTo(vHi, yHi); sh.lineTo(vHi, gb); sh.lineTo(vLo, gb);
-    const eg = new THREE.ExtrudeGeometry(sh, { depth: u1 - u0, bevelEnabled: false });
-    eg.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, u0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
-    K.add(G.panel, eg);
-    const L = Math.hypot(vLo - vHi, yHi - yLo), a = Math.atan2(yHi - yLo, vLo - vHi);
-    const pw = new THREE.BoxGeometry(0.3, 0.9, L); pw.rotateX(a); pw.translate(u1 + 0.15, (yHi + yLo) / 2 + 0.45, (vLo + vHi) / 2); K.add(G.panel, pw);
-    const tr = new THREE.BoxGeometry(0.07, 0.07, L); tr.rotateX(a); tr.translate(u1 + 0.15, (yHi + yLo) / 2 + 1.1, (vLo + vHi) / 2); K.add(G.steel, tr, { detail: true });
-    walkables.push(K.walkFn(u0, vHi, u1, vLo, (u, v) => (u < u0 - 0.05 || u > u1 + 0.05 || v < vHi - 0.05 || v > vLo + 0.05) ? null : yLo + (yHi - yLo) * (vLo - v) / (vLo - vHi)));
-    colliders.push(K.colPoly(quad(u1, vHi, u1 + 0.3, vLo), -2, yHi + 1.2));
+    const u0 = bE + 0.15, u1 = bE + 1.45, v0 = 9.5, v1 = bN + 3.0;   // planted strip along the blank north part of the east wall (the storefront band at the plaza end stays open)
+    const g = gMin(u0, v1, u1, v0, 6);
+    K.box(G.panel, u0, g - 0.4, v1, u1, g + 0.42, v0);
+    K.box(G.mulch, u0 + 0.12, g + 0.38, v1 + 0.12, u1 - 0.12, g + 0.44, v0 - 0.12, { detail: true });
+    for (let v = v1 + 0.8; v < v0 - 0.5; v += 1.25) { const r = 0.32 + (((v * 3.1) % 1) + 1) % 1 * 0.16; const ico = new THREE.IcosahedronGeometry(r, 1); ico.scale(1.15, 0.8, 1.05); ico.translate((u0 + u1) / 2, g + 0.44 + r * 0.4, v); K.add(G.planting, ico, { detail: true }); }
+    colliders.push(K.colPoly(quad(u0, v1, u1, v0), g - 1, g + 0.5));
   }
 
   // ============ TERRACED CONCRETE PLANTERS stepping down toward the SW corner ============

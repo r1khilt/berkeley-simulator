@@ -78,19 +78,59 @@ export async function build(ctx) {
     const lv = levels.filter((y) => y < top - 1.5).concat([top]);
     massBlock(K, { poly: rect(a, b, c, d), levels: lv, top, wall: TC, style: 'punched', depth: 0.4, rev: 0.28, glass: GL, frame: FR, win: winS, roof: B.roofMembrane, parapet: 0.6, pmat: TC, coping: B.panel });
   }
-  // ---- A. Richard Newton Bridge to Cory Hall (deck ~17.3 m, glass balustrades, cambered steel underside)
+  // ---- A. Richard Newton Bridge to Cory Hall
+  // [r5-audit-north] rebuilt from C. Sequin's 2009 construction / dedication photos: an open footbridge leaving the south
+  // podium roof terrace (18.3 m) and landing at a Cory doorway (~0.65 m higher), on an underslung Warren truss whose bottom
+  // chord bellies down to midspan (fish-belly), warm bronze-grey steel; champagne-framed perforated guard panels with a
+  // glass screen above and a round stainless handrail. The old version (two teal box girders, 1 m below the terrace) read
+  // as a floating slab.
   {
-    const bv = 19.3, bu0 = u1 + 0.1, bu1 = 39.1, deck = 17.3, w = 3.2;
-    K.box(B.panel, bu0, deck - 0.25, bv - w / 2, bu1, deck, bv + w / 2);
-    K.box(M.paving, bu0, deck, bv - w / 2 + 0.1, bu1, deck + 0.03, bv + w / 2 - 0.1);
-    for (const side of [-1, 1]) {
-      K.box(B.glassLight || M.glassLight, bu0, deck, bv + side * (w / 2 - 0.05) - 0.02, bu1, deck + 1.1, bv + side * (w / 2 - 0.05) + 0.02);
-      K.box(B.alum, bu0, deck + 1.1, bv + side * (w / 2 - 0.05) - 0.05, bu1, deck + 1.16, bv + side * (w / 2 - 0.05) + 0.05);
+    const bu0 = u1 + 0.05, bu1 = 39.15, bv = 21.75, w = 3.0, hw = w / 2;
+    const yA = PODIUM, yB = PODIUM + 0.65, camber = 0.22;
+    const deckY = (u) => { const t = (u - bu0) / (bu1 - bu0); return yA + (yB - yA) * t + camber * 4 * t * (1 - t); };
+    const STEEL = new THREE.MeshStandardMaterial({ color: 0x6b5f52, roughness: 0.5, metalness: 0.55 });
+    const CHAMP = new THREE.MeshStandardMaterial({ color: 0xa8987c, roughness: 0.4, metalness: 0.6 });
+    const MESH = new THREE.MeshStandardMaterial({ color: 0x7f7a70, roughness: 0.6, metalness: 0.45, side: THREE.DoubleSide });
+    const SCREEN = new THREE.MeshStandardMaterial({ color: 0x8fa3ad, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+    const bar = (mat, p0, p1, t, opts) => { const dx = p1[0] - p0[0], dy = p1[1] - p0[1], dz = p1[2] - p0[2]; const L = Math.hypot(dx, dy, dz); if (L < 1e-3) return;
+      const g = new THREE.BoxGeometry(L, t, t); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(dx / L, dy / L, dz / L)); g.applyQuaternion(q);
+      g.translate((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2); K.add(mat, g, opts); };
+    const N = 8, L = bu1 - bu0; const us = Array.from({ length: N + 1 }, (_, i) => bu0 + L * i / N);
+    // deck: a slab following the camber, paver-grey walking surface
+    { const sh = new THREE.Shape(); sh.moveTo(bu0, deckY(bu0) - 0.32); for (const u of us) sh.lineTo(u, deckY(u)); for (const u of [...us].reverse()) sh.lineTo(u, deckY(u) - 0.32); 
+      const eg = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); eg.translate(0, 0, bv - hw); K.add(M.paving, eg); }
+    // underslung Warren trusses under both deck edges: top chord = deck edge beam, bottom chord bellies to ~1.9 m at midspan
+    const depth = (u) => { const t = (u - bu0) / L; return 0.45 + 1.45 * 4 * t * (1 - t); };
+    for (const sv of [-1, 1]) {
+      const v = bv + sv * (hw - 0.15);
+      for (let i = 0; i < N; i++) {
+        const ua = us[i], ub = us[i + 1];
+        bar(STEEL, [ua, deckY(ua) - 0.42, v], [ub, deckY(ub) - 0.42, v], 0.2);                                      // top chord
+        bar(STEEL, [ua, deckY(ua) - 0.32 - depth(ua), v], [ub, deckY(ub) - 0.32 - depth(ub), v], 0.18);             // bottom chord
+        const up = i % 2 === 0; const um = (ua + ub) / 2;                                                            // Warren diagonals
+        bar(STEEL, [up ? ua : ub, deckY(up ? ua : ub) - 0.42, v], [um, deckY(um) - 0.32 - depth(um), v], 0.12, { detail: true });
+        bar(STEEL, [um, deckY(um) - 0.32 - depth(um), v], [up ? ub : ua, deckY(up ? ub : ua) - 0.42, v], 0.12, { detail: true });
+      }
     }
-    // cambered girder underside (three segments) and V-struts
-    const mid = (bu0 + bu1) / 2;
-    K.box(B.steelGrey, bu0, deck - 1.1, bv - 1.2, bu1, deck - 0.25, bv - 0.9); K.box(B.steelGrey, bu0, deck - 1.1, bv + 0.9, bu1, deck - 0.25, bv + 1.2); // box girders
-    walkables.push(K.walkPoly(rect(bu0, bv - w / 2, bu1, bv + w / 2), deck + 0.03));
+    for (let i = 0; i <= N; i++) { const u = us[i], y = deckY(u) - 0.32 - depth(u); bar(STEEL, [u, y, bv - hw + 0.15], [u, y, bv + hw - 0.15], 0.12, { detail: true }); }   // bottom cross members
+    // guards: champagne posts every ~1.5 m, perforated panels to 1.07 m, a glass screen above, stainless handrail
+    const np = Math.round(L / 1.5);
+    for (const sv of [-1, 1]) {
+      const v = bv + sv * (hw - 0.04);
+      for (let i = 0; i <= np; i++) { const u = bu0 + L * i / np, y = deckY(u); bar(CHAMP, [u, y, v], [u, y + 1.75, v], 0.07, { detail: i % 2 === 1 }); }
+      for (let i = 0; i < np; i++) { const ua = bu0 + L * i / np + 0.05, ub = bu0 + L * (i + 1) / np - 0.05, ya = deckY(ua), yb = deckY(ub);
+        const pg = new THREE.BufferGeometry(); const P = [ua, ya + 0.08, v, ub, yb + 0.08, v, ub, yb + 1.02, v, ua, ya + 0.08, v, ub, yb + 1.02, v, ua, ya + 1.02, v];
+        pg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); pg.computeVertexNormals();
+        K.add(MESH, pg);
+        const gg = new THREE.BufferGeometry(); const Q = [ua, ya + 1.07, v, ub, yb + 1.07, v, ub, yb + 1.72, v, ua, ya + 1.07, v, ub, yb + 1.72, v, ua, ya + 1.72, v];
+        gg.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); gg.computeVertexNormals(); K.add(SCREEN, gg, { detail: true });
+      }
+      for (let i = 0; i < N; i++) { const ua = us[i], ub = us[i + 1]; bar(B.alum, [ua, deckY(ua) + 1.04, v - sv * 0.08], [ub, deckY(ub) + 1.04, v - sv * 0.08], 0.05, { detail: true }); bar(CHAMP, [ua, deckY(ua) + 1.76, v], [ub, deckY(ub) + 1.76, v], 0.06); }
+    }
+    // Cory end: glazed door portal in a dark frame where the deck meets the Cory wall
+    K.box(FR, bu1 - 0.25, yB - 0.05, bv - hw - 0.2, bu1 + 0.15, yB + 2.85, bv + hw + 0.2);
+    K.box(GL, bu1 - 0.3, yB, bv - hw + 0.05, bu1 - 0.24, yB + 2.6, bv + hw - 0.05);
+    walkables.push(K.walkFn(bu0, bv - hw, bu1, bv + hw, (u, v) => (u < bu0 - 0.05 || u > bu1 + 0.05 || v < bv - hw - 0.05 || v > bv + hw + 0.05) ? null : deckY(Math.max(bu0, Math.min(bu1, u)))));
   }
   // ---- colliders
   colliders.push(K.colPoly(rect(u0, v0, u1, 23.74), -2, RIDGE));

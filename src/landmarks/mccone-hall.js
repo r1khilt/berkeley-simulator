@@ -17,15 +17,15 @@ export const info = {
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.8);
   const K = new Kit(ctx, ANG); const M = ctx.M; const B = mats(ctx);
-  const CREAM = panelMat('mcconePanel', { pw: 1.5, ph: 1.5, span: 6.0, base: 0xe7e0d0, joint: 0xc9c1ae, vary: 0.015, grain: 0.012, stagger: false }); const GL = M.windowNight;
+  const CREAM = panelMat('mcconePanel2', { pw: 3.05, ph: 3.05, span: 6.1, base: 0xe8dfc8, joint: 0xd6ccb4, vary: 0.01, grain: 0.01, stagger: false }); const GL = M.windowNight; // [r5-audit-north] smooth painted concrete (was a 1.5 m stone-joint grid)
   const FR = new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.5, metalness: 0.2 }); const FASC = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.6 });
   const colliders = [];
   const u0 = -13.7, u1 = 14.4, v0 = -37.3, v1 = 37.7, ROOF = 24.2, TOPF = 20.3;
   const levels = [-2, 2.6, 6.2, 9.8, 13.4, 17.0, TOPF];
   const runs = massBlock(K, { poly: rect(u0, v0, u1, v1), levels, top: TOPF, wall: CREAM, style: 'punched', depth: 0.35, rev: 0.25, glass: GL, frame: FR,
     win: { w: 1.05, h: 1.95, sill: 0.8, bay: 3.05, mull: 0, tran: 0.78 }, pier: { w: 0.45, p: 0.18, mat: CREAM, top: TOPF + 0.5, ends: true }, roof: M.concreteDark });
-  // dentil band under the top storey
-  for (const R of runs) { K.rbox(R, CREAM, -0.1, TOPF - 0.1, -0.05, R.L + 0.1, TOPF + 0.45, 0.3); for (let s = 0.2; s < R.L; s += 0.5) K.rbox(R, M.concreteDark, s, TOPF + 0.05, 0.3, s + 0.22, TOPF + 0.3, 0.32, { detail: true }); }
+  // plain slab edge under the top storey ([r5-audit-north] photos: no ornament; the old dentil course read as a classical cornice)
+  for (const R of runs) K.rbox(R, FASC, -0.1, TOPF - 0.05, -0.05, R.L + 0.1, TOPF + 0.45, 0.32);
   // continuous glazed top storey, set back slightly
   massBlock(K, { poly: inset(rect(u0, v0, u1, v1), 2.0), levels: [TOPF + 0.45, ROOF - 0.6], top: ROOF - 0.6, wall: CREAM, style: 'curtain', glass: GL, frame: B.alumDark, win: { mw: 1.5, spandrel: 0.0 }, core: true, roof: M.concreteDark });
   K.prism(M.concreteDark, rect(u0 + 0.3, v0 + 0.3, u1 - 0.3, v1 - 0.3), TOPF + 0.3, TOPF + 0.46); // open terrace floor in front of the recessed glass

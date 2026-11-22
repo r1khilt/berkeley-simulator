@@ -33,6 +33,9 @@ export async function build(ctx) {
   const CTR = (P.u0 + P.u1) / 2;
   const yF = -1.5, yEave = 13.4, yBase = 5.0;
   const g0 = k.groundMin([[W.u0, W.v1], [W.u1, W.v1], [CTR, P.v1]]);
+  // [r5-audit-north] entrance floor: photos show the three-arch portal raised ~1.5 m on its podium above the Mining Circle
+  // forecourt, up a broad flight of ~9-10 granite steps (it was g0 + 0.7, which read as doors at grade behind one step)
+  const EF = Math.max(g0 + 0.7, k.ground(CTR, P.v1 + 6.0) + 1.5);
 
   // core volumes (closed boxes behind the façades)
   // (split around the two light courts so they stay open to the sky)
@@ -127,9 +130,9 @@ export async function build(ctx) {
   {
     const F = k.side('S', P.v1);
     const aw = 5.3, pier = 1.9, arches = [-1, 0, 1].map((i) => CTR + i * (aw + pier));
-    const ops = arches.map((c) => ({ s0: c - aw / 2, s1: c + aw / 2, y0: g0 + 0.7, y1: 13.4, arch: true }));
-    F.wall(rust, P.u0, P.u1, yF, g0 + 3.2, 0.9, ops.map((o) => ({ ...o, arch: false, y1: g0 + 3.2 })));
-    F.wall(stone, P.u0, P.u1, g0 + 3.2, yPE, 0.9, ops.map((o) => ({ ...o, y0: g0 + 3.2 })));
+    const ops = arches.map((c) => ({ s0: c - aw / 2, s1: c + aw / 2, y0: EF, y1: 13.4, arch: true }));
+    F.wall(rust, P.u0, P.u1, yF, EF + 2.5, 0.9, ops.map((o) => ({ ...o, arch: false, y1: EF + 2.5 })));
+    F.wall(stone, P.u0, P.u1, EF + 2.5, yPE, 0.9, ops.map((o) => ({ ...o, y0: EF + 2.5 })));
     for (const o of ops) {
       const c = (o.s0 + o.s1) / 2, r = aw / 2, ys = o.y1 - r;
       // golden-oak doors under a transom, glazing above, framed by a pair of Tuscan columns carrying a lintel
@@ -159,15 +162,20 @@ export async function build(ctx) {
     F.repeat(wood, P.u0 + 0.2, P.u1 - 0.2, 0.9, 0.2, 15.6, yPE + 0.7, 0, OV - 0.1);
     // entrance steps across the arcade
     // broad granite stair across the arcade (refine-north: deeper treads, cheek blocks with lamp standards, brick apron)
-    const sA = arches[0] - aw / 2 - 1.2, sB = arches[2] + aw / 2 + 1.2; const gF = Math.min(k.ground(CTR, P.v1 + 5.5), g0); const top = g0 + 0.7;
+    const sA = arches[0] - aw / 2 - 1.2, sB = arches[2] + aw / 2 + 1.2; const gF = Math.min(k.ground(CTR, P.v1 + 6.0), g0); const top = EF;
     const nS = Math.max(3, Math.round((top - gF) / 0.155)); const tr = 0.38; const D0 = 1.2;
     F.box(dark, sA, sB, yF, top, 0, D0);
     for (let i = 0; i < nS; i++) F.box(dark, sA, sB, gF - 1.0, top - ((i + 1) * (top - gF)) / nS, D0 + i * tr, D0 + (i + 1) * tr);
     const D1 = D0 + nS * tr;
-    for (const [a0, a1] of [[sA - 1.3, sA], [sB, sB + 1.3]]) { F.box(stone, a0, a1, gF - 1.0, top + 0.95, 0, D1); F.box(stone, a0 - 0.08, a1 + 0.08, top + 0.95, top + 1.12, -0.08, D1 + 0.08);
-      const c = (a0 + a1) / 2; F.geom(M.lampGreen, new THREE.CylinderGeometry(0.07, 0.09, 3.0, 10).translate(c, top + 1.12 + 1.5, D1 - 0.65), { detail: true });
-      F.geom(M.lampGlow, new THREE.SphereGeometry(0.24, 12, 8).scale(1, 1.25, 1).translate(c, top + 1.12 + 3.25, D1 - 0.65), { detail: true }); }
-    F.box(M.brick, sA - 4, sB + 4, gF - 0.4, gF + 0.04, D1, D1 + 7.0);
+    for (const [a0, a1] of [[sA - 1.3, sA], [sB, sB + 1.3]]) { F.box(stone, a0, a1, gF - 1.0, top + 0.95, 0, D0 + 1.2); F.box(stone, a0 - 0.08, a1 + 0.08, top + 0.95, top + 1.12, -0.08, D0 + 1.28);
+      for (let q = 1; q <= 2; q++) { const ya = gF + 0.75 + (top - gF) * (1 - q / 3); F.box(stone, a0, a1, gF - 1.0, ya, D0 + 1.2 + (D1 - D0 - 1.2) * (q - 1) / 2, D0 + 1.2 + (D1 - D0 - 1.2) * q / 2); }   // [r5-audit-north] cheek walls step down with the raised flight
+      const c = (a0 + a1) / 2; F.geom(M.lampGreen, new THREE.CylinderGeometry(0.07, 0.09, 3.0, 10).translate(c, top + 1.12 + 1.5, D0 + 0.6), { detail: true });
+      F.geom(M.lampGlow, new THREE.SphereGeometry(0.24, 12, 8).scale(1, 1.25, 1).translate(c, top + 1.12 + 3.25, D0 + 0.6), { detail: true }); }
+    { // [r5-audit-north] forecourt apron: bright rust-red brick paving (photos), not the dark wall brick
+      const pave = new THREE.MeshStandardMaterial({ color: new THREE.Color(1.12, 1.02, 1.02) /* a touch brighter than the wall brick: dull brick red, centred on the entrance */, roughness: 0.9, map: M.brick.map, normalMap: M.brick.normalMap, roughnessMap: M.brick.roughnessMap });
+      // laid in 1 m strips that follow the forecourt's grade (a flat slab at the stair foot sank under the rising lawn)
+      for (let t = D1; t < D1 + 6.99; t += 1.0) { const gy = Math.max(gF, k.ground(CTR, P.v1 + t + 0.5)), t1 = Math.min(D1 + 7.0, t + 1.0);
+        F.box(pave, sA - 1.0, sB + 1.0, gy - 0.4, gy + 0.04, t, t1); } }
     walkables.push({ type: 'poly', pts: k.polyLocal([[sA, P.v1 - 0.9], [sB, P.v1 - 0.9], [sB, P.v1 + D0], [sA, P.v1 + D0]]), y: top });
     { const steps = (x, z) => { const [u, v] = k.uv(x, z); if (u < sA || u > sB || v < P.v1 + D0 - 0.05 || v > P.v1 + D1 + 0.05) return null; const i = Math.min(nS - 1, Math.max(0, Math.floor((v - P.v1 - D0) / tr))); return top - ((i + 1) * (top - gF)) / nS; };
       const cs = [[sA, P.v1 + D0], [sB, P.v1 + D0], [sB, P.v1 + D1], [sA, P.v1 + D1]].map(([u, v]) => k.xz(u, v)); walkables.push({ type: 'fn', bounds: [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1])), Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))], heightAt: steps }); }
@@ -206,5 +214,5 @@ export async function build(ctx) {
   colliders.push({ type: 'poly', pts: k.polyLocal([[W.u0, W.v0], [W.u1, W.v0], [W.u1, W.v1], [P.u1, W.v1], [P.u1, P.v1], [P.u0, P.v1], [P.u0, W.v1], [W.u0, W.v1]]), y0: -3, y1: 22 });
 
   const [ix, iz] = k.xz(CTR, P.v1 + 3);
-  return { object3d: k.finish(), colliders, walkables, interactions: [{ id: 'hearst-vestibule', pos: [ix, g0 + 1.5, iz], radius: 5, label: 'Hearst Memorial Mining Building: memorial vestibule' }] };
+  return { object3d: k.finish(), colliders, walkables, interactions: [{ id: 'hearst-vestibule', pos: [ix, EF + 0.8, iz], radius: 5, label: 'Hearst Memorial Mining Building: memorial vestibule' }] };
 }
