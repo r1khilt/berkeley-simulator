@@ -23,8 +23,10 @@ export async function build(ctx) {
   // r4-sweep-central2: really 2.2 m back, near-full-height dark glazing with dark sill panels and slim columns at the
   // balcony line (was 0.9 m back with tall cream spandrels: read as a lit shopfront podium, not a shaded base)
   const gi = 2.2, DK = tint(M, 'concrete', 0x5c5a55);
+  const GL0 = GL.clone(); GL0.onBeforeCompile = GL.onBeforeCompile; GL0.customProgramCacheKey = GL.customProgramCacheKey;
+  GL0.userData.interior = false; // dark lobby glass in the shaded recess (the furnished-office interior read as a lit shopfront)
   for (const { R } of runsOf(K, rect(u0 + gi, v0 + gi, u1 - gi, v1 - gi))) {
-    grid(K, R, 0, R.L, [-1, 4.6], { mat: DK, bay: 3.8, pier: 0.25, sill: 1.15, head: 0.45, rec: 0.1, mull: 2, tran: 0.75, frame: M.whitePaint, glass: GL });
+    grid(K, R, 0, R.L, [-1, 4.6], { mat: DK, bay: 3.8, pier: 0.25, sill: 1.15, head: 0.45, rec: 0.1, mull: 2, tran: 0.75, frame: M.whitePaint, glass: GL0 });
   }
   for (const { R } of runsOf(K, rect(u0 + 0.75, v0 + 0.75, u1 - 0.75, v1 - 0.75))) {
     const n = Math.max(2, Math.round(R.L / 7.6)); for (let i = 0; i <= n; i++) { const s = R.L * i / n; K.rbox(R, W, s - 0.25, -1, -0.5, s + 0.25, 4.32, 0.0); }
