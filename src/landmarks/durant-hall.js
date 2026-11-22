@@ -24,7 +24,11 @@ export async function build(ctx) {
   const fp = ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z));
   const u0 = Math.min(...fp.map((p) => p[0])), u1 = Math.max(...fp.map((p) => p[0]));
   const v0 = Math.min(...fp.map((p) => p[1])), v1 = Math.max(...fp.map((p) => p[1]));
-  const G = M.marble, GD = M.graniteDark, A = M.marble, FR = M.whitePaint;
+  // r4-sweep: same palette as Sproul (G = granite trim, A = jointed ashlar walls); smooth marble read flat and plasticky.
+  // Glass reads dark in photos (pale glass washed the punched windows out); sashes stay off-white.
+  const G = M.granite, GD = M.graniteDark, A = M.ashlar, FR = M.whitePaint;
+  const GLASS = M.windowNight;
+  const DW = M.woodDark.clone(); DW.color.set(0x5a4434); DW.name = 'durantDoorWood'; // photos: very dark brown doors
   const FL = 2.4, F2 = 7.3, TOP = 12.2, EAVE = 14.6;
   const colliders = [], walkables = [];
 
@@ -39,7 +43,7 @@ export async function build(ctx) {
     K.wall(R, mat, 0, R.L, y0, y1, ops, DEP);
   }
   function glaze(R, o, opts = {}) {
-    K.fill(R, o, { frame: FR, glass: paleGlass(), mull: 1, tran: [o.y0 + (o.y1 - o.y0) * 0.68], rev: 0.42, ...opts });
+    K.fill(R, o, { frame: FR, glass: GLASS, mull: 1, tran: [o.y0 + (o.y1 - o.y0) * 0.68], rev: 0.42, ...opts });
     // flat moulded architrave surround
     if (!opts.noSurround) {
       const w = 0.16, p = 0.07;
@@ -82,9 +86,9 @@ export async function build(ctx) {
     for (const o of uf) glaze(R, o);
     // giant pilaster strips between the central bays (water table to architrave)
     for (const s of [pier + endW, pier + endW + midW, pier + endW + midW * 2, pier + endW + midW * 3]) {
-      K.rbox(R, G, s - 0.42, FL + 0.25, 0, s + 0.42, TOP, 0.14);
-      K.rbox(R, G, s - 0.5, TOP - 0.35, 0, s + 0.5, TOP, 0.2); // capital block
-      K.rbox(R, G, s - 0.5, FL + 0.25, 0, s + 0.5, FL + 0.65, 0.2); // base block
+      K.rbox(R, A, s - 0.46, FL + 0.25, 0, s + 0.46, TOP, 0.22); // r4-sweep: deeper strip (was 0.14 m) so it reads in raking light
+      K.rbox(R, G, s - 0.54, TOP - 0.35, 0, s + 0.54, TOP, 0.3); // capital block
+      K.rbox(R, G, s - 0.54, FL + 0.25, 0, s + 0.54, FL + 0.65, 0.3); // base block
     }
   }
   // ---------- short façades (N, S): three bays of paired windows upstairs ----------
@@ -92,27 +96,54 @@ export async function build(ctx) {
     const R = runs[f]; const L = R.L; const pier = 1.7; const bw = (L - 2 * pier) / 3;
     const cs = [0, 1, 2].map((i) => pier + bw * (i + 0.5));
     const uf = []; cs.forEach((c) => uf.push(win(c - 0.95, F2 + 0.95, F2 + 3.75, 1.3), win(c + 0.95, F2 + 0.95, F2 + 3.75, 1.3)));
-    for (let i = 0; i <= 3; i++) { const s = pier + bw * i; K.rbox(R, G, s - 0.4, F2 + 0.7, 0, s + 0.4, TOP, 0.3); }
+    // r4-sweep: inner pilaster strips run the full height (water table to architrave) like the long sides; the old
+    // outer upper-storey piers are replaced by the wide corner pilasters added below for all four corners
+    for (let i = 1; i <= 2; i++) { const s = pier + bw * i; K.rbox(R, A, s - 0.42, FL + 0.25, 0, s + 0.42, TOP, 0.22); }
     const gf = [];
     const door = { s0: L / 2 - (f === 'S' ? 1.2 : 1.0), s1: L / 2 + (f === 'S' ? 1.2 : 1.0), y0: FL, y1: FL + (f === 'S' ? 4.5 : 3.4), doorTop: FL + (f === 'S' ? 3.1 : 2.5), sill: false };
     if (f === 'N') { gf.push(win(cs[0], FL + 0.95, FL + 3.75, 1.35), win(cs[2], FL + 0.95, FL + 3.75, 1.35)); }
     storey(R, G, -1.5, FL, []); K.rustic(R, 0, R.L, -0.6, FL - 0.25, [], 0.55, G); storey(R, A, FL, F2, [...gf, door]); storey(R, A, F2, TOP, uf);
     for (const o of gf) glaze(R, o); for (const o of uf) glaze(R, o);
-    K.fill(R, door, { kind: 'door', rev: 0.5, door: M.woodDark, frame: M.darkBronze });
+    glazedDoor(R, door, 0.5, f === 'S');
     // moulded door surround
-    const pp = f === 'S' ? 0.5 : 0.12; // portal projects from the wall: deep reveal
+    const pp = f === 'S' ? 0.3 : 0.12; // portal projects from the wall (r4-sweep: 0.5 -> 0.3; photo recess ~0.55 m)
     K.rbox(R, G, door.s0 - 0.5, FL, 0, door.s0, door.y1 + 0.45, pp); K.rbox(R, G, door.s1, FL, 0, door.s1 + 0.5, door.y1 + 0.45, pp);
     K.rbox(R, G, door.s0 - 0.5, door.y1, 0, door.s1 + 0.5, door.y1 + 0.45, pp);
     if (f === 'S') { K.rbox(R, G, door.s0 - 0.62, FL, pp, door.s0 - 0.38, door.y1 + 0.45, pp + 0.06); K.rbox(R, G, door.s1 + 0.38, FL, pp, door.s1 + 0.62, door.y1 + 0.45, pp + 0.06); }
     if (f === 'S') {
       // cornice hood on two scrolled consoles
-      K.rbox(R, G, door.s0 - 1.0, door.y1 + 0.45, 0, door.s1 + 1.0, door.y1 + 0.85, 1.05);
-      K.rbox(R, G, door.s0 - 1.15, door.y1 + 0.85, 0, door.s1 + 1.15, door.y1 + 1.15, 1.2);
+      K.rbox(R, G, door.s0 - 1.0, door.y1 + 0.45, 0, door.s1 + 1.0, door.y1 + 0.85, 0.75); // r4-sweep: hood 1.05 -> 0.75 m deep
+      K.rbox(R, G, door.s0 - 1.15, door.y1 + 0.85, 0, door.s1 + 1.15, door.y1 + 1.15, 0.9);  //  so the doorway isn't buried in shadow
+      for (const s of [door.s0 - 0.35, door.s1 + 0.35]) { const g = new THREE_.CylinderGeometry(0.13, 0.13, 0.06, 14); g.rotateX(Math.PI / 2); g.translate(s, door.y1 + 0.65, 0.78); K.addRun(R, G, g, { detail: true }); } // frieze rosettes
       for (const s of [door.s0 - 0.75, door.s1 + 0.75]) {
         K.rbox(R, G, s - 0.2, door.y1 - 1.2, pp, s + 0.2, door.y1 + 0.45, pp + 0.35);
         const g = new THREE_.CylinderGeometry(0.26, 0.26, 0.4, 12); g.rotateZ(Math.PI / 2); g.translate(s, door.y1 + 0.1, pp + 0.5); K.addRun(R, G, g);
         const g2 = new THREE_.CylinderGeometry(0.15, 0.15, 0.4, 10); g2.rotateZ(Math.PI / 2); g2.translate(s, door.y1 - 1.1, pp + 0.3); K.addRun(R, G, g2);
       }
+    }
+  }
+  // r4-sweep: wide flat corner pilasters at every corner (photos: ~1.3 m strips, no capitals), full height. Each run's
+  // start strip reaches 0.22 m past the corner so the outside corner closes.
+  for (const R of Object.values(runs)) { K.rbox(R, A, -0.22, FL + 0.25, 0, 1.4, TOP, 0.22); K.rbox(R, A, R.L - 1.4, FL + 0.25, 0, R.L, TOP, 0.22); }
+  // r4-sweep: glazed entrance doors (photos): a pair of dark-wood leaves with big glass panels over kick panels, a heavy
+  // transom bar and a tall four-light transom, plain stone reveal, and a small pendant lamp in the recess soffit.
+  function glazedDoor(R, o, rev, lamp) {
+    const d = -rev, w = o.s1 - o.s0, dt = o.doorTop, sm = (o.s0 + o.s1) / 2;
+    const gl = new THREE_.PlaneGeometry(w, o.y1 - o.y0); gl.translate(sm, (o.y0 + o.y1) / 2, d - 0.03); K.addRun(R, GLASS, gl, { uvMode: 'keep' });
+    const fr = (s0, y0, s1, y1, dz = 0.07) => K.rbox(R, DW, s0, y0, d - 0.05, s1, y1, d + dz);
+    fr(o.s0, o.y0, o.s0 + 0.1, o.y1); fr(o.s1 - 0.1, o.y0, o.s1, o.y1); fr(o.s0, o.y1 - 0.1, o.s1, o.y1);   // jamb + head liners
+    fr(sm - 0.06, o.y0, sm + 0.06, dt, 0.09);                                                            // meeting stiles
+    for (const [a, b] of [[o.s0 + 0.1, sm - 0.06], [sm + 0.06, o.s1 - 0.1]]) {
+      fr(a, o.y0, a + 0.13, dt, 0.05); fr(b - 0.13, o.y0, b, dt, 0.05);                                   // leaf stiles
+      fr(a, dt - 0.15, b, dt, 0.05); fr(a, o.y0, b, o.y0 + 0.62, 0.04);                                   // top rail, kick panel
+      K.rbox(R, M.darkBronze, b - 0.22, o.y0 + 1.0, d + 0.05, b - 0.19, o.y0 + 1.5, d + 0.09, { detail: true }); // pull
+    }
+    fr(o.s0, dt, o.s1, dt + 0.22, 0.1);                                                                   // heavy transom bar
+    for (let k = 1; k <= 3; k++) { const s = o.s0 + 0.1 + (w - 0.2) * k / 4; fr(s - 0.035, dt + 0.22, s + 0.035, o.y1 - 0.1, 0.04); }
+    if (lamp) { // small dome pendant hanging in the recess soffit, in front of the transom
+      const [lu, lv] = R.at(sm, -0.25);
+      K.cyl(M.darkBronze, lu, o.y1 - 0.32, lv, 0.012, 0.012, 0.32, 6, { detail: true });
+      K.lathe(M.lampGlow, [[0.001, -0.1], [0.12, -0.08], [0.15, 0.0], [0.11, 0.06], [0.001, 0.08]], lu, o.y1 - 0.4, lv, 12, { detail: true });
     }
   }
   // ---------- horizontal mouldings and the entablature (all four sides) ----------
