@@ -331,23 +331,21 @@ function buildOctagonDeck(A, MAT, p) {
   // deck-local frame: u along (tx,tz), v across (left normal (-tz,tx)); world = c + u*t + v*nrm
   const tx = b.tree[0] - cx, tz = b.tree[1] - cz; const tu = tx * q0.tx + tz * q0.tz, tv = -tx * q0.tz + tz * q0.tx;
   const sh = new THREE.Shape(); sh.moveTo(-len / 2, -b.w / 2); sh.lineTo(len / 2, -b.w / 2); sh.lineTo(len / 2, b.w / 2); sh.lineTo(-len / 2, b.w / 2); sh.closePath();
-  const RH = 0.85, hp = []; for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; hp.push(new THREE.Vector2(tu + Math.cos(a) * RH, tv + Math.sin(a) * RH)); }
+  const RH = 1.1, hp = []; for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; hp.push(new THREE.Vector2(tu + Math.cos(a) * RH, tv + Math.sin(a) * RH)); }
   sh.holes.push(new THREE.Path(hp.reverse()));
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.42, bevelEnabled: false });
   // shape (u, v, depth) -> world: x = cx + u*tx - v*tz, z = cz + u*tz + v*tx, y = y - depth
   const pos = g.attributes.position; for (let i = 0; i < pos.count; i++) { const u = pos.getX(i), v = pos.getY(i), d = pos.getZ(i); pos.setXYZ(i, cx + u * q0.tx - v * q0.tz, y - d, cz + u * q0.tz + v * q0.tx); }
   g.deleteAttribute('normal'); g.computeVertexNormals();
   A.add(MAT.concDeck, boxUV(g));
-  // octagonal bench round the hole (seat boards on concrete plinths)
-  const RB0 = 1.0, RB1 = 1.5, SY = y + 0.45, rm = (RB0 + RB1) / 2;
+  // octagonal bench round the hole: three timber seat slats per side on concrete plinths, seat at 0.45 m
+  const RB0 = 1.25, RB1 = 1.9, SY = y + 0.45; const seatWood = tint(MAT.timber, 0xb8a07c, 0.8);
   for (let i = 0; i < 8; i++) {
-    const am = i * Math.PI / 4 + Math.PI / 4;   // octagon edges face these angles (vertices at pi/8 + k pi/4)
-    const lu = tu + Math.cos(am) * rm, lv = tv + Math.sin(am) * rm;
-    const wx = cx + lu * q0.tx - lv * q0.tz, wz = cz + lu * q0.tz + lv * q0.tx; const side = 2 * RB1 * Math.tan(Math.PI / 8);
-    // edge direction in world: along local angle am + 90deg
+    const am = i * Math.PI / 4 + Math.PI / 4;   // edge-normal angle in deck-local (u, v)
     const ex = Math.cos(am + Math.PI / 2), ev = Math.sin(am + Math.PI / 2); const dwx = ex * q0.tx - ev * q0.tz, dwz = ex * q0.tz + ev * q0.tx; const segYaw = Math.atan2(dwz, dwx);
-    A.box(MAT.timber, wx, SY, wz, side, 0.07, RB1 - RB0, segYaw);
-    A.box(MAT.concDark, wx, (SY + y) / 2 - 0.02, wz, side * 0.5, SY - y - 0.04, (RB1 - RB0) * 0.6, segYaw);
+    const at = (r) => { const lu = tu + Math.cos(am) * r, lv = tv + Math.sin(am) * r; return [cx + lu * q0.tx - lv * q0.tz, cz + lu * q0.tz + lv * q0.tx]; };
+    for (let k = 0; k < 3; k++) { const r = RB0 + 0.11 + k * (RB1 - RB0 - 0.22) / 2; const [wx, wz] = at(r); A.box(seatWood, wx, SY - 0.02, wz, 2 * r * Math.tan(Math.PI / 8) + 0.02, 0.06, 0.17, segYaw); }
+    const [px, pz] = at((RB0 + RB1) / 2); A.box(MAT.conc, px, (SY + y) / 2 - 0.04, pz, 0.35, SY - y - 0.06, RB1 - RB0 - 0.15, segYaw);
   }
 }
 
