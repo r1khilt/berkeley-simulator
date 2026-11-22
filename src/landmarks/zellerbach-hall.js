@@ -91,6 +91,11 @@ export async function build(ctx) {
     for (let k = 0; k < 4; k++) glassBand(K, R, fr[0] + k * bay / 2 + 0.3, fr[0] + (k + 1) * bay / 2 - 0.25, SB, FA, { glass, frame, pitch: 1.25, transoms: [SB + (FA - SB) * 0.66], rec: 0.6 });
     for (let k = 0; k <= 2; k++) K.rbox(R, conc, fr[0] + k * bay - 0.45, gmin, -0.3, fr[0] + k * bay + 0.45, LB + 0.3, 0.6);
     for (let s = 1.2; s < L - 1; s += 1.2) K.rbox(R, M.concreteDark, s - 0.015, gmin + 0.5, 0.0, s + 0.015, LB, 0.01, { detail: true }); // board-form joints
+    // r4-sweep: the long side walls read as blank slabs; the lobby fascia band wraps the top (as on the plaza front) and a
+    // plain plinth course grounds the base
+    K.rbox(R, conc, -0.45, FA, 0.0, L + 0.45, LB + 0.3, 0.45);
+    K.rbox(R, M.concreteDark, -0.45, FA - 0.06, 0.0, L + 0.45, FA, 0.4);
+    K.rbox(R, conc, 0, gmin, 0.0, L, Math.max(gmin + 0.9, LF - 0.05), 0.18);
   }
   // low covered walkway along the south side (toward the Playhouse)
   { const v0 = S, v1 = S + 2.6, y = g(0, S + 1.3) + 3.2; K.box(conc, W0, y, v0, 8.0, y + 0.35, v1); for (let u = W0 + 2; u < 8; u += 5.5) K.box(conc, u - 0.2, y - 3.5, v1 - 0.6, u + 0.2, y, v1 - 0.2); }
@@ -114,8 +119,13 @@ export async function build(ctx) {
     K.box(fly, a0, LB - 0.5, b0, a1, FTT, b1);
     for (const [p, q] of [[[a0, b1], [a1, b1]], [[a1, b0], [a0, b0]], [[a0, b0], [a0, b1]]]) {
       const R = K.run(p, q); for (let y = LB + 1.2; y < FTT; y += 1.2) K.rbox(R, M.concreteDark, 0, y - 0.015, 0.0, R.L, y + 0.015, 0.01, { detail: true });
-      for (let s = R.L / 2 - 3; s < R.L / 2 + 3; s += 0.4) K.rbox(R, M.iron, s, FTT - 3.5, 0.0, s + 0.25, FTT - 1.5, 0.12, { detail: true });
+      // r4-sweep: louvre bank as a framed recess with stacked blades (was flat dark strips that read as painted on)
+      const l0 = R.L / 2 - 3, l1 = R.L / 2 + 3, ly0 = FTT - 3.6, ly1 = FTT - 1.4;
+      K.rbox(R, M.concreteDark, l0, ly0, -0.25, l1, ly1, -0.2);
+      for (const [a, b, c, d] of [[l0 - 0.25, ly0 - 0.25, l1 + 0.25, ly0], [l0 - 0.25, ly1, l1 + 0.25, ly1 + 0.25], [l0 - 0.25, ly0, l0, ly1], [l1, ly0, l1 + 0.25, ly1]]) K.rbox(R, fly, a, b, -0.25, c, d, 0.12);
+      for (let y = ly0 + 0.12; y < ly1 - 0.05; y += 0.2) { K.rbox(R, M.iron, l0, y, -0.2, l1, y + 0.05, 0.02, { detail: true }); K.rbox(R, M.iron, l0, y + 0.05, -0.12, l1, y + 0.09, 0.06, { detail: true }); }
     }
+    K.box(conc, a0 - 0.2, FTT - 0.45, b0 - 0.2, a1 + 0.2, FTT + 0.12, b1 + 0.2); // r4-sweep: coping band so the tower top reads finished
     K.box(conc, a0 + 3, FTT, b0 + 4, a0 + 8, FTT + 1.6, b0 + 9);
     colliders.push(K.colPoly([[a0, b0], [a1, b0], [a1, b1], [a0, b1]], LB - 1, FTT));
   }
