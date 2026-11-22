@@ -17,6 +17,15 @@ export const info = {
   replaces: ['w/24025428'],
 };
 
+// r4-sweep: expanded-metal mesh (diamond strands, see-through gaps); mipmaps average it to a light, ~60 % opaque grey
+function meshPanelMat() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(150,155,160,0.3)'; g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = 'rgba(222,225,228,1)'; g.lineWidth = 8; g.lineCap = 'square';
+  for (const [x0, y0, x1, y1] of [[0, 32, 32, 0], [32, 0, 64, 32], [64, 32, 32, 64], [32, 64, 0, 32]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return new THREE.MeshStandardMaterial({ map: t, color: 0xb9bdc0, metalness: 0.35, roughness: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide, name: 'mlkMesh' });
+}
 const FONT = { A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'], B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'], D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
   E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'], G: ['01110', '10000', '10000', '10111', '10001', '10001', '01110'], H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
   I: ['111', '010', '010', '010', '010', '010', '111'], J: ['00111', '00010', '00010', '00010', '00010', '10010', '01100'], K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
@@ -151,7 +160,18 @@ export async function build(ctx) {
     const fins = Math.round(R.L / 1.5);
     K.rbox(R, buff, 0, 9.3, -0.3, R.L, TOP - 0.1, -0.15);
     for (let i = 0; i <= fins; i++) { const s = i * R.L / fins; K.rbox(R, alu, s - 0.04, 9.6, -0.15, s + 0.04, TOP - 0.2, 0.35, { detail: i % 4 !== 0 }); }
-    K.rbox(R, mesh, 0.2, 10.2, 0.18, R.L - 0.2, TOP - 0.6, 0.2);
+    // r4-sweep: framed expanded-metal panels between the fins (photo: light galvanised mesh in thin frames, 40-60 % see-
+    // through, lighter than the glazing) instead of one dark see-through slab that read as a blank billboard
+    { const meshM = meshPanelMat(); const tiers = [[10.2, 15.35], [15.55, TOP - 0.6]];
+      for (let i = 0; i < fins; i++) {
+        const a = i * R.L / fins + 0.07, b = (i + 1) * R.L / fins - 0.07;
+        for (const [y0, y1] of tiers) {
+          const pg = new THREE.PlaneGeometry(b - a, y1 - y0); const uv = pg.attributes.uv;
+          for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * (b - a) / 0.3, uv.getY(k) * (y1 - y0) / 0.3);
+          pg.translate((a + b) / 2, (y0 + y1) / 2, 0.24); K.addRun(R, meshM, pg, { uvMode: 'keep' });
+          for (const [s0, q0, s1, q1] of [[a, y0, b, y0 + 0.06], [a, y1 - 0.06, b, y1], [a, y0, a + 0.05, y1], [b - 0.05, y0, b, y1]]) K.rbox(R, alu, s0, q0, 0.2, s1, q1, 0.28, { detail: true });
+        }
+      } }
     for (let k = 0; k < 6; k++) { const s0 = 3 + k * 9.4; glassBand(K, R, s0, s0 + 3.0, 13.6, 17.0, { glass: blueGlass, frame, pitch: 1.5, rec: -0.12 }); }
     // west wing: north part 13.5 m, south part 9.5 m with roof terrace
     const w0 = -25.4, wN = -26.0, wM = -4.0, wS = 22.0;
@@ -209,6 +229,7 @@ export async function build(ctx) {
   }
   const object3d = K.finish();
   object3d.name = 'martin-luther-king-jr-student-union';
+  object3d.traverse((o) => { if (o.isMesh && o.material && o.material.name === 'mlkMesh') o.castShadow = false; }); // r4-sweep: see-through mesh casts no solid shadow
   // interiors-cafe: furnished, walkable Lower Sproul dining room / food court + Cal Student Store frontage (distance-gated)
   const IN = mlkInterior(ctx, { ANG, floor: FLR, sGlass, frame, alu });
   object3d.add(IN.object3d); colliders.push(...IN.colliders); walkables.push(...IN.walkables);
