@@ -432,6 +432,22 @@ vec3 irAverage(int t, float seed, float lit, vec3 lampC) {
   vec3 base = irWallTint(seed) * 0.5; float dk = 1.0 - uNight;   // dim by day (glass reads dark from a distance), glowing at night
   return base * (lit * lampC * mix(0.55, 0.2, dk) + dk * 0.09 + 0.005) + lampC * lit * mix(0.12, 0.025, dk) * (t == IR_DORM || t == IR_LIVING ? 0.5 : 1.0);
 }
+// r4-generic: split mode for the procedural façades. When irSplit is set, irRoom returns the room without its blind /
+// curtain; the cover's albedo goes to irCovAlb and its coverage to irCovOut.a, so the host lights it like the wall
+// (sun + shadow through the glass). Landmark glass never sets irSplit and is unchanged.
+bool irSplit = false; vec3 irCovAlb = vec3(0.0); vec4 irCovOut = vec4(0.0);
+// average blind/curtain of a window (same dice as irCover) for windows too small to trace: (albedo, covered fraction)
+vec4 irCoverAvg(int t, float wseed) {
+  vec4 r = irH4(wseed + 19.7);
+  bool resid = (t == IR_DORM || t == IR_LIVING);
+  float pc = resid ? 0.5 : (t == IR_OFFICE ? 0.04 : 0.0);
+  float pb = resid ? 0.28 : (t == IR_CAFE || t == IR_RETAIL ? 0.08 : (t == IR_LIBRARY ? 0.2 : 0.36));
+  if (r.x < pc) { float f = r.w > 0.85 ? 1.0 : min(1.0, 0.2 + 0.38 * (r.y + r.z)); return vec4(mix(vec3(0.78, 0.72, 0.6), irMuted(r.w * 7.3) * 1.2, step(0.5, fract(r.w * 13.0))) * 0.86, f); }
+  if (r.x < pc + pb) { float f = r.y > 0.96 ? 1.0 : 0.1 + 0.75 * r.y * r.y; bool ven = r.z < 0.75;
+    vec3 bc = ven ? mix(vec3(0.8, 0.79, 0.76), vec3(0.58, 0.6, 0.62), step(0.7, r.w)) : mix(vec3(0.74, 0.71, 0.64), vec3(0.32, 0.33, 0.35), step(0.6, r.w));
+    return vec4(bc * (ven ? 0.78 : 0.95), f * (ven ? 0.95 : 1.0)); }
+  return vec4(0.0);
+}
 // blinds / roller shades / curtains hanging just behind the glass. win = (x0, y0, x1, y1) in room space.
 vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
   vec4 r = irH4(wseed + 19.7);
@@ -449,6 +465,7 @@ vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
     vec3 cc = mix(vec3(0.78, 0.72, 0.6), irMuted(r.w * 7.3) * 1.2, step(0.5, fract(r.w * 13.0)));
     float fold = mix(0.78 + 0.22 * sin(q.x * 22.0 + r.y * 9.0), 0.86, smoothstep(0.02, 0.06, irPx));
     vec3 col = cc * fold * ((1.0 - uNight) * 0.16 + lampC * lit * 0.5 + 0.005);
+    irCovAlb = cc * fold;
     return vec4(col, c);
   }
   if (r.x < pc + pb) { // venetian blind or roller shade from the top down to a random height
@@ -463,6 +480,7 @@ vec4 irCover(int t, vec4 win, float wseed, float lit, vec3 lampC) {
     else sl = 0.92 + 0.08 * smoothstep(bottom, win.w, q.y);
     float rail = 1.0 - step(bottom + 0.045, q.y);
     vec3 col = bc * sl * ((1.0 - uNight) * 0.15 + lampC * lit * (ven ? 0.18 : 0.3) + 0.004) * (1.0 - 0.45 * rail);
+    irCovAlb = bc * sl * (1.0 - 0.45 * rail);
     return vec4(col, c * (ven ? 0.95 : 1.0));
   }
   return vec4(0.0);
@@ -474,8 +492,8 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
   rd.z = max(rd.z, 0.02);
   rd = vec3(abs(rd.x) < 1e-4 ? 1e-4 : rd.x, abs(rd.y) < 1e-4 ? 1e-4 : rd.y, rd.z);
   irRO = ro; irRD = rd; irIRD = 1.0 / rd; irPx = px; irCamD = camD; irAO = 1.0;
-  vec4 cov = irCover(t, win, wseed, lit, lampC);
-  if (cov.a > 0.99) return cov.rgb;
+  vec4 cov = irCover(t, win, wseed, lit, lampC); irCovOut = cov;
+  if (cov.a > 0.99) return irSplit ? vec3(0.0) : cov.rgb;
   float yF = t == IR_LECTURE ? -1.6 : 0.0;
   vec3 lo = vec3(0.0, yF, 0.0);
   // room shell (hit from inside)
@@ -501,7 +519,7 @@ vec3 irRoom(vec3 ro, vec3 rd, vec3 R, int t, float seed, float wseed, float lit,
   vec3 col = irShade(t, R, yF, seed, lit, lampC);
   // by day, show close rooms clearly but let distant windows fall back to dark glass
   float nearK = 1.0 - smoothstep(0.035, 0.08, px);   // px ~ 0.0024 m per metre of distance at 720p
-  return mix(col, cov.rgb, cov.a) * mix(1.0, mix(0.75, 1.35, nearK), 1.0 - uNight);
+  return (irSplit ? col : mix(col, cov.rgb, cov.a)) * mix(1.0, mix(0.75, 1.35, nearK), 1.0 - uNight);
 }
 `;
 
