@@ -96,6 +96,8 @@ export async function build(ctx) {
       const g0 = Math.max(gAt(R, L / 2, 2), gAt(R, e + 1, 1), gAt(R, L - e - 1, 1)) + 0.08;
       K.rbox(R, P.concreteBuff, e, Y0, -D, L - e, g0, 2.0);
       walkables.push({ type: 'poly', pts: [R.at(e, -D), R.at(L - e, -D), R.at(L - e, 2.0), R.at(e, 2.0)].map(([u, v]) => K.xz(u, v)), y: g0 });
+      if (g0 < FL - 0.35) { K.rbox(R, DKG, e + 0.05, g0, -D + 0.01, L - e - 0.05, FL - 0.3, -D + 0.04, { uvMode: 'keep' }); } // [r5a] glazing runs down to the forecourt
+      { const m = L / 2; K.rbox(R, FR, m - 1.6, g0, -D + 0.04, m + 1.6, g0 + 2.75, -D + 0.12); for (const [x0, x1] of [[m - 1.5, m - 0.04], [m + 0.04, m + 1.5]]) K.rbox(R, DKG, x0, g0 + 0.06, -D + 0.12, x1, g0 + 2.6, -D + 0.14, { uvMode: 'keep' }); } // entrance doors
       // [r5a] where the grade falls away in front of the pavilion (the SW corner drops ~2 m toward the grove), a full-width
       // flight runs down from the forecourt edge to the path instead of leaving a bare slab edge standing above the lawn
       { const T = 0.36, d0 = 2.0; const gFoot = (dd) => { const a = [gAt(R, e + 1, dd), gAt(R, L / 2, dd), gAt(R, L - e - 1, dd)].sort((x, y) => x - y); return a[1]; };
@@ -103,7 +105,8 @@ export async function build(ctx) {
         const rise = g0 - gF;
         if (rise > 0.3) { const n = Math.max(2, Math.round(rise / 0.155)), r = rise / n;
           for (let k = 0; k < n - 1; k++) { K.rbox(R, P.concreteBuff, e, gF - 0.8, d0 + k * T, L - e, g0 - r * (k + 1), d0 + (k + 1) * T); K.rbox(R, CD, e, g0 - r * (k + 1) - 0.06, d0 + k * T - 0.01, L - e, g0 - r * (k + 1) - 0.03, d0 + k * T + 0.002, { detail: true }); }
-          for (const sx of [e - 0.45, L - e]) K.rbox(R, C, sx, gF - 0.8, -0.2, sx + 0.45, g0 + 0.9, d0 + (n - 1) * T); // cheek walls
+          for (const sx of [e - 0.45, L - e]) { const dE = d0 + (n - 1) * T; const sh = new THREE.Shape(); sh.moveTo(-0.2, gF - 0.8); sh.lineTo(-0.2, g0 + 0.9); sh.lineTo(d0, g0 + 0.9); sh.lineTo(dE, gF + r + 0.75); sh.lineTo(dE, gF - 0.8); sh.closePath(); // sloped cheek walls following the flight
+            const g = new THREE.ExtrudeGeometry(sh, { depth: 0.45, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(sx + 0.45, 0, 0); K.addRun(R, C, g); }
           const cs = [R.at(e, d0), R.at(L - e, d0), R.at(L - e, d0 + (n - 1) * T), R.at(e, d0 + (n - 1) * T)].map(([u, v]) => K.xz(u, v));
           walkables.push({ type: 'fn', bounds: [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1])), Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))],
             heightAt: (x, z) => { const [u, v] = K.uv(x, z); const du = u - R.a[0], dv = v - R.a[1]; const ss = du * R.t[0] + dv * R.t[1], dd = du * R.n[0] + dv * R.n[1];
