@@ -1,0 +1,164 @@
+{
+ "avatars": [
+  {
+   "id": "female_08",
+   "name": "Female_Adult_08",
+   "sex": "f",
+   "file": "female_08.glb",
+   "tris": 8276,
+   "bytes": 391484
+  },
+  {
+   "id": "male_12",
+   "name": "Male_Adult_12",
+   "sex": "m",
+   "file": "male_12.glb",
+   "tris": 6722,
+   "bytes": 362012
+  },
+  {
+   "id": "female_03",
+   "name": "Female_Adult_03",
+   "sex": "f",
+   "file": "female_03.glb",
+   "tris": 9208,
+   "bytes": 411680
+  },
+  {
+   "id": "female_04",
+   "name": "Female_Adult_04",
+   "sex": "f",
+   "file": "female_04.glb",
+   "tris": 9284,
+   "bytes": 451904
+  },
+  {
+   "id": "female_12",
+   "name": "Female_Adult_12",
+   "sex": "f",
+   "file": "female_12.glb",
+   "tris": 8774,
+   "bytes": 387508
+  },
+  {
+   "id": "female_14",
+   "name": "Female_Adult_14",
+   "sex": "f",
+   "file": "female_14.glb",
+   "tris": 8724,
+   "bytes": 538136
+  },
+  {
+   "id": "female_17",
+   "name": "Female_Adult_17",
+   "sex": "f",
+   "file": "female_17.glb",
+   "tris": 8516,
+   "bytes": 402564
+  },
+  {
+   "id": "female_01",
+   "name": "Female_Adult_01",
+   "sex": "f",
+   "file": "female_01.glb",
+   "tris": 8732,
+   "bytes": 424996
+  },
+  {
+   "id": "female_06",
+   "name": "Female_Adult_06",
+   "sex": "f",
+   "file": "female_06.glb",
+   "tris": 6992,
+   "bytes": 350136
+  },
+  {
+   "id": "female_09",
+   "name": "Female_Adult_09",
+   "sex": "f",
+   "file": "female_09.glb",
+   "tris": 9032,
+   "bytes": 422632
+  },
+  {
+   "id": "female_07",
+   "name": "Female_Adult_07",
+   "sex": "f",
+   "file": "female_07.glb",
+   "tris": 8308,
+   "bytes": 399948
+  },
+  {
+   "id": "male_04",
+   "name": "Male_Adult_04",
+   "sex": "m",
+   "file": "male_04.glb",
+   "tris": 8684,
+   "bytes": 427656
+  },
+  {
+   "id": "male_06",
+   "name": "Male_Adult_06",
+   "sex": "m",
+   "file": "male_06.glb",
+   "tris": 7456,
+   "bytes": 429568
+  },
+  {
+   "id": "male_09",
+   "name": "Male_Adult_09",
+   "sex": "m",
+   "file": "male_09.glb",
+   "tris": 7428,
+   "bytes": 389244
+  },
+  {
+   "id": "male_10",
+   "name": "Male_Adult_10",
+   "sex": "m",
+   "file": "male_10.glb",
+   "tris": 6732,
+   "bytes": 334856
+  },
+  {
+   "id": "male_16",
+   "name": "Male_Adult_16",
+   "sex": "m",
+   "file": "male_16.glb",
+   "tris": 7064,
+   "bytes": 291532
+  },
+  {
+   "id": "male_17",
+   "name": "Male_Adult_17",
+   "sex": "m",
+   "file": "male_17.glb",
+   "tris": 7084,
+   "bytes": 304504
+  },
+  {
+   "id": "male_18",
+   "name": "Male_Adult_18",
+   "sex": "m",
+   "file": "male_18.glb",
+   "tris": 6434,
+   "bytes": 223028
+  },
+  {
+   "id": "male_20",
+   "name": "Male_Adult_20",
+   "sex": "m",
+   "file": "male_20.glb",
+   "tris": 7120,
+   "bytes": 267416
+  },
+  {
+   "id": "male_03",
+   "name": "Male_Adult_03",
+   "sex": "m",
+   "file": "male_03.glb",
+   "tris": 7200,
+   "bytes": 562716
+  }
+ ]
+}

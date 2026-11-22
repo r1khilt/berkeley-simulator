@@ -16,6 +16,7 @@ import { loadPeopleAssets } from './assets.js';
 import { Character } from './character.js';
 import { prebuildParts } from './garments.js'; // r4-people2
 import { SKIN, HAIR, SHOE } from '../life/people.js';
+import { loadRocketbox, RBCharacter } from './rocketbox.js'; // r4-people3: realistic Rocketbox avatars as the near LOD
 
 const TAU = Math.PI * 2;
 const QK = { low: { k: 4, d: 14 }, medium: { k: 8, d: 20 }, high: { k: 14, d: 28 }, ultra: { k: 24, d: 38 } }; // skinned people near the camera (?npcK= ?npcD= override, ?people=0 off)
@@ -41,7 +42,8 @@ class People {
       const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
       const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xffffff, name: 'people:blob' });
       this.blobs = new THREE.InstancedMesh(g, m, Math.max(1, this.K)); this.blobs.count = 0; this.blobs.frustumCulled = false; this.blobs.renderOrder = 1; this.blobs.name = 'people:blobs'; this.group.add(this.blobs); this._bm = new THREE.Matrix4(); this._bq = new THREE.Quaternion(); this._bs = new THREE.Vector3(); this._bp = new THREE.Vector3(); }
-    if (this.K > 0 && qs.get('people') !== '0') loadPeopleAssets().then((A) => this._build(A)).catch((e) => console.warn('people assets failed', e));
+    this.useRB = qs.get('rb') !== '0'; // r4-people3: ?rb=0 keeps the procedural Quaternius people
+    if (this.K > 0 && qs.get('people') !== '0') loadPeopleAssets().then((A) => { this._build(A); this._rbLoad(A); }).catch((e) => console.warn('people assets failed', e));
   }
   _build(A) {
     A.palette = { SKIN, HAIR, SHOE }; this.assets = A;
@@ -57,6 +59,43 @@ class People {
     this.ready = true; if (this.life.enabled === false) this.setEnabled(false);
   }
   setEnabled(on) { this.enabled = !!on; if (!on) this._releaseAll(); this.group.visible = this.enabled; }
+  // ---------------------------------------------------------------- r4-people3: Rocketbox near LOD
+  // Loaded once the world is up (never delays the first frame). Every person then wears one avatar: the far crowd takes
+  // on its measured colours (rocketbox.js measureLook), so the hand-off to the near LOD adds detail, not new clothes.
+  _rbLoad(A) {
+    if (!this.useRB || typeof window === 'undefined') return;
+    const go = () => loadRocketbox(A).then((list) => this._rbReady(list)).catch((e) => console.warn('rocketbox people failed', e));
+    const wait = () => { const game = window.BSIM && window.BSIM.qs; if (!game || window.BSIM.ready) setTimeout(go, 500); else setTimeout(wait, 400); }; // game: after BSIM.ready
+    wait();
+  }
+  _rbReady(list) {
+    list = list.filter((av) => av.look); if (!list.length) return;
+    this.rb = { list, bySex: { f: list.filter((a) => a.sex === 'f'), m: list.filter((a) => a.sex === 'm') }, use: new Map(), n: new Map(), id0: this.life.nextId ?? 1e9 };
+    for (const av of list) this._rbInstance(av); // one of each up front; a second copy is made on demand
+    try { const r = window.BSIM && window.BSIM.composer && window.BSIM.composer.renderer; const c0 = this.pool.find((c) => c.isRB);
+      if (r && r.compileAsync && c0) { c0.root.visible = true; r.compileAsync(c0.root, this.ctx.camera, this.ctx.scene).catch(() => {}).finally(() => { if (!c0.agent) c0.root.visible = false; }); } } catch (e) { /* optional */ }
+  }
+  adoptAll() { // QA / debug: release everyone and dress them in avatars right away (BSIM.people.adoptAll())
+    if (!this.rb) return false; this._releaseAll(); for (const a of [...(this.life.walkers || []), ...(this.life.riders || []), ...(this.life.spots || [])]) if (!a._rb && a.look) this._adopt(a); return true; }
+  _rbInstance(av) {
+    const c = new RBCharacter(av, this.ctx.quality !== 'low'); this.rb.n.set(av.id, (this.rb.n.get(av.id) || 0) + 1);
+    if (!av.B.phaseOff) calibrate(c);
+    this.pool.push(c); this.group.add(c.root); const setup = this.ctx.setupMaterials; if (setup) setup(c.root);
+    return c;
+  }
+  _rbFree(a) { // a free near character wearing this agent's avatar (or a new copy, at most one per frame)
+    const id = a._rb.id; let c = this.pool.find((p) => p.rbId === id && !p.agent && !p.hideNext);
+    if (!c && !this._rbMade && (this.rb.n.get(id) || 0) < 3) { c = this._rbInstance(a._rb); this._rbMade = true; }
+    return c;
+  }
+  _adopt(a) { // give this person the least-used avatar of their sex, and its colours for the far crowd
+    const L0 = a.look; const list = this.rb.bySex[L0.fem ? 'f' : 'm']; if (!list.length) return;
+    const n = list.length, s0 = Math.floor(((a.seed ?? this.rand()) % 1) * n); let best = null, bu = 1e9;
+    for (let i = 0; i < n; i++) { const av = list[(s0 + i) % n]; const u = this.rb.use.get(av.id) || 0; if (u < bu) { bu = u; best = av; } }
+    this.rb.use.set(best.id, bu + 1); a._rb = best;
+    const keep = (L0.flags | 0) & ~(1 | 2 | 8); // sleeves / trousers / skirt come from the avatar; bags, phone, cup, book stay
+    a.look = Object.assign({}, L0, best.look, { flags: keep | best.look.flags, fem: L0.fem });
+  }
   _releaseAll() { for (const c of this.pool) { if (c.agent) c.agent.hidden = false; c.agent = null; c.root.visible = false; } this.byAgent.clear(); }
   _inView(a) { this.sph.center.set(a.x, a.y + 0.9, a.z); return this.fr.intersectsSphere(this.sph); }
   // ---------------------------------------------------------------- per frame (after campus life has moved everyone)
@@ -65,6 +104,10 @@ class People {
     const tStart = performance.now(); // r4-people2: CPU cost of the near-LOD layer (stats.ms, smoothed)
     const cam = camera.position; this.pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); this.fr.setFromProjectionMatrix(this.pm);
     for (const c of this.pool) if (c.hideNext) { c.hideNext = false; if (!c.agent) c.root.visible = false; }
+    // r4-people3: dress everyone in an avatar; people already on screen switch only once they're far away or out of view
+    this._rbMade = false;
+    if (this.rb) for (const a of agents) { if (a._rb || !a.look || this.byAgent.has(a)) continue;
+      if (a.id >= this.rb.id0 || (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 > 1600 || !this._inView(a)) this._adopt(a); }
     // pick the K nearest people in view (riders included: campus life keeps drawing their bike when the person is hidden)
     const maxD2 = this.maxD * this.maxD, cand = this._cand || (this._cand = []); cand.length = 0;
     for (const a of agents) { const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a); if (a.kind === 'rider' && d2 > 22 * 22 * (keep ? 1.25 : 1)) continue; // r4-people2: riders get skinned people too (on campus life's bikes)
@@ -73,7 +116,7 @@ class People {
     const want = this._want || (this._want = new Set()); want.clear(); let nf = 0, nm = 0; const half = this.K / 2;
     for (const [, a] of cand) { const f = a.look && a.look.fem; if (f ? nf >= half : nm >= half) continue; want.add(a); if (f) nf++; else nm++; if (want.size >= this.K) break; }
     for (const c of this.pool) if (c.agent && !want.has(c.agent)) { c.agent.hidden = false; this.byAgent.delete(c.agent); c.agent = null; c.hideNext = true; }
-    for (const a of want) { if (this.byAgent.has(a)) continue; const sex = a.look && a.look.fem ? 'f' : 'm'; const c = this.pool.find((p) => !p.agent && !p.hideNext && p.sex === sex); if (!c) continue;
+    for (const a of want) { if (this.byAgent.has(a)) continue; const sex = a.look && a.look.fem ? 'f' : 'm'; const c = (a._rb && this._rbFree(a)) || this.pool.find((p) => !p.isRB && !p.agent && !p.hideNext && p.sex === sex); if (!c) continue; // r4-people3: Rocketbox first
       c.agent = a; this.byAgent.set(a, c); c.setLook(a.look, a.extra, a.seed || 0.5); a.hidden = true; c.root.visible = true; c.react = 0; c.gazeYaw = a.gaze || 0; c.phoneK = a.state === 'phone' ? 1 : 0; c.w0 = true; }
     // spots (seated / standing people) notice the player too: they aren't steered by campus life, so do it here
     const pp = player && player.pos;
