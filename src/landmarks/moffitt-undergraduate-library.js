@@ -26,18 +26,36 @@ export const info = {
   name: 'Moffitt Undergraduate Library',
   subtitle: 'John Carl Warnecke · 1970 · renovated 2026',
   blurb: 'The undergraduate library beside Memorial Glade, linked underground to the Main Stacks. Its top two floors became a 24-hour study space in 2016, and its lower three floors reopened in August 2026 as the Carol T. Christ Center for Connected Learning, with an expanded Free Speech Movement Café at the south entrance.',
-  replaces: ['w/24025027', 'way/24025027', 'w/1098756727'],
+  replaces: ['w/24025027', 'way/24025027', 'w/1098756727', 'r/21101303'], // r4: + the Main Stacks vent stand-in east of the deck
   // site work outside the OSM outline (east plaza deck with Press, its stairs, north deck): hide stand-ins + 2021 LiDAR trees here
-  clear: [rectXZ(30.5, -17.5, 50.6, 12.5), rectXZ(30.5, 12.5, 38.5, 20.5), rectXZ(50.6, -7.5, 56.5, 7.5), rectXZ(-22, -31, 26, -23.9)],
+  clear: [rectXZ(1.5, 32.5, 10.5, 41.5), /* r4: the tree in front of the doors */ rectXZ(30.5, -17.5, 50.6, 12.5), rectXZ(30.5, 12.5, 38.5, 20.5), rectXZ(50.6, -7.5, 56.5, 7.5), rectXZ(-22, -31, 26, -23.9)],
 };
+
+// r4: matte black perforated metal (Press kiosk): canvas dot pattern, holes glow warm at night
+let _perf = null;
+function perfMetal() {
+  if (_perf) return _perf;
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  const e = document.createElement('canvas'); e.width = e.height = S; const ge = e.getContext('2d');
+  g.fillStyle = '#1b1b1c'; g.fillRect(0, 0, S, S); ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const r = 1.2 + 4.2 * Math.abs(Math.sin(x * 0.7 + y * 0.45) * Math.cos(y * 0.33 - x * 0.21)); // varying "pixel" holes
+    g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(x * 16 + 8, y * 16 + 8, r, 0, 7); g.fill();
+    ge.fillStyle = '#fff'; ge.beginPath(); ge.arc(x * 16 + 8, y * 16 + 8, r, 0, 7); ge.fill();
+  }
+  const t = new THREE.CanvasTexture(c), te = new THREE.CanvasTexture(e);
+  for (const x of [t, te]) { x.colorSpace = THREE.SRGBColorSpace; x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; }
+  _perf = nightGlow(new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, emissive: 0xffc68a, emissiveMap: te, emissiveIntensity: 1.1, roughness: 0.55, metalness: 0.55 }), 1.0);
+  _perf.name = 'mfPerf'; return _perf;
+}
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
-  const C = tint(M.concrete, 0xe1dfda, 'mfConc');          // cast-in-place concrete, weathered warm grey (~#a9a69f)
-  const CT = tint(M.concrete, 0xddd6cd, 'mfTower');        // the stair towers read a touch warmer
-  const CD = tint(M.concrete, 0xaaa8a3, 'mfConcDark');     // soffits, recesses, weathered parapets
+  const C = tint(M.concrete, 0xd5d9df, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
+  const CT = tint(M.concrete, 0xd2d3d4, 'mfTower');        // the stair towers read a touch warmer / board-marked
+  const CD = tint(M.concrete, 0x9da1a8, 'mfConcDark');     // soffits, recesses, weathered parapets
   const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
   const FR = std(0x3a322b, 'mfBronze', { rough: 0.45, metal: 0.7 });   // dark bronze anodised frames
   const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 0.45 } }), 1.0); // shaded podium glazing still catches the sky
@@ -132,7 +150,7 @@ export async function build(ctx) {
     }
     // flush end bay toward the east face (u 28..31.5)
     const [e0, e1] = [sf(TW[1][1]), sf(GE)].sort((x, y) => x - y);
-    glassStorey(R, e0, e1, F4, 12.6); K.rbox(R, C, e0, 12.6, -0.2, e1, 13.9, 0.12); glassStorey(R, e0, e1, 13.9, SOF);
+    glassStorey(R, e0, e1, F4, 12.6); K.rbox(R, C, e0, 12.6, -0.2, e1, 13.9, 0.45); glassStorey(R, e0, e1, 13.9, SOF);
     K.wall(R, C, e0, e1, -1.5, F4, [], 0.4);
   }
   // east face: flush — glass storey (F4, with doors), solid spandrel, glass band (F5); floor 3 shows only down the lightwell
@@ -143,7 +161,7 @@ export async function build(ctx) {
     K.rbox(RE, FR, dS1 - 0.09, F4, -0.06, dS1, F4 + 2.6, 0.04); K.rbox(RE, FR, dS0, F4 + 2.6, -0.1, dS1, F4 + 2.75, 0.05); K.rbox(RE, GL, dS0, F4 + 2.75, -0.12, dS1, 12.6, -0.06);
     K.rbox(RE, FR, dS0 - 1.2, 11.7, 0, dS1 + 1.2, 11.9, 2.4);         // slim steel canopy on thin columns
     for (const s of [dS0 - 0.9, dS1 + 0.9]) K.rbox(RE, FR, s - 0.07, F4, 2.15, s + 0.07, 11.7, 2.29);
-    K.rbox(RE, C, 0, 12.6, -0.2, RE.L, 13.9, 0.12);                 // continuous solid spandrel
+    K.rbox(RE, C, 0, 12.6, -0.2, RE.L, 13.9, 0.45); K.rbox(RE, CD, 0, 12.52, -0.2, RE.L, 12.6, 0.43); // continuous solid spandrel band, projecting ~0.45 m (terrace photos)
     glassStorey(RE, 0, RE.L, 13.9, SOF, { glass: GLP });
     glassStorey(RE, 0, RE.L, F3, F4 - 0.3);
   }
@@ -171,8 +189,10 @@ export async function build(ctx) {
     const R = south ? K.run([u0, vo], [u1, vo]) : K.run([u1, vo], [u0, vo]);
     const yb = Math.min(gAt(R, 2, 1), gAt(R, R.L - 2, 1), south ? F3 : DECK_N);
     const ops = [];
-    const pat = south ? (u0 > 0 ? [[], [], []] : [[], [0.3, 0.72], [0.3, 0.55]]) : [[0.3, 0.74], [0.22, 0.58], [0.36, 0.74]]; // loose, staggered; the SE tower beside the entrance is blank
-    [F3, F4, F5].forEach((yF, k) => { for (const f of pat[k]) { const c = R.L * f; ops.push({ s0: c - 0.65, s1: c + 0.65, y0: yF + 0.8, y1: yF + 3.0 }); } });
+    // r4: tall narrow stair slots in one stacked column (the old square punched windows read as an apartment block);
+    // the SE tower beside the entrance stays blank, as in the photos
+    const pat = south ? (u0 > 0 ? [[], [], []] : [[], [0.26], [0.26]]) : [[0.24], [0.24], [0.24]];
+    [F3, F4, F5].forEach((yF, k) => { for (const f of pat[k]) { const c = R.L * f; ops.push({ s0: c - 0.24, s1: c + 0.24, y0: yF + 0.55, y1: yF + 3.75 }); } });
     K.wall(R, CT, 0, R.L, yb - 1.5, TP, ops, 0.55);
     for (const o of ops) K.fill(R, o, { rev: 0.42, mull: 0, glass: GL, frame: FR });
     K.rbox(R, CT, -0.05, TP - 0.02, -0.6, R.L + 0.05, TP + 0.08, 0.05);
@@ -216,6 +236,32 @@ export async function build(ctx) {
     K.box(SW, 2.5, ga - 0.4, GS, 16, ga, GS + 9);
     for (let k = 1; k < 6; k++) K.box(CD, 2.5, ga, GS + k * 1.5 - 0.01, 16, ga + 0.004, GS + k * 1.5 + 0.01, { detail: true });
     walkables.push(K.walkPoly([[2.5, GS], [16, GS], [16, GS + 9], [2.5, GS + 9]], ga));
+    // r4: entrance forecourt furniture from the photos. The Free Speech Movement Café pylon: stacked, slightly
+    // offset board-marked concrete blocks, raised letters on the south face and flyer-covered cork boards on both
+    // faces; a row of redwood post-and-beam newspaper display cases; a low concrete planter ledge students sit on.
+    { const pu = -2.6, pv = 31.4, g = K.g(pu, pv) - 0.3;
+      for (let k = 0; k < 3; k++) { const o = [0, 0.07, -0.05][k]; K.box(CT, pu - 0.72 + o, g + k * 0.95, pv - 0.27, pu + 0.72 + o, g + (k + 1) * 0.95 - 0.02, pv + 0.27); K.box(CD, pu - 0.7 + o, g + (k + 1) * 0.95 - 0.02, pv - 0.25, pu + 0.7 + o, g + (k + 1) * 0.95, pv + 0.25, { detail: true }); }
+      const RSp = K.run([pu - 0.7, pv + 0.27], [pu + 0.7, pv + 0.27]), RNp = K.run([pu + 0.7, pv - 0.27], [pu - 0.7, pv - 0.27]);
+      const ink = { color: '#d9d6cf', metal: 0.0, rough: 0.85, d: 0.03, font: '"Courier New", Courier, monospace', weight: '700', spacing: 0.02 };
+      signText(K, RSp, 'FREE SPEECH', RSp.L / 2, g + 2.55, 0.16, ink); signText(K, RSp, 'MOVEMENT', RSp.L / 2, g + 2.34, 0.16, ink); signText(K, RSp, 'CAFE', RSp.L / 2, g + 2.13, 0.16, ink);
+      const CORK = std(0x9a7448, 'mfCork', { rough: 0.95 });
+      for (const R of [RSp, RNp]) { K.rbox(R, CORK, 0.22, g + 0.75, 0, R.L - 0.22, g + 1.85, 0.03, { detail: true });
+        for (let k = 0; k < 9; k++) { const fx = 0.3 + ((k * 37) % 7) / 7 * (R.L - 0.75), fy = g + 0.85 + ((k * 23) % 5) / 5 * 0.8; K.rbox(R, [M.whitePaint, M.calGold, M.seatBlue, M.whitePaint][k % 4] || M.whitePaint, fx, fy, 0.03, fx + 0.2, fy + 0.27, 0.035, { detail: true }); } }
+      colliders.push(rectCol(pu - 0.8, pv - 0.35, pu + 0.8, pv + 0.35, g, g + 2.9));
+      // newspaper display cases on redwood posts, east side of the forecourt
+      const RW8 = std(0x7a4a2c, 'mfRedwood', { rough: 0.8 });
+      for (let k = 0; k < 4; k++) { const u = 10.8 + k * 1.9, v = 30.2, gg = K.g(u, v) - 0.2;
+        for (const du of [-0.8, 0.8]) K.box(RW8, u + du - 0.07, gg, v - 0.07, u + du + 0.07, gg + 2.35, v + 0.07, { detail: true });
+        K.box(RW8, u - 0.95, gg + 2.2, v - 0.09, u + 0.95, gg + 2.34, v + 0.09, { detail: true });
+        K.box(FR, u - 0.68, gg + 1.05, v - 0.08, u + 0.68, gg + 1.95, v + 0.08, { detail: true }); K.box(M.whitePaint, u - 0.6, gg + 1.12, v - 0.085, u + 0.6, gg + 1.88, v + 0.085, { detail: true });
+        K.box(M.glassLight, u - 0.64, gg + 1.08, v - 0.1, u + 0.64, gg + 1.92, v + 0.1, { detail: true });
+        colliders.push(rectCol(u - 0.95, v - 0.12, u + 0.95, v + 0.12, gg, gg + 2.3)); }
+      // low planter ledge with shrubs along the west side of the forecourt (sitting height)
+      { const a = -6.3, b = -3.9, v0 = 26.0, v1 = 35.5, gg = K.gMin(a, v0, b, v1, 4) - 0.2, yt = K.gMax(a, v0, b, v1, 4) + 0.46;
+        K.box(C, a, gg, v0, b, yt, v1); K.box(M.soil, a + 0.15, yt - 0.04, v0 + 0.15, b - 0.15, yt + 0.01, v1 - 0.15, { detail: true });
+        for (let k = 0; k < 5; k++) { const gm = new THREE.IcosahedronGeometry(0.55 + 0.12 * (k % 2), 1); gm.scale(1, 0.75, 1); gm.translate((a + b) / 2, yt + 0.35, v0 + 1.0 + k * (v1 - v0 - 2) / 4); K.add(GRN, gm, { detail: true }); }
+        colliders.push(rectCol(a, v0, b, v1, gg, yt)); walkables.push(K.walkPoly([[a, v0], [b, v0], [b, v1], [a, v1]], yt)); }
+    }
   }
 
   // ---------- podium terrace (floor-3 level) on the west, walkway along the south, deck along the north ----------
@@ -280,17 +326,50 @@ export async function build(ctx) {
     // broad steps east to Memorial Glade
     { const g = Math.min(K.g(u1 + 4, -6), K.g(u1 + 4, 6)); const n = Math.max(2, Math.round((yF - g) / 0.16)); if (yF - g > 0.25) walkables.push(K.stairs(C, u1, -7, u1 + n * 0.33, 7, g, yF, '-u', n)); }
     // planters and timber benches on the deck
-    for (const [a, b] of [[37, 7.5], [43, 7.5], [48, -1]]) { K.box(C, a - 1.2, yF, b - 1.2, a + 1.2, yF + 0.55, b + 1.2); K.box(GRN, a - 1.05, yF + 0.55, b - 1.05, a + 1.05, yF + 0.75, b + 1.05, { detail: true }); colliders.push(rectCol(a - 1.2, b - 1.2, a + 1.2, b + 1.2, yF - 0.5, yF + 0.55)); }
-    for (const [a, b] of [[38, -8], [42, -8], [48, 9.5]]) K.box(WOOD, a - 1.1, yF, b - 0.3, a + 1.1, yF + 0.45, b + 0.3, { detail: true });
-    // Press café kiosk on the deck (NE corner): timber-clad box, glazed service front, flat overhanging roof, tables
-    { const a = 41.5, b = -16.2, c = 47.8, d = -10.2, h = yF + 3.3;
-      K.box(WOOD, a, yF, b, c, h, d);
-      const R = K.run([a, d], [c, d]); K.rbox(R, GL, 0.6, yF + 0.95, 0.0, R.L - 0.6, yF + 2.6, 0.04); K.rbox(R, FR, 0.5, yF + 0.9, 0.0, R.L - 0.5, yF + 1.05, 0.5);
-      K.box(FR, a - 0.8, h, b - 0.6, c + 0.8, h + 0.25, d + 1.4);
-      signText(K, R, 'PRESS', R.L / 2, yF + 2.95, 0.42, { color: '#f2efe6', metal: 0.0, rough: 0.6, d: 0.06, font: 'Helvetica, Arial, sans-serif', weight: '700', spacing: 0.12 });
+    // r4: the two south planters gave way to the OSM benches below
+    for (const [a, b] of [[48, -1]]) { K.box(C, a - 1.2, yF, b - 1.2, a + 1.2, yF + 0.55, b + 1.2); K.box(GRN, a - 1.05, yF + 0.55, b - 1.05, a + 1.05, yF + 0.75, b + 1.05, { detail: true }); colliders.push(rectCol(a - 1.2, b - 1.2, a + 1.2, b + 1.2, yF - 0.5, yF + 0.55)); }
+    // r4: Press café kiosk (2017, NE corner of the deck; OSM w/1098756727): a black perforated-metal box whose holes
+    // glow at night, a full-length top-hinged flap propped open as an awning over the white service counter, PRESS in
+    // white letters on the dark back wall, a warm LED line at the base. No tables (the photos show benches only).
+    { const a = 40.3, b = -15.4, c = 48.6, d = -11.7, h = yF + 3.3;
+      const PERF = perfMetal();
+      K.box(PERF, a, yF, b, c, h, d); K.box(FR, a - 0.04, h, b - 0.04, c + 0.04, h + 0.08, d + 0.04);
+      const R = K.run([a, d], [c, d]); const L = R.L;                              // service side faces the terrace (south)
+      const WHT = std(0xf4f2ee, 'mfPressWhite', { rough: 0.5, extra: { emissive: 0xfff6e8, emissiveIntensity: 0.25 } });
+      K.rbox(R, WHT, 0.5, yF + 0.95, -1.1, L - 0.5, yF + 2.55, -0.02);          // lit white interior seen through the opening
+      K.rbox(R, M.blackPaint || FR, 0.9, yF + 1.75, -1.05, L - 0.9, yF + 2.5, -1.0); // dark back wall
+      signText(K, R, 'PRESS', L / 2, yF + 2.13, 0.5, { color: '#ffffff', metal: 0.0, rough: 0.5, d: -0.99, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 });
+      K.rbox(R, WHT, 0.5, yF + 0.95, -0.02, L - 0.5, yF + 1.08, 0.32);          // counter top
+      K.rbox(R, PERF, 0.5, yF, 0.0, L - 0.5, yF + 0.95, 0.03);                    // counter front (perforated)
+      { const fd = 1.35, tilt = THREE.MathUtils.degToRad(16), g = new THREE.BoxGeometry(L - 0.6, 0.06, fd);   // the propped flap
+        g.translate(0, 0, fd / 2); g.rotateX(-tilt); g.translate(L / 2, yF + 2.62, 0.02); K.addRun(R, PERF, g);
+        for (const sx of [0.7, L - 0.7]) K.rbox(R, M.iron, sx - 0.02, yF + 2.2, 0.9, sx + 0.02, yF + 2.62 + fd * Math.sin(tilt) - 0.05, 0.94, { detail: true }); }
+      const LED = nightGlow(std(0x2a2724, 'mfLed', { rough: 0.6, extra: { emissive: 0xffc27a, emissiveIntensity: 1.6 } }), 1.0);
+      K.box(LED, a + 0.05, yF, b - 0.06, c - 0.05, yF + 0.05, b - 0.02, { detail: true }); K.box(LED, a - 0.06, yF, b, a - 0.02, yF + 0.05, d, { detail: true }); K.box(LED, c + 0.02, yF, b, c + 0.06, yF + 0.05, d, { detail: true });
       colliders.push(rectCol(a, b, c, d, yF - 1, h + 0.3));
-      for (const [x, z] of [[40.5, -6.5], [44.5, -6.0]]) { K.cyl(M.iron, x, yF, z, 0.04, 0.04, 0.72, 6, { detail: true }); K.cyl(WOOD, x, yF + 0.72, z, 0.45, 0.45, 0.04, 12, { detail: true }); }
+      for (const u of [41.0, 47.9]) { K.cyl(FR, u, yF, d + 1.9, 0.09, 0.09, 0.95, 10, { detail: true }); K.cyl(LED, u, yF + 0.82, d + 1.9, 0.095, 0.095, 0.1, 10, { detail: true }); } // bollard lights
     }
+    // r4: terrace furniture from the photos and OSM benches: long hardwood slat benches on low concrete plinths,
+    // slim dark pole lights with a single horizontal arm
+    for (const [u0, u1, v, w] of [[34.1, 37.4, 6.6, 0.55], [40.7, 45.2, 6.6, 0.55], [33.2, 38.6, 11.2, 0.6], [42.4, 45.2, 11.2, 0.6]]) {
+      K.box(C, u0 + 0.15, yF, v - w / 2 + 0.06, u1 - 0.15, yF + 0.34, v + w / 2 - 0.06);
+      for (let k = 0; k < 5; k++) { const vv = v - w / 2 + (k + 0.5) * w / 5; K.box(WOOD, u0, yF + 0.34, vv - w / 12, u1, yF + 0.45, vv + w / 12, { detail: true }); }
+      colliders.push(rectCol(u0, v - w / 2, u1, v + w / 2, yF - 0.5, yF + 0.45));
+    }
+    for (const [u, v] of [[33.5, -12.5], [49.6, 10.8]]) {
+      K.cyl(FR, u, yF, v, 0.07, 0.06, 5.6, 8, { detail: true }); K.box(FR, u - 0.05, yF + 5.5, v - 0.05, u + 1.25, yF + 5.62, v + 0.05, { detail: true });
+      K.box(M.lampGlow, u + 0.2, yF + 5.46, v - 0.04, u + 1.2, yF + 5.5, v + 0.04, { detail: true }); colliders.push(K.colCyl(u, v, 0.15, yF, yF + 5.6));
+    }
+  }
+
+  // r4: Main Stacks ventilation shaft east of the deck (OSM r/21101303; LiDAR top 11.2 m): board-formed concrete
+  // enclosure with a band of dark louvres under a thin cap (replaces the stand-in granite box with painted windows)
+  { const u0 = 52.6, u1 = 55.8, v0 = -15.6, v1 = -8.2, yT = 11.2, g0 = K.gMin(u0, v0, u1, v1, 4) - 0.6;
+    K.box(CT, u0, g0, v0, u1, yT - 1.7, v1); K.box(CD, u0 + 0.25, yT - 1.7, v0 + 0.25, u1 - 0.25, yT - 0.25, v1 - 0.25);
+    const ring = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); for (let y = yT - 1.6; y < yT - 0.3; y += 0.16) K.rbox(R, FR, 0.15, y, -0.22, R.L - 0.15, y + 0.06, -0.08, { detail: true }); for (let s2 = 0.15; s2 <= R.L - 0.1; s2 += (R.L - 0.3) / Math.max(1, Math.round((R.L - 0.3) / 1.5))) K.rbox(R, CT, s2 - 0.1, yT - 1.7, -0.25, s2 + 0.1, yT - 0.25, 0, { detail: true }); }
+    K.box(C, u0 - 0.1, yT - 0.25, v0 - 0.1, u1 + 0.1, yT, v1 + 0.1);
+    colliders.push(rectCol(u0, v0, u1, v1, g0, yT));
   }
 
   const object3d = K.finish(); object3d.name = 'moffitt-undergraduate-library';

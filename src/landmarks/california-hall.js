@@ -5,6 +5,7 @@
 // crowned by a long raised skylight with a copper frame and acroteria. Central entrance bay with five bays to either side.
 import * as THREE from 'three';
 import { siteDress } from './lib/rc-finish.js';
+import { lawnMat } from './lib/r4-lawn.js'; // r4-moffitt
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 
 export const info = {
@@ -151,8 +152,8 @@ export async function build(ctx) {
       const a = P(uW, h0, v0), b = P(uW, h0, v1), cc = P(uW - w, -0.3, v1), d = P(uW - w, -0.3, v0);
       pos.push(...a, ...cc, ...b, ...a, ...d, ...cc);
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
-      K.add(M.turf, g);
-      for (const vv of [v0, v1]) { const s = [[uW, -0.5, vv], [uW, h0, vv], [uW - w, -0.5, vv]]; const gg = new THREE.BufferGeometry(); const q = vv === v0 ? [...s[0], ...s[2], ...s[1]] : [...s[0], ...s[1], ...s[2]]; gg.setAttribute('position', new THREE.Float32BufferAttribute(q, 3)); gg.computeVertexNormals(); K.add(M.turf, gg); }
+      K.add(lawnMat(), g); // r4-moffitt: textured lawn instead of the flat neon M.turf
+      for (const vv of [v0, v1]) { const s = [[uW, -0.5, vv], [uW, h0, vv], [uW - w, -0.5, vv]]; const gg = new THREE.BufferGeometry(); const q = vv === v0 ? [...s[0], ...s[2], ...s[1]] : [...s[0], ...s[1], ...s[2]]; gg.setAttribute('position', new THREE.Float32BufferAttribute(q, 3)); gg.computeVertexNormals(); K.add(lawnMat(), gg); }
       walkables.push(K.walkFn(uW - w, v0, uW, v1, (u, v) => (u < uW - w || u > uW || v < v0 || v > v1) ? null : Math.max(K.g(u, v), -0.3 + (h0 + 0.3) * (u - (uW - w)) / w)));
     };
     berm(vN + 0.5, c - sw / 2 - 0.5); berm(c + sw / 2 + 0.5, vS - 0.5);
