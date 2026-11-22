@@ -27,8 +27,8 @@ export const R5W_OFF = qs.get('nor5w') === '1';
 // Octagon/car-bridge reach: the 2021 LiDAR returned the bridge decks as ground, so the creek bed is re-cut here
 // (x, z, bed y) from the open channel either side (72.3 m upstream, 71.0 m below the car bridge).
 const CARVE = [[-336.0, 204.6, 72.3], [-339.5, 203.6, 72.2], [-343.0, 199.3, 72.0], [-349.0, 195.0, 71.75], [-358.0, 192.0, 71.4], [-363.5, 189.2, 71.15], [-367.5, 186.8, 71.0]];
-const NF_LOWER = [[-562.5, 49.6, 65.75], [-565.4, 51.7, 65.55], [-568.5, 54.8, 65.6], [-572.5, 58.5, 65.55], [-576.0, 62.0, 65.4], [-579.0, 65.9, 65.2], [-582.0, 72.0, 64.95], [-585.0, 79.0, 64.55], [-585.2, 86.0, 64.3], [-585.4, 92.9, 63.85], [-583.4, 99.0, 63.3], [-581.1, 104.6, 62.8]];
-const OXFORD_APRON = [[-673.0, 189.6, 59.45], [-676.0, 187.6, 59.3], [-678.3, 186.9, 59.25]];
+const NF_LOWER = [[-562.4, 49.0, 65.6], [-565.4, 51.7, 65.55], [-568.5, 54.8, 65.6], [-572.5, 58.5, 65.55], [-576.0, 62.0, 65.4], [-579.0, 65.9, 65.2], [-582.0, 72.0, 64.95], [-585.0, 79.0, 64.55], [-585.2, 86.0, 64.3], [-585.4, 92.9, 63.85], [-583.4, 99.0, 63.3], [-581.1, 104.6, 62.8]];
+const OXFORD_APRON = [[-673.0, 189.6, 59.45], [-676.0, 187.6, 59.3], [-678.6, 186.85, 59.25], [-679.8, 186.6, 59.25]];
 const BRIDGES = [
   { id: 'asuc-arch', style: 'arch', pts: [[-259.8, 219.2], [-258.7, 230.8]], w: 2.5, camber: 0.7 },
   { id: 'octagon', style: 'octagon', pts: [[-345.9, 191.6], [-345.7, 202.4]], w: 9.4, off: -1.9, tree: [-342.8, 194.8], flat: true },
@@ -98,7 +98,7 @@ export function gradeR5West({ heights, c, gt, sdf }) {
   };
   carve(CARVE, 1.3, 0.62, 6.5);
   carve(NF_LOWER, 0.9, 0.85, 4.5, false, true);
-  carve(OXFORD_APRON, 1.6, 0.7, 4.5, true, false);
+  carve(OXFORD_APRON, 1.1, 0.9, 3.4, true, false);
   const nCut = cut.size;
   // b) deck plans from the graded ground
   PLANS = BRIDGES.map((b) => planBridge(b, G.at));
@@ -196,7 +196,7 @@ export function installR5West({ scene, heightAt, physics, water, setupMaterials,
   const MAT = {
     timber: tint(M.wood, 0xa08a6a, 0.88), timberDark: tint(M.wood, 0x6e5d48, 0.9), deck: tint(M.wood, 0x8f7d66, 0.92),
     conc: tint(M.concrete, 0xc9c3b6, 0.95), concDark: tint(M.concrete, 0xa8a296, 0.95), concDeck: tint(M.concrete, 0xb8b2a6, 0.95),
-    iron: M.iron, ironGreen: Object.assign(new THREE.MeshStandardMaterial({ color: 0x1c221f, roughness: 0.45, metalness: 0.25 }), { name: 'r5-paintedIron' }), stone: tint(M.ashlar || M.granite, 0x9a9488, 0.95), rubble: tint(M.ashlar || M.granite, 0x878479, 0.97),
+    iron: M.iron, ironGreen: Object.assign(new THREE.MeshStandardMaterial({ color: 0x1c221f, roughness: 0.45, metalness: 0.25 }), { name: 'r5-paintedIron' }), stone: tint(M.ashlar || M.granite, 0x9a9488, 0.95), rubble: tint(M.ashlar || M.granite, 0xa8a193, 0.97),
     castStone: tint(M.concrete, 0xe2ddd0, 0.85), bronze: tint(M.bronze || M.iron, 0x46594c, 0.5), dark: new THREE.MeshStandardMaterial({ color: 0x0b0c0b, roughness: 1 }),
   };
   const A = new Acc();
@@ -240,7 +240,8 @@ function buildBridge(A, MAT, p, physics, heightAt) {
     const nS = b.w > 2.2 ? 3 : 2;
     for (let k = 0; k < nS; k++) { const o = -hw + 0.18 + (b.w - 0.36) * k / (nS - 1); for (let i = 0; i < n - 1; i += 2) { const a = D[i], c = D[Math.min(n - 1, i + 2)]; const pa = L(a, o), pc = L(c, o); const bd = p.span > 10 ? 0.62 : 0.4; A.seg(MAT.timberDark, [pa[0], a.y - deckT - bd / 2, pa[1]], [pc[0], c.y - deckT - bd / 2, pc[1]], 0.18, bd); } }
   } else {
-    for (let i = 0; i < n - 1; i += 2) { const a = D[i], c = D[Math.min(n - 1, i + 2)]; A.seg(MAT.concDeck, [a.cx, a.y - deckT / 2, a.cz], [c.cx, c.y - deckT / 2, c.cz], b.w, deckT); }
+    for (let i = 0; i < n - 1; i += 2) { const a = D[i], c = D[Math.min(n - 1, i + 2)]; A.seg(MAT.concDeck, [a.cx, a.y - deckT / 2, a.cz], [c.cx, c.y - deckT / 2, c.cz], b.w, deckT);
+      for (const o of [-hw + 0.25, hw - 0.25]) { const pa = L(a, o), pc = L(c, o); A.seg(MAT.concDark, [pa[0], a.y - deckT - 0.25, pa[1]], [pc[0], c.y - deckT - 0.25, pc[1]], 0.5, 0.5); } }   // edge girders
   }
   // ---- abutments: footings at both ends from under the deck into the bank
   for (const q of [D[0], D[n - 1]]) {
@@ -248,7 +249,7 @@ function buildBridge(A, MAT, p, physics, heightAt) {
     A.box(wood ? MAT.concDark : MAT.stone, q.cx, (top + bot) / 2, q.cz, 0.9, top - bot, b.w + 0.5, Math.atan2(q.tz, q.tx));
   }
   // piers under long spans where the deck flies > 1.4 m up, every ~6 m
-  if (p.span > 9 && !wood && b.style !== 'octagon') for (let s = p.s0 + 5.5; s < p.s1 - 4; s += 6) {
+  if (false) for (let s = p.s0 + 5.5; s < p.s1 - 4; s += 6) {
     const q = D.reduce((m, r) => (Math.abs(r.s - s) < Math.abs(m.s - s) ? r : m), D[0]); const g = heightAt(q.cx, q.cz); if (q.y - g < 1.4) continue;
     for (const o of [-hw + 0.3, hw - 0.3]) { const [x, z] = L(q, o); A.box(wood ? MAT.timberDark : MAT.concDark, x, (q.y - deckT + g - 0.6) / 2, z, 0.3, q.y - deckT - g + 0.6, 0.3, Math.atan2(q.tz, q.tx)); }
   }
@@ -347,7 +348,7 @@ function buildCreekWorks(A, MAT, heightAt, water, physics, quality, group) {
   const nc = water && water.nearestCreek; if (!nc) return 0;
   // culvert headwalls: South Fork into the Oxford St culvert (in its redwood grove), North Fork out of its culvert below West Circle
   headwall(A, MAT, heightAt, nc, [-678.9, 186.8], [-674.0, 188.9], 7.0, true);
-  headwall(A, MAT, heightAt, nc, [-562.2, 49.3], [-558.0, 45.2], 6.0, false, true);
+  headwall(A, MAT, heightAt, nc, [-563.6, 50.2], [-559.6, 46.2], 6.0, false, true);
   // weirs: boulder step pools and cut-stone check dams where the creek drops (walk the mapped lines at 1 m)
   const reaches = [
     [[-302, 210], [-318, 204], [-329, 202], [-339, 204]],
@@ -370,17 +371,17 @@ function buildCreekWorks(A, MAT, heightAt, water, physics, quality, group) {
         for (let k = 0; k < nb; k++) { const o = -W / 2 + W * (k + 0.5) / nb; A.box(MAT.stone, m0[0] + nx * o, crest - 0.4, m0[1] + nz * o, W / nb - 0.04, 0.8 + (k % 2) * 0.04, 0.55, yaw); }
       } else {              // 2014 TGIF rock step pool: a line of boulders across the channel plus a few below
         const nb = Math.max(4, Math.round(hwid * 2 / 0.45));
-        for (let k = 0; k < nb; k++) { const o = -hwid + (2 * hwid) * (k + 0.5) / nb; const h = ((k * 7919 + nW * 104729) % 1000) / 1000; const r = 0.26 + h * 0.18; rocks.push([m0[0] + nx * o + t[0] * (h - 0.5) * 0.3, m0[2] - r * 0.3 + 0.05, m0[1] + nz * o + t[1] * (h - 0.5) * 0.3, r, h]); }
+        for (let k = 0; k < nb; k++) { const h = ((k * 7919 + nW * 104729) % 1000) / 1000, h2 = ((k * 6271 + nW * 15485) % 1000) / 1000; const o = -hwid + (2 * hwid) * (k + 0.3 + h2 * 0.4) / nb; const r = 0.2 + h * h * 0.38; rocks.push([m0[0] + nx * o + t[0] * (h2 - 0.5) * 0.7, m0[2] - r * (0.25 + h2 * 0.35) + 0.04, m0[1] + nz * o + t[1] * (h2 - 0.5) * 0.7, r, h]); }
         for (let k = 0; k < 3; k++) { const h = ((k * 3571 + nW * 7907) % 1000) / 1000; const o = (h - 0.5) * hwid * 1.6; rocks.push([m0[0] + nx * o + t[0] * (0.9 + h), m0[2] - 0.3, m0[1] + nz * o + t[1] * (0.9 + h), 0.22 + h * 0.12, h]); }
       }
     }
   }
   if (rocks.length) {
-    const geo = new THREE.IcosahedronGeometry(1, quality === 'low' ? 0 : 1); const p = geo.attributes.position;
-    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const k = 0.82 + 0.3 * Math.abs(Math.sin(x * 5.1 + y * 3.7 + z * 7.3)); p.setXYZ(i, x * k * 1.15, y * k * 0.72, z * k); }
+    const geo = new THREE.IcosahedronGeometry(1, quality === 'low' ? 1 : 2); const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const k = 0.8 + 0.16 * Math.sin(x * 4.1 + y * 2.7 + z * 5.3) + 0.08 * Math.sin(x * 11.3 - z * 9.1 + y * 7.7); p.setXYZ(i, x * k * 1.12, Math.max(-0.55, y * k * 0.74), z * k); }
     geo.deleteAttribute('normal'); geo.computeVertexNormals();
     const im = new THREE.InstancedMesh(geo, MAT.stone, rocks.length); const m = new THREE.Matrix4(), qn = new THREE.Quaternion(), e = new THREE.Euler();
-    rocks.forEach(([x, y, z, r, h], i) => { e.set((h - 0.5) * 0.4, h * 6.28, (h - 0.5) * 0.3); qn.setFromEuler(e); m.compose(new THREE.Vector3(x, y, z), qn, new THREE.Vector3(r, r, r)); im.setMatrixAt(i, m); });
+    rocks.forEach(([x, y, z, r, h], i) => { e.set((h - 0.5) * 0.6, h * 6.28 * 7.3, (h - 0.5) * 0.5); qn.setFromEuler(e); m.compose(new THREE.Vector3(x, y, z), qn, new THREE.Vector3(r * (0.85 + 0.4 * ((h * 13.7) % 1)), r * (0.7 + 0.35 * ((h * 7.1) % 1)), r * (0.8 + 0.4 * ((h * 3.3) % 1)))); im.setMatrixAt(i, m); });
     im.castShadow = true; im.receiveShadow = true; im.name = 'r5-weir-stones'; group.add(im);
   }
   return nW;
@@ -389,8 +390,9 @@ function buildCreekWorks(A, MAT, heightAt, water, physics, quality, group) {
 function headwall(A, MAT, heightAt, nc, at, up, width, grate, outlet = false) {
   const c = nc(at[0], at[1]); const bed = c ? c.s[2] - 0.22 : heightAt(at[0], at[1]);
   const t = norm2(at[0] - up[0], at[1] - up[1]); const nx = -t[1], nz = t[0]; const yaw = Math.atan2(t[1], t[0]);
-  const bank = Math.max(heightAt(at[0] + nx * width * 0.5, at[1] + nz * width * 0.5), heightAt(at[0] - nx * width * 0.5, at[1] - nz * width * 0.5));
-  const top = Math.max(bed + 2.0, bank + 0.3), OW = 2.0, OH = 1.5;
+  const back = outlet ? -1 : 1, W2 = width * 0.5 + 2.5;   // grade beside and behind the wall (outside any apron cut)
+  const bank = Math.max(heightAt(at[0] + nx * W2, at[1] + nz * W2), heightAt(at[0] - nx * W2, at[1] - nz * W2), heightAt(at[0] + t[0] * 2.5 * back, at[1] + t[1] * 2.5 * back));
+  const top = Math.max(bed + 2.1, bank + 0.25), OW = 2.0, OH = 1.5;
   const cx = at[0] + t[0] * 0.35, cz = at[1] + t[1] * 0.35;
   // wall (thickness along t) in three parts round the opening
   const side = (width - OW) / 2;
