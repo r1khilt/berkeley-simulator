@@ -96,10 +96,20 @@ export function blocks(ctx, S, style = {}) {
       const nm = Math.max(1, Math.round(len / 1.5)); for (let q = 0; q <= nm; q++) K.rbox(R, mFrame, 0.3 + (len - 0.6) * q / nm - 0.04, Math.max(yb, F0) + 0.2, 0.05, 0.3 + (len - 0.6) * q / nm + 0.04, top - 0.5, 0.12, { detail: true });
       for (let y = F0 + sh; y < top - 0.6; y += sh) K.rbox(R, mFrame, 0.3, y - 0.05, 0.05, len - 0.3, y + 0.05, 0.12, { detail: true });
     } else {
-      K.wall(R, mat, 0, len, wallBot, top + parapet, ops.filter((o) => o.y0 >= wallBot + 0.1), 0.3);
+      // r4-sweep-outer2 (opt-in style.base2 = {mat, h}): a different cladding for the ground storey (stucco under shingle),
+      // split at F0 + h with a trim belt; style.trim = hex adds flat window casings (Craftsman trim). Others unchanged.
+      const b2 = style.base2 && bot < 0 && top > F0 + style.base2.h + 0.5 ? F0 + style.base2.h : null;
+      if (b2 != null) {
+        K.wall(R, style.base2.mat, 0, len, wallBot, b2, ops.filter((o) => o.y0 >= wallBot + 0.1 && o.y1 <= b2), 0.3);
+        K.wall(R, mat, 0, len, b2, top + parapet, ops.filter((o) => o.y0 >= b2), 0.3);
+        K.rbox(R, mCope, -0.02, b2 - 0.07, -0.02, len + 0.02, b2 + 0.07, 0.09);
+      } else K.wall(R, mat, 0, len, wallBot, top + parapet, ops.filter((o) => o.y0 >= wallBot + 0.1), 0.3);
+      const mTrim = style.trim != null ? paintTint(M, style.trim) : null;
       for (const o of ops) {
         if (o.y0 < wallBot + 0.1) continue;
         K.fill(R, o, { rev: 0.2, glass: mWin, frame: mFrame, mull: o.s1 - o.s0 > 1.4 ? 1 : 0, sill: false });
+        if (mTrim) { const t = 0.11; K.rbox(R, mTrim, o.s0 - t, o.y1, -0.02, o.s1 + t, o.y1 + 0.14, 0.06); K.rbox(R, mTrim, o.s0 - t - 0.04, o.y0 - 0.1, -0.02, o.s1 + t + 0.04, o.y0, 0.08);
+          for (const x of [o.s0 - t, o.s1]) K.rbox(R, mTrim, x, o.y0, -0.02, x + t, o.y1, 0.05, { detail: true }); }
         if (rnd() < 0.5) { const cw = (o.s1 - o.s0) * (0.35 + 0.6 * rnd()); const left = rnd() < 0.5; K.rbox(R, mCurt, left ? o.s0 + 0.03 : o.s1 - 0.03 - cw, o.y0 + 0.04, -0.215, left ? o.s0 + 0.03 + cw : o.s1 - 0.03, o.y1 - 0.05, -0.208); }
         if (style.sill !== false) K.rbox(R, mCope, o.s0 - 0.05, o.y0 - 0.06, -0.02, o.s1 + 0.05, o.y0, 0.07, { detail: true });
       }
