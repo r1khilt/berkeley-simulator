@@ -143,6 +143,10 @@ export async function build(ctx) {
   K.prism(M.concreteDark, coreP, Y0, EAVE - 0.05);
   // west door (path arrives at u ≈ -31.5) and north-end door (v ≈ -1.3)
   const door = (R, s) => { const g = gAt(R, s); const y = Math.max(g, FL - 0.2);
+    { const gO = Math.min(gAt(R, s - 1.0, 2.2), gAt(R, s + 1.0, 2.2)); const rise = y - gO; // [r5a] steps + landing where the door sits above the walk (was a door floating over the lawn)
+      if (rise > 0.1) { const n = Math.max(1, Math.round(rise / 0.155)), r = rise / n, T = 0.34; K.rbox(R, P.concreteBuff, s - 1.5, gO - 0.6, 0, s + 1.5, y, 1.3);
+        walkables.push({ type: 'poly', pts: [R.at(s - 1.5, 0), R.at(s + 1.5, 0), R.at(s + 1.5, 1.3), R.at(s - 1.5, 1.3)].map(([u, v]) => K.xz(u, v)), y });
+        for (let k = 0; k < n; k++) { const yy = y - r * (k + 1); if (yy <= gO + 0.02) break; K.rbox(R, P.concreteBuff, s - 1.5, gO - 0.6, 1.3 + k * T, s + 1.5, yy, 1.3 + (k + 1) * T); walkables.push({ type: 'poly', pts: [R.at(s - 1.5, 1.3 + k * T), R.at(s + 1.5, 1.3 + k * T), R.at(s + 1.5, 1.3 + (k + 1) * T), R.at(s - 1.5, 1.3 + (k + 1) * T)].map(([u, v]) => K.xz(u, v)), y: yy }); } } }
     K.rbox(R, M.glass, s - 1.1, y, 0.02, s + 1.1, y + 2.8, 0.06, { uvMode: 'keep' });
     K.rbox(R, FR, s - 1.2, y, 0.02, s + 1.2, y + 2.9, 0.1, { detail: true });
     K.rbox(R, C, s - 1.8, y + 3.2, 0, s + 1.8, y + 3.45, 1.4); };

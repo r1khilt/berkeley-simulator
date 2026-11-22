@@ -23,6 +23,15 @@ export async function build(ctx) {
   const STEP = tint(M.concrete, 0xd9d3c5), NOSE = solid(0x8f897d, 0.9, 0.0); // [r5a] steps: concrete treads with a dark shadow line under each nosing so flights read as steps, not ramps
   const SP = solid(0x1d1e20, 0.6, 0.3), FR = solid(0x1b1c1e, 0.45, 0.5), LV = solid(0x8c8a84, 0.8, 0.2), DOOR = solid(0x2b2a27, 0.4, 0.6);
   const GL = M.windowNight;
+  const RAIL = solid(0xa7abae, 0.38, 0.7);
+  const pipe = (a, b, r = 0.024) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
+  // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
+  const railV = (u, vA, yA, vB, yB) => { const H = 0.92, sg = Math.sign(vB - vA); pipe([u, yA + H, vA], [u, yB + H, vB]); pipe([u, yA + H, vA - sg * 0.3], [u, yA + H, vA]); pipe([u, yB + H, vB], [u, yB + H, vB + sg * 0.3]);
+    const np = Math.max(1, Math.round(Math.abs(vB - vA) / 1.6)); for (let k = 0; k <= np; k++) { const t = k / np; pipe([u, yA + (yB - yA) * t - 0.02, vA + (vB - vA) * t], [u, yA + (yB - yA) * t + H, vA + (vB - vA) * t], 0.02); } };
+  // flight along v: foot edge vFoot -> top edge vTop (either direction), concrete treads + a dark line under each nosing
+  const stairV = (uA, uB, vFoot, vTop, yLo, yHi, n) => { const sg = Math.sign(vTop - vFoot), T = Math.abs(vTop - vFoot) / n, rise = (yHi - yLo) / n;
+    for (let i = 0; i < n; i++) { const e = vFoot + sg * T * i, top = yLo + rise * (i + 1); K.box(NOSE, uA + 0.01, top - 0.075, Math.min(e - sg * 0.012, e + sg * 0.004), uB - 0.01, top - 0.04, Math.max(e - sg * 0.012, e + sg * 0.004), { detail: true }); }
+    return K.stairs(STEP, uA, Math.min(vFoot, vTop), uB, Math.max(vFoot, vTop), yLo, yHi, sg > 0 ? '+v' : '-v', n); };
   const colliders = [], walkables = [];
   const FL = 5.3, CT = 18.0, EN = 20.9, AT = 24.2, TOP = 25.3;
   const SOUTH_Y = 4.5; // [r5a] south entrance landing/doors (LiDAR ~4.5 m; OSM flight only ~4 m long from Campanile Way)
@@ -206,8 +215,22 @@ export async function build(ctx) {
   // east entrance block (one storey) in front of the east wing
   {
     const P = rect(73.3, -8.0, 77.1, 8.2);
-    polyWalls(K, P, { stories: [{ y0: K.g(76, 0) - 1.5, y1: 4.6, mat: ST, win: null }, { y0: 4.6, y1: 7.6, mat: ST, win: { w: 2.2, h: 2.0, sill: 0.5, mull: 2 } }], bay: 4.0 });
+    polyWalls(K, P, { stories: [{ y0: K.g(76, 0) - 1.5, y1: 4.6, mat: ST, win: null }, { y0: 4.6, y1: 7.6, mat: ST, win: { w: 2.2, h: 2.0, sill: 0.5, mull: 2 } }], bay: 4.0,
+      edge: (i, R) => (R.a[0] > 77.0 && Math.abs(R.t[0]) < 0.1 ? { skip: [1, 2] } : null) });
     flatRoof(K, P, 7.6, { mat: ST, parapet: 0.6, deck: ROOF });
+    // [r5a] the east entrance itself (OSM steps u 77 -> 82 had nothing to lead to): glazed double doors with sidelights and a
+    // flat dark canopy at the main floor, a landing and a short flight down to the walk, pipe rails
+    { const R = K.run([77.1, 8.2], [77.1, -8.0]), sc = 8.1, gE = Math.min(K.g(81.5, -1.5), K.g(81.5, 1.5), K.g(81.5, 0)), uL = 78.7;
+      K.rbox(R, FR, sc - 2.1, FL - 0.02, -0.06, sc + 2.1, FL + 3.15, 0.05);
+      for (const [x0, x1] of [[sc - 1.95, sc - 1.25], [sc - 1.15, sc - 0.06], [sc + 0.06, sc + 1.15], [sc + 1.25, sc + 1.95]]) K.rbox(R, GL, x0, FL + 0.1, 0.05, x1, FL + 2.45, 0.065, { uvMode: 'keep' });
+      K.rbox(R, GL, sc - 1.95, FL + 2.58, 0.05, sc + 1.95, FL + 3.02, 0.065, { uvMode: 'keep' }); K.rbox(R, FR, sc - 2.1, FL + 2.45, 0.05, sc + 2.1, FL + 2.58, 0.09);
+      K.rbox(R, FR, sc - 2.6, FL + 3.25, -0.05, sc + 2.6, FL + 3.6, 1.7);
+      if (FL - gE > 0.12) { const n = Math.max(1, Math.round((FL - gE) / 0.155)), T = 0.34, rise = (FL - gE) / n, u1 = uL + n * T;
+        K.box(STEP, 77.1, gE - 1, sc - 8.1 - 2.6, uL, FL, sc - 8.1 + 2.8); walkables.push(K.walkPoly(rect(77.1, -2.5, uL, 2.7), FL)); (K._stairs || (K._stairs = [])).push([77.1, -2.5, uL, 2.7]);
+        walkables.push(K.stairs(STEP, uL, -2.5, u1, 2.7, gE, FL, '-u', n));
+        for (let i = 0; i < n; i++) { const e = u1 - T * i, top = gE + rise * (i + 1); K.box(NOSE, e - 0.004, top - 0.075, -2.49, e + 0.012, top - 0.04, 2.69, { detail: true }); }
+        for (const v of [-2.25, 2.45]) { const H = 0.92; pipe([u1 + 0.3, gE + H, v], [u1, gE + rise * 0.5 + H, v]); pipe([u1, gE + rise * 0.5 + H, v], [uL, FL + H, v]); pipe([uL, FL + H, v], [77.6, FL + H, v]);
+          for (const u of [u1 - 0.1, (u1 + uL) / 2, uL, 77.7]) pipe([u, (u >= uL ? gE + (FL - gE) * (u1 - u) / (u1 - uL) : FL) - 0.02, v], [u, (u >= uL ? gE + (FL - gE) * (u1 - u) / (u1 - uL) : FL) + H, v], 0.02); } } }
     for (const [a, b] of [[[73.3, 8.2], [73.3, 20.8]], [[73.3, -21.0], [73.3, -8.0]]]) { /* wing face already built */ }
   }
 
@@ -215,15 +238,6 @@ export async function build(ctx) {
   // [r5a] photo-matched (Commons "VLSB exterior 1/3", "VLSB, UC Berkeley (6377)"): one flight centred on the three entrance
   // bays (bay 8 sits at u = 0.95, not 0), rising to a ~2.5 m landing; the two bottom treads run wider past the stepped cheek
   // blocks; four galvanised pipe rails (two on the pilaster lines between the doors, one inside each cheek).
-  const RAIL = solid(0xa7abae, 0.38, 0.7);
-  const pipe = (a, b, r = 0.024) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
-  // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
-  const railV = (u, vA, yA, vB, yB) => { const H = 0.92, sg = Math.sign(vB - vA); pipe([u, yA + H, vA], [u, yB + H, vB]); pipe([u, yA + H, vA - sg * 0.3], [u, yA + H, vA]); pipe([u, yB + H, vB], [u, yB + H, vB + sg * 0.3]);
-    const np = Math.max(1, Math.round(Math.abs(vB - vA) / 1.6)); for (let k = 0; k <= np; k++) { const t = k / np; pipe([u, yA + (yB - yA) * t - 0.02, vA + (vB - vA) * t], [u, yA + (yB - yA) * t + H, vA + (vB - vA) * t], 0.02); } };
-  // flight along v: foot edge vFoot -> top edge vTop (either direction), concrete treads + a dark line under each nosing
-  const stairV = (uA, uB, vFoot, vTop, yLo, yHi, n) => { const sg = Math.sign(vTop - vFoot), T = Math.abs(vTop - vFoot) / n, rise = (yHi - yLo) / n;
-    for (let i = 0; i < n; i++) { const e = vFoot + sg * T * i, top = yLo + rise * (i + 1); K.box(NOSE, uA + 0.01, top - 0.075, Math.min(e - sg * 0.012, e + sg * 0.004), uB - 0.01, top - 0.04, Math.max(e - sg * 0.012, e + sg * 0.004), { detail: true }); }
-    return K.stairs(STEP, uA, Math.min(vFoot, vTop), uB, Math.max(vFoot, vTop), yLo, yHi, sg > 0 ? '+v' : '-v', n); };
   const UC = (U0 + U1) / 2;
   for (const [sgn, vF] of [[-1, V0], [1, V1]]) {
     const FLs = sgn < 0 ? FL : SOUTH_Y;
@@ -231,6 +245,7 @@ export async function build(ctx) {
     const land0 = vF + sgn * 1.9, land1 = vF - sgn * 0.62;
     K.box(STD, uA, g0 - 1, Math.min(land0, land1), uB, FLs, Math.max(land0, land1));
     walkables.push(K.walkPoly(rect(uA, Math.min(land0, land1), uB, Math.max(land0, land1)), FLs));
+    (K._stairs || (K._stairs = [])).push([uA - 1.6, Math.min(land0, land1), uB + 1.6, Math.max(land0, land1)]); // [r5a] keep foundation planting off landings/cheeks
     const n = Math.max(3, Math.round((FLs - g0) / 0.16)); const T = 0.34, len = n * T, rise = (FLs - g0) / n;
     const va = sgn < 0 ? land0 - len : land0, vb = sgn < 0 ? land0 : land0 + len; const vFoot = sgn < 0 ? va : vb;
     walkables.push(stairV(uA, uB, vFoot, sgn < 0 ? vb : va, g0, FLs, n));
@@ -250,7 +265,7 @@ export async function build(ctx) {
     if (sgn < 0) { const ya = g0 + 0.02, Rr = 6.8; const sh = new THREE.Shape(); sh.moveTo(UC - Rr, vFoot); for (let k = 0; k <= 24; k++) { const t = Math.PI * k / 24; sh.lineTo(UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr); } sh.lineTo(UC - Rr, vFoot);
       const ag = new THREE.ExtrudeGeometry(sh, { depth: 0.55, bevelEnabled: false, curveSegments: 1 }); ag.rotateX(Math.PI / 2); ag.translate(0, ya, 0); K.add(STEP, ag);
       const cg = new THREE.TorusGeometry(Rr, 0.07, 4, 32, Math.PI); cg.rotateX(Math.PI / 2); cg.scale(1, 1, -1); cg.translate(UC, ya - 0.05, vFoot); K.add(STD, cg, { detail: true });
-      walkables.push({ type: 'poly', pts: K.polyXZ(Array.from({ length: 25 }, (_, k) => { const t = Math.PI * k / 24; return [UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr]; })), y: ya }); }
+      walkables.push({ type: 'poly', pts: K.polyXZ(Array.from({ length: 25 }, (_, k) => { const t = Math.PI * k / 24; return [UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr]; })), y: ya }); (K._stairs || (K._stairs = [])).push([UC - Rr, vFoot - Rr, UC + Rr, vFoot]); }
     // four pipe rails
     for (const u of [uA + 0.3, UC - 2.47, UC + 2.47, uB - 0.3]) railV(u, vFoot - sgn * 0.15, g0 + rise * 0.5, vTopF + sgn * 0.05, FLs);
   }
@@ -262,7 +277,7 @@ export async function build(ctx) {
     if (FL - gW < 0.4) continue;
     const n = Math.max(2, Math.round((FL - gW) / 0.155)), n2 = Math.ceil(n / 2), n1 = n - n2, rise = (FL - gW) / n, yMid = gW + rise * n1;
     const gl = Math.min(K.g(uc, vL), K.g(uc - hw, vL), K.g(uc + hw, vL));
-    K.box(STD, uc - hw - 0.55, gl - 1, vL, uc + hw + 0.55, FL, vF); walkables.push(K.walkPoly(rect(uc - hw - 0.55, vL, uc + hw + 0.55, vF), FL));
+    K.box(STD, uc - hw - 0.55, gl - 1, vL, uc + hw + 0.55, FL, vF); walkables.push(K.walkPoly(rect(uc - hw - 0.55, vL, uc + hw + 0.55, vF), FL)); (K._stairs || (K._stairs = [])).push([uc - hw - 0.55, vL - 8, uc + hw + 0.55, vF]);
     const vU = vL - n2 * T; walkables.push(stairV(uc - hw, uc + hw, vU, vL, yMid, FL, n2));
     const vM = vU - LM; if (n1 > 0) { K.box(STD, uc - hw, gW - 1, vM, uc + hw, yMid, vU); walkables.push(K.walkPoly(rect(uc - hw, vM, uc + hw, vU), yMid)); }
     const vB = n1 > 0 ? vM - n1 * T : vU; if (n1 > 0) walkables.push(stairV(uc - hw, uc + hw, vB, vM, gW, yMid, n1));
