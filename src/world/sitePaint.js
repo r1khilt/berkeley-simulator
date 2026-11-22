@@ -51,6 +51,16 @@ export const SITES = [
   // the paved plaza (they grew straight out of the concrete)
   { type: 'lawn', pts: MF(rect(17.5, 27.5, 31, 33.5)) },
   ...[[47, 16], [41, 16], [39, 42], [37, 45], [42, 48]].map(([u, v]) => ({ type: 'dirt', pts: MF(rect(u - 1.1, v - 1.1, u + 1.1, v + 1.1)) })),
+  // [r5-sproul] Upper Sproul Plaza: brick-in-concrete-grid special (10) wherever the ground is already paved (lawns, beds and
+  // Lower Sproul are untouched; terrain.js only shows specials on paved ground)
+  { type: 'special', special: 10, pts: [[-160.5, 206.0], [-92.0, 206.0], [-92.0, 368.5], [-131.5, 369.0], [-133.5, 353.0], [-141.5, 293.5], [-157.0, 291.0], [-158.5, 272.5], [-160.5, 233.0]] },
+  // [r5-sproul] Lower Sproul Plaza (rebuilt 2015): one paved field from Zellerbach to MLK and from the Chávez Center to
+  // Eshleman, stamped with special id 9 (terrain.js draws the banded concrete) instead of the old red brick
+  { type: 'paved', special: 9, pts: [[-233.5, 286.0], [-222.0, 283.5], [-216.8, 277.5], [-183.5, 272.0], [-174.6, 275.3], [-170.6, 298.5], [-180.5, 298.0], [-191.6, 299.7],
+    [-190.5, 307.0], [-182.9, 354.4], [-192.6, 354.7], [-203.0, 355.5], [-226.1, 357.5], [-226.1, 348.0], [-233.1, 304.3]] },
+  // [r5-sproul] the Sproul Plaza entrance from Bancroft/Telegraph is paving, not road: the OSM footway is tagged asphalt,
+  // so the bake drew a street running on from Telegraph into the plaza (keeps any brick/granite special underneath)
+  { type: 'paved', keepSpecial: true, pts: [[-131.5, 352.0], [-106.0, 348.0], [-106.0, 366.8], [-131.5, 369.2]] },
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
@@ -74,7 +84,7 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
     const ch = CH[s.type] ?? -1;
     const j0 = Math.max(0, Math.floor((bx0 - 3 - x0) / st)), j1 = Math.min(nx - 1, Math.ceil((bx1 + 3 - x0) / st));
     const i0 = Math.max(0, Math.floor((bz0 - 3 - z0) / st)), i1 = Math.min(nz - 1, Math.ceil((bz1 + 3 - z0) / st));
-    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1 && s.type !== 'special'; i++) for (let j = j0; j <= j1; j++) { // [r5-sproul] type 'special' leaves the SDF alone
       const d = sdPoly(P, x0 + (j + 0.5) * st, z0 + (i + 0.5) * st); if (d < -3) continue;
       const k = (i * nx + j) * 4, ein = enc(d), eout = enc(-d);
       for (let c = 0; c < 4; c++) {
@@ -82,10 +92,12 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
         else if (s.type !== 'lawn' || c === 3) sdf[k + c] = Math.min(sdf[k + c], eout); // lawn only replaces dirt: existing paths stay on top
       }
     }
-    if (special && gt.snx) { // 1 m special ids (brick/granite pavers, turf) are cleared under painted surfaces
+    if (special && gt.snx && !s.keepSpecial) { // 1 m special ids (brick/granite pavers, turf) are cleared under painted surfaces
       const snx = gt.snx, snz = gt.snz;
       for (let z = Math.max(0, Math.floor(bz0 - z0)); z <= Math.min(snz - 1, Math.ceil(bz1 - z0)); z++) for (let x = Math.max(0, Math.floor(bx0 - x0)); x <= Math.min(snx - 1, Math.ceil(bx1 - x0)); x++) {
-        const k = z * snx + x; const v = special[k]; if (v >= 4 && v <= 6 && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = 0;
+        const k = z * snx + x; const v = special[k];
+        if (s.special) { if ((v === 0 || v === 4 || v === 5 || v === 9 || v === 10) && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = s.special; continue; } // [r5-sproul] stamp a paving special id (9 Lower Sproul bands, 10 Upper Sproul brick); water/ivy/turf stay
+        if (v >= 4 && v <= 6 && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = 0;
       }
     }
   }

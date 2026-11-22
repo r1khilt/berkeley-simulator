@@ -19,7 +19,10 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-9);
   const K = new Kit(ctx, ANG); const M = ctx.M; const g = (u, v) => K.g(u, v);
   const colliders = [], walkables = [];
-  const sand = tinted(M.whitePaint, 0xa89a88, { roughness: 0.5, metalness: 0.2 }), sandD = tinted(M.whitePaint, 0x8c7f6e, { roughness: 0.6 });
+  // [r5-sproul] photos (MRY 385-UCB_0012/0013/0024a): warm beige ribbed terracotta rainscreen (#CFC1A6), not grey-mauve paint
+  const sand = tone(M.concrete, 0xc9bb9f, undefined, { roughness: 0.75 }), sandD = tone(M.concrete, 0xa89a80, undefined, { roughness: 0.8 });
+  const orange = tinted(M.whitePaint, 0xd9643a, { roughness: 0.6 }); // [r5-sproul] the signature orange soffits
+  const colC = tone(M.concrete, 0xbab7b0); // [r5-sproul] round board-smooth concrete columns
   const silver = tinted(M.iron, 0xd8dee6, { metalness: 0.55, roughness: 0.3 });
   const eave = tinted(M.whitePaint, 0xdcdcd8);
   const cglass = tinted(M.windowNight, 0x7fa3c4, { metalness: 0.45, roughness: 0.05 });
@@ -49,8 +52,10 @@ export async function build(ctx) {
     glassBand(K, Rg, 0.5, L - 0.5, GP - 0.6, F1, { glass: sglass, frame: silver, pitch: 1.5, transoms: [GP + 2.8], doors: [{ s0: 9.0, s1: 10.8, h: 2.4 }, { s0: 24.0, s1: 25.8, h: 2.4 }] });
     K.rbox(Rg, turq, 12.5, GP + 0.3, -0.42, 13.2, GP + 2.6, -0.4, { detail: true }); K.rbox(Rg, tinted(M.whitePaint, 0x2f6fa6), 8.0, GP + 0.4, 0.02, 8.7, GP + 3.2, 0.1);
     K.rbox(Rg, tinted(M.stucco, 0xe4d2b0), 0.5, GP - 0.6, -0.5, L - 0.5, F1, -0.45);
-    K.rbox(R, eave, -0.3, F1 - 0.45, -2.5, L + 0.3, F1, 0.3); // deep soffit over the recessed storefronts
-    for (let s = 6; s < L - 2; s += 9.2) K.rbox(R, silver, s - 0.2, GP - 0.5, -0.6, s + 0.2, F1 - 0.45, -0.2); // slim columns
+    K.rbox(R, eave, -0.3, F1 - 0.2, -2.5, L + 0.3, F1, 0.3); // slab edge over the recessed storefronts
+    K.rbox(R, orange, -0.25, F1 - 0.45, -2.48, L + 0.25, F1 - 0.2, 0.28); // [r5-sproul] orange soffit (photo #E0663A)
+    // [r5-sproul] round concrete columns (~0.7 m, ~7.5 m bays) instead of slim silver posts
+    for (let s = 4.5; s < L - 2; s += 7.6) { const p = R.at(s, -0.9); K.cyl(colC, p[0], GP - 0.6, p[1], 0.36, 0.36, F1 - 0.45 - GP + 0.6, 18); colliders.push(K.colCyl(p[0], p[1], 0.4, GP - 1, F1)); }
     // curtain wall (4 storeys) with silver floor bands, irregular mullion rhythm
     for (let k = 0; k < 4; k++) {
       const y0 = FL[k], y1 = (FL[k + 1] ?? TOP - 0.3);
@@ -59,6 +64,14 @@ export async function build(ctx) {
       K.rbox(R, silver, -0.1, y0 - 0.1, -0.1, cw, y0 + 0.8, 0.12);
     }
     ribbon(R, cw, L, F1, TOP - 0.3, FL);
+    // [r5-sproul] staggered two-storey glass bay boxes projecting 0.9 m, light frames, orange undersides (photo 0013/0024a)
+    for (const [s0, k] of [[3.0, 0], [10.5, 1], [17.5, 0], [24.0, 2], [31.0, 1], [43.0, 1], [50.5, 0]]) {
+      if (s0 + 3.2 > L - 0.5) continue; const y0 = FL[k] + 0.4, y1 = (FL[k + 2] ?? TOP - 0.3) - 0.2;
+      K.rbox(R, cglass, s0, y0, 0.1, s0 + 3.0, y1, 0.95);
+      for (const [a0, a1] of [[s0, s0 + 0.08], [s0 + 2.92, s0 + 3.0]]) K.rbox(R, silver, a0, y0, 0.1, a1, y1, 1.0);
+      K.rbox(R, silver, s0, y1 - 0.1, 0.1, s0 + 3.0, y1 + 0.05, 1.0); K.rbox(R, orange, s0, y0 - 0.18, 0.1, s0 + 3.0, y0, 1.0);
+      K.rbox(R, silver, s0, (y0 + y1) / 2 - 0.06, 0.9, s0 + 3.0, (y0 + y1) / 2 + 0.06, 1.0, { detail: true });
+    }
     colliders.push(K.colPoly([[U0, V0], [U1, V0], [U1, V0 + 1.7], [U0, V0 + 1.7]], F1 - 0.4, TOP));
   }
   // ---- SOUTH (Bancroft), EAST and WEST faces: sand slab with ribbon windows and a stepped upper eave ----

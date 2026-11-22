@@ -49,7 +49,8 @@ export async function build(ctx) {
   const sglass = tinted(M.glassLight, 0x7f9196, { opacity: 0.3 }); // transparent storefront glass (lighter: the furnished interior shows through — interiors-cafe)
   const interior = tinted(M.stucco, 0xe6c896);                  // warm-lit café interior seen through the glass
   const greenGlass = tinted(M.windowNight, 0x6f8a80);           // light-green clerestory glass
-  const YT = 11.8, DEP = 0.92, TH = 0.3, FL = 7.0; // shell rim 11.8 + 0.2 m upturned rim = 12.0 (LiDAR) // umbrella rim, depth, slab; café / upper floor level
+  const YT = 11.9, DEP = 1.02, TH = 0.2, FL = 7.0; // shell rim 11.9 + 0.1 m upturned rim = 12.0 (LiDAR), centre 10.88 // umbrella rim, depth, slab; café / upper floor level
+  // [r5-sproul] thinner shells (0.3 m fascia instead of 0.5) so the 0.8 m V-dips of the east/west edges read as a zigzag
   const g = (u, v) => K.g(u, v);
 
   // ---- umbrella field (strips measured from the LiDAR) ----
@@ -249,7 +250,7 @@ export async function build(ctx) {
   };
   // r4-sweep: soffits in light board-marked concrete (the untextured white paint read as raw blockout from spawn)
   const sofC = tone(M.concrete, 0xe8e4dc), sofC2 = tone(M.concrete, 0xd8d3c9);
-  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.2, rimW: 0.15, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv) });
+  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.1, rimW: 0.12, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv), aoSoffit: 0.42 /* r5-sproul */ });
 
   // rooftop mechanical equipment and a small penthouse (LiDAR 12.9–15.0 m)
   const mech = tinted(M.concrete, 0xd0d0cc);

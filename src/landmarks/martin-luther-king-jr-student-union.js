@@ -210,9 +210,41 @@ export async function build(ctx) {
     walkables.push(K.walkPoly([[w0, wM], [U0, wM], [U0, wS], [w0, wS]], 9.5));
     // board-formed concrete terrace at the wing's north end (LiDAR ~5 m), stair down to Lower Sproul
     const tv0 = -33.4; K.box(board, w0, -1.5, tv0, U0, 4.8, wN); K.box(conc, w0 - 0.1, 4.8, tv0 - 0.1, U0, 5.0, wN);
-    pipeRail(K, alu, [[w0 + 0.1, wN], [w0 + 0.1, tv0 + 0.1], [U0, tv0 + 0.1]], 5.0);
+    pipeRail(K, alu, [[w0 + 0.1, wN - 3.2], [w0 + 0.1, tv0 + 0.1], [U0, tv0 + 0.1]], 5.0); // [r5-sproul] opening onto the new stair landing
     walkables.push(K.walkPoly([[w0, tv0], [U0, tv0], [U0, wN], [w0, wN]], 5.0));
-    { const gs = g(w0 - 4, (tv0 + wN) / 2), n = Math.max(3, Math.round((5.0 - gs) / 0.17)); walkables.push(K.stairs(conc, w0 - n * 0.3, tv0 + 1.0, w0, tv0 + 4.0, gs, 5.0, '+u', n)); }
+    // [r5-sproul] the external stair runs along the west façade (MRY 385-UCB_0001/0002a/0058): two open flights rising north
+    // to the terrace with a mid-landing on a round concrete column, grey steel stringers, orange-red soffits, galvanised
+    // picket guards and stainless rails, instead of one solid 29-riser block perpendicular to the façade
+    { const sU0 = w0 - 3.0, sU1 = w0 - 0.6, gs = g(w0 - 1.8, -16.0), yT = 5.0, n1 = 14, n2 = 15, r = (yT - gs) / (n1 + n2), t = 0.3;
+      const vTop = wN, v2b = vTop + n2 * t, vL = v2b + 1.8, v1b = vL + n1 * t, yL = gs + n1 * r; // flight 2 [vTop, v2b], landing [v2b, vL], flight 1 [vL, v1b]
+      const orange = tinted(M.whitePaint, 0xd25a35, { roughness: 0.6 }), stringer = tinted(M.iron, 0xbfc2c3, { metalness: 0.5, roughness: 0.45 });
+      const flight = (vLo, vHi, yLo, n) => { // low end at vLo (south), rising toward -v (north)
+        for (let i = 0; i < n; i++) { const vb = vLo - i * t, va = vb - t, y = yLo + r * (i + 1);
+          K.box(conc, sU0 + 0.08, y - 0.17, va, sU1 - 0.08, y, vb + 0.02);
+          K.box(M.blackPaint, sU0 + 0.12, y - 0.003, vb - 0.06, sU1 - 0.12, y + 0.004, vb + 0.025, { detail: true }); }
+        const L = vLo - vHi, yA = yLo, yB = yLo + r * n, ang = Math.atan2(yB - yA, L), hyp = Math.hypot(L, yB - yA);
+        for (const [u0, u1, mat, dy, h] of [[sU0, sU0 + 0.08, stringer, -0.05, 0.42], [sU1 - 0.08, sU1, stringer, -0.05, 0.42], [sU0 + 0.08, sU1 - 0.08, orange, -0.3, 0.05]]) {
+          const gg = new THREE.BoxGeometry(u1 - u0, h, hyp); gg.rotateX(ang); gg.translate((u0 + u1) / 2, (yA + yB) / 2 + dy - h / 2 + 0.17, (vLo + vHi) / 2); K.add(mat, gg); }
+        for (const uu of [sU0 + 0.04, sU1 - 0.04]) { // picket guards + handrail
+          for (let v = vHi + 0.06; v < vLo; v += 0.12) { const yy = yLo + (vLo - v) / L * (yB - yA) + 0.1; K.box(alu, uu - 0.012, yy, v - 0.012, uu + 0.012, yy + 1.0, v + 0.012, { detail: true }); }
+          pipeRail(K, alu, [[uu, vLo + 0.25], [uu, vHi - 0.25]], (u, v) => yLo + Math.max(0, Math.min(L, vLo - v)) / L * (yB - yA) + 0.15, { h: 0.92, mid: false, pitch: 99 });
+        }
+      };
+      flight(v1b, vL, gs, n1); flight(v2b, vTop, yL, n2);
+      // mid-landing on a round column, top landing joining the terrace
+      K.box(conc, sU0, yL - 0.3, v2b, sU1, yL, vL); K.box(orange, sU0 + 0.05, yL - 0.33, v2b + 0.05, sU1 - 0.05, yL - 0.3, vL - 0.05);
+      K.cyl(conc, (sU0 + sU1) / 2, gs - 0.5, (v2b + vL) / 2, 0.3, 0.3, yL - 0.33 - gs + 0.5, 16);
+      K.box(conc, sU0, yT - 0.3, vTop - 3.0, w0, yT, vTop); K.box(orange, sU0 + 0.05, yT - 0.33, vTop - 2.95, w0 - 0.05, yT - 0.3, vTop - 0.05);
+      K.cyl(conc, sU0 + 0.5, gs - 0.5, vTop - 2.5, 0.3, 0.3, yT - 0.33 - gs + 0.5, 16);
+      for (const [p0, p1] of [[[sU0 + 0.04, vTop + 0.1], [sU0 + 0.04, vTop - 2.96]], [[sU0 + 0.04, vTop - 2.96], [w0, vTop - 2.96]], [[sU1 - 0.04, v2b + 0.02], [sU1 - 0.04, vL]], [[sU0 + 0.04, v2b], [sU0 + 0.04, vL]]]) {
+        const yy = p0[1] > vTop + 0.5 ? yL : yT; pipeRail(K, alu, [p0, p1], yy, { h: 1.07, mid: false, pitch: 99 });
+        const dl = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); for (let k = 0; k <= dl / 0.12; k++) { const q = k / Math.max(1, Math.floor(dl / 0.12)); const pu = p0[0] + (p1[0] - p0[0]) * q, pv = p0[1] + (p1[1] - p0[1]) * q; K.box(alu, pu - 0.012, yy, pv - 0.012, pu + 0.012, yy + 1.05, pv + 0.012, { detail: true }); } }
+      colliders.push(K.colCyl((sU0 + sU1) / 2, (v2b + vL) / 2, 0.35, gs - 1, yL - 0.35), K.colCyl(sU0 + 0.5, vTop - 2.5, 0.35, gs - 1, yT - 0.35));
+      colliders.push(K.colPoly([[sU0, v1b], [sU0, vTop - 3.0], [w0, vTop - 3.0]], yL - 0.2, yT + 1.1)); // outer guard line
+      walkables.push(K.walkFn(sU0, vTop - 3.0, sU1, v1b, (uu, vv) => {
+        if (vv <= vTop) return yT; if (vv <= v2b) return yL + r * Math.min(n2, Math.floor((v2b - vv) / t) + 1); if (vv <= vL) return yL;
+        return gs + r * Math.min(n1, Math.max(1, Math.floor((v1b - vv) / t) + 1)); }));
+      walkables.push(K.walkPoly([[sU0, vTop - 3.0], [w0, vTop - 3.0], [w0, vTop], [sU0, vTop]], yT)); }
     colliders.push(K.colPoly([[w0, tv0], [U0, tv0], [U0, wN], [w0, wN]], -2, 5.0));
   }
   // ---- roof: penthouse, lantern, solar canopy ----

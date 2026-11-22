@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { Kit } from '../landmarks/lib/classic-kit.js';
 import { tinted, tone, pipeRail } from '../landmarks/lib/b01-kit.js';
-import { blobGeo, tintGeo, addShrubGeo } from '../landmarks/lib/rsw-site.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { boxUV } from '../materials.js';
 
 const OFF = typeof location !== 'undefined' && /[?&]nosproulsteps=1/.test(location.search);
@@ -98,9 +98,10 @@ export function buildSproulSteps({ heightAt, physics, M }) {
   const K = new Kit({ M, boxUV, groundAt: (x, z) => heightAt(O.x + x, O.z + z) }, ANG);
   // light broom-finished concrete treads/landings, dark anti-slip nosings, board-formed cheek walls, weathering-steel
   // bed walls, stainless rails, ipe seat tops, dark mulch
-  const tread = tone(M.concrete, 0xcbc7be), nose = tinted(M.blackPaint, 0x55575a, { roughness: 0.7 }), cheek = tone(M.concrete, 0xb9b4a9), cope = tone(M.concrete, 0xc6c1b6);
-  const corten = tinted(M.iron, 0x7e4528, { metalness: 0.25, roughness: 0.82 }), steel = tinted(M.iron, 0xb9bdc0, { metalness: 0.85, roughness: 0.3 });
-  const ipe = tinted(M.wood || M.concrete, 0x9a6438, { roughness: 0.7 }), mulch = tinted(M.soil || M.concreteDark, 0x4a3828, { roughness: 1 });
+  const tread = tone(M.concrete, 0xd2cec5), nose = tinted(M.blackPaint, 0x3c3e40, { roughness: 0.7 }), cheek = tone(M.concrete, 0xb9b4a9), cope = tone(M.concrete, 0xc6c1b6);
+  const riser = tone(M.concrete, 0x8f8b84); // risers a shade darker (shadowed, weathered) so flights read as steps, not ramps
+  const corten = tinted(M.iron, 0x6c3a24, { metalness: 0.1, roughness: 0.9 }), steel = tinted(M.iron, 0xb9bdc0, { metalness: 0.85, roughness: 0.3 });
+  const ipe = tinted(M.wood || M.concrete, 0x9a6438, { roughness: 0.7 }), mulch = tinted(M.soil || M.concreteDark, 0xb49c80, { roughness: 1 });
   const base = (u, v) => K.g(u, v) - 0.4;
   const colls = [];
   for (const st of p.stairs) {
@@ -110,7 +111,8 @@ export function buildSproulSteps({ heightAt, physics, M }) {
       for (let i = 0; i < f.n; i++) {
         const ua = f.uBot + i * f.t, ub = f.uBot + (i + 1) * f.t, y = f.yLo + p.r * (i + 1);
         K.box(tread, ua - 0.02, Math.min(base(ua, vc), y - 0.5), v0, ub, y, v1);
-        K.box(nose, ua - 0.025, y - 0.004, v0 + 0.06, ua + 0.06, y + 0.006, v1 - 0.06, { detail: true });
+        K.box(nose, ua - 0.025, y - 0.004, v0 + 0.06, ua + 0.07, y + 0.006, v1 - 0.06);
+        K.box(riser, ua - 0.032, y - p.r + 0.01, v0 + 0.02, ua - 0.022, y - 0.02, v1 - 0.02, { detail: true });
       }
     }
     // landings between flights, the top apron and the foot landing
@@ -138,18 +140,19 @@ export function buildSproulSteps({ heightAt, physics, M }) {
   cheekRun(N, SITE.v0 + 0.05, N.v0); cheekRun(N, N.v1, N.v1 + 0.3); cheekRun(S, S.v0 - 0.3, S.v0); cheekRun(S, S.v1, S.v1 + 0.3);
   // terraced planting beds: corten walls on each terrace's downhill face, mulch, shrubs and grasses (vertex-coloured blobs)
   let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const greens = [0x4b6a36, 0x5a7a3c, 0x3f5a30, 0x6b7f45, 0x7a6a3a, 0x8a4a3a, 0x58703f];
+  // planting palette from the photos: dark evergreen shrubs, olive grasses, a few red-leaved shrubs (photinia/barberry)
+  const greens = [0x34502a, 0x3e5c2e, 0x2f4626, 0x4d6634, 0x5d6a38, 0x44582c, 0x6b3b2c]; const shrubs = [];
   for (const bed of Object.values(BEDS)) {
     const { v0, v1, cuts } = bed;
     for (let i = 0; i + 1 < cuts.length; i++) {
       const ua = cuts[i], ub = cuts[i + 1], ys = bedSoil(p, bed, i);
       K.box(mulch, ua, Math.min(base(ua, (v0 + v1) / 2), ys - 1.2), v0, ub, ys, v1);
       const yLow = i === 0 ? p.yB : bedSoil(p, bed, i - 1);
-      K.box(corten, ua - 0.04, Math.min(yLow, base(ua, v0)) - 0.3, v0, ua + 0.04, ys + 0.12, v1);
-      for (let u = ua + 0.55; u < ub - 0.35; u += 0.95) for (let v = v0 + 0.5; v < v1 - 0.35; v += 0.95) {
-        if (rnd() < 0.18) continue;
-        const r0 = 0.28 + rnd() * 0.38, hx = greens[Math.floor(rnd() * greens.length)];
-        const g = tintGeo(blobGeo(r0, 1 + Math.floor(rnd() * 9999)), hx); g.translate(u + (rnd() - 0.5) * 0.4, ys + r0 * 0.42, v + (rnd() - 0.5) * 0.4); addShrubGeo(K, g);
+      K.box(corten, ua - 0.05, Math.min(yLow, base(ua, v0)) - 0.3, v0, ua + 0.05, ys + 0.22, v1);
+      for (let u = ua + 0.7; u < ub - 0.45; u += 1.15) for (let v = v0 + 0.6; v < v1 - 0.45; v += 1.15) {
+        if (rnd() < 0.22) continue;
+        const r0 = 0.32 + rnd() * 0.36, hx = greens[Math.floor(rnd() * (rnd() < 0.9 ? greens.length - 1 : greens.length))];
+        shrubs.push(...shrubClump(rnd, u + (rnd() - 0.5) * 0.4, ys - 0.05, v + (rnd() - 0.5) * 0.4, r0, hx));
       }
     }
     // top edge along Upper Sproul: a low concrete seat wall closing the beds
@@ -165,11 +168,29 @@ export function buildSproulSteps({ heightAt, physics, M }) {
     colls.push([[29.55, v0 - 0.3], [30.1, v0 - 0.3], [30.1, v1 + 0.3], [29.55, v1 + 0.3]]); }
   // north cheek strip against the café terrace wall
   colls.push([[BOT_U, SITE.v0 + 0.05], [SITE.u1, SITE.v0 + 0.05], [SITE.u1, N.v0], [BOT_U, N.v0]]);
+  if (shrubs.length) { const mg = mergeGeometries(shrubs, false); if (mg) { const m = new THREE.Mesh(mg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, name: 'r5-shrubs' })); m.userData.detail = true; m.castShadow = true; m.receiveShadow = true; K.extra.push(m); } }
   const obj = K.finish(); obj.position.set(O.x, 0, O.z); obj.name = 'r5:sproul-steps';
   obj.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; if (o.parent && o.parent.userData.detail) o.castShadow = false; } });
   // colliders: beds and cheeks are solid; the stairs are walked on the graded bed (like the other groundworks flights)
   if (physics) for (const c of colls) physics.addRing(c.map(([u, v]) => xz(u, v)), p.yB - 3, p.yU + 0.5, 'r5-sproul-steps');
   return obj;
+}
+// shrub clump: 2-4 overlapping noisy spheres, smooth-shaded, vertex colours darker underneath (fake contact AO)
+function shrubClump(rnd, u, y, v, r, hex) {
+  const out = []; const base = new THREE.Color(hex); const n = 2 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const rr = r * (0.55 + rnd() * 0.45); const g = new THREE.IcosahedronGeometry(rr, 2); const p = g.attributes.position; const col = new Float32Array(p.count * 3);
+    const ox = (rnd() - 0.5) * r * 0.9, oz = (rnd() - 0.5) * r * 0.9, sq = 0.62 + rnd() * 0.2;
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k), yy = p.getY(k), z = p.getZ(k); const nn = 0.86 + 0.28 * Math.abs(Math.sin(x * 7.1 + z * 5.3 + yy * 9.7 + i));
+      p.setXYZ(k, x * nn, yy * nn * sq, z * nn);
+      const t = Math.max(0, Math.min(1, (yy / rr + 1) / 2)); const shade = 0.55 + 0.55 * t; const var_ = 0.92 + 0.16 * Math.abs(Math.sin(k * 1.7));
+      col[k * 3] = base.r * shade * var_; col[k * 3 + 1] = base.g * shade * var_; col[k * 3 + 2] = base.b * shade * var_;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.deleteAttribute('uv'); g.computeVertexNormals();
+    g.translate(u + ox, y + rr * sq * 0.55, v + oz); out.push(g);
+  }
+  return out;
 }
 // a box whose top slopes from ya (at u0) to yb (at u1), across v0..v1, bottom at y0 (building frame u, y, v)
 function slopedBox(K, mat, u0, u1, v0, v1, y0, ya, yb, opts) {
