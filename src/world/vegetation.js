@@ -29,8 +29,11 @@ function remapSpecies(t) {
 }
 const s2l = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
 export class TreeSystem {
-  constructor({ lib, trees, refTint, lodDistances = [120, 600], maxDist = 4500 }) {
+  constructor({ lib, trees, refTint, lodDistances = [120, 600], maxDist = 4500, heroK = 0.24 }) {
     this.lib = lib; this.t = trees; this.lod = lodDistances; this.maxDist = maxDist;
+    // r4-trees2: species may carry a hero LOD in front (lods = [hero, near, mid, far]); it takes over inside
+    // heroK x the near distance (115 m -> ~28 m on high). LOD switches cross-fade with a screen-space dither.
+    this.heroD = lodDistances[0] * heroK;
     this.group = new THREE.Group(); this.group.name = 'trees';
     const n = trees.n;
     // precompute matrices & colours
@@ -69,10 +72,13 @@ export class TreeSystem {
     const count = new Map(); for (let i = 0; i < n; i++) count.set(this.speciesOf[i], (count.get(this.speciesOf[i]) || 0) + 1);
     for (const [spIdx, cnt] of count) {
       const sid = SPECIES_IDS[spIdx]; const spc = lib.species[sid] || lib.species.deciduous;
+      const nL = spc.lods.length, shadowL = nL > 3 ? 1 : 0; // hero and near LODs cast shadows
       this.meshes[spIdx] = spc.lods.map((lod, li) => lod.parts.map((p) => {
         const m = new THREE.InstancedMesh(p.geometry, p.material, cnt);
         if (p.depthMaterial) m.customDepthMaterial = p.depthMaterial; if (p.distanceMaterial) m.customDistanceMaterial = p.distanceMaterial;
-        m.castShadow = li === 0; m.receiveShadow = true; m.frustumCulled = false; m.count = 0;
+        m.castShadow = li <= shadowL; m.receiveShadow = true; m.frustumCulled = false; m.count = 0;
+        // r4-trees2: per-instance LOD cross-fade (0 = solid; t > 0 fading in, -t fading out; see tree-shaders.js)
+        const fa = new THREE.InstancedBufferAttribute(new Float32Array(cnt), 1); fa.setUsage(THREE.DynamicDrawUsage); p.geometry.setAttribute('aLodFade', fa); m.userData.fade = fa;
         m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cnt * 3), 3);
         m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
         m.name = `trees:${sid}:lod${li}`;
@@ -91,32 +97,56 @@ export class TreeSystem {
     for (let i = 0; i < this.t.n; i++) for (const [x, z, r] of pts) { if ((this.px[i] - x) ** 2 + (this.pz[i] - z) ** 2 < (r || radius) ** 2) { this.hidden.add(i); break; } }
   }
   update(camera, force = false) {
-    const cp = camera.position;
-    if (!force && cp.distanceToSquared(this.lastPos) < 1.0 && camera.quaternion.angleTo(this.lastQ) < 0.02) return;
+    const cp = camera.position, now = performance.now() / 1000;
+    const dtF = Math.min(0.25, Math.max(0, now - (this._lastT ?? now))); this._lastT = now;
+    if (!force && !this._fading && cp.distanceToSquared(this.lastPos) < 1.0 && camera.quaternion.angleTo(this.lastQ) < 0.02) return;
     this.lastPos.copy(cp); this.lastQ.copy(camera.quaternion);
     this._pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); this._fr.setFromProjectionMatrix(this._pm);
-    const d0 = this.lod[0] ** 2, d1 = this.lod[1] ** 2, dm = this.maxDist ** 2;
-    const fill = {}; for (const k in this.meshes) fill[k] = [0, 0, 0];
-    const counts = [0, 0, 0];
+    // r4-trees2: N LODs per species. When a tree changes LOD it is drawn in both for ~0.35 s with complementary dither
+    // masks (tree-shaders.js aLodFade), so nothing pops and no tree stays stippled while the player stands still.
+    // Switch distances have a little hysteresis so trees on a boundary don't flicker between LODs.
+    const D4 = [this.heroD, this.lod[0], this.lod[1]], D3 = [this.lod[0], this.lod[1]], dm = this.maxDist ** 2, hyst = 0.03, fadeS = this.fadeS ?? 0.35;
+    const nearSq = this.lod[0] ** 2, n = this.t.n;
+    if (!this.tier) { this.tier = new Int8Array(n).fill(-1); this.from = new Int8Array(n).fill(-1); this.fadeP = new Float32Array(n).fill(1); }
+    const tier = this.tier, from = this.from, fadeP = this.fadeP;
+    const fill = {}; for (const k in this.meshes) fill[k] = this.meshes[k].map(() => 0);
+    const counts = [0, 0, 0, 0]; let fading = false;
+    const put = (s, l, i, fv) => {
+      const slot = fill[s][l]++;
+      for (const m of this.meshes[s][l]) { m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), slot * 16); m.instanceColor.array.set(this.col.subarray(i * 3, i * 3 + 3), slot * 3); m.userData.fade.array[slot] = fv; }
+      counts[l]++;
+    };
+    const seen = this._seen || (this._seen = new Uint8Array(n)); seen.fill(0);
     for (const c of this.cells.values()) {
       const b = c.box;
       const dx = Math.max(b.min.x - cp.x, 0, cp.x - b.max.x), dz = Math.max(b.min.z - cp.z, 0, cp.z - b.max.z);
       const cd = dx * dx + dz * dz; if (cd > dm) continue;
       const inView = this._fr.intersectsBox(b);
-      if (!inView && cd > d0) continue; // keep near trees (shadow casters) even when off-screen
+      if (!inView && cd > nearSq) continue; // keep near trees (shadow casters) even when off-screen
       const idx = c.idx;
       for (let k = 0; k < idx.length; k++) {
         const i = idx[k]; if (this.hidden.has(i)) continue;
         const ddx = this.px[i] - cp.x, ddz = this.pz[i] - cp.z, ddy = (this.py[i] + this.ht[i] * 0.5 - cp.y) * 0.5;
-        const d = ddx * ddx + ddz * ddz + ddy * ddy;
-        const l = d < d0 ? 0 : d < d1 ? 1 : 2;
-        if (l > 0 && !inView) continue;
-        const s = this.speciesOf[i]; const f = fill[s]; const slot = f[l]++;
-        for (const m of this.meshes[s][l]) { m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), slot * 16); m.instanceColor.array.set(this.col.subarray(i * 3, i * 3 + 3), slot * 3); }
-        counts[l]++;
+        const d = Math.sqrt(ddx * ddx + ddz * ddz + ddy * ddy);
+        const s = this.speciesOf[i], ms = this.meshes[s], D = ms.length > 3 ? D4 : D3, sh = ms.length > 3 ? 1 : 0;
+        let l = 0; while (l < D.length && d >= D[l]) l++;
+        const cur = tier[i];
+        if (cur >= 0 && l !== cur && Math.abs(d - D[Math.min(l, cur)]) < D[Math.min(l, cur)] * hyst) l = cur; // hysteresis
+        if (!inView) { if (l > sh) { tier[i] = -1; continue; } seen[i] = 1; put(s, sh, i, 0); tier[i] = sh; fadeP[i] = 1; continue; } // off-screen: shadow-only, cheapest shadow LOD
+        seen[i] = 1;
+        if (cur >= 0 && l !== cur) { from[i] = cur; fadeP[i] = 0; } // start a cross-fade
+        else if (cur < 0) fadeP[i] = 1;                              // newly visible: no fade (it streams in at the frustum edge / far range)
+        tier[i] = l;
+        if (fadeP[i] < 1) {
+          fadeP[i] = Math.min(1, fadeP[i] + dtF / fadeS);
+          if (fadeP[i] < 1 && from[i] >= 0 && from[i] < ms.length) { const t = fadeP[i]; put(s, from[i], i, -t); put(s, l, i, Math.max(t, 1e-3)); fading = true; continue; }
+        }
+        put(s, l, i, 0);
       }
     }
-    for (const k in this.meshes) this.meshes[k].forEach((parts, l) => parts.forEach((m) => { m.count = fill[k][l]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; m.instanceMatrix.clearUpdateRanges?.(); }));
+    for (let i = 0; i < n; i++) if (!seen[i] && tier[i] >= 0) tier[i] = -1; // left the drawn set
+    this._fading = fading;
+    for (const k in this.meshes) this.meshes[k].forEach((parts, l) => parts.forEach((m) => { m.count = fill[k][l]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; m.userData.fade.needsUpdate = true; m.instanceMatrix.clearUpdateRanges?.(); }));
     this.counts = counts;
   }
 }

@@ -134,6 +134,18 @@ export const LEAF_KINDS = {
   oak: { cellM: 1.0 }, shrub: { cellM: 0.5 }, bay: { cellM: 1.0 }, magnolia: { cellM: 1.3 }, plane: { cellM: 1.4 }, maple: { cellM: 1.2 },
   ginkgo: { cellM: 1.0 }, euc: { cellM: 1.8 }, needle: { cellM: 1.4 }, spray: { cellM: 1.3 }, tuft: { cellM: 1.4 }, scale: { cellM: 0.8 }, palm: { cellM: 2.0 },
 };
+// r4-trees2: hero-LOD sprigs (M = sprig card size in metres, o = broadleaf overrides: fewer shoots/sides so a sprig
+// is one small twig carrying a dozen or two real-size leaves)
+export const SPRIGS = {
+  oak: { M: 0.85, o: { shoots: 5, sides: 9, sub: 2, fan: 0.85, len: 0.95 } },
+  bay: { M: 0.5, o: { shoots: 2, sides: 4, sub: 1, fan: 0.6 } },
+  shrub: { M: 0.3, o: { shoots: 2, sides: 4, sub: 1 } },
+  magnolia: { M: 0.75, o: { shoots: 2, sides: 2, sub: 0, nodes: 6 } },
+  plane: { M: 0.95, o: { shoots: 2, sides: 2, sub: 0, nodes: 5, fan: 0.55 } },
+  maple: { M: 0.7, o: { shoots: 2, sides: 2, sub: 0, nodes: 6 } },
+  ginkgo: { M: 0.6 }, euc: { M: 1.0, o: { shoots: 2, sides: 3, sub: 1, fan: 0.4 } },
+  needle: { M: 0.7 }, spray: { M: 0.65 }, tuft: { M: 0.7 }, scale: { M: 0.45 }, palm: { M: 2.0 },
+};
 export function leafCellUV(cell) { const e = 0.003; return cell ? [0.5 + e, e, 1 - e, 1 - e] : [e, e, 0.5 - e, 1 - e]; }
 
 const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
@@ -280,7 +292,8 @@ function fan(g, rnd, n, spreadA, o, cb) {
 }
 
 // leaves at regular spacing (metres) along every twig: alternate (default) or opposite pairs; bare twig bases
-function broadleaf(g, rnd, M, o) {
+function broadleaf(g, rnd, M, o, over) {
+  if (over) o = { ...o, ...over }; // r4-trees2: sprig atlas overrides
   const m = (v) => v / M;
   const step = m(o.spacing ?? 0.02); let alt = 1;
   fan(g, rnd, o.shoots ?? 3, o.fan ?? 0.6, { irregular: o.irregular, twigW: m(o.twig ?? 0.005), sides: o.sides ?? 6, sideLen: o.sideLen ?? 0.36, sideStart: o.sideStart ?? 0.25, len: o.len ?? 0.9, nodes: o.nodes ?? 12, sub: o.sub ?? 0, sideAngle: o.sideAngle ?? 0.75 }, (x, y, a, t, main, dx, dy) => {
@@ -303,12 +316,12 @@ function broadleaf(g, rnd, M, o) {
 }
 
 const DRAW = {
-  oak: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'oak', L: [0.03, 0.065], aspect: 0.7, spacing: 0.0075, shoots: 7, fan: 0.8, irregular: true, sides: 11, sub: 3, sideLen: 0.4, ang: 0.95, angJit: 1.3, fore: 0.45, cupped: true, twig: 0.005, lo: 80, hi: 225, under: 0.18 }),
-  shrub: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'shrub', L: [0.02, 0.04], aspect: 0.55, spacing: 0.007, shoots: 4, fan: 0.75, sides: 10, sub: 2, sideLen: 0.42, ang: 1.0, twig: 0.004, lo: 85, hi: 235, nodes: 14, under: 0.1 }),
-  bay: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'lance', L: [0.05, 0.095], aspect: 0.28, spacing: 0.012, shoots: 4, fan: 0.7, sides: 10, sub: 3, sideLen: 0.4, ang: 0.6, twig: 0.005, veins: true, lo: 100, hi: 240, under: 0.15 }),
-  magnolia: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'ellip', L: [0.12, 0.2], aspect: 0.42, spacing: 0.035, shoots: 3, fan: 0.6, sides: 6, sub: 1, sideLen: 0.34, ang: 0.75, twig: 0.01, petiole: 0.02, veins: true, lo: 95, hi: 255, nodes: 9, under: 0.2 }),
-  plane: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'plane', L: [0.16, 0.25], aspect: 1, spacing: 0.08, shoots: 3, fan: 0.65, sides: 6, sub: 1, sideLen: 0.36, ang: 0.7, twig: 0.006, petiole: 0.03, veins: true, lo: 105, hi: 245, nodes: 8, under: 0.12 }),
-  maple: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'maple', L: [0.1, 0.15], aspect: 1, spacing: 0.07, opposite: true, shoots: 3, fan: 0.6, sides: 6, sub: 1, sideLen: 0.36, ang: 0.85, twig: 0.005, petiole: 0.09, veins: true, lo: 105, hi: 245, nodes: 9, under: 0.12 }),
+  oak: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'oak', L: [0.03, 0.065], aspect: 0.7, spacing: 0.0075, shoots: 7, fan: 0.8, irregular: true, sides: 11, sub: 3, sideLen: 0.4, ang: 0.95, angJit: 1.3, fore: 0.45, cupped: true, twig: 0.005, lo: 80, hi: 225, under: 0.18 }, over),
+  shrub: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'shrub', L: [0.02, 0.04], aspect: 0.55, spacing: 0.007, shoots: 4, fan: 0.75, sides: 10, sub: 2, sideLen: 0.42, ang: 1.0, twig: 0.004, lo: 85, hi: 235, nodes: 14, under: 0.1 }, over),
+  bay: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'lance', L: [0.05, 0.095], aspect: 0.28, spacing: 0.012, shoots: 4, fan: 0.7, sides: 10, sub: 3, sideLen: 0.4, ang: 0.6, twig: 0.005, veins: true, lo: 100, hi: 240, under: 0.15 }, over),
+  magnolia: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'ellip', L: [0.12, 0.2], aspect: 0.42, spacing: 0.035, shoots: 3, fan: 0.6, sides: 6, sub: 1, sideLen: 0.34, ang: 0.75, twig: 0.01, petiole: 0.02, veins: true, lo: 95, hi: 255, nodes: 9, under: 0.2 }, over),
+  plane: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'plane', L: [0.16, 0.25], aspect: 1, spacing: 0.08, shoots: 3, fan: 0.65, sides: 6, sub: 1, sideLen: 0.36, ang: 0.7, twig: 0.006, petiole: 0.03, veins: true, lo: 105, hi: 245, nodes: 8, under: 0.12 }, over),
+  maple: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'maple', L: [0.1, 0.15], aspect: 1, spacing: 0.07, opposite: true, shoots: 3, fan: 0.6, sides: 6, sub: 1, sideLen: 0.36, ang: 0.85, twig: 0.005, petiole: 0.09, veins: true, lo: 105, hi: 245, nodes: 9, under: 0.12 }, over),
   ginkgo: (g, rnd, cell, M) => { // clusters of 3-5 fans on stubby spur shoots spaced along bare long shoots
     const m = (v) => v / M, step = m(0.05);
     fan(g, rnd, 3, 0.6, { twigW: m(0.008), sides: 5, sub: 1, sideLen: 0.4, sideStart: 0.25, sideAngle: 0.6, nodes: 10 }, (x, y, a, t, main, dx, dy) => {
@@ -328,7 +341,7 @@ const DRAW = {
       }
     });
   },
-  euc: (g, rnd, cell, M) => broadleaf(g, rnd, M, { shape: 'sickle', L: [0.12, 0.24], aspect: 0.15, spacing: 0.03, shoots: 4, fan: 0.65, sides: 9, sub: 2, sideLen: 0.36, ang: 0.3, twig: 0.005, petiole: 0.015, lo: 115, hi: 240, nodes: 9 }),
+  euc: (g, rnd, cell, M, over) => broadleaf(g, rnd, M, { shape: 'sickle', L: [0.12, 0.24], aspect: 0.15, spacing: 0.03, shoots: 4, fan: 0.65, sides: 9, sub: 2, sideLen: 0.36, ang: 0.3, twig: 0.005, petiole: 0.015, lo: 115, hi: 240, nodes: 9 }, over),
   needle: (g, rnd, cell, M) => { // Monterey pine: fascicles of 3 needles (10-15 cm) crowded toward the shoot tips
     const m = (v) => v / M;
     fan(g, rnd, 4, 0.6, { twigW: m(0.016), sides: 5, sub: 1, sideLen: 0.4, sideAngle: 0.7, nodes: 14 }, (x, y, a, t) => {
@@ -414,10 +427,13 @@ function buildCoverageMips(level0, W, H, thr) {
 }
 
 const _leaf = {};
-export function leafTexture(kind, S = 2048) {
-  const key = kind + ':' + S;
+// r4-trees2: sprig = true draws the hero LOD's sprig atlas: the same channel encoding, but a small twig of real-size
+// leaves for a cell of SPRIGS[kind].M metres (3D leaf clusters are built from many of these, see tree-hero.js)
+export function leafTexture(kind, S = 2048, sprig = false) {
+  const key = kind + ':' + S + (sprig ? ':sprig' : '');
   if (_leaf[key]) return _leaf[key];
-  const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1;
+  const SP = sprig ? SPRIGS[kind] ?? { M: (LEAF_KINDS[kind]?.cellM ?? 1) * 0.5 } : null;
+  const W = S, H = S / 2, cs = S / 2, M = SP ? SP.M : LEAF_KINDS[kind]?.cellM ?? 1;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d', { willReadFrequently: true });
   g.clearRect(0, 0, W, H);
@@ -427,9 +443,9 @@ export function leafTexture(kind, S = 2048) {
     g.save(); g.beginPath(); g.rect(cell * cs + 1, 1, cs - 2, cs - 2); g.clip();
     g.translate(cell * cs, 0); g.scale(cs, cs);
     // content is drawn at real size inside a uniformly inset frame so nothing is clipped at the cell edges
-    const k = kind === 'palm' ? 1 - 2 * pad : 0.88;
+    const k = kind === 'palm' ? 1 - 2 * pad : SP ? 0.8 : 0.88; // r4-trees2: sprigs keep a wider margin (no clipped leaves)
     g.translate(0.5, 0); g.scale(k, k); g.translate(-0.5, 0);
-    DRAW[kind](g, rnd, cell, M * k);
+    DRAW[kind](g, rnd, cell, M * k, SP?.o);
     g.restore();
   }
   const img = g.getImageData(0, 0, W, H); const d = img.data;

@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { U } from '../materials.js';
 import { mulberry32 } from '../lib/noise.js';
-import { leafTexture, barkTexture, LEAF_KINDS, leafCellUV, puffTexture } from './tree-textures.js';
+import { leafTexture, barkTexture, LEAF_KINDS, leafCellUV, puffTexture, SPRIGS } from './tree-textures.js';
 import { makeTreeUniforms, patchLeaf, patchBark, patchBlob, makeDepthMaterials, patchPuff, makePuffDepthMaterials, TREE_REF_TINT, TREE_WIND_DIR, TREE_VIEW } from './tree-shaders.js';
 export { TREE_REF_TINT, TREE_WIND_DIR };
 export const TREE_LOD_DISTANCES = [120, 600];
@@ -359,6 +359,11 @@ function genPollard(d, rnd) {
 }
 
 // ---------------------------------------------------------------- LOD builders
+function capTube(pts, rads) { // r4-trees2: close an open tube end with a short rounded tip
+  const n = pts.length, r = rads[n - 1]; if (n < 2 || r < 0.015) return [pts, rads];
+  const dir = pts[n - 1].clone().sub(pts[n - 2]).normalize();
+  return [[...pts, pts[n - 1].clone().addScaledVector(dir, r * 0.7), pts[n - 1].clone().addScaledVector(dir, r * 1.1)], [...rads, r * 0.6, r * 0.04]];
+}
 function buildBark(sk, d, lod) {
   const acc = new Acc(['aRad']);
   const tSeg = lod === 0 ? (d.trunk.seg ?? 8) : 6;
@@ -368,9 +373,9 @@ function buildBark(sk, d, lod) {
   }
   const limbs = lod === 0 ? sk.limbs : sk.limbs.filter((l) => !l.thin).slice(0, d.lod1Limbs ?? 7);
   // (lod0 draws secondaries with 3 sides)
-  for (const l of limbs) {
-    if (lod === 0) tube(acc, l.pts, l.rads, l.thin ? 3 : (d.limbSeg ?? 5));
-    else { const n = l.pts.length, idx = [0, Math.floor(n / 2), n - 1]; tube(acc, idx.map((i) => l.pts[i]), idx.map((i) => l.rads[i]), 4); }
+  for (const l of limbs) { // r4-trees2: limb ends closed with a short rounded tip (no blunt cut-off stubs poking out of crowns)
+    if (lod === 0) tube(acc, ...capTube(l.pts, l.rads), l.thin ? 3 : (d.limbSeg ?? 5));
+    else { const n = l.pts.length, idx = [0, Math.floor(n / 2), n - 1]; tube(acc, ...capTube(idx.map((i) => l.pts[i]), idx.map((i) => l.rads[i])), 5); }
   }
   if (lod === 0) for (const t of sk.twigs) tube(acc, t.pts.length > 2 && d.arche !== 'pollard' ? [t.pts[0], t.pts[t.pts.length - 1]] : t.pts, t.pts.length > 2 && d.arche !== 'pollard' ? [t.rads[0], t.rads[t.rads.length - 1]] : t.rads, 3);
   else if (d.arche === 'pollard') sk.twigs.forEach((t, i) => { if (i % 3 === 0) tube(acc, [t.pts[0], t.pts[t.pts.length - 1]], [t.rads[0] * 1.5, t.rads[t.rads.length - 1] * 1.5], 3); }); // keep the whip silhouette
@@ -609,6 +614,19 @@ function buildPuffs(sk, d, rnd, density, N, o = {}) {
     const wl = (d.pollard?.whipLen?.[1] ?? 2) * 0.55, r = wl * (o.fistK ?? 0.75) * (0.6 + 0.6 * Math.min(1, density * 2));
     list.push({ c: kn.c.clone().add(V3(0, wl * 0.55, 0)).addScaledVector(V3(kn.c.x, 0, kn.c.z).normalize(), wl * 0.2), r });
   }
+  { // r4-trees2: no small puffs floating on their own beside the crown: isolated ones are pulled in until they overlap
+    // a neighbour (toward the crown axis), and tiny isolated ones are dropped
+    const rs = list.map((p) => p.r).sort((a, b) => a - b), med = rs.length ? rs[rs.length >> 1] : 1;
+    for (let it = 0; it < 2; it++) for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i]; let gap = 1e9, nb = null;
+      for (const q of list) { if (q === p) continue; const g = p.c.distanceTo(q.c) - p.r - q.r; if (g < gap) { gap = g; nb = q; } }
+      if (!nb || gap < -0.25 * p.r) continue;
+      if (p.r < 0.5 * med && list.length > 4) { list.splice(i, 1); continue; }
+      const toNb = nb.c.clone().sub(p.c), dd = toNb.length(), need = gap + 0.3 * Math.min(p.r, nb.r);
+      if (dd > 1e-4) p.c.addScaledVector(toNb, Math.min(1, need / dd) * 0.7); // most of the way toward its neighbour
+      const ax = V3(-p.c.x, 0, -p.c.z), al = ax.length(); if (al > 1e-4) p.c.addScaledVector(ax, Math.min(1, need * 0.3 / al)); // and a little toward the axis
+    }
+  }
   const nc = o.core ?? P.core ?? 2; // dark core so the crown never reads hollow between the shell puffs
   for (let i = 0; i < nc; i++) { const y = lerp(env.base, env.top, (o.coreY ?? 0.36) + 0.22 * i / Math.max(1, nc - 1)); const re = env.r(y, i) || R * 0.5; list.push({ c: V3((rnd() - 0.5) * re * 0.25, y, (rnd() - 0.5) * re * 0.25), r: Math.min(re * (o.coreR ?? 0.5), (env.top - env.base) * 0.36, 4.5), core: true }); }
   for (const p of list) { const sH = clamp((p.c.y - env.base) / Math.max(env.top - env.base, 1e-3), 0, 1); puffQuad(acc, p.c, p.r, nrm(p.c), (p.core ? 0.6 : Math.min(1, ao(p.c) * 1.04)) * (0.8 + 0.2 * sH) * (o.aoK ?? 1), rnd(), rnd() < 0.5 ? 0 : 1, rnd()); } // lower puffs sit in the crown's own shade
@@ -621,17 +639,146 @@ function trunkOnly(sk, d) { // far LOD trunk: 5-sided tube up to the crown base 
   return acc;
 }
 
+// ---------------------------------------------------------------- r4-trees2: hero LOD (real 3D leaf clusters)
+// Trees around the player are rebuilt from small sprigs of real-size leaves (tree-textures.js SPRIGS, one twig with a
+// dozen or two leaves per card) gathered into 3D rosettes: every rosette sits at the tip of a tertiary twig that grows
+// from the nearest skeleton branch out to a point on the crown shell, and its sprigs fan out over a hemisphere around
+// the twig's growth direction, each with its own roll. From any side (walking past, or standing under the crown and
+// looking up) you see overlapping leaf clusters at different depths, lit as small balls inside the crown's own shade,
+// never a large flat plane. Conifers get flat drooping sprays along every whorl branch, pollards a rosette on each whip.
+function heroAttach(sk) { // branch points a tertiary twig may grow from (resampled every ~0.6 m)
+  const out = [], env = sk.env;
+  for (const l of sk.limbs) for (let j = 1; j < l.pts.length; j++) {
+    const a = l.pts[j - 1], b = l.pts[j], n = Math.max(1, Math.ceil(a.distanceTo(b) / 0.6));
+    for (let k = (j === 1 ? 1 : 0); k <= n; k++) { const t = k / n; out.push({ p: a.clone().lerp(b, t), r: lerp(l.rads[j - 1], l.rads[j], t) }); }
+  }
+  for (const t of sk.trunks) for (let j = 1; j < t.pts.length; j++) if (t.pts[j].y > env.base) out.push({ p: t.pts[j].clone(), r: t.rads[j] });
+  return out;
+}
+function heroRosettes(sk, d, rnd, nRos) {
+  const env = sk.env, R = env.R, H = env.top - env.base, Sp = d.sprigM, HH = d.hero || {}, sh = HH.shellR ?? [0.55, 1.0];
+  const attach = heroAttach(sk), ros = [];
+  // true surface-area weighting (ring radius x slope factor), so the flat top of a dome and the crown's underside get
+  // their share of leaf clusters (a canopy you can't see the sky through from below)
+  const hy = H * 0.01, wAt = (y, th) => { const re = env.r(y, th), g = (env.r(Math.min(y + hy, env.top - 1e-3), th) - env.r(Math.max(y - hy, env.base + 1e-3), th)) / (2 * hy); return re * Math.sqrt(1 + Math.min(g * g, 64)); };
+  let wMax = 1e-6; for (let i = 0; i <= 64; i++) for (let j = 0; j < 4; j++) wMax = Math.max(wMax, wAt(env.base + H * (0.02 + 0.96 * i / 64), j * 1.57));
+  let tries = 0;
+  while (ros.length < nRos && tries++ < nRos * 80) {
+    const y = env.base + H * (0.02 + 0.96 * rnd()), th = rnd() * TAU, re = env.r(y, th);
+    if (re < 0.12 || rnd() * wMax * 1.1 > wAt(y, th)) continue; // area-weighted over the crown
+    const rr = Math.max(0, re * lerp(sh[0], sh[1], Math.pow(rnd(), HH.shellPow ?? 0.55)) - Sp * 0.5); // mostly in the outer shell
+    const P = V3(Math.cos(th) * rr, Math.min(y, env.top - Sp * 0.5), Math.sin(th) * rr);
+    let best = null, bd = 1e9; for (const a of attach) { const dd = a.p.distanceToSquared(P); if (dd < bd) { bd = dd; best = a; } }
+    ros.push({ c: P, a: best ? best.p : null, ar: best ? best.r : 0.05 });
+  }
+  return ros;
+}
+function heroFan(acc, P, grow, nC, k, d, rnd, nrm, ao, o = {}) { // one 3D rosette of k sprigs around P
+  const Sp = d.sprigM, HH = d.hero || {}, shellF = o.shell ?? HH.shell ?? 0.55;
+  for (let i = 0; i < k; i++) {
+    if (rnd() < shellF) { // shell sprig: lies along the crown surface facing out (the rosettes merge into a continuous leafy crown)
+      let t = randUnit(rnd); t.addScaledVector(nC, -t.dot(nC)); if (t.lengthSq() < 1e-6) t = anyPerp(nC); t.normalize();
+      if (HH.droop) { t.y -= HH.droop * 0.5; t.addScaledVector(nC, -t.dot(nC)); if (t.lengthSq() < 1e-6) t = anyPerp(nC); t.normalize(); }
+      const f = nC.clone().addScaledVector(randUnit(rnd), HH.shellJit ?? 0.4).normalize();
+      let side = V3().crossVectors(t, f); if (side.lengthSq() < 1e-6) side = anyPerp(t); side.normalize();
+      const sz = Sp * (0.9 + 0.4 * rnd()) * (o.size ?? 1);
+      const base = P.clone().addScaledVector(t, -sz * 0.45).addScaledVector(randUnit(rnd), Sp * 0.3).addScaledVector(nC, Sp * 0.1 * rnd());
+      cardAt(acc, base, t, side, sz, sz, rnd() < 0.5 ? 0 : 1, nrm, ao, rnd(), rnd() < 0.5);
+      continue;
+    }
+    const dir = grow.clone().addScaledVector(randUnit(rnd), o.spread ?? HH.spread ?? 1.0).normalize();
+    if (HH.droop) { dir.y -= HH.droop * (0.6 + 0.8 * rnd()); dir.normalize(); } // pendulous foliage hangs
+    const base = P.clone().addScaledVector(randUnit(rnd), Sp * 0.14).addScaledVector(dir, -Sp * (o.back ?? 0.18));
+    const face = Y.clone().multiplyScalar(HH.faceUp ?? 0.55).addScaledVector(nC, 0.45).addScaledVector(randUnit(rnd), HH.faceJit ?? 0.75);
+    let side = V3().crossVectors(dir, face); if (side.lengthSq() < 1e-6) side = anyPerp(dir); side.normalize();
+    const sz = Sp * (0.78 + 0.44 * rnd()) * (o.size ?? 1);
+    cardAt(acc, base, dir, side, sz, sz, rnd() < 0.5 ? 0 : 1, nrm, ao, rnd(), rnd() < 0.5);
+  }
+}
+function buildLeavesHero(sk, d, rnd, density, budget) {
+  const acc = new Acc(LEAF_ATTRS), env = sk.env, Sp = d.sprigM, HH = d.hero || {};
+  acc.ros = [];
+  if (density <= 0.001 || !sk.clumps.length) return acc;
+  const ao0 = aoFn(env, d.aoLift ?? 0), crownN = normalFn(env, d.normal, null);
+  const nSpr = Math.max(60, Math.floor(budget / 2 * (d.arche === 'decurrent' ? 1 : Math.min(1, density * 1.15)))); // decurrent crowns thin by bare patches below
+  const ballN = (P, w) => (p) => { const q = p.clone().sub(P), l = q.length(), n = crownN(p).multiplyScalar(1 - w); if (l > 1e-5) n.addScaledVector(q.divideScalar(l), w); return n.addScaledVector(Y, 0.08).normalize(); };
+  const ballAO = (P, r) => (p) => Math.pow(ao0(p), HH.aoPow ?? 1.5) * (0.62 + 0.38 * smooth(0, r, p.distanceTo(P))); // rosette cores and the crown interior sit in their own shade
+  if (d.arche === 'conifer') { // flat sprays leaving every whorl branch on both sides, drooping toward their tips
+    const cl = sk.clumps, tot = cl.reduce((s, c) => s + (c.mode === 'branch' ? c.p0.distanceTo(c.p1) + 0.3 : c.r), 0);
+    for (const c of cl) {
+      const k = Math.max(2, Math.round(nSpr * (c.mode === 'branch' ? c.p0.distanceTo(c.p1) + 0.3 : c.r) / tot));
+      if (c.mode !== 'branch') { const g = c.dir.clone().addScaledVector(V3(c.c.x, 0, c.c.z).normalize(), 0.6).normalize(); heroFan(acc, c.c, g, crownN(c.c), k, d, rnd, ballN(c.c, 0.4), ballAO(c.c, c.r), { spread: 1.1 }); continue; }
+      const lat = V3().crossVectors(c.dir, Y); if (lat.lengthSq() < 1e-6) lat.copy(anyPerp(c.dir)); lat.normalize();
+      const nrm = (p) => { const n = crownN(p).multiplyScalar(0.6).addScaledVector(Y, 0.4); return n.normalize(); };
+      for (let i = 0; i < k; i++) {
+        const base = c.p0.clone().lerp(c.p1, Math.pow(rnd(), 0.8)).addScaledVector(randUnit(rnd), Sp * 0.08);
+        const phi = 0.35 + rnd() * 1.0, sg = rnd() < 0.5 ? -1 : 1;
+        const up = c.dir.clone().multiplyScalar(Math.cos(phi)).addScaledVector(lat, sg * Math.sin(phi)).addScaledVector(randUnit(rnd), HH.jit ?? 0.25);
+        up.y -= (HH.droop ?? 0.25) * (0.4 + rnd()); up.normalize();
+        const face = Y.clone().addScaledVector(randUnit(rnd), HH.faceJit ?? 0.45); // sprays lie roughly flat
+        let side = V3().crossVectors(up, face); if (side.lengthSq() < 1e-6) side = anyPerp(up); side.normalize();
+        const sz = Sp * (0.75 + 0.5 * rnd());
+        cardAt(acc, base, up, side, sz, sz, rnd() < 0.5 ? 0 : 1, nrm, (p) => ao0(p) * (0.8 + 0.2 * rnd()), rnd(), rnd() < 0.5);
+      }
+    }
+    return acc;
+  }
+  if (d.arche === 'pollard') { // a rosette on every whip tip
+    const per = Math.max(3, Math.round(nSpr / sk.clumps.length));
+    for (const c of sk.clumps) heroFan(acc, c.c, c.dir.clone().addScaledVector(Y, 0.3).normalize(), crownN(c.c), per, d, rnd, ballN(c.c, 0.5), ballAO(c.c, Sp), { spread: 1.1 });
+    return acc;
+  }
+  // decurrent: rosettes spread evenly over the crown shell (area-weighted, outer 45% of the radius), each on a stalk
+  // grown from the nearest skeleton branch, so the leaf clusters merge into a closed crown with depth instead of
+  // garlands along the limbs. Thinning crowns (late-autumn planes) lose whole patches of rosettes.
+  const per = HH.per ?? 11, ros0 = heroRosettes(sk, d, rnd, Math.max(10, Math.round(nSpr / per))), ros = [];
+  for (const l of sk.limbs) { const n = l.pts.length; ros0.push({ c: l.pts[n - 1].clone(), a: null, ar: 0, tip: true }); } // every limb ends in a leaf cluster, never a bare spike
+  const ph = [rnd() * TAU, rnd() * TAU, rnd() * TAU], fq = HH.patchF ?? 0.55;
+  const patch = (p) => 0.5 + 0.5 * Math.sin(p.x * fq + ph[0]) * Math.sin(p.y * fq * 0.8 + ph[1]) * Math.sin(p.z * fq + ph[2] + p.x * 0.3);
+  for (const r of ros0) {
+    const P = r.c;
+    if (!r.tip && density < 0.98 && patch(P) * 0.75 + rnd() * 0.25 > density * (HH.densK ?? 1.05)) continue; // bare patches
+    ros.push(r);
+    const nC = crownN(P), out = r.a ? P.clone().sub(r.a) : nC.clone(); if (out.lengthSq() < 1e-6) out.copy(nC); out.normalize();
+    const grow = out.multiplyScalar(0.5).addScaledVector(nC, 0.5).addScaledVector(Y, HH.up ?? 0.15).normalize();
+    heroFan(acc, P, grow, nC, Math.max(3, per + Math.round((rnd() - 0.5) * per * 0.5)), d, rnd, ballN(P, HH.ballW ?? 0.25), ballAO(P, Sp * 0.9));
+  }
+  acc.ros = ros;
+  return acc;
+}
+function buildBarkHero(sk, d, ros) { // smoother wood than LOD0 + the tertiary twigs that carry the rosettes
+  const acc = new Acc(['aRad']), twR = d.clumps?.twigR ?? 0.05;
+  const capped = capTube;
+  for (const t of sk.trunks) { // broadleaf trunks taper into their top limbs (hidden inside the limb bases, no stump); leaders get a tip
+    if (d.arche === 'conifer') { tube(acc, ...capped(t.pts, t.rads), (d.trunk.seg ?? 8) + 4); continue; }
+    const n = t.rads.length, rr = t.rads.slice(); rr[n - 1] *= 0.45; if (n > 2) rr[n - 2] *= 0.8;
+    tube(acc, t.pts, rr, (d.trunk.seg ?? 8) + 4);
+  }
+  for (const l of sk.limbs) tube(acc, ...capped(l.pts, l.rads), l.thin ? 5 : (d.limbSeg ?? 5) + 3);
+  for (const t of sk.twigs) tube(acc, t.pts, t.rads, 3);
+  for (const k of sk.knobs) { ico(acc, k.c, k.r, 0.85); if (d.arche === 'pollard' && k.r > 0.2) ico(acc, k.c.clone().add(V3(k.r * 0.45, k.r * 0.3, -k.r * 0.3)), k.r * 0.7, 0.9); }
+  for (const r of ros || []) {
+    if (!r.a) continue;
+    const L = r.a.distanceTo(r.c); if (L < 0.08) continue;
+    const r0 = Math.min(r.ar * 0.5, twR * 1.0), r1 = twR * 0.22; // thin stalks, mostly hidden in the foliage
+    if (L > 2.2) continue; // long straight stalks read as sticks: those rosettes just sit among their neighbours
+    if (L < 1.0) tube(acc, [r.a, r.c], [r0, r1], 3);
+    else { const m = r.a.clone().lerp(r.c, 0.45); m.y += 0.1 * L; tube(acc, [r.a, m, r.c], [r0, (r0 + r1) * 0.5, r1], 3); }
+  }
+  return acc;
+}
+
 // ---------------------------------------------------------------- species definitions (metres, typical tree)
 const SPECIES_DEF = {
   oak: {
     lod2K: 0.65, cardK: 1.5, name: 'Coast live oak', arche: 'decurrent', leaf: 'oak', bark: 'oak', seed: 101, typical: { height: 12, crownR: 9.5 },
-    trunk: { h: 2.3, r0: 0.62, r1: 0.5, lean: 0.06, flare: 0.4, wiggle: 0.05, seg: 9 },
-    crown: { base: 1.6, top: 12, R: 9.5, shape: ['superegg', 0.3, 2.3], irr: 0.15 },
+    trunk: { h: 2.9, r0: 0.62, r1: 0.5, lean: 0.06, flare: 0.4, wiggle: 0.05, seg: 9 }, // r4-trees2: crown lifted (2.4 m, was 1.6) so walkers fit under campus oaks
+    crown: { base: 2.4, top: 12, R: 9.5, shape: ['superegg', 0.3, 2.3], irr: 0.15 },
     limbs: { n: 7, h0: 0.65, h1: 1.0, up: [0.15, 0.55], reach: [0.62, 0.9], r: 0.5, arch: -0.1, wiggle: 1.2 },
     branch2: { n: 5, spread: 1.0, twigs: 3, up: [-0.55, 0.65] },
     clumps: { twigR: 0.045 },
     cards: { n: 1500, vbias: 0.25, out: 1.0, face: 0.6, jit: 0.5 },
-    normal: 'ellipsoid', lod1Core: true,
+    normal: 'ellipsoid', lod1Core: true, hero: { budgetK: 1.3, spread: 0.85, shell: 0.65, shellR: [0.3, 1.0], shellPow: 0.45 }, // r4-trees2: dense evergreen dome, some leaves inside
     look: { cols: ['#4f5c30', '#5d6a3a', '#767c55'], ramp: [0.45, 0.93, 0.12, 0.08], twig: '#5b5045', rough: 0.55, leafSpec: 0.3, transBack: 0.45, transWrap: 0.3, blobK: 0.91, sway: 0.007, flutter: 0.0010, tintK: 1.0 },
   },
   plane: {
@@ -642,7 +789,7 @@ const SPECIES_DEF = {
     clumps: { n: 62, r: [1.1, 1.7], shell: [0.55, 0.97], twigR: 0.05 },
     branch2: { n: 4, spread: 1.0, twigs: 3, up: [-0.45, 0.75] },
     cards: { n: 1500, size: 1.5, vbias: 0.3, out: 0.9, face: 0.55, jit: 0.6 },
-    normal: 'ellipsoid', seasonal: 'plane',
+    normal: 'ellipsoid', seasonal: 'plane', hero: { densK: 0.9 },
     look: { twig: '#6b6250', rough: 0.8, transBack: 0.75, transWrap: 0.3, blobK: 0.64, sway: 0.010, flutter: 0.0016, tintK: 0.35 },
   },
   planePollard: {
@@ -660,7 +807,7 @@ const SPECIES_DEF = {
     crown: { base: 7.5, top: 35, R: 5, shape: ['cone', 0.8, 5], irr: 0.24 }, // r4-trees: clear red bole below a ragged, narrow crown (not a generic cone)
     whorls: { spacing: 1.15, n: 4, elev: [-0.35, 0.3], droop: 0.12, r: 0.07, lenK: [0.85, 1.0], clumpK: 0.35, clumpR: [0.6, 1.4] },
     cards: { n: 1500, size: 1.5, vbias: 0.05, out: 1.0, face: 0.35, flat: 0.45, jit: 0.35 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 24, rK0: 0.85, n1: 56, n2: 26, rK: 0.85, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, // dense, flat, ragged branch-spray tiers (the near cards alone read as a scrawny bottlebrush)
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 24, rK0: 0.85, n1: 56, n2: 26, rK: 0.85, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, sprigK: 1.0, hero: { faceJit: 0.75, droop: 0.45, jit: 0.25 }, // r4-trees2: drooping, tilted sprays (flat ones vanish edge-on from eye level) // dense, flat, ragged branch-spray tiers (the near cards alone read as a scrawny bottlebrush)
     look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
@@ -671,7 +818,7 @@ const SPECIES_DEF = {
     clumps: { n: 38, r: [1.3, 2.3], shell: [0.5, 0.97], twigR: 0.07 }, // fewer, smaller clumps: sky shows through
     branch2: { n: 4, spread: 1.1, twigs: 2, up: [-0.5, 0.7] },
     cards: { n: 1500, size: 2.4, vbias: -0.9, out: 0.35, face: 0.4, jit: 0.35, tangent: 0.2 }, // most sprays hang (pendulous) instead of forming a shell
-    normal: 'ellipsoid', puff: { rK: 0.8, core: 0, core0: 0, n0: 7, rK0: 0.6, n1: 30, aspect: 0.72 }, // pendulous: narrow, hanging leaf masses
+    normal: 'ellipsoid', puff: { rK: 0.8, core: 0, core0: 0, n0: 7, rK0: 0.6, n1: 30, aspect: 0.72 }, hero: { droop: 1.1, shell: 0.35, spread: 0.7, faceJit: 1.0, budgetK: 1.1 }, // r4-trees2: hanging gum foliage // pendulous: narrow, hanging leaf masses
     look: { cols: ['#6f7f6c', '#7f8e7a', '#647262'], ramp: [0.4, 0.8, 0.25, 0.2], twig: '#8a7a62', rough: 0.6, leafSpec: 0.3, transBack: 0.55, transWrap: 0.3, blobK: 0.79, sway: 0.012, flutter: 0.002, tintK: 0.6 }, // r4-trees: grey-green, less aerial tint (read as oak)
   },
   pine: {
@@ -816,7 +963,7 @@ function triCount(g) { return (g.index ? g.index.count : g.attributes.position.c
 
 function buildSpecies(id, d, season, opts) {
   // opts: { leafTexSize, alphaToCoverage }
-  d = { ...d, cardM: (LEAF_KINDS[d.leaf]?.cellM ?? 1) * (d.cardK ?? 1) };
+  d = { ...d, cardM: (LEAF_KINDS[d.leaf]?.cellM ?? 1) * (d.cardK ?? 1), sprigM: (SPRIGS[d.leaf]?.M ?? 0.5) * (d.sprigK ?? 1) };
   const rnd = mulberry32(d.seed * 7919 + 17);
   const sea = d.seasonal ? SEASONAL[d.seasonal][season] ?? SEASONAL[d.seasonal]['late-autumn'] : null;
   const look = { ...d.look, ...(sea ? { cols: sea.cols, ramp: sea.ramp } : {}) };
@@ -865,15 +1012,20 @@ function buildSpecies(id, d, season, opts) {
     } else L1.leaves = buildLeaves1(sk, d, rnd, density, (opts.lod1Budget ?? 400) - 5 - L1.bark.tris);
   }
   if (!L2.puffs) L2.blob = buildBlob(sk, d, rnd, d.arche === 'palm' ? 1 : density);
+  // r4-trees2: hero LOD (own random stream, so LOD0-2 are unchanged)
+  const LH = {}, useHero = opts.hero !== false && d.arche !== 'palm';
+  if (useHero) { const rh = mulberry32(d.seed * 104729 + 7); LH.leaves = buildLeavesHero(sk, d, rh, density, (opts.heroBudget ?? 14000) * (d.hero?.budgetK ?? 1)); LH.bark = buildBarkHero(sk, d, LH.leaves.ros); }
 
   const g0 = { bark: L0.bark.geometry(), leaves: L0.leaves.count ? L0.leaves.geometry() : null, puffs: L0.puffs?.count ? L0.puffs.geometry() : null };
   const g1 = { bark: L1.bark.geometry(), leaves: L1.leaves.count ? L1.leaves.geometry() : null };
   const g2 = L2.puffs ? { trunk: L2.trunk.geometry(), puffs: L2.puffs.geometry() } : { blob: L2.blob.geometry() };
   const puff1 = !!(L1.leaves && L1.leaves.puffs);
+  const gH = useHero ? { bark: LH.bark.geometry(), leaves: LH.leaves.count ? LH.leaves.geometry() : null, puffs: null } : opts.hero !== false ? { bark: g0.bark.clone(), leaves: g0.leaves ? g0.leaves.clone() : null, puffs: g0.puffs ? g0.puffs.clone() : null } : null; // palms: hero = a copy of LOD0
 
   // ---- normalise to height 1 using LOD0's top
   const H = maxY([g0.bark, g0.leaves].filter(Boolean));
   for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs]) if (g) scaleGeo(g, 1 / H);
+  if (gH) for (const g of [gH.bark, gH.leaves, gH.puffs]) if (g) scaleGeo(g, 1 / H); // (cloned before LOD0 was scaled)
   const top1 = maxY([g1.bark, puff1 ? null : g1.leaves].filter(Boolean)), top2 = g2.blob ? maxY([g2.blob]) : 1;
   if (!puff1 && Math.abs(top1 - 1) > 0.01) for (const g of [g1.bark, g1.leaves]) if (g) scaleGeo(g, 1, 1 / top1, 1);
   if (g2.blob && Math.abs(top2 - 1) > 0.01) scaleGeo(g2.blob, 1, 1 / top2, 1);
@@ -887,7 +1039,7 @@ function buildSpecies(id, d, season, opts) {
     const k2 = (d.lod2K ?? 0.9) * (d.seasonal ? 0.75 + 0.25 * density : 1);
     const r = percentile(radialList(g2.blob), 0.97); if (r > 1e-4) { const s = clamp(normRadius * k2 / r, 0.5, 1.3); scaleGeo(g2.blob, s, 1, s); }
   }
-  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
+  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs, gH?.bark, gH?.leaves, gH?.puffs]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
 
   // ---- materials (one set per species; all share the species' sway uniforms)
   const uni = makeTreeUniforms({ ...look, swayBase: clamp(crownBase * 0.55, 0.02, 0.6), typH: H });
@@ -905,27 +1057,33 @@ function buildSpecies(id, d, season, opts) {
   const puffMat0 = puffTex ? mkPuff(puffP0, `tree:${id}:puff0`) : null, puffMat1 = puffTex ? mkPuff(puffP1, `tree:${id}:puff`) : null;
   const dp0 = puffTex ? makePuffDepthMaterials(uni, puffP0) : null;
   const dl = makeDepthMaterials(uni, true), db = makeDepthMaterials(uni, false);
+  // r4-trees2: hero leaves use the sprig atlas (real-size leaves on small twigs)
+  const heroMat = useHero && gH.leaves ? patchLeaf(new THREE.MeshStandardMaterial({ map: leafTexture(d.leaf, opts.leafTexSize, true), alphaTest: 0.42, alphaToCoverage: false /* sub-pixel leaves dithered into a visible dot grid under A2C */, side: THREE.DoubleSide, roughness: Math.max(0.75, look.rough ?? 0.8), metalness: 0 }), uni) : null;
+  if (heroMat) heroMat.name = `tree:${id}:hero`;
+  const dh = heroMat ? makeDepthMaterials(uni, true) : null;
   const P = (geometry, material, kind, dm) => ({ geometry, material, kind, depthMaterial: dm ? dm.depth : null, distanceMaterial: dm ? dm.distance : null, castShadow: true, receiveShadow: true });
   const lod = (parts) => ({ parts, triangles: parts.reduce((s, p) => s + triCount(p.geometry), 0) });
+  const lodH = gH ? lod([P(gH.bark, barkMat, 'bark', db), ...(gH.leaves ? [P(gH.leaves, heroMat || leafMat, 'leaves', heroMat ? dh : dl)] : []), ...(gH.puffs ? [P(gH.puffs, puffMat0, 'puffs', dp0)] : [])]) : null;
   const lods = [
     lod([P(g0.bark, barkMat, 'bark', db), ...(g0.leaves ? [P(g0.leaves, leafMat, 'leaves', dl)] : []), ...(g0.puffs ? [P(g0.puffs, puffMat0, 'puffs', dp0)] : [])]),
     lod([P(g1.bark, barkMat, 'bark', db), ...(g1.leaves ? [puff1 ? P(g1.leaves, puffMat1, 'puffs', null) : P(g1.leaves, leafMat, 'leaves', dl)] : [])]),
     g2.puffs ? lod([P(g2.trunk, barkMat, 'bark', null), P(g2.puffs, puffMat1, 'puffs', null)]) : lod([P(g2.blob, blobMat, 'far', null)]),
   ];
+  if (lodH) lods.unshift(lodH); // r4-trees2: lods = [hero, near, mid, far] (TreeSystem adds the hero distance)
   const trunkRadius = sk.trunks[0].rads[Math.min(1, sk.trunks[0].rads.length - 1)] / H;
   return {
     id, name: d.name, lods, normHeight: 1, normRadius, crownBase, trunkRadius,
-    typical: { ...d.typical }, season, leafDensity: density, uniforms: uni, materials: [barkMat, leafMat, blobMat, ...(puffMat0 ? [puffMat0, puffMat1] : [])],
+    typical: { ...d.typical }, season, leafDensity: density, uniforms: uni, materials: [barkMat, leafMat, blobMat, ...(puffMat0 ? [puffMat0, puffMat1] : []), ...(heroMat ? [heroMat] : [])], hero: !!lodH,
   };
 }
 
 // ---------------------------------------------------------------- public API
 export const TREE_SPECIES = Object.keys(SPECIES_DEF);
 
-export function createTreeLibrary({ season = 'late-autumn', leafTexSize = 2048, alphaToCoverage = true, lod0Budget = 3000, lod1Budget = 400, only = null, puffs = true, puffK = 1 } = {}) {
+export function createTreeLibrary({ season = 'late-autumn', leafTexSize = 2048, alphaToCoverage = true, lod0Budget = 3000, lod1Budget = 400, only = null, puffs = true, puffK = 1, hero = true, heroBudget = 14000 } = {}) { // r4-trees2: hero = 3D-cluster LOD for nearby trees
   if (!SEASONS.includes(season)) throw new Error(`createTreeLibrary: unknown season '${season}' (${SEASONS.join(', ')})`);
   const species = {};
-  for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget, puffs, puffK }); }
+  for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget, puffs, puffK, hero, heroBudget }); }
   let lastTime = U.uTime.value, clock = 0;
   const baseDir = TREE_WIND_DIR.value.clone();
   return {
