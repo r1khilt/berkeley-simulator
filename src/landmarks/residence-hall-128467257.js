@@ -1,5 +1,6 @@
 // Clark Kerr Campus one-storey residence pavilion beside the tennis courts (Spanish Colonial Revival): a low white stucco
 // block under a shallow red clay-tile hipped roof, deep-set dark casements and a small arched entry. LiDAR: eaves ≈3.3 m, ridge ≈4.6 m.
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit } from './lib/b08a-kit.js';
 import { ckWing } from './lib/b08a-mission.js';

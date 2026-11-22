@@ -3,6 +3,7 @@
 // round-arched French doors in an arcade-like row on the ground floor, small rectangular upper windows, a lower two-storey
 // west wing and a one-storey link, behind a red-brick garden wall with stucco-capped gate piers. Massing from the LiDAR
 // (main block eaves ≈9 m above its grade, i.e. ≈12 m above the low west datum; ridge ≈13.9 m).
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit, pal, facade } from './lib/b08a-kit.js';
 import { ckWing } from './lib/b08a-mission.js';

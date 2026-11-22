@@ -2,6 +2,7 @@
 // renewed for student housing). Three-storey white stucco wings with red clay-tile gable roofs: a long north–south range
 // and an east–west wing at the south end, fronted on the west by a long one-storey colonnaded veranda with a shed tile roof.
 // Massing from the 2021 LiDAR: eaves ≈10 m, ridges 11.5–13 m above the low (west) side; the site rises ≈4 m to the east.
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit, pal } from './lib/b08a-kit.js';
 import { ckWing, veranda } from './lib/b08a-mission.js';

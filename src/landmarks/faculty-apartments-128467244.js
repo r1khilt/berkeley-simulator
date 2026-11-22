@@ -2,6 +2,7 @@
 // a rambling two/three-storey Spanish Colonial Revival group of white stucco wings under red clay-tile roofs — a taller
 // west wing with a steep gable, a long low north range, a gabled cross wing and an east range — around a south-facing
 // garden court. Massing from the 2021 LiDAR (west wing eaves ≈11 m, ridge ≈13 m; other ranges eaves ≈9 m).
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit } from './lib/b08a-kit.js';
 import { ckWing } from './lib/b08a-mission.js';
