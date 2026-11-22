@@ -4,7 +4,7 @@ import { U } from '../materials.js';
 function bladeClump() {
   const pos = [], col = [];
   // r4-ground: mown campus lawn -> short (4-10 cm) blades spread over the whole cell instead of tall 10-20 cm tufts,
-  // which read as an unmown field and aliased into vertical streaks / a 'hedge band' at mid distance
+  // which read as an unmown field and piled up into a 'hedge band' along the far edge of the blade radius
   const blades = 14;
   for (let b = 0; b < blades; b++) {
     const a = (b / blades) * Math.PI * 2 + Math.random() * 0.6, r = Math.sqrt(Math.random()) * 0.2;
