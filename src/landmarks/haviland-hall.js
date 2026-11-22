@@ -65,18 +65,19 @@ export async function build(ctx) {
     inscription(K, RF, 0.6, 5.8, yT + 0.25, yT + 0.75, 0.005, 'HAVILAND HALL', { fg: '#6a6252', cut: true });
     // doorway: 6 m round-arched opening from the landing, double doors under a tall gridded transom
     // (the frontispiece now stands 0.25 m proud of the façade: the recessed door used to sit behind the solid bay-7 wall face and never showed)
-    const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 6.0, arch: true, doorTop: yL + 3.0 };
-    const WD = tint(M.woodDark, 0x5e3320);
+    const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 5.9, doorTop: yL + 3.2 }; // rectangular opening (photo): arched wood doors under a tall gridded transom
+    const WD = tint(M.woodDark, 0x8a5634);
     K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); K.fill(R, o, { kind: 'door', door: WD, glass: M.glass, rev: 0.15 }); // dark glass: no lit interior behind the fanlight
-    { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 - rr; // gridded fanlight (photo: ~5 x 6 lights)
-      for (let k = 1; k < 5; k++) { const x = o.s0 + w * k / 5, dx = x - cx, top = spring + Math.sqrt(Math.max(0, rr * rr - dx * dx)) - 0.02; K.rbox(R, WD, x - 0.025, o.doorTop, -0.15, x + 0.025, top, -0.11, { detail: true }); }
+    { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 + 99; // gridded transom (photo: ~5 x 6 lights)
+      { const ag = new THREE.TorusGeometry(rr - 0.08, 0.07, 5, 20, Math.PI); ag.translate(cx, o.doorTop - rr + 0.02, -0.12); K.addRun(R, WD, ag, { detail: true }); const tg = new THREE.Shape(); tg.moveTo(o.s0, o.doorTop); tg.lineTo(o.s0, o.doorTop - rr); tg.absarc(cx, o.doorTop - rr, rr, Math.PI, 0, true); tg.lineTo(o.s1, o.doorTop); tg.lineTo(o.s0, o.doorTop); const sg = new THREE.ShapeGeometry(tg, 8); sg.translate(0, 0, -0.135); K.addRun(R, tint(M.woodDark, 0x6e4228), sg, { detail: true }); } // arched head of the door leaves
+      for (let k = 1; k < 5; k++) { const x = o.s0 + w * k / 5, dx = x - cx, top = Math.min(o.y1 - 0.02, spring + Math.sqrt(Math.max(0, rr * rr - dx * dx)) - 0.02); K.rbox(R, WD, x - 0.025, o.doorTop, -0.15, x + 0.025, top, -0.11, { detail: true }); }
       for (let j = 1; j < 6; j++) { const y = o.doorTop + (o.y1 - o.doorTop) * j / 6; const hw = y <= spring ? rr : Math.sqrt(Math.max(0, rr * rr - (y - spring) ** 2)); if (hw < 0.15) continue; K.rbox(R, WD, cx - hw + 0.02, y - 0.025, -0.15, cx + hw - 0.02, y + 0.025, -0.11, { detail: true }); }
       K.rbox(R, WD, o.s0, o.doorTop - 0.06, -0.16, o.s1, o.doorTop + 0.08, -0.08, { detail: true }); }
     // balcony railing on the portico roof: balusters, a large central seal medallion and two smaller roundels
-    { const RB = K.run([uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]); K.rbox(RB, CU, 0, yT + 2.1, -0.05, RB.L, yT + 2.17, 0.05); K.rbox(RB, CU, 0, yT + 1.27, -0.04, RB.L, yT + 1.33, 0.04);
-      for (let s = 0.12; s < RB.L; s += 0.12) { const c = RB.L / 2; if (Math.abs(s - c) < 0.5 || Math.abs(Math.abs(s - c) - 1.75) < 0.3) continue; K.rbox(RB, CU, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); }
-      for (const [dv, r] of [[0, 0.44], [-1.75, 0.26], [1.75, 0.26], [-0.95, 0.13], [0.95, 0.13], [-2.6, 0.13], [2.6, 0.13]]) { const g = new THREE.TorusGeometry(r, 0.035, 5, 18); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.69, dv); K.add(CU, g, { detail: true });
-        const d = new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 14); d.rotateZ(Math.PI / 2); d.translate(uP - 0.2, yT + 1.69, dv); K.add(CU, d, { detail: true }); } }
+    { const RB = K.run([uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]); K.rbox(RB, CU, 0, yT + 2.33, -0.05, RB.L, yT + 2.41, 0.05); K.rbox(RB, CU, 0, yT + 1.27, -0.04, RB.L, yT + 1.33, 0.04);
+      for (let s = 0.12; s < RB.L; s += 0.12) { const c = RB.L / 2; if (Math.abs(s - c) < 0.5 || Math.abs(Math.abs(s - c) - 1.75) < 0.3) continue; K.rbox(RB, CU, s - 0.017, yT + 1.25, -0.017, s + 0.017, yT + 2.33, 0.017, { detail: true }); }
+      for (const [dv, r] of [[0, 0.5], [-1.75, 0.3], [1.75, 0.3], [-0.95, 0.13], [0.95, 0.13], [-2.6, 0.13], [2.6, 0.13]]) { const g = new THREE.TorusGeometry(r, 0.035, 5, 18); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.8, dv); K.add(CU, g, { detail: true });
+        const d = new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 14); d.rotateZ(Math.PI / 2); d.translate(uP - 0.2, yT + 1.8, dv); K.add(CU, d, { detail: true }); } }
     // one long straight red-brick flight from the lower walk up to the landing
     const uTop = uP - 0.6, TR = 0.39, RS = 0.155, sw = 2.3;
     let uFoot = uTop - 11.5, gF = K.g(uFoot - 0.6, 0);
@@ -92,8 +93,7 @@ export async function build(ctx) {
       const sh = new THREE.Shape(); sh.moveTo(uFoot - 0.3, gF - 1.8); sh.lineTo(uTop - 0.4, yL - 1.8); sh.lineTo(uTop - 0.4, yAt(uTop - 0.4) + 0.27); sh.lineTo(uFoot - 0.3, yAt(uFoot - 0.3) + 0.27); sh.closePath();
       const g = new THREE.ExtrudeGeometry(sh, { depth: 0.38, bevelEnabled: false }); g.translate(0, 0, vc - 0.19); K.add(CON, g);
       K.box(CON, uTop - 0.55, yL - 0.9, vc - 0.27, uTop, yL + 0.95, vc + 0.27); K.box(CON, uTop - 0.6, yL + 0.95, vc - 0.31, uTop + 0.05, yL + 1.03, vc + 0.31);
-      K.box(CON, uFoot - 0.8, gF - 0.9, vc - 0.27, uFoot - 0.25, gF + 0.8, vc + 0.27); K.box(CON, uFoot - 0.85, gF + 0.8, vc - 0.31, uFoot - 0.2, gF + 0.88, vc + 0.31);
-      colliders.push(K.colPoly(rect(uFoot - 0.8, vc - 0.2, uTop, vc + 0.2), gF - 1, yL + 1.0));
+      colliders.push(K.colPoly(rect(uFoot - 0.3, vc - 0.2, uTop, vc + 0.2), gF - 1, yL + 1.0));
       // black steel pipe handrail on posts set into the coping
       const ua = uFoot + 0.15, ub = uTop - 0.75;
       pipe(RAIL, [ua, yAt(ua) + 0.95, vc], [ub, yAt(ub) + 0.95, vc], 0.025);
@@ -101,15 +101,19 @@ export async function build(ctx) {
       const np = Math.max(2, Math.round((ub - ua) / 1.5)); for (let k = 0; k <= np; k++) { const u = ua + (ub - ua) * k / np; pipe(RAIL, [u, yAt(u) + 0.25, vc], [u, yAt(u) + 0.95, vc], 0.02); }
       // spreading juniper masses on the slope beside the flight
       const X = rnMats(M);
-      for (let k = 0; k < 10; k++) { const u = uFoot + 0.6 + (uTop - uFoot - 1.2) * (k + 0.5) / 10, v = vs * (sw + 1.05 + ((k * 7) % 3) * 0.55);
+      for (let k = 0; k < 10; k++) { const u = uFoot + 0.6 + (uTop - uFoot - 1.2) * (k + 0.5) / 10, v = vs * (sw + 2.0 + ((k * 7) % 3) * 0.5);
         const jg = new THREE.IcosahedronGeometry(1, 1); jg.scale(1.35 + (k % 2) * 0.4, 0.68, 1.15); jg.translate(u, Math.max(K.g(u, v), yAt(u) - 0.3) + 0.2, v); K.add(k % 3 ? X.leafA : X.leafC, jg, { detail: true });
-        if (k % 2) { const jg2 = new THREE.IcosahedronGeometry(1, 1); jg2.scale(1.2, 0.6, 1.0); const v2 = v + vs * 1.9; jg2.translate(u + 0.4, Math.max(K.g(u + 0.4, v2), yAt(u) - 0.5) + 0.18, v2); K.add(X.leafA, jg2, { detail: true }); } }
+        if (k % 2) { const jg2 = new THREE.IcosahedronGeometry(1, 1); jg2.scale(1.2, 0.6, 1.0); const v2 = v + vs * 2.0; jg2.translate(u + 0.4, Math.max(K.g(u + 0.4, v2), yAt(u) - 0.5) + 0.18, v2); K.add(X.leafA, jg2, { detail: true }); } }
     }
     { const X = rnMats(M); const RW = K.run([-11.0, -26.6], [-11.0, 26.6]); planting(K, RW, 1.0, RW.L - 1.0, { d0: 0.1, depth: 1.3, h: 0.9, skip: [[RW.L / 2 - 4.2, RW.L / 2 + 4.2]], seed: 61 }); }
     // black cast-iron campus lamp in the planting south of the flight
-    { const lu = uFoot + 2.6, lv = sw + 2.2, lg = K.g(lu, lv); K.cyl(RAIL, lu, lg - 0.2, lv, 0.17, 0.14, 0.75); K.cyl(RAIL, lu, lg + 0.55, lv, 0.075, 0.055, 3.1, 8);
+    { const lu = uFoot + 1.0, lv = sw + 1.25, lg = K.g(lu, lv); K.cyl(RAIL, lu, lg - 0.2, lv, 0.17, 0.14, 0.75); K.cyl(RAIL, lu, lg + 0.55, lv, 0.075, 0.055, 3.1, 8);
       K.lathe(RAIL, [[0.12, 0], [0.16, 0.06], [0.05, 0.12]], lu, lg + 3.62, lv, 8); K.lathe(M.lampGlow, [[0.1, 0], [0.19, 0.28], [0.17, 0.5], [0.06, 0.58]], lu, lg + 3.72, lv, 8);
       K.lathe(RAIL, [[0.2, 0], [0.12, 0.12], [0.02, 0.22]], lu, lg + 4.28, lv, 8); colliders.push(K.colCyl(lu, lv, 0.2, lg - 1, lg + 4.4)); }
+    // the tall columnar cypress right (south) of the portico (photo)
+    { const cu = -14.6, cv = 6.4, cg = K.g(cu, cv), X = rnMats(M); K.cyl(X.bark, cu, cg - 0.2, cv, 0.16, 0.12, 0.9, 6);
+      const pr = [[0.05, 0], [0.62, 0.35], [0.88, 1.6], [0.9, 3.0], [0.8, 4.6], [0.6, 6.0], [0.36, 7.2], [0.12, 8.1], [0.02, 8.5]];
+      K.lathe(X.leafA, pr, cu, cg + 0.5, cv, 10); colliders.push(K.colCyl(cu, cv, 0.5, cg - 1, cg + 6)); }
     // pendant lantern
     K.cyl(M.iron, uP + 1.2, yT - 0.9, 0, 0.01, 0.01, 0.9, 4, { detail: true }); K.lathe(M.lampGlow, [[0.05, 0], [0.18, 0.1], [0.2, 0.45], [0.08, 0.6]], uP + 1.2, yT - 1.5, 0, 8, { detail: true });
   }
