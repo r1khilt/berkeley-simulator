@@ -55,7 +55,7 @@ export const SITES = [
   // [r5-audit-central] Wheeler Plaza (Wheeler frame: anchor -116.9, 85.7; -16.122 deg): photos show one grey paved plaza
   // rising eastward along the whole foot of the grand south stair (the bake left lawn there, wrapping the bottom steps),
   // with the big south-east tree in a planting bed.
-  { type: 'paved', pts: WF([[-27.5, 38.0], [28, 38.0], [28, 50.5], [10.8, 50.5], [10.8, 41.8], [5.4, 41.8], [5.4, 50.5], [-27.5, 50.5]]) }, // (a bed is left round the big LiDAR oak at u 8.1, v 44.5)
+  { type: 'paved', pts: WF([[-27.5, 38.0], [28, 38.0], [28, 61.5], [10.8, 61.5], [10.8, 41.8], [5.4, 41.8], [5.4, 61.5], [-27.5, 61.5]]) }, // (a bed is left round the big LiDAR oak at u 8.1, v 44.5)
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
