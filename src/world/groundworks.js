@@ -227,7 +227,11 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const fit = (a) => { const m = a.length; let sx = 0, sy = 0, sxx = 0, sxy = 0; a.forEach((v, k) => { sx += k; sy += v; sxx += k * k; sxy += k * v; }); const den = m * sxx - sx * sx || 1; const bb = (m * sxy - sx * sy) / den, aa = (sy - bb * sx) / m; return a.map((_, k) => aa + bb * k); };
     const rawH = sgn > 0 ? hl : hr; const spanH = Math.max(...rawH) - Math.min(...rawH);
     const H = spanH < 0.8 ? fit(rawH) : sm(rawH, 4), Lo = sm(sgn > 0 ? hr : hl, 2);
-    const defaultH = Math.abs(b.h - 1.4) < 1e-6; // bake default for untagged walls: campus walls are mostly seat height
+    // [r5-audit-central] retaining_wall ways carry the bake default h = 1.2 too; when the ground is level on both sides they
+    // are low seat/planter walls (LiDAR along the Memorial Glade south edge: ~0.5 m tops, not 1.2 m walls hiding the lawn).
+    // Limited to the central/west core, where it was checked against the LiDAR.
+    const r5core = P[0][0] > -760 && P[0][0] < -30 && P[0][1] > -240 && P[0][1] < 240;
+    const defaultH = Math.abs(b.h - 1.4) < 1e-6 || (r5core && b.type === 'retaining_wall' && Math.abs(b.h - 1.2) < 1e-6); // bake default for untagged walls: campus walls are mostly seat height
     const hFree = defaultH ? (CAMPUS(P[0][0], P[0][1]) ? 0.55 : 1.1) : Math.max(0.4, Math.min(2.5, b.h));
     walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h, hlS: sm(hl, 2), hrS: sm(hr, 2) });
   }
