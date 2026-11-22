@@ -46,6 +46,9 @@ const BRIDGES = [
 ];
 const SIGN = { x: -693.7, z: 142.6, yaw: Math.PI / 2 };   // Oxford & Center campus sign: fence runs N-S along Oxford, faces west down Center St
 
+// Class of 1953 gift (Berkeleyan, 17 Nov 1999): with the cast granite + bronze sign came "landscaping along a wooded path
+// on the opposite corner ... above the banks of the south fork ... boulders for use as seats": granite seat boulders
+const SEATS = [[-683.6, 174.4, 0.3], [-676.3, 177.0, 1.4], [-669.0, 176.4, 2.2], [-661.4, 174.0, 0.9]];
 let PLANS = null;   // bridge deck profiles, computed once from the graded heightfield
 
 // ------------------------------------------------------------------ heightfield helpers
@@ -471,6 +474,14 @@ function buildGatewaySign(A, MAT, heightAt, physics, group) {
     if (physics) { const a = [hx - dx * len / 2, hz - dz * len / 2], b2 = [hx + dx * len / 2, hz + dz * len / 2]; physics.addSeg(a[0], a[1], b2[0], b2[1], hg - 1, hg + 0.95, 'r5-gate'); }
   }
   if (physics) { const a = P(-LEN / 2 - 0.5, 0), b2 = P(LEN / 2 + 0.5, 0); physics.addSeg(a[0], a[2], b2[0], b2[2], g0 - 1, g0 + 2.2, 'r5-gate'); }
+  // granite seat boulders along the wooded path on the opposite corner
+  const geo = new THREE.IcosahedronGeometry(1, 2); const pa = geo.attributes.position;
+  for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i); const k = 0.86 + 0.1 * Math.sin(x * 3.1 + z * 4.7) + 0.05 * Math.sin(y * 9.3 + x * 7.1); pa.setXYZ(i, x * k, Math.min(0.62, y) * k, z * k); }
+  geo.deleteAttribute('normal'); geo.computeVertexNormals();
+  const granite = tint(MAT.stone, 0xb3ada2, 0.9);
+  const im = new THREE.InstancedMesh(geo, granite, SEATS.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+  SEATS.forEach(([sx, sz, r], i) => { const g = heightAt(sx, sz); q.setFromEuler(new THREE.Euler(0, r, 0)); m4.compose(new THREE.Vector3(sx, g + 0.05, sz), q, new THREE.Vector3(0.62 + 0.1 * (i % 2), 0.62, 0.48)); im.setMatrixAt(i, m4); if (physics) physics.addCircle(sx, sz, 0.45, g - 0.5, g + 0.42, 'r5-seat'); });
+  im.castShadow = true; im.receiveShadow = true; im.name = 'r5-seat-boulders'; group.add(im);
 }
 
 // ------------------------------------------------------------------ ASUC reach: south-bank retaining wall + stepping stones
