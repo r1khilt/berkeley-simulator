@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { materials, boxUV, U, nightGlow } from '../materials.js';
+import { CAMPUS_MAP } from './campusMapData.js'; // r4-props2: real campus outline for the kiosk map
 
 const TAU = Math.PI * 2;
 export const PROP_NAMES = ['campusLamp', 'streetLight', 'bench', 'trashCan', 'recyclingBin', 'bikeRack', 'parkedBike', 'bollard',
@@ -267,12 +268,13 @@ export function parkedBike() { // city bike on its kickstand, front wheel toward
   return { ...P.build(), collider: { type: 'box', min: [-0.32, 0, -0.9], max: [0.32, 1.05, 0.9] } };
 }
 
-export function bollard() { // 0.95 m steel bollard with a reflective band
+export function bollard() { // r4-props2: 0.95 m steel pipe bollard: embedded sleeve collar, slight taper, chamfered dome cap, two reflective bands
   const M = materials(), P = new Parts();
-  P.add(M.blackPaint, cyl(0.1, 0.1, 0.82, 16, 0, 0, 0));
-  P.add(M.blackPaint, lathe([[0.1, 0], [0.098, 0.04], [0.085, 0.09], [0.05, 0.125], [0, 0.135]], 16, 0, 0.82, 0));
-  P.add(M.whitePaint, cyl(0.102, 0.102, 0.06, 16, 0, 0.7, 0, true));
-  P.add(M.iron, cyl(0.13, 0.13, 0.02, 16, 0, 0, 0));
+  P.add(M.blackPaint, lathe([[0, 0.0], [0.1, 0.0], [0.1, 0.02], [0.098, 0.4], [0.094, 0.8], [0.096, 0.81], [0.096, 0.83], [0.088, 0.85], [0.07, 0.895], [0.04, 0.925], [0, 0.935]], 20));
+  P.add(M.whitePaint, cyl(0.0985, 0.0965, 0.045, 20, 0, 0.66, 0, true));
+  P.add(M.whitePaint, cyl(0.0968, 0.0955, 0.025, 20, 0, 0.74, 0, true));
+  P.add(M.iron, lathe([[0, 0], [0.14, 0], [0.14, 0.012], [0.125, 0.025], [0, 0.025]], 20));         // embedded sleeve collar
+  contactShadow(P, 0.42, 0.42, 0, 0, 0.45);
   return { ...P.build(), collider: { type: 'cyl', r: 0.1, h: 0.95 } };
 }
 
@@ -292,30 +294,74 @@ export function fireHydrant() { // California wet-barrel hydrant: two hose outle
   return { ...P.build(), collider: { type: 'cyl', r: 0.17, h: 0.72 } };
 }
 
-function posterTex() {
+function posterTex() { // r4-props2: a Cal Performances season poster instead of a blue card with a gold dot
   return texCache('poster', () => canvasTex(256, 512, (g, w, h) => {
-    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#0a3d6b'); gr.addColorStop(1, '#2b7bb8'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#fdb515'; g.beginPath(); g.arc(w * 0.5, h * 0.36, w * 0.28, 0, TAU); g.fill();
-    g.fillStyle = '#fff'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.fillText('TRANSIT', w / 2, h * 0.72); g.font = '22px sans-serif'; g.fillText('ride to campus', w / 2, h * 0.8);
+    const gr = g.createLinearGradient(0, 0, w * 0.4, h); gr.addColorStop(0, '#1b1530'); gr.addColorStop(0.55, '#5a1f3d'); gr.addColorStop(1, '#c2462e'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    // a dancer silhouette in a pool of light
+    const sp = g.createRadialGradient(w * 0.55, h * 0.42, 6, w * 0.55, h * 0.42, w * 0.55); sp.addColorStop(0, 'rgba(255,214,150,0.85)'); sp.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = sp; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#16101f'; g.beginPath(); g.ellipse(w * 0.56, h * 0.25, 13, 15, 0, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(w * 0.53, h * 0.28); g.quadraticCurveTo(w * 0.36, h * 0.2, w * 0.22, h * 0.12); g.lineTo(w * 0.24, h * 0.15); g.quadraticCurveTo(w * 0.4, h * 0.27, w * 0.5, h * 0.33);
+    g.lineTo(w * 0.48, h * 0.47); g.quadraticCurveTo(w * 0.4, h * 0.6, w * 0.3, h * 0.66); g.lineTo(w * 0.33, h * 0.68); g.quadraticCurveTo(w * 0.47, h * 0.62, w * 0.56, h * 0.5);
+    g.quadraticCurveTo(w * 0.68, h * 0.58, w * 0.8, h * 0.62); g.lineTo(w * 0.8, h * 0.6); g.quadraticCurveTo(w * 0.7, h * 0.5, w * 0.62, h * 0.45); g.lineTo(w * 0.6, h * 0.31);
+    g.quadraticCurveTo(w * 0.74, h * 0.24, w * 0.86, h * 0.17); g.lineTo(w * 0.84, h * 0.15); g.quadraticCurveTo(w * 0.72, h * 0.2, w * 0.59, h * 0.28); g.closePath(); g.fill();
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.font = 'bold 26px Georgia, serif'; g.fillText('Cal', 18, h * 0.76); g.fillText('Performances', 18, h * 0.76 + 28);
+    g.fillStyle = '#fdb515'; g.fillRect(18, h * 0.84, w - 36, 3);
+    g.fillStyle = '#f2e6d8'; g.font = '15px sans-serif'; g.fillText('2026–27 SEASON · ZELLERBACH HALL', 18, h * 0.89); g.fillText('calperformances.org', 18, h * 0.93);
   }));
 }
-export function busShelter() { // 3.6 x 1.6 m glazed bus shelter, open side toward +z
+export function busShelter() { // r4-props2: AC Transit-style shelter: three rear posts, curved cantilevered perforated-metal roof, fritted
+  // back glass + side wing, perforated bench, lit ad/map panel at one end and a bus-stop flag pole; open side toward +z
   const M = materials(), Lm = L(), P = new Parts();
-  const W = 3.6, D = 1.6, H = 2.5;
-  for (const x of [-W / 2 + 0.05, W / 2 - 0.05]) for (const z of [-D / 2 + 0.05, D / 2 - 0.15]) P.add(M.iron, boxY(0.08, H, 0.08, x, 0, z));
-  P.add(M.iron, boxY(W + 0.25, 0.12, D + 0.25, 0, H, -0.04));
-  P.add(Lm.signBack, boxY(W + 0.15, 0.03, D + 0.15, 0, H + 0.12, -0.04));
-  P.add(M.iron, boxY(W - 0.1, 0.06, 0.06, 0, 0.2, -D / 2 + 0.05)); P.add(M.iron, boxY(W - 0.1, 0.06, 0.06, 0, H - 0.08, -D / 2 + 0.05));
-  P.add(M.glassLight, box(W - 0.12, H - 0.36, 0.012, 0, 0.23 + (H - 0.36) / 2, -D / 2 + 0.05));                  // back glass
-  P.add(M.glassLight, box(0.012, H - 0.36, D * 0.55, -W / 2 + 0.05, 0.23 + (H - 0.36) / 2, -D / 2 + 0.05 + D * 0.275)); // side glass
-  // illuminated advertising panel on the +x end
-  P.add(M.iron, boxY(0.14, 1.95, 1.3, W / 2 - 0.05, 0.3, -0.08));
+  const W = 3.8, D = 1.5, H = 2.5, zb = -D / 2 + 0.08;
+  const roofM = Lm.roofPerf || (Lm.roofPerf = new THREE.MeshStandardMaterial({ color: 0x80878b, roughness: 0.5, metalness: 0.65, side: THREE.DoubleSide, name: 'prop:shelterRoof' }));
+  // roof: a shallow arch (r = 2.6 m) spanning front to back, tilted up toward the street; posts, braces and beams meet its underside
+  const Rr = 2.6, th = (D + 0.4) / Rr, tilt = 0.1, yOff = H + 0.06 - Rr, zOff = 0.1;
+  const arc = (phi) => { const y = Rr * Math.cos(phi), z = Rr * Math.sin(phi); return [y * Math.cos(tilt) + z * Math.sin(tilt) + yOff, -y * Math.sin(tilt) + z * Math.cos(tilt) + zOff]; };
+  const roofY = (zq) => { let b = arc(0); for (let i = 0; i <= 120; i++) { const p = arc(-th / 2 + th * i / 120); if (Math.abs(p[1] - zq) < Math.abs(b[1] - zq)) b = p; } return b[0] - 0.02; };
+  const yb = roofY(zb), yk = roofY(zb + 0.6);
+  for (const x of [-W / 2 + 0.15, 0, W / 2 - 0.15]) {
+    P.add(Lm.charcoal, boxY(0.1, yb, 0.1, x, 0, zb));                                         // posts up to the roof
+    P.add(Lm.charcoal, rod([x, yb - 0.45, zb + 0.05], [x, yk, zb + 0.6], 0.035, 6));             // knee brace under the cantilever
+    P.add(Lm.charcoal, boxY(0.2, 0.012, 0.2, x, 0, zb));                                     // base plate
+  }
+  const roof = new THREE.CylinderGeometry(Rr, Rr, W + 0.2, 20, 1, true, -th / 2, th);
+  roof.rotateZ(Math.PI / 2); roof.rotateX(-Math.PI / 2 - tilt); roof.translate(0, yOff, zOff); // axis along x, arch on top
+  P.add(roofM, roof);
+  const fe = arc(th / 2), be = arc(-th / 2);
+  P.add(Lm.charcoal, box(W + 0.24, 0.1, 0.05, 0, fe[0] - 0.03, fe[1]));                      // street-side fascia on the front edge
+  P.add(Lm.charcoal, box(W + 0.24, 0.06, 0.04, 0, be[0] - 0.02, be[1]));                     // rear edge trim
+  P.add(Lm.charcoal, box(W + 0.2, 0.08, 0.08, 0, yb - 0.04, zb));                           // rear beam under the roof
+  // glazing: back wall in two panes + a side wing at the -x end, white frit band at eye level
+  for (const [x0, x1] of [[-W / 2 + 0.2, -0.05], [0.05, W / 2 - 0.2]]) P.add(M.glassLight, box(x1 - x0, 1.95, 0.012, (x0 + x1) / 2, 0.22 + 0.975, zb + 0.06));
+  P.add(M.glassLight, box(0.012, 1.95, D * 0.6, -W / 2 + 0.15, 0.22 + 0.975, zb + 0.06 + D * 0.3));
+  P.add(Lm.charcoal, box(0.04, 2.0, 0.04, -W / 2 + 0.15, 0.2 + 1.0, zb + 0.06 + D * 0.6));                  // side-wing edge mullion
+  P.add(Lm.charcoal, box(0.04, 0.04, D * 0.6, -W / 2 + 0.15, 0.2, zb + 0.06 + D * 0.3));
+  const fritM = texCache('frit', () => new THREE.MeshStandardMaterial({ map: canvasTex(256, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = 'rgba(245,245,240,0.85)'; for (let x = 4; x < w; x += 8) for (let y = 4; y < h; y += 8) { g.beginPath(); g.arc(x, y, 2.2, 0, TAU); g.fill(); } }, { repeat: true }), transparent: true, alphaTest: 0.3, roughness: 0.6, side: THREE.DoubleSide, name: 'prop:frit' }));
+  for (const [x0, x1] of [[-W / 2 + 0.2, -0.05], [0.05, W / 2 - 0.2]]) P.add(fritM, panel(x1 - x0, 0.12, (x0 + x1) / 2, 1.42, zb + 0.07, 0, 0, 0, (x1 - x0) * 4, 1), { uv: 'keep' });
+  P.add(Lm.charcoal, boxY(W - 0.3, 0.05, 0.05, 0, 0.17, zb + 0.06));                        // bottom rail
+  // perforated steel bench on two brackets, lean rail above
+  P.add(Lm.charcoal, boxY(1.7, 0.035, 0.38, -0.65, 0.44, zb + 0.27));
+  for (const x of [-1.35, 0.05]) { P.add(Lm.charcoal, boxY(0.05, 0.44, 0.05, x, 0, zb + 0.34)); P.add(Lm.charcoal, box(0.05, 0.05, 0.3, x, 0.42, zb + 0.2)); }
+  P.add(Lm.steel, cyl(0.022, 0.022, W / 2 - 0.3, 8, 0, 0, 0).rotateZ(Math.PI / 2).translate(-(W / 2 - 0.15) / 2, 0.82, zb + 0.13)); // lean rail between two posts
+  for (const x of [-W / 2 + 0.2, -0.05]) P.add(Lm.charcoal, box(0.04, 0.04, 0.09, x, 0.82, zb + 0.09));             // its brackets
+  // illuminated ad / route-map panel at the +x end, in a slim frame
+  P.add(Lm.charcoal, boxY(0.14, 1.95, 1.3, W / 2 - 0.15, 0.25, -0.05));
   const adMat = texCache('adMat', () => nightGlow(new THREE.MeshStandardMaterial({ map: posterTex(), emissiveMap: posterTex(), emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.25, name: 'prop:adPanel' }), 1.0));
-  P.add(adMat, panel(1.15, 1.75, W / 2 - 0.05 - 0.071, 1.275, -0.08, -Math.PI / 2), { uv: 'keep' });
-  P.add(adMat, panel(1.15, 1.75, W / 2 - 0.05 + 0.071, 1.275, -0.08, Math.PI / 2), { uv: 'keep' });
-  // bench
-  P.add(Lm.steel, boxY(2.0, 0.04, 0.38, -0.3, 0.44, -D / 2 + 0.3));
-  for (const x of [-1.15, 0.55]) P.add(M.iron, boxY(0.05, 0.44, 0.3, x, 0, -D / 2 + 0.3));
+  P.add(adMat, panel(1.15, 1.75, W / 2 - 0.15 - 0.071, 1.225, -0.05, -Math.PI / 2), { uv: 'keep' });
+  P.add(adMat, panel(1.15, 1.75, W / 2 - 0.15 + 0.071, 1.225, -0.05, Math.PI / 2), { uv: 'keep' });
+  // bus-stop flag on its own pole at the street-side corner
+  const fx = W / 2 + 0.35, fz = D / 2 + 0.2;
+  P.add(Lm.galv, cyl(0.03, 0.03, 3.0, 8, fx, 0, fz));
+  const stopMat = texCache('acStop', () => new THREE.MeshStandardMaterial({ map: canvasTex(128, 256, (g, w, h) => {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#00843d'; g.fillRect(0, 0, w, 64);
+    g.fillStyle = '#ffffff'; g.font = 'bold 30px Arial'; g.textAlign = 'center'; g.fillText('AC', w / 2, 30); g.font = 'bold 20px Arial'; g.fillText('TRANSIT', w / 2, 55);
+    g.fillStyle = '#111'; g.font = 'bold 26px Arial'; g.fillText('BUS', w / 2, 100); g.fillText('STOP', w / 2, 128);
+    g.fillStyle = '#00843d'; for (const [i, t] of ['6', '51B', '79', 'F'].entries()) { g.fillRect(10 + (i % 2) * 58, 150 + Math.floor(i / 2) * 50, 50, 40); g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.fillText(t, 35 + (i % 2) * 58, 178 + Math.floor(i / 2) * 50); g.fillStyle = '#00843d'; }
+  }), roughness: 0.5, name: 'prop:acTransitSign' }));
+  P.add(Lm.signBack, box(0.31, 0.61, 0.012, fx, 2.6, fz + 0.04));            // blade clamped to the pole
+  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.04 + 0.0075, 0), { uv: 'keep' });
+  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.04 - 0.0075, Math.PI), { uv: 'keep' });
+  contactShadow(P, W + 0.6, D + 0.5, 0, 0, 0.35);
   return { ...P.build(), collider: { type: 'box', min: [-W / 2, 0, -D / 2], max: [W / 2, H + 0.15, D / 2] } };
 }
 
@@ -481,30 +527,49 @@ export function newsRack() { // coin-op newspaper box on a pedestal
   return { ...P.build(), collider: { type: 'box', min: [-0.26, 0, -0.24], max: [0.26, 1.15, 0.24] } };
 }
 
-function mapTex() {
+function mapTex() { // r4-props2: drawn from the real campus outline (CAMPUS_MAP) instead of random blobs
   return texCache('map', () => canvasTex(512, 640, (g, w, h) => {
     g.fillStyle = '#f2ecd9'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#003262'; g.fillRect(0, 0, w, 86);
     g.fillStyle = '#fdb515'; g.fillRect(0, 86, w, 8);
     g.fillStyle = '#ffffff'; g.font = 'bold 34px Georgia, serif'; g.textAlign = 'left'; g.fillText('UC Berkeley', 22, 44); g.font = '22px Georgia, serif'; g.fillText('Campus Map', 22, 74);
-    const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-    g.fillStyle = '#b9d39a'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(40 + rnd() * 430, 130 + rnd() * 470, 30 + rnd() * 60, 20 + rnd() * 40, rnd() * 3, 0, TAU); g.fill(); }
-    g.strokeStyle = '#ffffff'; g.lineWidth = 9; g.beginPath(); g.moveTo(0, 360); g.bezierCurveTo(150, 330, 330, 400, w, 350); g.moveTo(250, 100); g.lineTo(270, h); g.stroke();
-    g.fillStyle = '#9a8f80'; for (let i = 0; i < 26; i++) g.fillRect(30 + rnd() * 440, 120 + rnd() * 480, 18 + rnd() * 46, 14 + rnd() * 34);
-    g.fillStyle = '#c1121f'; g.beginPath(); g.arc(262, 372, 11, 0, TAU); g.fill();
-    g.fillStyle = '#003262'; g.font = 'bold 18px sans-serif'; g.fillText('You are here', 280, 378);
+    const S = 0.6, X0 = -470, Z0 = -470, top = 100; const P = ([x, z]) => [(x - X0) * S, top + (z - Z0) * S];
+    const poly = (pts) => { g.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); };
+    const line = (pts) => { g.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); };
+    g.save(); g.beginPath(); g.rect(0, top, w, h - top - 46); g.clip();
+    g.fillStyle = '#bcd59e'; for (const l of CAMPUS_MAP.l) { poly(l); g.fill(); }
+    g.strokeStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 4; for (const l of CAMPUS_MAP.w) { line(l); g.stroke(); }
+    g.strokeStyle = '#6aa7d8'; g.lineWidth = 3; for (const l of CAMPUS_MAP.c) { line(l); g.stroke(); }
+    g.fillStyle = '#b3a48e'; g.strokeStyle = '#7d6f5c'; g.lineWidth = 1; for (const b of CAMPUS_MAP.b) { poly(b); g.fill(); g.stroke(); }
+    const [cx, cy] = P([2, 2]); g.fillStyle = '#003262'; g.beginPath(); g.arc(cx, cy, 6, 0, TAU); g.fill(); // Sather Tower
+    g.fillStyle = '#1d2a3c'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center';
+    for (const [t, x, z] of [['Sather Tower', 2, 18], ['Memorial Glade', -136, -112], ['Sproul Plaza', -123, 300], ['Evans Hall', 0, -150], ['Faculty Glade', 118, 96], ['Strawberry Creek', -300, 175], ['Doe Library', -150, -40]]) { const [px, py] = P([x, z]); g.fillText(t, px, py); }
+    g.restore();
+    // footer: north arrow, scale bar, legend
+    g.fillStyle = '#003262'; g.fillRect(0, h - 46, w, 46);
+    g.fillStyle = '#ffffff'; g.font = '15px sans-serif'; g.textAlign = 'left'; g.fillText('Visitor Services  ·  Restrooms  ·  Bike Parking', 16, h - 18);
+    g.beginPath(); g.moveTo(w - 30, h - 38); g.lineTo(w - 38, h - 12); g.lineTo(w - 22, h - 12); g.closePath(); g.fillStyle = '#fdb515'; g.fill();
   }));
 }
-export function infoKiosk() { // two-post campus map kiosk, map faces +z (lit softly at night)
-  const M = materials(), P = new Parts();
-  for (const x of [-0.68, 0.68]) P.add(M.calBlue, boxY(0.1, 2.45, 0.1, x, 0, 0));
-  P.add(M.calBlue, boxY(1.46, 1.62, 0.12, 0, 0.66, 0));
+
+export function infoKiosk() { // r4-props2: UC Berkeley wayfinding monolith: Berkeley Blue frame, gold cap band, "UC Berkeley" header, lit map both faces
+  const M = materials(), Lm = L(), P = new Parts();
+  const W = 1.2, H = 2.3, T = 0.16;
+  P.add(Lm.charcoal, boxY(W + 0.12, 0.08, T + 0.14, 0, 0, 0));                                // plinth
+  P.add(M.calBlue, boxY(0.07, H - 0.08, T, -W / 2 + 0.035, 0.08, 0)); P.add(M.calBlue, boxY(0.07, H - 0.08, T, W / 2 - 0.035, 0.08, 0)); // side stiles
+  P.add(M.calBlue, boxY(W, 0.5, T, 0, 0.08, 0));                                               // base panel
+  P.add(M.calBlue, boxY(W, 0.3, T, 0, H - 0.3, 0));                                            // header block
+  P.add(M.calBlue, boxY(W - 0.14, 1.42, T * 0.55, 0, 0.58, 0));                                 // map backer (maps sit in a shallow reveal)
+  P.add(M.calGold, boxY(W + 0.02, 0.035, T + 0.02, 0, H - 0.035, 0));                            // gold cap band
+  P.add(Lm.charcoal, boxY(W + 0.04, 0.02, T + 0.04, 0, H, 0));
   const mapMat = texCache('mapMat', () => nightGlow(new THREE.MeshStandardMaterial({ map: mapTex(), emissiveMap: mapTex(), emissive: 0xffffff, emissiveIntensity: 0.5, roughness: 0.35, name: 'prop:campusMap' }), 1.0));
-  P.add(mapMat, panel(1.26, 1.45, 0, 1.47, 0.061), { uv: 'keep' });
-  P.add(mapMat, panel(1.26, 1.45, 0, 1.47, -0.061, Math.PI), { uv: 'keep' });
-  P.add(M.calGold, boxY(1.6, 0.06, 0.34, 0, 2.45, 0));
-  P.add(M.calBlue, boxY(1.5, 0.05, 0.28, 0, 2.4, 0));
-  return { ...P.build(), collider: { type: 'box', min: [-0.8, 0, -0.17], max: [0.8, 2.52, 0.17] } };
+  P.add(mapMat, panel(W - 0.16, 1.4, 0, 0.59 + 0.7, T * 0.275 + 0.002), { uv: 'keep' });
+  P.add(mapMat, panel(W - 0.16, 1.4, 0, 0.59 + 0.7, -T * 0.275 - 0.002, Math.PI), { uv: 'keep' });
+  const hdr = texCache('kioskHdr', () => new THREE.MeshStandardMaterial({ map: canvasTex(512, 128, (g, w, h) => { g.fillStyle = '#003262'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffffff'; g.font = 'bold 54px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('UC Berkeley', w / 2, h * 0.44); g.fillStyle = '#fdb515'; g.fillRect(w * 0.3, h * 0.78, w * 0.4, 5); }), roughness: 0.6, name: 'prop:kioskHeader' }));
+  P.add(hdr, panel(W - 0.04, 0.27, 0, H - 0.16, T / 2 + 0.002), { uv: 'keep' });
+  P.add(hdr, panel(W - 0.04, 0.27, 0, H - 0.16, -T / 2 - 0.002, Math.PI), { uv: 'keep' });
+  contactShadow(P, W + 0.5, 0.7, 0, 0, 0.45);
+  return { ...P.build(), collider: { type: 'box', min: [-0.66, 0, -0.15], max: [0.66, 2.32, 0.15] } };
 }
 
 function flagTex() {

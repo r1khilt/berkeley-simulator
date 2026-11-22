@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { siteDress } from './lib/rc-finish.js';
 import { Kit } from './lib/classic-kit.js';
 import { tint, paleGlass, textPanel, shrubRow, drapeStrip } from './lib/b05a-kit.js';
+import { loadSculpt, sculptMaterial } from '../props/sculpt.js'; // r4-props2: baked Laughing Pelican
 
 export const info = {
   id: 'anthony-hall',
@@ -18,6 +19,8 @@ export const info = {
 
 export async function build(ctx) {
   const M = ctx.M; const K = new Kit(ctx, THREE.MathUtils.degToRad(-19.0));
+  // r4-props2: Frances Rich's Laughing Pelican as a baked SDF sculpt (tools/sculpt/pelican.mjs) [hi, lo]; null -> primitive bird
+  const pelGeo = await Promise.all([loadSculpt('pelican', { uvScale: 0.6 }), loadSculpt('pelican-lo', { uvScale: 0.6 })]).catch((e) => { console.warn('pelican sculpt unavailable', e); return null; });
   const ST = tint(K, M.stucco, 0xb04a32, 'ahStucco'), TM = tint(K, M.woodDark, 0x5a3a26, 'ahTimber'), CP = tint(K, M.concrete, 0xdccfb2, 'ahCol');
   const GL = paleGlass(); const FR = tint(K, M.whitePaint, 0xe6e4dc, 'ahFrame');
   const colliders = [], walkables = [];
@@ -91,7 +94,13 @@ export async function build(ctx) {
   {
     const pu = P.u1 + 4.6, pvv = pv1 + 2.6; const g0 = K.g(pu, pvv); const B = tint(K, M.bronze, 0x4f6a68, 'ahPel');
     const f = new THREE.CylinderGeometry(1.1, 1.2, 0.25, 9); f.translate(pu, g0 + 0.05, pvv); K.add(tint(K, M.granite, 0xa9a8a2, 'ahStone'), f);
-    const add = (g) => K.add(B, g);
+    if (pelGeo) { // r4-props2: the baked sculpt (beak toward +u, like the primitive bird it replaces), standing on the stone base
+      const lod = new THREE.LOD(); lod.name = 'laughing-pelican'; lod.userData.keep = true; // keep: mergeStatic must not fuse the LOD levels
+      const mat = sculptMaterial(B, { color: 0x55695f });
+      for (const [lvl, dist] of [[0, 0], [1, 35]]) { const g = pelGeo[lvl]; g.rotateY(Math.PI / 2); g.translate(pu, g0 + 0.175, pvv); const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; lod.addLevel(m, dist); }
+      K.extra.push(lod);
+    }
+    const add = (g) => { if (!pelGeo) K.add(B, g); }; // primitive fallback only
     const body = new THREE.SphereGeometry(0.5, 12, 9); body.scale(1.15, 0.85, 0.8); body.translate(pu, g0 + 0.8, pvv); add(body);
     const tail = new THREE.ConeGeometry(0.3, 0.6, 8); tail.rotateZ(Math.PI / 2 + 0.3); tail.translate(pu - 0.75, g0 + 0.75, pvv); add(tail);
     // S-curved neck: three tilted segments, head high, long beak raised ~60 degrees with a hanging pouch

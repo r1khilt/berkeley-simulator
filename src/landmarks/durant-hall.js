@@ -5,7 +5,7 @@
 // scrolled consoles, flanked by a pair of Chinese guardian lions.
 // LiDAR: eaves ~14.7 m above the lowest ground, flat roof deck ~18.3 m.
 import * as THREE from 'three';
-import { siteDress } from './lib/rc-finish.js';
+import { siteDress, baseShrubs } from './lib/rc-finish.js';
 import { Kit, corniceProfile } from './lib/classic-kit.js';
 import { campusLamp, drapeStrip, shrubRow, paleGlass } from './lib/b05a-kit.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';

@@ -211,6 +211,8 @@ async function boot() {
   const found = new Set(store.get('found', []));
   for (const p of places) p.found = found.has(p.id);
   // Big Game easter egg (src/props/bigGame.js): The Play at Memorial Stadium, the Stanford Tree, the Axe. ?nobg=1 disables it.
+  // r4-props2: campus bear statues, Sather Tower memorial benches, Mining Circle pool (src/props/statues.js). ?nostatues=1 skips.
+  if (!qs.get('nostatues')) import('./props/statues.js').then((m) => m.installStatues({ scene, physics, heightAt, setupMaterials, trees: treeSys })).then((s) => { BS.statues = s; }).catch((e) => console.warn('statues failed', e));
   let bigGame = null; if (!qs.get('nobg')) try { bigGame = installBigGame({ scene, lm, physics, heightAt, setupMaterials, audio, ui, places, quality: settings.quality }); BS.bigGame = bigGame; } catch (e) { console.warn('big game egg failed', e); }
   phase('misc'); const map = buildMapCanvas({ sdf, nx: gt.nx, nz: gt.nz, step: gt.step, x0: c.x0, z0: c.z0, buildings: bjson, trees, water: vectors.water, landmarkFootprints: lmFootprints, replaced: standinIds });
   map.places = places; ui.setMap(map); BS.places = places; phase('map');
