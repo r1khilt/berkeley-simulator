@@ -17,7 +17,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-17.2)); const M = ctx.M;
-  const ST = ashlarMat('havilandStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xdad4c5, joint: 0xbcb5a4, /* [r5a] a touch cooler/lower (photo #d8d1c0..#e2ddd0; render blew out) */ vary: 0.02, grain: 0.012 }), ORN = tint(M.stucco, 0xd8d0be), BASE = tint(M.granite, 0xb3a893), CU = tint(M.copper, 0x5f8f7e), FR = solid(0xede8dc, 0.5, 0.05);
+  const ST = ashlarMat('havilandStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xdad4c5, joint: 0xbcb5a4, /* [r5a] a touch cooler/lower (photo #d8d1c0..#e2ddd0; render blew out) */ vary: 0.02, grain: 0.012 }), ORN = tint(M.stucco, 0xd8d0be), BASE = tint(M.granite, 0xcdc5b3) /* [r5a] pale like the walls (photo); read as a dark brown plinth */, CU = tint(M.copper, 0x5f8f7e), FR = solid(0xede8dc, 0.5, 0.05);
   const BRICK = tint(M.brick, 0xb0604c);
   const colliders = [], walkables = [];
   const FL = 2.0, BWY = 0.52; // BWY: basement window sill (local y)
@@ -47,13 +47,13 @@ export async function build(ctx) {
   // concrete cheek walls with black pipe handrails, set into juniper planting. (Was: a raised granite platform at FL with
   // a short pale flight whose foot hung ~1.3 m above the walk.)
   {
-    const uF = -11.0, uP = -13.4, v0 = -3.2, v1 = 3.2, yT = FL + 5.4;
+    const uF = -11.0, uP = -13.4, v0 = -2.8, v1 = 2.8, yT = FL + 5.4; // [r5a] porch narrowed to ~5.6 m (photo: barely wider than the door bay)
     const yL = Math.max(K.g(-12.2, 0), K.g(-14.4, 0), K.g(-12.2, -2.6), K.g(-12.2, 2.6)) + 0.12; // landing: one low step above the terrace walk
     const LAND = tint(M.granite, 0xc8c0b0), CON = tint(M.concrete, 0xc9c4b8), BRK = tint(M.brick, 0x9a4636), NOSE = tint(M.concrete, 0xb48e7e), RAIL = solid(0x1b1b1b, 0.5, 0.6);
     K.box(LAND, uP - 0.6, yL - 0.9, v0 - 0.3, uF, yL, v1 + 0.3);
     walkables.push(K.walkPoly(rect(uP - 0.6, v0 - 0.3, uF, v1 + 0.3), yL));
     const yC = yL + 0.9; // pedestal top
-    for (const v of [-1.35, 1.35]) {
+    for (const v of [-1.25, 1.25]) {
       const uc = uP + 0.45;
       K.box(BASE, uc - 0.56, yL, v - 0.56, uc + 0.56, yL + 0.16, v + 0.56); K.box(ST, uc - 0.5, yL + 0.16, v - 0.5, uc + 0.5, yC - 0.12, v + 0.5); K.box(ST, uc - 0.57, yC - 0.12, v - 0.57, uc + 0.57, yC, v + 0.57);
       ionicColumn(K, ST, uc, yC, v, 0.62, yT - yC, { flutes: 20, rotV: 1 }); colliders.push(K.colCyl(uc, v, 0.6, yL - 1, yT));
@@ -62,12 +62,12 @@ export async function build(ctx) {
     K.box(ST, uP - 0.05, yT, v0 - 0.05, uF, yT + 0.95, v1 + 0.05);
     K.box(ST, uP - 0.25, yT + 0.95, v0 - 0.25, uF, yT + 1.25, v1 + 0.25);
     const RF = K.run([uP - 0.06, v0], [uP - 0.06, v1]);
-    inscription(K, RF, 0.6, 5.8, yT + 0.25, yT + 0.75, 0.005, 'HAVILAND HALL', { fg: '#6a6252', cut: true });
+    inscription(K, RF, 1.0, RF.L - 1.0, yT + 0.25, yT + 0.75, 0.005, 'HAVILAND', { fg: '#6a6252', cut: true }); // [r5a] the frieze reads HAVILAND (photos)
     // doorway: 6 m round-arched opening from the landing, double doors under a tall gridded transom
     // (the frontispiece now stands 0.25 m proud of the façade: the recessed door used to sit behind the solid bay-7 wall face and never showed)
-    const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 5.9, doorTop: yL + 3.2 }; // rectangular opening (photo): arched wood doors under a tall gridded transom
-    const WD = tint(M.woodDark, 0x8a5634);
-    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass';
+    const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: (v1 - v0) / 2 - 1.2, s1: (v1 - v0) / 2 + 1.2, y0: yL, y1: yL + 5.9, doorTop: yL + 3.2 }; // rectangular opening (photo): arched wood doors under a tall gridded transom
+    const WD = tint(M.woodDark, 0x9c6844);
+    K.wall(R, ST, 0.3, (v1 - v0) - 0.3, yL, yT, [o], 0.25); const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x4a565e); DKG.envMapIntensity = 1.8; // reflective, mid-dark
     K.fill(R, o, { kind: 'door', door: WD, glass: DKG, rev: 0.15 }); // dark glass: no lit interior behind the transom
     { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 + 99; // gridded transom (photo: ~5 x 6 lights)
       { const ag = new THREE.TorusGeometry(rr - 0.08, 0.07, 5, 20, Math.PI); ag.translate(cx, o.doorTop - rr + 0.02, -0.12); K.addRun(R, WD, ag, { detail: true }); const tg = new THREE.Shape(); tg.moveTo(o.s0, o.doorTop); tg.lineTo(o.s0, o.doorTop - rr); tg.absarc(cx, o.doorTop - rr, rr, Math.PI, 0, true); tg.lineTo(o.s1, o.doorTop); tg.lineTo(o.s0, o.doorTop); const sg = new THREE.ShapeGeometry(tg, 8); sg.translate(0, 0, -0.135); K.addRun(R, tint(M.woodDark, 0x6e4228), sg, { detail: true }); } // arched head of the door leaves
