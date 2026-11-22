@@ -24,3 +24,5 @@ All CC0 (public domain). Downloaded at 1K, then de-tiled, colour-calibrated and 
 
 ## Sculptures (r4-props)
 - `sculpt/lion-*.bin`: Durant Hall guardian lions, an original procedural SDF sculpt baked by `tools/sculpt/guardian-lion.mjs` (no third-party mesh or texture). Modelled from the reference photo "Durant Hall lion statues - 2015-07-25" by James Lin (CC BY-SA 4.0, Wikimedia Commons), used for reference only and not shipped.
+- `people/female.glb`, `people/male.glb`, `people/hair.glb` — bodies (Superhero female/male), hairstyles and eyebrows from "Universal Base Characters [Standard]" by Quaternius (https://quaternius.com/packs/universalbasecharacters.html), CC0 1.0. Repacked by `tools/people_build.mjs` (webp textures, pruned); slimmed, dressed and propped at runtime (src/people/).
+- `people/anims.bin` — 15 motion clips (idle, talking, walk, formal walk, jog, sitting, sitting talk, hit reaction, ...) from "Universal Animation Library [Standard]" by Quaternius (https://quaternius.com/packs/universalanimationlibrary.html), CC0 1.0. Extracted and key-reduced by `tools/people_anims.mjs`.
