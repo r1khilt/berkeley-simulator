@@ -97,8 +97,10 @@ export async function build(ctx) {
       walkables.push({ type: 'poly', pts: [R.at(e, -D), R.at(L - e, -D), R.at(L - e, 2.0), R.at(e, 2.0)].map(([u, v]) => K.xz(u, v)), y: g0 });
       // [r5a] where the grade falls away in front of the pavilion (the SW corner drops ~2 m toward the grove), a full-width
       // flight runs down from the forecourt edge to the path instead of leaving a bare slab edge standing above the lawn
-      { const gF = Math.min(gAt(R, e + 1, 5.0), gAt(R, L / 2, 5.0), gAt(R, L - e - 1, 5.0)); const rise = g0 - gF;
-        if (rise > 0.3) { const n = Math.max(2, Math.round(rise / 0.155)), r = rise / n, T = 0.36, d0 = 2.0;
+      { const T = 0.36, d0 = 2.0; const gFoot = (dd) => { const a = [gAt(R, e + 1, dd), gAt(R, L / 2, dd), gAt(R, L - e - 1, dd)].sort((x, y) => x - y); return a[1]; };
+        let gF = gFoot(4.0); for (let it = 0; it < 3; it++) { const nn = Math.min(12, Math.max(2, Math.round((g0 - gF) / 0.155))); gF = Math.max(gFoot(d0 + nn * T + 0.4), g0 - 12 * 0.155); } // foot lands on the grade it meets (median across the width), max 12 risers
+        const rise = g0 - gF;
+        if (rise > 0.3) { const n = Math.max(2, Math.round(rise / 0.155)), r = rise / n;
           for (let k = 0; k < n - 1; k++) { K.rbox(R, P.concreteBuff, e, gF - 0.8, d0 + k * T, L - e, g0 - r * (k + 1), d0 + (k + 1) * T); K.rbox(R, CD, e, g0 - r * (k + 1) - 0.06, d0 + k * T - 0.01, L - e, g0 - r * (k + 1) - 0.03, d0 + k * T + 0.002, { detail: true }); }
           for (const sx of [e - 0.45, L - e]) K.rbox(R, C, sx, gF - 0.8, -0.2, sx + 0.45, g0 + 0.9, d0 + (n - 1) * T); // cheek walls
           const cs = [R.at(e, d0), R.at(L - e, d0), R.at(L - e, d0 + (n - 1) * T), R.at(e, d0 + (n - 1) * T)].map(([u, v]) => K.xz(u, v));
