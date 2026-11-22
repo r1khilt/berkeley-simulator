@@ -304,28 +304,37 @@ export function busShelter() { // r4-props2: AC Transit-style shelter: three rea
   // back glass + side wing, perforated bench, lit ad/map panel at one end and a bus-stop flag pole; open side toward +z
   const M = materials(), Lm = L(), P = new Parts();
   const W = 3.8, D = 1.5, H = 2.5, zb = -D / 2 + 0.08;
-  const roofM = Lm.roofPerf || (Lm.roofPerf = new THREE.MeshStandardMaterial({ color: 0x5b6063, roughness: 0.55, metalness: 0.6, side: THREE.DoubleSide, name: 'prop:shelterRoof' }));
+  const roofM = Lm.roofPerf || (Lm.roofPerf = new THREE.MeshStandardMaterial({ color: 0x80878b, roughness: 0.5, metalness: 0.65, side: THREE.DoubleSide, name: 'prop:shelterRoof' }));
+  // roof: a shallow arch (r = 2.6 m) spanning front to back, tilted up toward the street; posts, braces and beams meet its underside
+  const Rr = 2.6, th = (D + 0.4) / Rr, tilt = 0.1, yOff = H + 0.06 - Rr, zOff = 0.1;
+  const arc = (phi) => { const y = Rr * Math.cos(phi), z = Rr * Math.sin(phi); return [y * Math.cos(tilt) + z * Math.sin(tilt) + yOff, -y * Math.sin(tilt) + z * Math.cos(tilt) + zOff]; };
+  const roofY = (zq) => { let b = arc(0); for (let i = 0; i <= 120; i++) { const p = arc(-th / 2 + th * i / 120); if (Math.abs(p[1] - zq) < Math.abs(b[1] - zq)) b = p; } return b[0] - 0.02; };
+  const yb = roofY(zb), yk = roofY(zb + 0.6);
   for (const x of [-W / 2 + 0.15, 0, W / 2 - 0.15]) {
-    P.add(Lm.charcoal, boxY(0.1, H + 0.05, 0.1, x, 0, zb));                                  // posts
-    P.add(Lm.charcoal, rod([x, H - 0.25, zb], [x, H + 0.04, zb + 0.55], 0.035, 6));             // knee brace under the cantilever
+    P.add(Lm.charcoal, boxY(0.1, yb, 0.1, x, 0, zb));                                         // posts up to the roof
+    P.add(Lm.charcoal, rod([x, yb - 0.45, zb + 0.05], [x, yk, zb + 0.6], 0.035, 6));             // knee brace under the cantilever
     P.add(Lm.charcoal, boxY(0.2, 0.012, 0.2, x, 0, zb));                                     // base plate
   }
-  // roof: a shallow arch (r = 4 m) spanning front to back, sloping up toward the street, with a fascia band
-  const Rr = 4, th = (D + 0.4) / Rr; const roof = new THREE.CylinderGeometry(Rr, Rr, W + 0.2, 16, 1, true, -th / 2, th);
-  roof.rotateZ(Math.PI / 2); roof.rotateX(-0.08); roof.translate(0, H + 0.1 - Rr, 0.08);
+  const roof = new THREE.CylinderGeometry(Rr, Rr, W + 0.2, 20, 1, true, -th / 2, th);
+  roof.rotateZ(Math.PI / 2); roof.rotateX(-Math.PI / 2 - tilt); roof.translate(0, yOff, zOff); // axis along x, arch on top
   P.add(roofM, roof);
-  P.add(Lm.charcoal, boxY(W + 0.24, 0.12, 0.05, 0, H + 0.04, D / 2 + 0.26));                 // street-side fascia
-  P.add(Lm.charcoal, boxY(W + 0.2, 0.08, 0.08, 0, H - 0.02, zb));                           // rear beam
+  const fe = arc(th / 2), be = arc(-th / 2);
+  P.add(Lm.charcoal, box(W + 0.24, 0.1, 0.05, 0, fe[0] - 0.03, fe[1]));                      // street-side fascia on the front edge
+  P.add(Lm.charcoal, box(W + 0.24, 0.06, 0.04, 0, be[0] - 0.02, be[1]));                     // rear edge trim
+  P.add(Lm.charcoal, box(W + 0.2, 0.08, 0.08, 0, yb - 0.04, zb));                           // rear beam under the roof
   // glazing: back wall in two panes + a side wing at the -x end, white frit band at eye level
   for (const [x0, x1] of [[-W / 2 + 0.2, -0.05], [0.05, W / 2 - 0.2]]) P.add(M.glassLight, box(x1 - x0, 1.95, 0.012, (x0 + x1) / 2, 0.22 + 0.975, zb + 0.06));
   P.add(M.glassLight, box(0.012, 1.95, D * 0.6, -W / 2 + 0.15, 0.22 + 0.975, zb + 0.06 + D * 0.3));
+  P.add(Lm.charcoal, box(0.04, 2.0, 0.04, -W / 2 + 0.15, 0.2 + 1.0, zb + 0.06 + D * 0.6));                  // side-wing edge mullion
+  P.add(Lm.charcoal, box(0.04, 0.04, D * 0.6, -W / 2 + 0.15, 0.2, zb + 0.06 + D * 0.3));
   const fritM = texCache('frit', () => new THREE.MeshStandardMaterial({ map: canvasTex(256, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = 'rgba(245,245,240,0.85)'; for (let x = 4; x < w; x += 8) for (let y = 4; y < h; y += 8) { g.beginPath(); g.arc(x, y, 2.2, 0, TAU); g.fill(); } }, { repeat: true }), transparent: true, alphaTest: 0.3, roughness: 0.6, side: THREE.DoubleSide, name: 'prop:frit' }));
   for (const [x0, x1] of [[-W / 2 + 0.2, -0.05], [0.05, W / 2 - 0.2]]) P.add(fritM, panel(x1 - x0, 0.12, (x0 + x1) / 2, 1.42, zb + 0.07, 0, 0, 0, (x1 - x0) * 4, 1), { uv: 'keep' });
   P.add(Lm.charcoal, boxY(W - 0.3, 0.05, 0.05, 0, 0.17, zb + 0.06));                        // bottom rail
   // perforated steel bench on two brackets, lean rail above
   P.add(Lm.charcoal, boxY(1.7, 0.035, 0.38, -0.65, 0.44, zb + 0.27));
   for (const x of [-1.35, 0.05]) { P.add(Lm.charcoal, boxY(0.05, 0.44, 0.05, x, 0, zb + 0.34)); P.add(Lm.charcoal, box(0.05, 0.05, 0.3, x, 0.42, zb + 0.2)); }
-  P.add(Lm.steel, cyl(0.022, 0.022, 1.7, 8, 0, 0, 0).rotateZ(Math.PI / 2).translate(-0.65, 0.82, zb + 0.1));
+  P.add(Lm.steel, cyl(0.022, 0.022, W / 2 - 0.3, 8, 0, 0, 0).rotateZ(Math.PI / 2).translate(-(W / 2 - 0.15) / 2, 0.82, zb + 0.13)); // lean rail between two posts
+  for (const x of [-W / 2 + 0.2, -0.05]) P.add(Lm.charcoal, box(0.04, 0.04, 0.09, x, 0.82, zb + 0.09));             // its brackets
   // illuminated ad / route-map panel at the +x end, in a slim frame
   P.add(Lm.charcoal, boxY(0.14, 1.95, 1.3, W / 2 - 0.15, 0.25, -0.05));
   const adMat = texCache('adMat', () => nightGlow(new THREE.MeshStandardMaterial({ map: posterTex(), emissiveMap: posterTex(), emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.25, name: 'prop:adPanel' }), 1.0));
@@ -340,9 +349,9 @@ export function busShelter() { // r4-props2: AC Transit-style shelter: three rea
     g.fillStyle = '#111'; g.font = 'bold 26px Arial'; g.fillText('BUS', w / 2, 100); g.fillText('STOP', w / 2, 128);
     g.fillStyle = '#00843d'; for (const [i, t] of ['6', '51B', '79', 'F'].entries()) { g.fillRect(10 + (i % 2) * 58, 150 + Math.floor(i / 2) * 50, 50, 40); g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.fillText(t, 35 + (i % 2) * 58, 178 + Math.floor(i / 2) * 50); g.fillStyle = '#00843d'; }
   }), roughness: 0.5, name: 'prop:acTransitSign' }));
-  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.035, 0), { uv: 'keep' });
-  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.033, Math.PI), { uv: 'keep' });
-  P.add(Lm.signBack, box(0.31, 0.61, 0.012, fx, 2.6, fz + 0.034 - 0.002));
+  P.add(Lm.signBack, box(0.31, 0.61, 0.012, fx, 2.6, fz + 0.04));            // blade clamped to the pole
+  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.04 + 0.0075, 0), { uv: 'keep' });
+  P.add(stopMat, panel(0.3, 0.6, fx, 2.6, fz + 0.04 - 0.0075, Math.PI), { uv: 'keep' });
   contactShadow(P, W + 0.6, D + 0.5, 0, 0, 0.35);
   return { ...P.build(), collider: { type: 'box', min: [-W / 2, 0, -D / 2], max: [W / 2, H + 0.15, D / 2] } };
 }
