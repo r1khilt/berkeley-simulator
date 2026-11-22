@@ -228,8 +228,8 @@ export async function build(ctx) {
   }
   // refine-central: planted beds, lamps and a bike rack where the paths arrive
   siteDress(K, ctx, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], { d: 1.0, skipSides: ['S'] });
-  { // r4-props2: the south (entrance) face is planted here instead, so the foundation shrubs stop short of the stairs and the lion pedestals (|u| < 5.4)
-    const R = K.run([u0, v1], [u1, v1]); baseShrubs(K, R, 1.2, R.L - 1.2, { skip: [[-u0 - 5.4, -u0 + 5.4]], d: 1.0 });
+  { // r4-props2: the south (entrance) face is planted here instead, so the foundation shrubs stop short of the stairs and the lion pedestals (|u| < 6.3)
+    const R = K.run([u0, v1], [u1, v1]); baseShrubs(K, R, 1.2, R.L - 1.2, { skip: [[-u0 - 6.3, -u0 + 6.3]], d: 1.0 });
   }
   const object3d = K.finish(); object3d.name = 'durant-hall';
   return { object3d, colliders, walkables };
