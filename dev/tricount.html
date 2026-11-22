@@ -1,0 +1,8 @@
+<!doctype html><html><body><script type="module">
+import { personGeometry } from '/src/life/people.js';
+import { bikeGeometry, scooterGeometry } from '/src/life/vehicles.js';
+const n = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+const g1 = personGeometry(1), g0 = personGeometry(0);
+window.RES = { near: n(g1), nearV: g1.attributes.position.count, far: n(g0), farV: g0.attributes.position.count, bike: n(bikeGeometry()), scooter: n(scooterGeometry()) };
+window.DONE = true;
+</script></body></html>

@@ -71,7 +71,7 @@ function box(w, h, d, x, y, z) { const g = new THREE.BoxGeometry(w, h, d); g.tra
 // detail: 1 = near LOD, 0 = far LOD
 export function personGeometry(detail = 1) {
   const B = new Builder(); const hi = detail > 0;
-  const L = hi ? 8 : 5, TS = hi ? 14 : 8;
+  const L = hi ? 7 : 4, TS = hi ? 12 : 6;
   // feminine build: narrower shoulders/waist, wider hips, slight bust; arms move in with the shoulders
   const femTorso = (x, y, z) => {
     let k = 1;
@@ -86,32 +86,32 @@ export function personGeometry(detail = 1) {
   splitAdd(B, torso, (y) => (y < 1.0 ? [BONE.pelvis, SLOT.bottom] : [BONE.torso, SLOT.top]), femTorso);
   // neck + head
   B.add(limb(0.048, 0.054, 0, 1.58, 1.44, 0.004, L), BONE.torso, SLOT.skin);
-  B.add(ball(0.1, 0, 1.64, -0.004, hi ? 14 : 8, hi ? 10 : 6, 0.84, 1.1, 0.97), BONE.head, SLOT.skin);
+  B.add(ball(0.1, 0, 1.64, -0.004, hi ? 12 : 6, hi ? 9 : 4, 0.84, 1.1, 0.97), BONE.head, SLOT.skin);
   if (hi) {
     const nose = new THREE.ConeGeometry(0.017, 0.045, 5); nose.rotateX(-Math.PI / 2 - 0.25); nose.translate(0, 1.625, -0.105); B.add(nose, BONE.head, SLOT.skin);
     for (const s of [-1, 1]) B.add(ball(0.022, s * 0.083, 1.635, 0.005, 6, 5, 0.5, 1.2, 0.9), BONE.head, SLOT.skin);
   }
   // ---- hair styles (head bone)
-  const hairCap = new THREE.SphereGeometry(0.1065, hi ? 14 : 8, hi ? 8 : 5, 0, Math.PI * 2, 0, Math.PI * 0.56); hairCap.scale(0.86, 1.1, 0.99); hairCap.rotateX(-0.42); hairCap.translate(0, 1.655, 0.012);
+  const hairCap = new THREE.SphereGeometry(0.1065, hi ? 12 : 6, hi ? 6 : 3, 0, Math.PI * 2, 0, Math.PI * 0.56); hairCap.scale(0.86, 1.1, 0.99); hairCap.rotateX(-0.42); hairCap.translate(0, 1.655, 0.012);
   B.add(hairCap, BONE.head, SLOT.hair, TAG.hairCap);
-  const longH = new THREE.CylinderGeometry(0.098, 0.115, 0.3, hi ? 12 : 6, 1, true, Math.PI * 0.5 - 1.35, 2.7 + Math.PI * 0.0); longH.rotateY(Math.PI); longH.scale(0.95, 1, 0.9); longH.translate(0, 1.53, 0.02);
+  const longH = new THREE.CylinderGeometry(0.098, 0.115, 0.3, hi ? 10 : 4, 1, true, Math.PI * 0.5 - 1.35, 2.7 + Math.PI * 0.0); longH.rotateY(Math.PI); longH.scale(0.95, 1, 0.9); longH.translate(0, 1.53, 0.02);
   B.add(longH, BONE.head, SLOT.hair, TAG.hairLong);
-  const pony = new THREE.CapsuleGeometry(0.03, 0.15, 3, hi ? 6 : 4); pony.rotateX(-0.22); pony.translate(0, 1.575, 0.118); B.add(pony, BONE.head, SLOT.hair, TAG.pony);
-  B.add(ball(0.05, 0, 1.75, 0.07, hi ? 8 : 5, hi ? 6 : 4), BONE.head, SLOT.hair, TAG.bun);
-  const beanie = new THREE.SphereGeometry(0.112, hi ? 14 : 8, hi ? 7 : 5, 0, Math.PI * 2, 0, Math.PI * 0.52); beanie.scale(0.88, 1.12, 1.0); beanie.rotateX(-0.12); beanie.translate(0, 1.668, 0.004);
+  const pony = new THREE.CapsuleGeometry(0.03, 0.15, hi ? 3 : 1, hi ? 6 : 3); pony.rotateX(-0.22); pony.translate(0, 1.575, 0.118); B.add(pony, BONE.head, SLOT.hair, TAG.pony);
+  B.add(ball(0.05, 0, 1.75, 0.07, hi ? 8 : 4, hi ? 6 : 3), BONE.head, SLOT.hair, TAG.bun);
+  const beanie = new THREE.SphereGeometry(0.112, hi ? 12 : 6, hi ? 6 : 3, 0, Math.PI * 2, 0, Math.PI * 0.52); beanie.scale(0.88, 1.12, 1.0); beanie.rotateX(-0.12); beanie.translate(0, 1.668, 0.004);
   B.add(beanie, BONE.head, SLOT.accent, TAG.beanie);
-  const capTop = new THREE.SphereGeometry(0.109, hi ? 14 : 8, hi ? 6 : 4, 0, Math.PI * 2, 0, Math.PI * 0.5); capTop.scale(0.87, 0.9, 1.0); capTop.translate(0, 1.672, 0.004);
+  const capTop = new THREE.SphereGeometry(0.109, hi ? 12 : 6, hi ? 5 : 3, 0, Math.PI * 2, 0, Math.PI * 0.5); capTop.scale(0.87, 0.9, 1.0); capTop.translate(0, 1.672, 0.004);
   B.add(capTop, BONE.head, SLOT.accent, TAG.cap);
-  const brim = new THREE.CylinderGeometry(0.085, 0.085, 0.012, hi ? 12 : 6, 1, false, Math.PI * 0.5, Math.PI); brim.scale(1, 1, 0.95); brim.rotateX(0.12); brim.translate(0, 1.68, -0.075);
+  const brim = new THREE.CylinderGeometry(0.085, 0.085, 0.012, hi ? 10 : 4, 1, false, Math.PI * 0.5, Math.PI); brim.scale(1, 1, 0.95); brim.rotateX(0.12); brim.translate(0, 1.68, -0.075);
   B.add(brim, BONE.head, SLOT.accent, TAG.cap);
   // ---- legs (thigh, knee ball + shin, shoe)
   const femLeg = (x, y, z) => [x * 0.04 * (y > 0.7 ? 1 : 0.3), 0, 0];
   for (const s of [-1, 1]) {
     const th = s < 0 ? BONE.thighL : BONE.thighR, sh = s < 0 ? BONE.shinL : BONE.shinR, ft = s < 0 ? BONE.footL : BONE.footR;
     B.add(limb(0.082, 0.056, s * 0.092, 0.97, 0.5, 0.002, L, 1, 1.02), th, SLOT.bottom, 0, femLeg);
-    B.add(ball(0.056, s * 0.092, 0.5, 0.004, L, hi ? 5 : 4), sh, SLOT.shin, 0, femLeg);
+    if (hi) B.add(ball(0.056, s * 0.092, 0.5, 0.004, L, 5), sh, SLOT.shin, 0, femLeg);
     B.add(limb(0.055, 0.04, s * 0.092, 0.5, 0.1, 0.008, L, 1, 1.05), sh, SLOT.shin, 0, femLeg);
-    const shoe = new THREE.CapsuleGeometry(0.047, 0.16, 3, hi ? 7 : 5); shoe.rotateX(Math.PI / 2); shoe.scale(1, 0.95, 1); shoe.translate(s * 0.094, 0.055, -0.06);
+    const shoe = hi ? new THREE.CapsuleGeometry(0.047, 0.16, 3, 6) : new THREE.BoxGeometry(0.095, 0.26, 0.09); shoe.rotateX(Math.PI / 2); shoe.scale(1, 0.95, 1); shoe.translate(s * 0.094, 0.05, -0.06);
     B.add(shoe, ft, SLOT.shoe);
     if (hi) B.add(box(0.098, 0.022, 0.255, s * 0.094, 0.011, -0.06), ft, SLOT.sole);
   }
@@ -119,20 +119,20 @@ export function personGeometry(detail = 1) {
   const femArm = (x) => [-Math.sign(x) * 0.016, 0, 0];
   for (const s of [-1, 1]) {
     const ua = s < 0 ? BONE.uarmL : BONE.uarmR, fa = s < 0 ? BONE.farmL : BONE.farmR;
-    B.add(ball(0.051, s * 0.186, 1.4, 0.0, L, hi ? 6 : 4, 1, 1, 0.95), ua, SLOT.top, 0, femArm);
+    B.add(ball(0.051, s * 0.186, 1.4, 0.0, L, hi ? 5 : 3, 1, 1, 0.95), ua, SLOT.top, 0, femArm);
     B.add(limb(0.052, 0.042, s * 0.19, 1.41, 1.12, 0.0, L), ua, SLOT.top, 0, femArm);
-    B.add(ball(0.041, s * 0.19, 1.12, 0.0, L, hi ? 5 : 4), fa, SLOT.sleeve, 0, femArm);
+    if (hi) B.add(ball(0.041, s * 0.19, 1.12, 0.0, L, 4), fa, SLOT.sleeve, 0, femArm);
     B.add(limb(0.04, 0.031, s * 0.19, 1.12, 0.865, 0.0, L), fa, SLOT.sleeve, 0, femArm);
-    B.add(ball(0.05, s * 0.19, 0.81, -0.004, hi ? 7 : 5, hi ? 5 : 4, 0.62, 1.15, 0.5), fa, SLOT.skin, 0, femArm);
+    B.add(hi ? ball(0.05, s * 0.19, 0.81, -0.004, 6, 4, 0.62, 1.15, 0.5) : box(0.06, 0.11, 0.05, s * 0.19, 0.81, -0.004), fa, SLOT.skin, 0, femArm);
     if (s > 0) { // right hand props
       if (hi) { B.add(box(0.075, 0.15, 0.012, s * 0.19, 0.795, -0.035), fa, SLOT.dark, TAG.phone, femArm);
         const cup = new THREE.CylinderGeometry(0.043, 0.036, 0.14, 8); cup.translate(s * 0.19, 0.81, -0.04); B.add(cup, fa, SLOT.paper, TAG.cup, femArm); }
-    } else B.add(box(0.2, 0.26, 0.028, s * 0.15, 0.80, -0.06), fa, SLOT.paper, TAG.book, femArm); // book held in the left hand
+    } else if (hi) B.add(box(0.2, 0.26, 0.028, s * 0.15, 0.80, -0.06), fa, SLOT.paper, TAG.book, femArm); // book held in the left hand
   }
   // ---- accessories on the torso / pelvis
-  const bp = new THREE.CapsuleGeometry(0.1, 0.17, 3, hi ? 8 : 5); bp.scale(1.35, 1, 0.68); bp.translate(0, 1.21, 0.175); B.add(bp, BONE.torso, SLOT.bag, TAG.backpack);
+  const bp = hi ? new THREE.CapsuleGeometry(0.1, 0.17, 2, 7) : new THREE.BoxGeometry(0.2, 0.36, 0.2); bp.scale(1.35, 1, 0.68); bp.translate(0, 1.21, 0.175); B.add(bp, BONE.torso, SLOT.bag, TAG.backpack);
   if (hi) for (const s of [-1, 1]) B.add(box(0.04, 0.26, 0.02, s * 0.1, 1.3, -0.108), BONE.torso, SLOT.bag, TAG.backpack, femTorso);
-  const sk = loft([[0.56, 0.235, 0.2], [0.75, 0.2, 0.16], [0.95, 0.172, 0.112]], hi ? 14 : 8, false, false); B.add(sk, BONE.pelvis, SLOT.bottom, TAG.skirt, femTorso);
+  const sk = loft([[0.56, 0.235, 0.2], [0.75, 0.2, 0.16], [0.95, 0.172, 0.112]], hi ? 12 : 6, false, false); B.add(sk, BONE.pelvis, SLOT.bottom, TAG.skirt, femTorso);
   B.add(box(0.07, 0.24, 0.22, 0.215, 0.93, 0.0), BONE.pelvis, SLOT.bag, TAG.bag);
   if (hi) { const strap = box(0.035, 0.62, 0.012, 0, 1.2, -0.11); strap.rotateZ(0); const m = new THREE.Matrix4().makeRotationZ(0.55); strap.translate(0, -1.2, 0); strap.applyMatrix4(m); strap.translate(0.0, 1.2, 0); B.add(strap, BONE.torso, SLOT.bag, TAG.bag, femTorso); }
   return B.build();
@@ -190,17 +190,17 @@ vec3 bsimPose(vec3 p, inout vec3 n){
   int iv = int(vari + 0.5);
   if (pose < 0.5) { // ---- walk / jog
     float jog = aux; float sL = sin(ph), sR = -sL;
-    float A = mix(0.4, 0.58, jog);
+    float A = mix(0.37, 0.46, jog);
     hip = vec2(sL, sR) * A + 0.05 + 0.1 * jog;
     float w0 = pow(max(0., cos(ph + 0.35)), 2.0), w1 = pow(max(0., cos(ph + PI + 0.35)), 2.0);
-    float K = mix(1.0, 1.75, jog);
+    float K = mix(1.0, 1.5, jog);
     knee = -vec2(0.07 + K * w0 + 0.12 * max(0., sin(ph - 0.3)), 0.07 + K * w1 + 0.12 * max(0., sin(ph + PI - 0.3)));
     vec2 sw = vec2(smoothstep(0.0, 0.25, w0), smoothstep(0.0, 0.25, w1));
     ank = mix(-(hip + knee), vec2(0.18) - 0.2 * vec2(w0, w1), sw);
-    sh = vec2(-sL, sL) * mix(0.3, 0.55, jog) + 0.06;
-    el = vec2(0.2) + jog * 1.25 + 0.22 * max(vec2(0.0), vec2(-sL, sL));
+    sh = vec2(-sL, sL) * mix(0.3, 0.6, jog) + 0.06 - 0.12 * jog;
+    el = vec2(0.2) + jog * 1.15 + 0.22 * max(vec2(0.0), vec2(-sL, sL));
     sabd = vec2(0.1 + 0.08 * jog);
-    spine = vec3(-0.04 - 0.16 * jog, 0.09 * sL, 0.025 * sL);
+    spine = vec3(-0.04 - 0.24 * jog, 0.09 * sL, 0.025 * sL);
     pel = vec3(0.0, -0.07 * sL, 0.035 * sL);
     head = vec2(0.03 + 0.12 * jog, -0.07 * sL);
     if (iv == 1) { sh.y = 0.4; el.y = 1.7; syaw.y = 0.42; head.x = -0.6; } // texting while walking
@@ -214,9 +214,9 @@ vec3 bsimPose(vec3 p, inout vec3 n){
     head = vec2(-0.04 + 0.05 * sin(t * 0.37), 0.35 * sin(t * 0.13 + seed * 6.0) * smoothstep(0.2, 0.8, sin(t * 0.07 + seed * 3.0) * 0.5 + 0.5));
     sh = vec2(0.05); el = vec2(0.22); sabd = vec2(0.11);
     if (iv == 1) { sh = vec2(0.22, 0.26); sabd = vec2(0.16); syaw = vec2(1.25, 1.15); el = vec2(1.62, 1.8); }       // arms crossed
-    else if (iv == 2) { sh = vec2(0.3, 0.34); el = vec2(1.5, 1.62); syaw = vec2(0.62, 0.42); head.x = -0.62; head.y *= 0.2; spine.x = -0.06; } // phone
-    else if (iv == 3) { sh = vec2(-0.2); el = vec2(0.55); sabd = vec2(0.3); syaw = vec2(0.25); }                    // hands in pockets
-    else if (iv == 4) { float g1 = sin(t * 1.7), g2 = sin(t * 2.3 + 1.0); sh.y = 0.35 + 0.22 * g1; el.y = 0.95 + 0.45 * g2; syaw.y = 0.3; sh.x = 0.1 + 0.12 * max(0.0, sin(t * 1.1)); el.x = 0.4 + 0.6 * max(0.0, sin(t * 1.1)); head.x += 0.05 * sin(t * 3.1); } // talking
+    else if (iv == 2) { sh = vec2(0.3, 0.34); el = vec2(1.5, 1.62); syaw = vec2(0.62, 0.42); head.x = -0.82; head.y *= 0.2; spine.x = -0.1; } // phone
+    else if (iv == 3) { sh = vec2(-0.3); el = vec2(0.9); sabd = vec2(0.22); syaw = vec2(0.5); }                      // hands in pockets
+    else if (iv == 4) { float g1 = sin(t * 1.7), g2 = sin(t * 2.3 + 1.0); sh.y = 0.45 + 0.25 * g1; el.y = 1.3 + 0.4 * g2; syaw.y = 0.35; sh.x = 0.1 + 0.12 * max(0.0, sin(t * 1.1)); el.x = 0.4 + 0.6 * max(0.0, sin(t * 1.1)); head.x += 0.05 * sin(t * 3.1); } // talking
     else if (iv == 5) { sh.y = 0.28; el.y = 1.5; syaw.y = 0.28; }                                                  // coffee
     else if (iv == 6) { sh = vec2(0.25); el = vec2(1.0); syaw = vec2(0.7); sabd = vec2(0.15); }                   // hands clasped in front (tabler)
   } else if (pose < 2.5) { // ---- sitting on a bench / ledge / step (aux = seat height above the feet)
@@ -227,7 +227,7 @@ vec3 bsimPose(vec3 p, inout vec3 n){
     knee = vec2(th - hf - 0.0) - 0.04; ank = -(hip + knee) * 0.7; habd = vec2(0.09); hin = vec2(-0.08);
     spine = vec3(-0.06 + 0.012 * sin(t * 0.9), 0.0, 0.0); head = vec2(-0.08 + 0.05 * sin(t * 0.31), 0.3 * sin(t * 0.11 + seed * 5.0));
     sh = vec2(0.2); el = vec2(0.92); sabd = vec2(0.1); syaw = vec2(0.12);
-    if (iv == 1) { spine.x = -0.5; sh = vec2(0.95, 1.0); el = vec2(1.35, 1.5); syaw = vec2(0.45, 0.35); head.x = -0.5; head.y *= 0.2; } // elbows on knees, phone
+    if (iv == 1) { spine.x = -0.7; sh = vec2(0.75, 0.78); el = vec2(1.6, 1.7); syaw = vec2(0.38, 0.32); head.x = -0.3; head.y *= 0.2; } // elbows on knees, phone
     else if (iv == 2) { spine.x = 0.36; sh = vec2(-0.72); el = vec2(0.05); sabd = vec2(0.2); syaw = vec2(-0.15); head.x = -0.2; } // leaning back on hands
     else if (iv == 3) { hip.y = 1.75; hin.y = 0.38; habd.y = 0.0; knee.y = -1.75; ank.y = 0.2; htw.y = 0.25; sh = vec2(0.25); el = vec2(1.0); syaw = vec2(0.2); } // legs crossed (right over left)
     else if (iv == 4) { sh = vec2(0.6, 0.5); el = vec2(1.45, 1.3); syaw = vec2(0.38, 0.5); head.x = -0.62; head.y *= 0.15; }  // reading
@@ -237,8 +237,8 @@ vec3 bsimPose(vec3 p, inout vec3 n){
     head = vec2(-0.1 + 0.06 * sin(t * 0.29), 0.3 * sin(t * 0.09 + seed * 4.0));
     if (iv == 0 || iv == 4) { hip = vec2(1.45, 1.5); hin = vec2(-0.6, -0.48); htw = vec2(1.4, 1.35); knee = vec2(-2.4, -2.5); ank = vec2(-0.3); habd = vec2(0.0); spine.x = -0.12; sh = vec2(0.42); sabd = vec2(0.28); el = vec2(0.55); syaw = vec2(0.1);
       if (iv == 4) { sh = vec2(0.85, 0.75); el = vec2(1.4, 1.25); syaw = vec2(0.45, 0.55); head.x = -0.6; spine.x = -0.25; } }          // cross-legged (+ book)
-    else if (iv == 1) { hip = vec2(2.45); knee = vec2(-1.98); ank = vec2(-0.45); spine.x = -0.32; sh = vec2(1.0); el = vec2(1.0); syaw = vec2(0.5); sabd = vec2(0.12); habd = vec2(0.08); } // hugging knees
-    else if (iv == 2) { hip = vec2(1.52, 1.38); knee = vec2(-0.12, -0.55); ank = vec2(0.1); spine.x = 0.42; sh = vec2(-0.78); el = vec2(0.02); sabd = vec2(0.3); habd = vec2(0.08); } // legs out, leaning back
+    else if (iv == 1) { hip = vec2(2.45); knee = vec2(-1.98); ank = vec2(-0.45); spine.x = -0.32; sh = vec2(0.22); el = vec2(1.65); syaw = vec2(0.55); sabd = vec2(0.3); habd = vec2(0.08); } // hugging knees
+    else if (iv == 2) { hip = vec2(1.52, 1.38); knee = vec2(-0.12, -0.55); ank = vec2(0.1); spine.x = 0.42; sh = vec2(-0.88); el = vec2(0.02); sabd = vec2(0.1); syaw = vec2(-0.2); habd = vec2(0.08); } // legs out, leaning back
     else { hip = vec2(1.45, 1.4); hin = vec2(0.9, -0.2); htw = vec2(-1.2, 1.3); knee = vec2(-2.3, -2.5); ank = vec2(-0.4); habd = vec2(0.0); spine = vec3(-0.05, 0.3, 0.12); sh = vec2(0.35, -0.1); sabd = vec2(0.15, 0.55); el = vec2(0.6, 0.05); } // side-sit, legs swept left, propped on the right hand
   } else if (pose < 4.5) { // ---- lying on the lawn
     autoPel = 0.0;
@@ -248,7 +248,7 @@ vec3 bsimPose(vec3 p, inout vec3 n){
       knee = vec2(-1.65 - 0.3 * sin(t * 1.4), -1.65 + 0.3 * sin(t * 1.4)); hip = vec2(0.04); habd = vec2(0.08); hin = vec2(0.12, -0.12); ank = vec2(-0.5);
     } else { // on the back
       rootPitch = PI * 0.5; rootOff = vec3(0.0, 0.11, 0.0); head = vec2(0.12, 0.25 * sin(t * 0.07 + seed * 3.0));
-      hip = vec2(0.62, 0.03); knee = vec2(-1.25, -0.06); ank = vec2(0.2, -0.45); habd = vec2(0.06, 0.12);
+      hip = vec2(0.95, 0.03); knee = vec2(-1.75, -0.06); ank = vec2(0.45, -0.45); habd = vec2(0.06, 0.12);
       if (iv == 2) { sh = vec2(0.1, 2.5); el = vec2(0.2, 2.2); sabd = vec2(0.12, 0.2); syaw = vec2(0.0, 0.6); }   // arm over the eyes
       else { sh = vec2(2.85); el = vec2(2.25); sabd = vec2(0.55); }                                            // hands behind the head
     }
@@ -269,7 +269,7 @@ vec3 bsimPose(vec3 p, inout vec3 n){
     autoPel = 1.0; rootOff = vec3(0.0, 0.13, 0.0);
     hip = vec2(0.16, -0.16); knee = vec2(-0.12, -0.2); ank = vec2(-0.04, 0.3); habd = vec2(0.03);
     spine = vec3(-0.14, -0.1, 0.0); pel.y = 0.12; head = vec2(0.12, 0.1 * sin(t * 0.3));
-    sh = vec2(0.82, 0.78); el = vec2(0.5); sabd = vec2(0.12); syaw = vec2(0.1);
+    sh = vec2(0.86, 0.84); el = vec2(0.18, 0.22); sabd = vec2(0.13); syaw = vec2(0.08);
   }
   // ---- evaluate the skeleton
   float sgn = 1.0; vec3 q = p; mat3 R = mat3(1.0);
@@ -394,8 +394,8 @@ export class CrowdMesh {
 
 // ---------------------------------------------------------------- random looks (November in Berkeley: layers, hoodies, Cal colours)
 const TOPS = [ // weighted palette of tops (linear-ish sRGB values, converted below)
-  ['#1d2a44', 4], ['#003262', 4], ['#fdb515', 1.4], ['#2b2b2d', 5], ['#e9e6df', 3], ['#7d8590', 3], ['#5a6b4f', 2], ['#8a2f2a', 1.5], ['#c9b79c', 2],
-  ['#3b4f6b', 2], ['#6b4e3a', 1.5], ['#b84a39', 1], ['#2f5f5a', 1], ['#d8d2c4', 2], ['#4a3f5c', 1], ['#9fb3c8', 1.5], ['#e7c9a0', 1], ['#111214', 3],
+  ['#1d2a44', 4], ['#003262', 4], ['#fdb515', 1.4], ['#2b2b2d', 5], ['#e9e6df', 3], ['#7d8590', 3], ['#5a6b4f', 2], ['#8a2f2a', 1.5], ['#5e6f86', 2],
+  ['#3b4f6b', 2], ['#5a4030', 1.5], ['#b84a39', 1], ['#2f5f5a', 1], ['#dcdcd6', 2], ['#4a3f5c', 1], ['#9fb3c8', 1.5], ['#6e2140', 1], ['#111214', 3],
 ];
 const BOTS = [['#1f2b40', 6], ['#2b3a55', 4], ['#121214', 6], ['#5d6067', 3], ['#8c7b5c', 1.6], ['#3e4a3c', 1.2], ['#5a4636', 1.2], ['#6d7d94', 2], ['#3a3d44', 2]];
 const srgbToLin = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; }; // THREE.Color parses hex as sRGB -> linear working space

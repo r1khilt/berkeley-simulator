@@ -23,10 +23,10 @@ import { pacificParts } from '../time.js';
 const PEOPLE_PLUGIN = import.meta.glob('../people/index.js'); // optional (r4-people); empty object when absent
 const TAU = Math.PI * 2;
 const QL = { // per quality level: walkers, riders, static-spot share, draw distance, near-LOD distance, instance caps
-  low: { walk: 55, ride: 8, spots: 0.45, far: 95, lod: 26, nearMax: 70, farMax: 160, shadow: false },
-  medium: { walk: 120, ride: 16, spots: 0.75, far: 140, lod: 36, nearMax: 130, farMax: 300, shadow: true },
-  high: { walk: 210, ride: 26, spots: 1, far: 185, lod: 46, nearMax: 190, farMax: 460, shadow: true },
-  ultra: { walk: 300, ride: 36, spots: 1, far: 230, lod: 60, nearMax: 260, farMax: 620, shadow: true },
+  low: { walk: 55, ride: 10, spots: 0.45, far: 95, lod: 26, nearMax: 70, farMax: 160, shadow: false },
+  medium: { walk: 120, ride: 24, spots: 0.75, far: 140, lod: 36, nearMax: 130, farMax: 300, shadow: true },
+  high: { walk: 210, ride: 40, spots: 1, far: 185, lod: 40, nearMax: 190, farMax: 460, shadow: true },
+  ultra: { walk: 300, ride: 56, spots: 1, far: 230, lod: 60, nearMax: 260, farMax: 620, shadow: true },
 };
 // hotspots: [x, z, sigma, weight]
 const HOT = [[-135, 255, 55, 3.2], [-147, 206, 28, 2.0], [-140, -118, 65, 1.6], [0, -25, 55, 1.6], [-185, -25, 55, 1.2], [-180, 110, 70, 1.6], [-378, 67, 55, 1.0],
@@ -55,10 +55,11 @@ export class CampusLife {
     this.trunks = new Map(); if (trees) for (let i = 0; i < trees.n; i++) { if (trees.h[i] < 250) continue; const x = trees.x[i] / 10, z = trees.z[i] / 10; const k = cellKey(x, z, 8); let l = this.trunks.get(k); if (!l) this.trunks.set(k, (l = [])); l.push([x, z, Math.min(1.1, 0.25 + trees.h[i] / 100 * 0.015)]); }
     this.fps = []; if (manifest) for (const l of manifest.landmarks) for (const fp of l.footprints || []) if (fp.length > 2) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of fp) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } this.fps.push({ fp, b: [x0, z0, x1, z1] }); }
     // ---- graphs
-    this.graph = this.walkG = buildGraph(vectors.paths.filter((L) => !L.tunnel && (L.hw === 'footway' || L.hw === 'pedestrian' || L.hw === 'path' || L.hw === 'steps')), (L) => ({ pedestrian: 2.6, footway: 1, path: 0.7, steps: 0.45 }[L.hw] || 1), (L) => (L.hw === 'pedestrian' ? 3.4 : Math.max(0.35, (L.w || 2) / 2 - 0.25)), 40);
+    this.graph = this.walkG = buildGraph(vectors.paths.filter((L) => !L.tunnel && (L.hw === 'footway' || L.hw === 'pedestrian' || L.hw === 'path' || L.hw === 'steps')), (L) => ({ pedestrian: 2.6, footway: 1, path: 0.7, steps: 0.45 }[L.hw] || 1), (L) => (L.hw === 'pedestrian' ? 2.7 : Math.max(0.35, (L.w || 2) / 2 - 0.25)), 40);
     const campus = (x, z) => x > -720 && x < 470 && z > -520 && z < 420;
     const rideRoads = vectors.roads.filter((r) => !r.tunnel && r.hw !== 'construction' && (r.hw !== 'service' || campus(r.pts[0][0], r.pts[0][1])));
-    this.rideG = buildGraph([...rideRoads, ...vectors.paths.filter((L) => L.hw === 'cycleway' && !L.tunnel)], (L) => ({ secondary: 2.2, tertiary: 1.8, primary: 2, residential: 1, unclassified: 0.8, service: 0.35, cycleway: 1.6 }[L.hw] || 1), (L) => L.w || 8, 60, true);
+    const BUSY = new Set(['Bancroft Way', 'Telegraph Avenue', 'Durant Avenue', 'College Avenue', 'Hearst Avenue', 'Oxford Street', 'Piedmont Avenue', 'Channing Way', 'Dana Street', 'Bowditch Street', 'Shattuck Avenue', 'Fulton Street']); // student bike routes around campus
+    this.rideG = buildGraph([...rideRoads, ...vectors.paths.filter((L) => L.hw === 'cycleway' && !L.tunnel)], (L) => ({ secondary: 2.2, tertiary: 1.8, primary: 2, residential: 1, unclassified: 0.8, service: 0.35, cycleway: 1.6 }[L.hw] || 1) * (BUSY.has(L.name) ? 3 : 1), (L) => L.w || 8, 60, true);
     // ---- render resources
     const mats = personMaterials();
     this.near = new CrowdMesh(personGeometry(1), mats, this.Q.nearMax, 'life:people-near');
@@ -67,12 +68,13 @@ export class CampusLife {
     this.bikes = new VehicleMesh(bikeGeometry(), vmat, 64, 'life:bikes'); this.scooters = new VehicleMesh(scooterGeometry(), vmat, 64, 'life:scooters');
     this.blankets = new VehicleMesh(blanketGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, name: 'life:blanket' }), 64, 'life:blankets'); this.blankets.mesh.castShadow = false;
     for (const m of [this.near.mesh, this.far.mesh, this.bikes.mesh, this.scooters.mesh]) { m.castShadow = this.Q.shadow; this.group.add(m); }
+    this.far.mesh.castShadow = quality === 'ultra'; // perf: distant people skip the shadow cascades (contact AO still grounds them)
     this.group.add(this.blankets.mesh);
     // ---- agents + static spots
     this.walkers = []; this.riders = []; this.spots = []; this.groups = []; this.agents = [];
-    this._buildSpots(pois, streets, vectors);
     this.tabling = null;
     try { this._buildTabling(vectors); } catch (e) { console.warn('tabling failed', e); }
+    this._buildSpots(pois, streets, vectors);
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.v3 = new THREE.Vector3(); this.s3 = new THREE.Vector3(); this.up = new THREE.Vector3(0, 1, 0);
     this.frustum = new THREE.Frustum(); this.pm = new THREE.Matrix4(); this.sph = new THREE.Sphere(new THREE.Vector3(), 1.3);
     this.first = true; this.stats = {}; this.buildMs = Math.round(performance.now() - t0);
@@ -113,7 +115,7 @@ export class CampusLife {
     } }
     // lawns: groups sitting / lying on the grass, some on picnic blankets
     const LAWNS = [[-142, -122, 44, 26], [118, 84, 30, 9], [-640, 30, 40, 9], [-48, -45, 14, 4], [-610, 120, 22, 4], [-105, 222, 12, 4], [210, 120, 22, 4]];
-    const BLANKET = [[0.62, 0.1, 0.08], [0.08, 0.2, 0.42], [0.85, 0.68, 0.2], [0.18, 0.4, 0.22], [0.75, 0.75, 0.72], [0.45, 0.12, 0.3], [0.1, 0.1, 0.12]];
+    const BLANKET = [[0.55, 0.06, 0.05], [0.04, 0.12, 0.32], [0.8, 0.55, 0.1], [0.1, 0.3, 0.14], [0.35, 0.08, 0.22], [0.06, 0.24, 0.3], [0.62, 0.35, 0.18]];
     for (const [lx, lz, lr, n] of LAWNS) {
       let made = 0;
       for (let tries = 0; tries < n * 30 && made < n; tries++) {
@@ -125,7 +127,7 @@ export class CampusLife {
         for (let m = 0; m < size; m++) {
           let px = x, pz = z, yaw = face, pose = POSE.GROUND, vari = Math.floor(R() * 5);
           if (size === 1) { if (R() < 0.45) { pose = POSE.LIE; vari = Math.floor(R() * 3); } }
-          else { const aa = face + (m / size) * TAU; const rr = 0.62 + size * 0.06; px = x + Math.cos(aa) * rr; pz = z + Math.sin(aa) * rr; yaw = Math.atan2(Math.cos(aa), Math.sin(aa)); /* face the centre */ if (R() < 0.15) { pose = POSE.LIE; vari = 1; } }
+          else { const aa = face + (m / size) * TAU; const rr = 0.46 + size * 0.05; px = x + Math.cos(aa) * rr; pz = z + Math.sin(aa) * rr; yaw = Math.atan2(Math.cos(aa), Math.sin(aa)); /* face the centre */ if (R() < 0.15) { pose = POSE.LIE; vari = 1; } }
           const look = randomLook(R, { backpack: false }); look.flags &= ~(FLAG.SKIRT | FLAG.BAG);
           const extra = (pose === POSE.GROUND && vari === 4) || (pose === POSE.LIE && vari === 1) ? FLAG.BOOK : 0;
           this._spot({ cat: 'lawn', x: px, z: pz, y: null, yaw, pose, vari, aux: 0, p: 0.7, look, extra, groupId: g.id });
@@ -142,6 +144,10 @@ export class CampusLife {
         this._spot({ cat: 'steps', x, z, y: null, yaw: face + (R() - 0.5) * 0.5, pose, vari: pose === POSE.SIT ? [0, 1, 1, 2, 3, 4][Math.floor(R() * 6)] : [0, 2, 3, 4][Math.floor(R() * 4)], aux: 0.45, p: 0.55, steps: true, foot: [fx, fz], groupId: g.id });
       }
     }
+    // Ludwig's Fountain: people sitting on the rim (crest r~3.4 m, ~0.42 m above the plaza), facing out
+    { const F = [-144.87, 278.76];
+      for (let k = 0; k < 14; k++) { const a = (k / 14) * TAU + (R() - 0.5) * 0.25, fx = Math.cos(a), fz = Math.sin(a); const sx = F[0] + fx * 3.42, sz = F[1] + fz * 3.42; const g = this._group({ cat: 'rim' });
+        this._spot({ cat: 'rim', x: sx + fx * 0.05, z: sz + fz * 0.05, y: null, yaw: Math.atan2(-fx, -fz) + (R() - 0.5) * 0.3, pose: POSE.SIT, vari: [0, 1, 1, 2, 3, 4][Math.floor(R() * 6)], aux: 0.43, p: 0.5, lm: 'ludwigs-fountain', foot: [sx + fx * 0.45, sz + fz * 0.45], groupId: g.id }); } }
     // small standing groups chatting on paved ground near the busy spots
     const CHAT = [[-140, 214, 10, 3], [-130, 250, 16, 4], [-125, 300, 14, 3], [-126, 340, 10, 2], [-6, -38, 18, 5], [-128, -36, 16, 3], [-170, 60, 20, 3], [-235, 125, 18, 2], [-370, 95, 20, 2],
       [-60, -300, 22, 3], [-190, 330, 20, 3], [-85, 470, 30, 3], [260, 260, 20, 2], [-270, -20, 20, 2], [-147, 190, 8, 2], [-140, 280, 14, 3], [-225, 320, 18, 3]];
@@ -150,6 +156,7 @@ export class CampusLife {
       for (let tries = 0; tries < n * 40 && made < n; tries++) {
         const a = R() * TAU, d = Math.sqrt(R()) * cr; const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
         if (this.maskAt(x, z, 1) < 1.0 || !this.treeClear(x, z, 1.4) || this.inFootprint(x, z, 1.5) || !this.wallFree(x, z, 1.4)) continue;
+        if (this.tabling && this.tabling.tables.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < (t.canopy ? 4.2 : 3.0) ** 2)) continue;
         const size = 2 + Math.floor(R() * 2.4); const face = R() * TAU; const g = this._group({ cat: 'chat', x, z });
         for (let m = 0; m < size; m++) { const aa = face + (m / size) * TAU + (R() - 0.5) * 0.5, rr = 0.55 + size * 0.1; const px = x + Math.cos(aa) * rr, pz = z + Math.sin(aa) * rr;
           const v = [0, 0, 1, 2, 3, 4, 4, 4, 5][Math.floor(R() * 9)];
@@ -161,7 +168,9 @@ export class CampusLife {
   _buildTabling(vectors) {
     const sp = vectors.paths.find((L) => L.name === 'Sproul Plaza' && L.pts.length > 6); if (!sp) return;
     const F = [-144.87, 278.76];
-    const ok = (x, z, r) => this.maskAt(x, z, 1) > 0.4 && this.maskAt(x, z, 2) < 0.2 && this.treeClear(x, z, r) && !this.inFootprint(x, z, 1.0) && (x - F[0]) ** 2 + (z - F[1]) ** 2 > 7.5 * 7.5 && !(z > 261 && z < 298) && this.wallFree(x, z, 0.9);
+    const G = this.walkG; const sproulEdge = new Set(); // keep side footways that cross the table rows clear
+    const offPath = (x, z, r) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const c = G.cells.get((Math.floor(x / G.cell) + i) + ',' + (Math.floor(z / G.cell) + j)); if (!c) continue; for (const e of c.list) { const E = G.edges[e]; if (E.w > 2) continue; const A = G.nodes[E.a], B = G.nodes[E.b]; if (segDist(x, z, A[0], A[1], B[0], B[1]) < r + 1.2) return false; } } return true; };
+    const ok = (x, z, r) => this.maskAt(x, z, 1) > 0.4 && this.maskAt(x, z, 2) < 0.2 && this.treeClear(x, z, r) && !this.inFootprint(x, z, 1.0) && (x - F[0]) ** 2 + (z - F[1]) ** 2 > 7.5 * 7.5 && !(z > 261 && z < 298) && offPath(x, z, r) && this.wallFree(x, z, 0.9);
     const T = buildTabling({ line: sp.pts, heightAt: this.heightAt, ok, rand: this.rand });
     this.tabling = T; this.group.add(T.group);
     const R = this.rand;
@@ -213,7 +222,7 @@ export class CampusLife {
     }
     return null;
   }
-  _offFor(w, E) { const hw = E.hw; return w.buddy ? w.buddy.off + 0.62 : (0.25 + w.offN * Math.max(0.1, hw - 0.25)); }
+  _offFor(w, E) { const hw = E.hw; if (w.buddy) return w.buddy.off + 0.62; return hw > 2 ? -0.9 + w.offN * (hw + 0.9) : 0.25 + w.offN * Math.max(0.1, hw - 0.25); } // wide plazas: use both halves
   _walkPos(w) {
     const G = this.walkG, E = G.edges[w.e]; const A = G.nodes[w.dir ? E.a : E.b], B = G.nodes[w.dir ? E.b : E.a];
     const dx = (B[0] - A[0]) / E.len, dz = (B[1] - A[1]) / E.len; const s = w.dir ? w.t : 1 - w.t; // fraction along travel
@@ -258,7 +267,11 @@ export class CampusLife {
   _ridePos(r) {
     const G = this.rideG, E = G.edges[r.e]; const A = G.nodes[r.dir ? E.a : E.b], B = G.nodes[r.dir ? E.b : E.a];
     const dx = (B[0] - A[0]) / E.len, dz = (B[1] - A[1]) / E.len; const s = r.dir ? r.t : 1 - r.t; const u = s * E.len;
-    const off = E.cyc ? 0.5 : Math.max(0.8, E.hw / 2 - 1.15); const rx = -dz, rz = dx;
+    const rx = -dz, rz = dx;
+    if (E.lane == null) { // ride ~1.3 m inside the drawn asphalt edge (OSM widths overstate some streets)
+      const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2; let d = 0; if (this.mask) while (d < E.hw / 2 + 2 && this.maskAt(mx + rx * (d + 0.5), mz + rz * (d + 0.5), 0) > 0.2) d += 0.5; else d = E.hw / 2;
+      E.lane = E.cyc ? 0.5 : Math.max(0.7, Math.min(E.hw / 2 - 1.2, d - 1.3)); }
+    const off = E.lane;
     return [A[0] + dx * u + rx * off, A[1] + dz * u + rz * off, Math.atan2(-dx, -dz)];
   }
   _stepRider(r, dt) {
@@ -314,7 +327,7 @@ export class CampusLife {
       if (!alive || (p[0] - cx) ** 2 + (p[1] - cz) ** 2 > far2 * 1.15) { const n = this._spawnWalker(cx, cz, true); if (n) { this.walkers[i] = n; live.add(n); } else this.walkers.splice(i, 1); continue; }
       w.vx += (p[0] + (w.sx || 0) - w.vx) * k; w.vz += (p[1] + (w.sz || 0) - w.vz) * k;
       let dh = p[2] - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); w.hd += dh * Math.min(1, dt * 6);
-      const v = w.speed * w.speedMul; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.25 : 1.42)) % TAU;
+      const v = w.speed * w.speedMul; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
     }
     // ---- riders
     const wantR = Math.round(this.Q.ride * T.ride);
@@ -358,7 +371,7 @@ export class CampusLife {
     for (const g of this.groups) g._vis = false;
     for (const s of this.spots) {
       const dd = (s.x - cam.x) ** 2 + (s.z - cam.z) ** 2; if (dd > far2) { s.epoch = -1; continue; }
-      const dens = s.cat === 'lawn' ? T.lawn : s.cat === 'bench' ? T.bench : s.cat === 'steps' ? T.steps : s.cat === 'chat' ? T.chat : s.cat === 'table' ? (s.table.core ? (T.table > 0 ? 1 : 0) : (T.table > 0.5 ? 1 : 0)) : 1;
+      const dens = s.cat === 'lawn' ? T.lawn : s.cat === 'bench' ? T.bench : s.cat === 'steps' || s.cat === 'rim' ? T.steps : s.cat === 'chat' ? T.chat : s.cat === 'table' ? (s.table.core ? (T.table > 0 ? 1 : 0) : (T.table > 0.5 ? 1 : 0)) : 1;
       if (s.epoch !== T.epoch) {
         const vis = s.y != null && dd < 80 * 80 && this._inView(s.x, s.y, s.z);
         if (!vis || s.epoch === -1) { const g = this.groups[s.groupId - 1]; const gs = g ? g.seed : s.seed; const roll = fract(Math.sin(gs * 9871.3 + (s.cat === 'table' ? 0 : T.epoch) * 0.137) * 43758.55); const indiv = fract(Math.sin(s.seed * 3733.1 + T.epoch * 0.71) * 24634.6);
@@ -366,8 +379,9 @@ export class CampusLife {
       }
       if (s.cat === 'table' && dens <= 0) s.on = false;
       if (!s.on) continue;
-      if (s.y == null || s.steps) {
+      if (s.y == null || s.steps || (s.lm && !this.lmReady(s.lm))) {
         if (s.steps) { if (!this.lmReady('sproul-hall')) continue; const g = this.physics.groundAt(s.x, s.z, this.heightAt(s.x, s.z) + 4); if (!g.on) continue; const gf = this.physics.groundAt(s.foot[0], s.foot[1], g.y - 0.2); s.y = s.pose === POSE.SIT ? Math.max(gf.y, g.y - 0.45) : g.y; s.aux = s.pose === POSE.SIT ? g.y - s.y : 0; }
+        else if (s.lm) { if (!this.lmReady(s.lm)) continue; s.y = this.heightAt(s.foot[0], s.foot[1]); }
         else s.y = this._groundY(s.x, s.z);
       }
       s.state = SPOT_STATE(s); agents.push(s); draw(s); nOn++;
@@ -380,7 +394,7 @@ export class CampusLife {
   }
 }
 function blanketGeometry() {
-  const g = new THREE.BoxGeometry(1.7, 0.012, 1.4, 1, 1, 1).toNonIndexed(); const n = g.attributes.position.count;
+  const g = new THREE.BoxGeometry(1.9, 0.012, 1.75, 1, 1, 1).toNonIndexed(); const n = g.attributes.position.count;
   g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3)); g.setAttribute('aPaint', new THREE.BufferAttribute(new Float32Array(n).fill(1), 1)); g.setAttribute('aGlow', new THREE.BufferAttribute(new Float32Array(n), 1));
   return g;
 }
@@ -396,7 +410,7 @@ function buildGraph(lines, weightOf, halfWidthOf, cell, ride = false) {
   }
   // spatial cells of edges with cumulative weights (length x type x hotspot), and dead-end nodes (building doors)
   const cells = new Map(), doors = new Map();
-  edges.forEach((E, i) => { const A = nodes[E.a], B = nodes[E.b]; const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2; const k = cellKey(mx, mz, cell); let c = cells.get(k); if (!c) cells.set(k, (c = { list: [], cum: [], tot: 0, x: (Math.floor(mx / cell) + 0.5) * cell, z: (Math.floor(mz / cell) + 0.5) * cell })); c.tot += E.len * E.w * (ride ? 1 : hot(mx, mz)); c.list.push(i); c.cum.push(c.tot); });
+  edges.forEach((E, i) => { const A = nodes[E.a], B = nodes[E.b]; const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2; const k = cellKey(mx, mz, cell); let c = cells.get(k); if (!c) cells.set(k, (c = { list: [], cum: [], tot: 0, x: (Math.floor(mx / cell) + 0.5) * cell, z: (Math.floor(mz / cell) + 0.5) * cell })); c.tot += E.len * E.w * (ride ? 0.4 + hot(mx, mz) : hot(mx, mz)); c.list.push(i); c.cum.push(c.tot); });
   if (!ride) adj.forEach((l, n) => { if (l.length !== 1) return; const P = nodes[n]; const k = cellKey(P[0], P[1], cell); let d = doors.get(k); if (!d) doors.set(k, (d = [])); d.push(n); });
   return { nodes, adj, edges, cells, cell,
     pickEdge(cx, cz, r, rand) {
@@ -411,6 +425,7 @@ function buildGraph(lines, weightOf, halfWidthOf, cell, ride = false) {
       return best;
     } };
 }
+function segDist(px, pz, ax, az, bx, bz) { const dx = bx - ax, dz = bz - az; const l = dx * dx + dz * dz; let t = l ? ((px - ax) * dx + (pz - az) * dz) / l : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(ax + t * dx - px, az + t * dz - pz); }
 function cellKey(x, z, c) { return Math.floor(x / c) + ',' + Math.floor(z / c); }
 function inRing(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c; } return c; }
 function fract(x) { return x - Math.floor(x); }

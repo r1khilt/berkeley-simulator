@@ -25,14 +25,14 @@ class VB { // vehicle builder
   build() { const g = mergeGeometries(this.parts); g.computeBoundingSphere(); return g; }
 }
 function wheel(V, z, R, tire, rimCol, spokes = 6) {
-  const t = new THREE.TorusGeometry(R, tire, 6, 22); t.rotateY(Math.PI / 2); t.translate(0, R, z); V.add(t, DARK);
-  const rim = new THREE.TorusGeometry(R - tire * 1.4, tire * 0.45, 4, 22); rim.rotateY(Math.PI / 2); rim.translate(0, R, z); V.add(rim, rimCol);
+  const t = new THREE.TorusGeometry(R, tire, 4, 18); t.rotateY(Math.PI / 2); t.translate(0, R, z); V.add(t, DARK);
+  const rim = new THREE.TorusGeometry(R - tire * 1.4, tire * 0.45, 3, 18); rim.rotateY(Math.PI / 2); rim.translate(0, R, z); V.add(rim, rimCol);
   for (let k = 0; k < spokes; k++) { const a = (k / spokes) * Math.PI; const s = new THREE.BoxGeometry(0.006, 2 * (R - tire * 1.6), 0.006); s.rotateX(a); s.translate(0, R, z); V.add(s, METAL); }
   const hub = new THREE.CylinderGeometry(0.022, 0.022, 0.09, 8); hub.rotateZ(Math.PI / 2); hub.translate(0, R, z); V.add(hub, METAL);
 }
 export function bikeGeometry() {
   const V = new VB(); const R = 0.34;
-  wheel(V, 0.52, R, 0.02, METAL, 8); wheel(V, -0.52, R, 0.02, METAL, 8);
+  wheel(V, 0.52, R, 0.02, METAL, 6); wheel(V, -0.52, R, 0.02, METAL, 6);
   const bb = [0, 0.3, 0], seat = [0, 0.84, 0.2], ht = [0, 0.86, -0.36], hb = [0, 0.72, -0.4], ra = [0, R, 0.52], fa = [0, R, -0.52];
   V.tube(bb, seat, 0.018, [1, 1, 1], 1); V.tube(seat, ht, 0.016, [1, 1, 1], 1); V.tube(bb, hb, 0.02, [1, 1, 1], 1); V.tube(ht, hb, 0.022, [1, 1, 1], 1);
   for (const s of [-1, 1]) { V.tube([s * 0.035, 0.3, 0], [s * 0.05, R, 0.52], 0.01, [1, 1, 1], 1); V.tube([s * 0.02, 0.82, 0.21], [s * 0.05, R, 0.52], 0.009, [1, 1, 1], 1);
@@ -41,10 +41,9 @@ export function bikeGeometry() {
   const saddle = new THREE.BoxGeometry(0.13, 0.05, 0.25); saddle.translate(0, 0.945, 0.25); V.add(saddle, DARK);
   V.tube(ht, [0, 1.0, -0.38], 0.014, METAL); V.tube([-0.26, 1.03, -0.4], [0.26, 1.03, -0.4], 0.013, GRIP);
   for (const s of [-1, 1]) { V.tube([s * 0.07, 0.3, 0], [s * 0.08, 0.3 + 0.17 * s, 0.0], 0.012, METAL); const ped = new THREE.BoxGeometry(0.09, 0.02, 0.06); ped.translate(s * 0.12, 0.3 + 0.17 * s, 0); V.add(ped, DARK); }
-  const ring = new THREE.TorusGeometry(0.1, 0.008, 4, 16); ring.rotateY(Math.PI / 2); ring.translate(0.055, 0.3, 0); V.add(ring, METAL);
-  for (const s of [-1, 1]) { const fen = new THREE.TorusGeometry(R + 0.03, 0.012, 3, 12, Math.PI * 0.55); fen.rotateY(Math.PI / 2); fen.rotateX(s < 0 ? -0.15 : -Math.PI * 0.55 + 0.15 + Math.PI); fen.translate(0, R, s * 0.52); }
-  const lamp = new THREE.BoxGeometry(0.06, 0.05, 0.05); lamp.translate(0, 0.95, -0.44); V.add(lamp, [0.9, 0.9, 0.85], 0, 1);
-  const tail = new THREE.BoxGeometry(0.05, 0.035, 0.02); tail.translate(0, 0.86, 0.36); V.add(tail, [0.7, 0.05, 0.04], 0, 2);
+  const ring = new THREE.TorusGeometry(0.1, 0.008, 3, 12); ring.rotateY(Math.PI / 2); ring.translate(0.055, 0.3, 0); V.add(ring, METAL);
+  const lamp = new THREE.BoxGeometry(0.08, 0.06, 0.06); lamp.translate(0, 0.95, -0.44); V.add(lamp, [0.9, 0.9, 0.85], 0, 1);
+  const tail = new THREE.BoxGeometry(0.07, 0.045, 0.025); tail.translate(0, 0.86, 0.36); V.add(tail, [0.7, 0.05, 0.04], 0, 2);
   return V.build();
 }
 export function scooterGeometry() {
@@ -74,7 +73,7 @@ export function vehicleMaterial() {
   vGlow = aGlow;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNight; varying float vGlow;')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  if (vGlow > 0.5) totalEmissiveRadiance += (vGlow < 1.5 ? vec3(1.0, 0.95, 0.85) * 6.0 : vec3(1.0, 0.06, 0.03) * 3.0) * uNight;`);
+  if (vGlow > 0.5) totalEmissiveRadiance += (vGlow < 1.5 ? vec3(1.0, 0.95, 0.85) * 14.0 : vec3(1.0, 0.06, 0.03) * 7.0) * uNight;`);
   };
   m.customProgramCacheKey = () => 'life-vehicle-v1';
   return m;
