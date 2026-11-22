@@ -20,9 +20,9 @@ let _band = null;
 function bandMat(M) { // smooth pale precast with horizontal rustication grooves every 0.5 m (UVs are metres/2 → 4 grooves per tile)
   if (_band) return _band;
   const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
-  g.fillStyle = '#b9b8af'; g.fillRect(0, 0, N, N); // [r5a] mid-grey precast (photo #a9aaa4..#b9b7ae), was a pale cream
+  g.fillStyle = '#abaca6'; g.fillRect(0, 0, N, N); // [r5a] cool mid-grey precast (photo #a9aaa4), was a pale cream
   for (let i = 0; i < 2600; i++) { const x = Math.random() * N, y = Math.random() * N, a = Math.random() * 0.05; g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '90,85,75'},${a})`; g.fillRect(x, y, 2 + Math.random() * 6, 1 + Math.random() * 3); }
-  for (let k = 0; k < 4; k++) { const y = k * N / 4; g.fillStyle = '#8e8c85'; g.fillRect(0, y, N, 4); g.fillStyle = '#cac8c0'; g.fillRect(0, y + 4, N, 2); } // [r5a] fine, subtle grooves (read as siding before)
+  for (let k = 0; k < 4; k++) { const y = k * N / 4; g.fillStyle = '#7f7f7a'; g.fillRect(0, y, N, 4); g.fillStyle = '#c0c0ba'; g.fillRect(0, y + 4, N, 2); } // [r5a] fine, subtle grooves (read as siding before)
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   _band = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
   return _band;
@@ -32,7 +32,7 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(73.6);
   const K = new Kit(ctx, ANG); const M = ctx.M; const P = pal(ctx);
   const BAND = bandMat(M);                                                     // banded precast concrete
-  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xcdcac0);         // smooth concrete (frame, mouldings) [r5a] greyer
+  const C = M.stuccoWhite.clone(); C.color = new THREE.Color(0xc3c3bc);         // smooth concrete (frame, mouldings) [r5a] greyer
   const CD = M.stuccoWhite.clone(); CD.color = new THREE.Color(0xa8a69e);       // plinth / shadowed concrete [r5a] greyer
   const TILE = M.redTile;                                                       // [r5a] red Mission clay tile (photo: #b85a3e sunlit), was a grey-mauve slate tint
   const FR = P.trimWhite, GL = M.windowNight;
@@ -52,8 +52,8 @@ export async function build(ctx) {
     for (const h of holes) { const p = new THREE.Path();
       if (h.r) { p.absarc(h.s, h.y, h.r, 0, Math.PI * 2, true); } else { p.moveTo(h.s0, h.y0); p.lineTo(h.s1, h.y0); p.lineTo(h.s1, h.y1); p.lineTo(h.s0, h.y1); p.lineTo(h.s0, h.y0); }
       sh.holes.push(p);
-      if (h.r) { const dg = new THREE.CircleGeometry(h.r + 0.02, 20); dg.translate(h.s, h.y, -depth + 0.06); K.addRun(R, M.glass, dg, { uvMode: 'keep' }); /* [r5a] dark, so oculi read as openings */
-        const tg = new THREE.TorusGeometry(h.r + 0.08, 0.1, 6, 20); tg.translate(h.s, h.y, 0.04); K.addRun(R, C, tg); }
+      if (h.r) { const dg = new THREE.CircleGeometry(h.r + 0.02, 20); dg.translate(h.s, h.y, -depth + 0.06); K.addRun(R, M.blackPaint, dg, { uvMode: 'keep' }); /* [r5a] dark, so oculi read as openings */
+        const tg = new THREE.TorusGeometry(h.r + 0.1, 0.14, 6, 20); tg.translate(h.s, h.y, 0.04); K.addRun(R, C, tg); }
       else { K.rbox(R, GL, h.s0, h.y0, -depth + 0.04, h.s1, h.y1, -depth + 0.07, { uvMode: 'keep' }); K.rbox(R, C, h.s0 - 0.1, h.y0 - 0.14, -0.1, h.s1 + 0.1, h.y0, 0.08); }
     }
     const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -depth); K.addRun(R, mat, g);
@@ -86,7 +86,7 @@ export async function build(ctx) {
       }
       // paired round columns carrying the double-height entrance bay
       const mid = (px[1] + px[2]) / 2;
-      for (const sx of [-1, 1]) { const g = new THREE.CylinderGeometry(0.43, 0.43, floors[2] - FL + 0.3, 20); g.translate(mid + sx * 1.5, (FL - 0.3 + floors[2]) / 2, 0.0); K.addRun(R, C, g); colliders.push((() => { const p = R.at(mid + sx * 1.5, 0); const [x, z] = K.xz(p[0], p[1]); return { type: 'cyl', x, z, r: 0.45, y0: FL - 1, y1: floors[2] }; })()); }
+      for (const sx of [0]) { const g = new THREE.CylinderGeometry(0.52, 0.52, floors[2] - FL + 0.3, 24); g.translate(mid + sx * 1.5, (FL - 0.3 + floors[2]) / 2, 0.0); K.addRun(R, C, g); colliders.push((() => { const p = R.at(mid + sx * 1.5, 0); const [x, z] = K.xz(p[0], p[1]); return { type: 'cyl', x, z, r: 0.55, y0: FL - 1, y1: floors[2] }; })()); } // [r5a] one free-standing round column (photo), was a pair
       // attic over the pavilion: central oculus flanked by square windows
       K.rbox(R, C, -0.1, TOP - 0.1, 0, L + 0.1, TOP + 0.4, 0.4);
       { const yc = (TOP + 0.4 + EAVE) / 2; frieze(R, C, -0.05, L + 0.05, TOP + 0.4, EAVE, [{ s: L / 2, y: yc, r: 0.65 }, { s0: L / 2 - 3.4 - 0.5, s1: L / 2 - 3.4 + 0.5, y0: yc - 0.5, y1: yc + 0.5 }, { s0: L / 2 + 3.4 - 0.5, s1: L / 2 + 3.4 + 0.5, y0: yc - 0.5, y1: yc + 0.5 }]); }
@@ -114,8 +114,9 @@ export async function build(ctx) {
     const endFace = L < 30; // [r5a] the short end walls flanking the corner pavilions read mostly solid, with sparse small square windows (photo)
     for (const [k, c] of cs.entries()) {
       if (endFace) { if (k % 2 === 0 || c < 2.5 || c > L - 2.5) continue; for (let f = 1; f < 6; f++) ops.push({ s0: c - 0.5, s1: c + 0.5, y0: floors[f] + 1.15, y1: floors[f] + 2.25, mull: 0, tran: 0.0 }); continue; }
-      ops.push({ s0: c - 0.45, s1: c + 0.45, y0: FL + 0.7, y1: FL + 3.4, mull: 0, tran: 0.75 });             // tall ground-floor slot
-      for (let f = 1; f < 6; f++) ops.push({ s0: c - 0.42, s1: c + 0.42, y0: floors[f] + 0.55, y1: floors[f] + 2.75, mull: 0, tran: 0.0, vent: true });
+      if (k % 2) continue; // [r5a] long fronts: a window every other bay, squarer (photo: mostly solid banded wall, sparse punched windows)
+      ops.push({ s0: c - 0.5, s1: c + 0.5, y0: FL + 0.9, y1: FL + 3.1, mull: 0, tran: 0.7 });             // ground-floor window
+      for (let f = 1; f < 6; f++) ops.push({ s0: c - 0.5, s1: c + 0.5, y0: floors[f] + 0.95, y1: floors[f] + 2.3, mull: 0, tran: 0.0, vent: true });
     }
     K.wall(R, BAND, 0, L, Y0, TOP, ops, 0.6);
     for (const o of ops) {
@@ -128,7 +129,7 @@ export async function build(ctx) {
     K.rbox(R, CD, -0.06, Y0, 0, L + 0.06, FL + 0.25, 0.1);                       // plinth
 
     K.rbox(R, C, -0.12, TOP - 0.15, 0, L + 0.12, TOP + 0.4, 0.42);                // attic string course
-    frieze(R, C, 0, L, TOP + 0.4, EAVE, cs.filter((c, k) => k % 2 === 0 && c > 0.9 && c < L - 0.9).map((c) => ({ s: c + bw / 2 < L - 0.9 ? c + bw / 2 : c, y: (TOP + 0.4 + EAVE) / 2 - 0.05, r: 0.6 })));    // attic frieze with real oculi
+    frieze(R, C, 0, L, TOP + 0.4, EAVE, cs.filter((c, k) => k % 4 === 1 && c > 1.2 && c < L - 1.2).map((c) => ({ s: c, y: (TOP + 0.4 + EAVE) / 2 - 0.05, r: 0.72 }))); // [r5a] fewer, larger oculi (over every other blank bay)    // attic frieze with real oculi
     K.rbox(R, C, -0.08, EAVE - 0.25, 0, L + 0.08, EAVE, 0.18);
     // entrance doors where paths reach the long west side and the north end
   }
