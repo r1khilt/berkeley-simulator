@@ -12,8 +12,8 @@
 import * as THREE from 'three';
 import { U } from '../materials.js';
 import { mulberry32 } from '../lib/noise.js';
-import { leafTexture, barkTexture, LEAF_KINDS, leafCellUV } from './tree-textures.js';
-import { makeTreeUniforms, patchLeaf, patchBark, patchBlob, makeDepthMaterials, TREE_REF_TINT, TREE_WIND_DIR, TREE_VIEW } from './tree-shaders.js';
+import { leafTexture, barkTexture, LEAF_KINDS, leafCellUV, puffTexture } from './tree-textures.js';
+import { makeTreeUniforms, patchLeaf, patchBark, patchBlob, makeDepthMaterials, patchPuff, makePuffDepthMaterials, TREE_REF_TINT, TREE_WIND_DIR, TREE_VIEW } from './tree-shaders.js';
 export { TREE_REF_TINT, TREE_WIND_DIR };
 export const TREE_LOD_DISTANCES = [120, 600];
 export const SEASONS = ['spring', 'summer', 'early-autumn', 'late-autumn', 'winter'];
@@ -35,7 +35,7 @@ class Acc {
   get tris() { return this.i.length / 3; }
   v(p, n, u, v, ex) {
     this.p.push(p.x, p.y, p.z); this.n.push(n.x, n.y, n.z); this.t.push(u, v);
-    for (const k in this.x) { const val = ex?.[k]; if (this.xs[k] === 1) this.x[k].push(val ?? 1); else { const q = val ?? p; this.x[k].push(q.x, q.y, q.z); } }
+    for (const k in this.x) { const val = ex?.[k]; if (this.xs[k] === 1) this.x[k].push(val ?? 1); else if (this.xs[k] === 4) this.x[k].push(...(val ?? [0, 0, 0, 0])); /* r4-trees: vec4 (aPuff) */ else { const q = val ?? p; this.x[k].push(q.x, q.y, q.z); } }
     return this.count - 1;
   }
   quad(a, b, c, d) { this.i.push(a, b, c, a, c, d); }
@@ -555,6 +555,67 @@ function palmBark(sk, d, lod) {
   return acc;
 }
 
+// ---------------------------------------------------------------- r4-trees: volumetric puff crowns
+// Mid/far crowns (and the dense core of near crowns) are camera-facing leaf puffs (tree-shaders.js patchPuff): one
+// quad per puff, never seen edge-on, shaded as a sphere. They are fitted to the same skeleton clumps and envelope as
+// the near cards, so every LOD shares one silhouette.
+const PUFF_ATTRS = ['aAO', 'aRnd', ['aPuff', 4]];
+function puffQuad(acc, c, r, n, ao, rnd01, cell, rot) {
+  const [u0, v0, u1, v1] = leafCellUV(cell); const i0 = acc.count;
+  for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) acc.v(c, n, u0 + (x * 0.5 + 0.5) * (u1 - u0), v0 + (y * 0.5 + 0.5) * (v1 - v0), { aAO: ao, aRnd: rnd01, aPuff: [x, y, r, rot] });
+  acc.quad(i0, i0 + 1, i0 + 2, i0 + 3);
+}
+function kmeans(pts, k, iters = 6) { // weighted, deterministic (farthest-point seeding)
+  if (pts.length <= k) return pts.map((p) => ({ c: p.c.clone(), w: p.w, n: 1, ext: Math.sqrt(p.w) }));
+  const C = [pts.reduce((a, b) => (b.w > a.w ? b : a)).c.clone()];
+  const dmin = pts.map((p) => p.c.distanceToSquared(C[0]));
+  while (C.length < k) { let bi = 0; for (let i = 1; i < pts.length; i++) if (dmin[i] * pts[i].w > dmin[bi] * pts[bi].w) bi = i; C.push(pts[bi].c.clone()); for (let i = 0; i < pts.length; i++) dmin[i] = Math.min(dmin[i], pts[i].c.distanceToSquared(C[C.length - 1])); }
+  const asg = new Int32Array(pts.length);
+  for (let it = 0; it < iters; it++) {
+    for (let i = 0; i < pts.length; i++) { let b = 0, bd = 1e18; for (let j = 0; j < C.length; j++) { const dd = pts[i].c.distanceToSquared(C[j]); if (dd < bd) { bd = dd; b = j; } } asg[i] = b; }
+    const S = C.map(() => [V3(), 0]);
+    for (let i = 0; i < pts.length; i++) { const q = S[asg[i]]; q[0].addScaledVector(pts[i].c, pts[i].w); q[1] += pts[i].w; }
+    S.forEach((q, j) => { if (q[1] > 0) C[j].copy(q[0].divideScalar(q[1])); });
+  }
+  const out = C.map((c) => ({ c, w: 0, n: 0, ext: 0 }));
+  for (let i = 0; i < pts.length; i++) { const o = out[asg[i]]; o.w += pts[i].w; o.n++; o.ext = Math.max(o.ext, pts[i].c.distanceTo(o.c) + Math.sqrt(pts[i].w)); }
+  return out.filter((o) => o.n > 0);
+}
+function buildPuffs(sk, d, rnd, density, N, o = {}) {
+  const acc = new Acc(PUFF_ATTRS); const env = sk.env, S = d.cardM, P = d.puff || {};
+  if (!sk.clumps.length || N <= 0) return acc;
+  const pts = sk.clumps.map((cl) => ({ c: cl.mode === 'tip' && cl.dir ? cl.c.clone().addScaledVector(cl.dir, S * 0.3) : cl.c.clone(), w: cl.r * cl.r }));
+  const n = Math.max(3, Math.round(N * clamp(0.3 + density * 0.85, 0.3, 1)));
+  const cent = kmeans(pts, Math.min(n, pts.length));
+  const ao = aoFn(env, d.aoLift ?? 0), nrm = normalFn(env, d.normal, null), R = env.R;
+  for (const a of cent) { let d1 = 1e9, d2 = 1e9; for (const b of cent) { if (a === b) continue; const dd = a.c.distanceTo(b.c); if (dd < d1) { d2 = d1; d1 = dd; } else if (dd < d2) d2 = dd; } a.nn = d2 < 1e8 ? d2 : R; }
+  const rK = (o.rK ?? 1) * (P.rK ?? 1) * (0.72 + 0.28 * Math.min(1, density * 1.4));
+  const list = [];
+  for (const a of cent) {
+    const r = clamp(Math.max(a.ext * 0.8, a.nn * 0.6), S * 0.5, Math.min(R * (P.rMax ?? 0.7), (env.top - env.base) * 0.33)) * rK;
+    const c = a.c.clone(), th = Math.atan2(c.z, c.x), rad = Math.hypot(c.x, c.z);
+    c.y = clamp(c.y, Math.max(env.base, o.fit?.base ?? -1e9) + 0.75 * r, env.top - 0.8 * r);
+    let re = env.r(clamp(c.y, env.base + 1e-3, env.top - 1e-3), th) || R * 0.3;
+    if (o.fit) re = Math.min(re, o.fit.R * (o.fit.R / R < 1 ? 1 : 1)); // never wider than the near LOD's leaves
+    // snap onto the crown shell: the puff's edge (not its centre) meets the envelope, so far crowns keep the full
+    // silhouette of the near ones instead of shrinking toward the k-means centroids
+    const lim = Math.max(0, re * (o.shell ?? P.shell ?? 1.0) - 0.75 * r);
+    const k = rad > 1e-4 ? (rad > lim ? lim / rad : lerp(1, lim / rad, o.snap ?? 0.6)) : 1; c.x *= k; c.z *= k;
+    list.push({ c, r });
+  }
+  { const top = list.reduce((m, p) => Math.max(m, p.c.y + p.r), -1e9); if (top < env.top - 0.04 * (env.top - env.base)) { const r = Math.min(R * 0.35, (env.top - env.base) * 0.12, Math.max(S * 0.5, env.r(env.top - (env.top - env.base) * 0.1, 0) * 1.1)); list.push({ c: V3(0, env.top - r * 0.85, 0), r }); } } // apex
+  const nc = o.core ?? P.core ?? 2; // dark core so the crown never reads hollow between the shell puffs
+  for (let i = 0; i < nc; i++) { const y = lerp(env.base, env.top, 0.36 + 0.22 * i / Math.max(1, nc - 1)); const re = env.r(y, i) || R * 0.5; list.push({ c: V3((rnd() - 0.5) * re * 0.25, y, (rnd() - 0.5) * re * 0.25), r: Math.min(re * 0.62, (env.top - env.base) * 0.42), core: true }); }
+  for (const p of list) puffQuad(acc, p.c, p.r, nrm(p.c), (p.core ? 0.6 : Math.min(1, ao(p.c) * 1.04)) * (o.aoK ?? 1), rnd(), rnd() < 0.5 ? 0 : 1, rnd());
+  acc.puffs = list;
+  return acc;
+}
+function trunkOnly(sk, d) { // far LOD trunk: 5-sided tube up to the crown base (bark material; sub-pixel parts are culled)
+  const acc = new Acc(['aRad']);
+  for (const t of sk.trunks) { const n = t.pts.length, top = Math.min(n - 1, Math.max(1, Math.round((n - 1) * (d.arche === 'conifer' ? 0.5 : 1)))); tube(acc, [t.pts[0], t.pts[Math.floor(top / 2)], t.pts[top]], [t.rads[0], t.rads[Math.floor(top / 2)], t.rads[top]], 5); }
+  return acc;
+}
+
 // ---------------------------------------------------------------- species definitions (metres, typical tree)
 const SPECIES_DEF = {
   oak: {
@@ -708,21 +769,21 @@ const SEASONAL = {
     spring: { cols: ['#6f9a3a', '#7ca843', '#5f8a33'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.85 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.9 },
-    'late-autumn': { cols: ['#8a8040', '#a28446', '#7a5836'], ramp: [0.3, 0.62, 0.5, 0.25], density: 0.32 }, // planes: browning, thinning
+    'late-autumn': { cols: ['#8a8040', '#a28446', '#7a5836'], ramp: [0.3, 0.62, 0.5, 0.25], density: 0.55 }, // planes: browning, thinning (r4-trees: 0.32 -> 0.55, crowns read as volumes)
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.05 },
   },
   pollard: {
     spring: { cols: ['#74a03c', '#82ad45', '#669036'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.75 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.8 },
-    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.03 }, // the esplanade pollards are nearly bare by late November
+    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.16 }, // the esplanade pollards are mostly bare by late November (r4-trees: a few brown leaves still cling to the whips)
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.0 },
   },
   deciduous: {
     spring: { cols: ['#77a33f', '#86b048', '#689338'], ramp: [0.35, 0.8, 0.25, 0.2], density: 0.85 },
     summer: { cols: ['#4f7430', '#5e8138', '#46692a'], ramp: [0.35, 0.8, 0.25, 0.2], density: 1 },
     'early-autumn': { cols: ['#5f7a32', '#9a9a3a', '#c98a2e'], ramp: [0.45, 0.78, 0.7, 0.25], density: 0.9 },
-    'late-autumn': { cols: ['#6c7336', '#ad8a40', '#8c6838'], ramp: [0.36, 0.76, 0.75, 0.28], density: 0.5 }, // late Nov in Berkeley: some still olive, most ochre, a few russet; half the leaves down
+    'late-autumn': { cols: ['#6c7336', '#ad8a40', '#8c6838'], ramp: [0.36, 0.76, 0.75, 0.28], density: 0.62 }, // late Nov in Berkeley: some still olive, most ochre, a few russet; a third of the leaves down
     winter: { cols: ['#7a5a3a', '#8a6a40', '#6b5035'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.03 },
   },
   ginkgo: {
@@ -738,6 +799,7 @@ const SEASONAL = {
 function scaleGeo(g, sx, sy = sx, sz = sx) {
   g.scale(sx, sy, sz);
   const pv = g.attributes.aPivot; if (pv) { for (let i = 0; i < pv.count; i++) pv.setXYZ(i, pv.getX(i) * sx, pv.getY(i) * sy, pv.getZ(i) * sz); pv.needsUpdate = true; }
+  const pf = g.attributes.aPuff; if (pf) { const k = Math.cbrt(Math.abs(sx * sy * sz)); for (let i = 0; i < pf.count; i++) pf.setZ(i, pf.getZ(i) * k); pf.needsUpdate = true; } // r4-trees
   const ra = g.attributes.aRad; if (ra) { const k = Math.cbrt(Math.abs(sx * sy * sz)); for (let i = 0; i < ra.count; i++) ra.setX(i, ra.getX(i) * k); ra.needsUpdate = true; }
   return g;
 }
@@ -754,6 +816,7 @@ function buildSpecies(id, d, season, opts) {
   const sea = d.seasonal ? SEASONAL[d.seasonal][season] ?? SEASONAL[d.seasonal]['late-autumn'] : null;
   const look = { ...d.look, ...(sea ? { cols: sea.cols, ramp: sea.ramp } : {}) };
   const density = sea ? sea.density : 1;
+  const usePuffs = opts.puffs !== false && d.arche !== 'palm'; // r4-trees (?treepuffs=0 restores the round-3 card/blob LODs)
 
   // skeleton
   const sk = d.arche === 'conifer' ? genConifer(d, rnd) : d.arche === 'pollard' ? genPollard(d, rnd) : d.arche === 'palm' ? buildPalm(d, rnd) : genDecurrent(d, rnd);
@@ -785,31 +848,41 @@ function buildSpecies(id, d, season, opts) {
     const dd = { ...d, cards: { ...d.cards, n: Math.min(d.cards.n * B0 / 3000, Math.floor(budgetLeaves / 2 / Math.max(density, 0.05))) } };
     L0.leaves = buildLeaves0(sk, dd, rnd, density);
     L1.bark = buildBark(sk, d, 1);
-    L1.leaves = buildLeaves1(sk, d, rnd, density, (opts.lod1Budget ?? 400) - 5 - L1.bark.tris);
+    if (usePuffs) { // r4-trees: volumetric puff crowns for the mid/far LODs + a dense puff core inside the near crown
+      const PF = d.puff || {};
+      // fit the puff crowns to where the near LOD's leaves actually are (95th-percentile radius, 3rd-percentile base)
+      const lp = L0.leaves.p, rads = [], ys = []; for (let i = 0; i < lp.length; i += 3) { rads.push(Math.hypot(lp[i], lp[i + 2])); ys.push(lp[i + 1]); }
+      const fit = rads.length > 60 ? { R: percentile(rads, 0.95), base: percentile(ys, 0.03) } : null;
+      L0.puffs = buildPuffs(sk, d, rnd, density, Math.round((PF.n0 ?? 16) * (opts.puffK ?? 1)), { rK: PF.rK0 ?? 0.78, shell: 0.88, aoK: 0.86, core: PF.core0 ?? 1, fit });
+      L1.leaves = buildPuffs(sk, d, rnd, density, Math.round((PF.n1 ?? 30) * (opts.puffK ?? 1)), { fit, aoK: 0.92 });
+      L2.trunk = trunkOnly(sk, d);
+      L2.puffs = buildPuffs(sk, d, rnd, density, PF.n2 ?? 16, { core: 1, rK: 0.9, fit, aoK: 0.9 });
+    } else L1.leaves = buildLeaves1(sk, d, rnd, density, (opts.lod1Budget ?? 400) - 5 - L1.bark.tris);
   }
-  L2.blob = buildBlob(sk, d, rnd, d.arche === 'palm' ? 1 : density);
+  if (!L2.puffs) L2.blob = buildBlob(sk, d, rnd, d.arche === 'palm' ? 1 : density);
 
-  const g0 = { bark: L0.bark.geometry(), leaves: L0.leaves.count ? L0.leaves.geometry() : null };
+  const g0 = { bark: L0.bark.geometry(), leaves: L0.leaves.count ? L0.leaves.geometry() : null, puffs: L0.puffs?.count ? L0.puffs.geometry() : null };
   const g1 = { bark: L1.bark.geometry(), leaves: L1.leaves.count ? L1.leaves.geometry() : null };
-  const g2 = { blob: L2.blob.geometry() };
+  const g2 = L2.puffs ? { trunk: L2.trunk.geometry(), puffs: L2.puffs.geometry() } : { blob: L2.blob.geometry() };
+  const puff1 = !!(L1.leaves && L1.leaves.puffs);
 
   // ---- normalise to height 1 using LOD0's top
   const H = maxY([g0.bark, g0.leaves].filter(Boolean));
-  for (const g of [g0.bark, g0.leaves, g1.bark, g1.leaves, g2.blob]) if (g) scaleGeo(g, 1 / H);
-  const top1 = maxY([g1.bark, g1.leaves].filter(Boolean)), top2 = maxY([g2.blob]);
-  if (Math.abs(top1 - 1) > 0.01) for (const g of [g1.bark, g1.leaves]) if (g) scaleGeo(g, 1, 1 / top1, 1);
-  if (Math.abs(top2 - 1) > 0.01) scaleGeo(g2.blob, 1, 1 / top2, 1);
+  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs]) if (g) scaleGeo(g, 1 / H);
+  const top1 = maxY([g1.bark, puff1 ? null : g1.leaves].filter(Boolean)), top2 = g2.blob ? maxY([g2.blob]) : 1;
+  if (!puff1 && Math.abs(top1 - 1) > 0.01) for (const g of [g1.bark, g1.leaves]) if (g) scaleGeo(g, 1, 1 / top1, 1);
+  if (g2.blob && Math.abs(top2 - 1) > 0.01) scaleGeo(g2.blob, 1, 1 / top2, 1);
   const foliage0 = g0.leaves && g0.leaves.attributes.position.count > 60 ? g0.leaves : g0.bark;
   const normRadius = percentile(radialList(foliage0), 0.95);
   const crownBase = g0.leaves && g0.leaves.attributes.position.count > 60 ? percentile(yList(g0.leaves), 0.03) : sk.env.base / H;
   // match the far LODs' crown radius to LOD0 (LOD2 is a solid blob, so it is drawn a little smaller to cover
   // the same screen area as the see-through alpha-tested crowns; factors measured with dev/assets.check.mjs --qa)
-  if (g1.leaves) { const r = percentile(radialList(g1.leaves), 0.95); if (r > 1e-4 && Math.abs(r / normRadius - 1) > 0.06) { const s = clamp(normRadius / r, 0.75, 1.3); scaleGeo(g1.leaves, s, 1, s); } }
-  {
+  if (g1.leaves && !puff1) { const r = percentile(radialList(g1.leaves), 0.95); if (r > 1e-4 && Math.abs(r / normRadius - 1) > 0.06) { const s = clamp(normRadius / r, 0.75, 1.3); scaleGeo(g1.leaves, s, 1, s); } }
+  if (g2.blob) {
     const k2 = (d.lod2K ?? 0.9) * (d.seasonal ? 0.75 + 0.25 * density : 1);
     const r = percentile(radialList(g2.blob), 0.97); if (r > 1e-4) { const s = clamp(normRadius * k2 / r, 0.5, 1.3); scaleGeo(g2.blob, s, 1, s); }
   }
-  for (const g of [g0.bark, g0.leaves, g1.bark, g1.leaves, g2.blob]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
+  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
 
   // ---- materials (one set per species; all share the species' sway uniforms)
   const uni = makeTreeUniforms({ ...look, swayBase: clamp(crownBase * 0.55, 0.02, 0.6), typH: H });
@@ -820,28 +893,34 @@ function buildSpecies(id, d, season, opts) {
   barkMat.normalScale.set(0.9, 0.9);
   const blobMat = patchBlob(new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 }), uni);
   leafMat.name = `tree:${id}:leaves`; barkMat.name = `tree:${id}:bark`; blobMat.name = `tree:${id}:far`;
+  // r4-trees: puff materials (near-core puffs fade out as the camera closes in on them; mid/far puffs never fade)
+  const puffTex = (g0.puffs || puff1 || g2.puffs) ? puffTexture(d.leaf, opts.leafTexSize, d.puff?.ballM ?? 3) : null;
+  const puffP0 = { value: new THREE.Vector4(3.4, 0.42, 0.45, 0) }, puffP1 = { value: new THREE.Vector4(0, 0.45, 0.45, 0) }; // x near-fade (radii), y ball-normal weight, z pull toward viewer
+  const mkPuff = (pp, nm) => { const m = patchPuff(new THREE.MeshStandardMaterial({ map: puffTex, alphaTest: 0.42, alphaToCoverage: !!opts.alphaToCoverage, side: THREE.DoubleSide, roughness: look.rough ?? 0.8, metalness: 0 }), uni, pp); m.name = nm; return m; };
+  const puffMat0 = puffTex ? mkPuff(puffP0, `tree:${id}:puff0`) : null, puffMat1 = puffTex ? mkPuff(puffP1, `tree:${id}:puff`) : null;
+  const dp0 = puffTex ? makePuffDepthMaterials(uni, puffP0) : null;
   const dl = makeDepthMaterials(uni, true), db = makeDepthMaterials(uni, false);
   const P = (geometry, material, kind, dm) => ({ geometry, material, kind, depthMaterial: dm ? dm.depth : null, distanceMaterial: dm ? dm.distance : null, castShadow: true, receiveShadow: true });
   const lod = (parts) => ({ parts, triangles: parts.reduce((s, p) => s + triCount(p.geometry), 0) });
   const lods = [
-    lod([P(g0.bark, barkMat, 'bark', db), ...(g0.leaves ? [P(g0.leaves, leafMat, 'leaves', dl)] : [])]),
-    lod([P(g1.bark, barkMat, 'bark', db), ...(g1.leaves ? [P(g1.leaves, leafMat, 'leaves', dl)] : [])]),
-    lod([P(g2.blob, blobMat, 'far', null)]),
+    lod([P(g0.bark, barkMat, 'bark', db), ...(g0.leaves ? [P(g0.leaves, leafMat, 'leaves', dl)] : []), ...(g0.puffs ? [P(g0.puffs, puffMat0, 'puffs', dp0)] : [])]),
+    lod([P(g1.bark, barkMat, 'bark', db), ...(g1.leaves ? [puff1 ? P(g1.leaves, puffMat1, 'puffs', null) : P(g1.leaves, leafMat, 'leaves', dl)] : [])]),
+    g2.puffs ? lod([P(g2.trunk, barkMat, 'bark', null), P(g2.puffs, puffMat1, 'puffs', null)]) : lod([P(g2.blob, blobMat, 'far', null)]),
   ];
   const trunkRadius = sk.trunks[0].rads[Math.min(1, sk.trunks[0].rads.length - 1)] / H;
   return {
     id, name: d.name, lods, normHeight: 1, normRadius, crownBase, trunkRadius,
-    typical: { ...d.typical }, season, leafDensity: density, uniforms: uni, materials: [barkMat, leafMat, blobMat],
+    typical: { ...d.typical }, season, leafDensity: density, uniforms: uni, materials: [barkMat, leafMat, blobMat, ...(puffMat0 ? [puffMat0, puffMat1] : [])],
   };
 }
 
 // ---------------------------------------------------------------- public API
 export const TREE_SPECIES = Object.keys(SPECIES_DEF);
 
-export function createTreeLibrary({ season = 'late-autumn', leafTexSize = 2048, alphaToCoverage = true, lod0Budget = 3000, lod1Budget = 400, only = null } = {}) {
+export function createTreeLibrary({ season = 'late-autumn', leafTexSize = 2048, alphaToCoverage = true, lod0Budget = 3000, lod1Budget = 400, only = null, puffs = true, puffK = 1 } = {}) {
   if (!SEASONS.includes(season)) throw new Error(`createTreeLibrary: unknown season '${season}' (${SEASONS.join(', ')})`);
   const species = {};
-  for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget }); }
+  for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget, puffs, puffK }); }
   let lastTime = U.uTime.value, clock = 0;
   const baseDir = TREE_WIND_DIR.value.clone();
   return {

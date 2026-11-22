@@ -267,3 +267,107 @@ export function makeDepthMaterials(uni, leafy) {
     distance: patch(new THREE.MeshDistanceMaterial(), leafy ? 'tree-dist-leaf-4' : 'tree-dist-4'),
   };
 }
+
+// ---------------------------------------------------------------- r4-trees: volumetric leaf puffs
+// A puff is one quad whose 4 vertices share the puff centre (position) and carry aPuff = (corner x, corner y,
+// radius in normalised tree units, random). The vertex shader turns it into a billboard facing the camera
+// *position* (world-up locked, so turning the head never spins it), rotated by a per-puff random angle, and pulls it
+// toward the viewer by ~0.4 r so its visible surface sits where the front of a leafy ball would be. The fragment
+// shader shades it as a sphere: normal = mix(crown normal, per-pixel sphere normal), so crowns are lit as solid,
+// lumpy volumes from every side and no plane is ever seen edge-on. Used for the mid/far LODs and for the dense core
+// of the near LOD (faded out when the camera gets close, where the real cards and branches take over).
+const PUFF_VERT = /* glsl */`
+attribute vec4 aPuff;
+uniform vec4 uPuffP; // x: near fade start (in radii), y: sphere-normal weight, z: depth pull (radii), w: unused
+varying vec2 vCorner;
+varying vec3 vSphN;  // view-space normal of the ball at this corner (corner directions are not unit: interpolates linearly)
+varying float vNearFade;
+vec3 treePuffW;
+void treePuff(vec3 c) {
+  mat4 m = treeObjM();
+  vec3 s = max(vec3(length(m[0].xyz), length(m[1].xyz), length(m[2].xyz)), vec3(1e-5));
+  float su = pow(s.x * s.y * s.z, 1.0 / 3.0);
+  vec3 cw = (m * vec4(c, 1.0)).xyz;
+  float r = aPuff.z * su;
+  vec3 tc = cameraPosition - cw; float dist = max(length(tc), 1e-3); tc /= dist;
+  vec3 rt = cross(vec3(0.0, 1.0, 0.0), tc); float rl = length(rt);
+  rt = rl > 1e-3 ? rt / rl : vec3(1.0, 0.0, 0.0);
+  vec3 up = cross(tc, rt);
+  float a = aPuff.w * 6.2832, ca = cos(a), sa = sin(a);
+  vec2 k = vec2(ca * aPuff.x - sa * aPuff.y, sa * aPuff.x + ca * aPuff.y);
+  vCorner = aPuff.xy;
+  vSphN = mat3(viewMatrix) * (rt * k.x + up * k.y); // the rotated corner direction in view space (z added per pixel)
+  treePuffW = cw + (rt * k.x + up * k.y) * r + tc * min(r * uPuffP.z, dist * 0.5);
+  vNearFade = uPuffP.x > 0.0 ? smoothstep(uPuffP.x * 0.55, uPuffP.x, dist / max(r, 1e-3)) : 1.0;
+}
+`;
+const PUFF_PROJECT = /* glsl */`
+vec4 mvPosition = viewMatrix * vec4( treePuffW, 1.0 );
+gl_Position = projectionMatrix * mvPosition;
+`;
+const PUFF_WORLDPOS = /* glsl */`
+#if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION ) || NUM_SPOT_LIGHT_COORDS > 0
+  vec4 worldPosition = vec4( treePuffW, 1.0 );
+#endif
+`;
+export function patchPuff(mat, uni, puffP) {
+  mat.onBeforeCompile = (sh) => {
+    withUniforms(sh, uni, false);
+    sh.uniforms.uPuffP = puffP;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\n' + WIND + VARY_VERT + PUFF_VERT + 'attribute float aAO;\nattribute float aRnd;\n')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntreePuff(treeWind(transformed));\nvAO = aAO; vRnd = aRnd; vFade = 1.0;\n' + VARY_VERT_MAIN)
+      .replace('#include <project_vertex>', PUFF_PROJECT)
+      .replace('#include <worldpos_vertex>', PUFF_WORLDPOS);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + RAMP + 'uniform vec4 uPuffP;\nvarying vec2 vCorner;\nvarying vec3 vSphN;\nvarying float vNearFade;\n')
+      .replace('#include <map_fragment>', /* glsl */`
+  float pr2 = dot( vCorner, vCorner );
+  if ( pr2 > 1.0 ) discard;
+#ifdef USE_MAP
+  vec4 lt = texture2D( map, vMapUv );
+  float q = lt.g + ( vInst - 0.5 ) * uRamp.z + ( vRnd - 0.5 ) * uRamp.w;
+  vec3 lc = mix( leafRamp( q ) * vTint, uTwigCol, lt.b );
+  float ball = 0.66 + 0.26 * sqrt( max( 0.0, 1.0 - pr2 ) ); // rim of the ball a little darker (leaves seen edge-on, gaps); x0.92 overall to match the card crowns' value
+  diffuseColor.rgb *= lc * lt.r * vAO * ball;
+  diffuseColor.a *= lt.a * vNearFade;
+#endif
+`)
+      .replace('#include <color_fragment>', '')
+      .replace('#include <normal_fragment_begin>', NORMAL_NOFLIP + `
+  {
+    // ball normal: in-plane part from the (rotated) corner direction, out-of-plane part toward the viewer
+    vec3 sn = normalize( vSphN + vec3( 0.0, 0.0, sqrt( max( 0.0, 1.0 - dot( vCorner, vCorner ) ) ) + 0.2 ) );
+    normal = normalize( mix( normal, sn, uPuffP.y ) );
+  }
+`)
+      .replace('#include <lights_physical_pars_fragment>', TRANSLUCENT)
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= uLeafSpec * 0.5; material.specularColorBlended *= uLeafSpec * 0.5; material.specularF90 *= uLeafSpec * 0.5;') // balls: half the sheen of flat cards (no white tops)
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * (1.0 - uNight);');
+    sh.uniforms.uNight = U.uNight;
+    sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
+  };
+  mat.customProgramCacheKey = () => 'tree-puff-2';
+  return mat;
+}
+// shadow-pass materials for puffs: the billboard faces the shadow camera (i.e. the sun), so each puff casts a round,
+// leafy shadow the size of the ball
+export function makePuffDepthMaterials(uni, puffP) {
+  const patch = (m, key) => {
+    m.onBeforeCompile = (sh) => {
+      withUniforms(sh, uni, false);
+      sh.uniforms.uPuffP = puffP;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\n' + WIND + PUFF_VERT)
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntreePuff(treeWind(transformed));\n')
+        .replace('#include <project_vertex>', PUFF_PROJECT)
+        .replace('#include <worldpos_vertex>', PUFF_WORLDPOS);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vCorner;\nvarying vec3 vSphN;\nvarying float vNearFade;\n')
+        .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n#include <alphatest_fragment>');
+    };
+    m.customProgramCacheKey = () => key;
+    return m;
+  };
+  return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-1'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-1') };
+}
