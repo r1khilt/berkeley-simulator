@@ -58,8 +58,8 @@ export function bandOnGround(K, mat, a, b, w = 0.32, lift = 0.015) {
 export function basketweave() {
   return local('basketweave', () => {
     const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
-    g.fillStyle = '#b8a996'; g.fillRect(0, 0, 512, 512);
-    const cols = ['#a4625a', '#9a5a50', '#ad6b5f', '#8f5249', '#a7685a', '#b07262'];
+    g.fillStyle = '#c4b6a3'; g.fillRect(0, 0, 512, 512);
+    const cols = ['#b56e62', '#ab665b', '#bd7768', '#a35f55', '#b87363', '#c27d6b']; // sunlit salmon-red (photo)
     let k = 0; const m = 128, b = m / 3, j = 3;
     for (let i = 0; i < 4; i++) for (let jj = 0; jj < 4; jj++) for (let r = 0; r < 3; r++) {
       g.fillStyle = cols[(k++ * 7 + i * 3 + jj) % cols.length];

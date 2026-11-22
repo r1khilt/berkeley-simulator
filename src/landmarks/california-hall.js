@@ -30,7 +30,7 @@ export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-16.805);
   const K = new Kit(ctx, ANG); const M = ctx.M; const G = M.granite, GD = M.graniteDark, A = M.ashlar;
   const uW = -11.4, uE = 11.2, vN = -31.4, vS = 30.8, vMid = (vN + vS) / 2;
-  const SHRUB = new THREE.MeshStandardMaterial({ color: 0x34552a, roughness: 0.95 }), SHRUB2 = new THREE.MeshStandardMaterial({ color: 0x3f6a2f, roughness: 0.95 }), LANT = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.55, metalness: 0.3 }); // [r5-audit-central]
+  const SHRUB = new THREE.MeshStandardMaterial({ color: 0x2c4a24, roughness: 0.95 }), SHRUB2 = new THREE.MeshStandardMaterial({ color: 0x355a2b, roughness: 0.95 }), LANT = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.55, metalness: 0.3 }); // [r5-audit-central]
   const B = 2.6, F1 = 2.9, F2 = 7.7, ENT = 11.4, EAVE = 13.0;
   const colliders = [], walkables = [];
   const stories = [
@@ -163,9 +163,9 @@ export async function build(ctx) {
       walkables.push(K.walkFn(uW - w, v0, uW, v1, (u, v) => (u < uW - w || u > uW || v < v0 || v > v1) ? null : Math.max(K.g(u, v), -0.3 + (h0 + 0.3) * (u - (uW - w)) / w)));
       // [r5-audit-central] the photos show no lawn bank here: a continuous belt of clipped, cloud-pruned mounding shrubs
       // (juniper/yew, 1-1.8 m tall, 4-6 m deep) masks the whole base on both sides of the stair
-      let q = 0; for (let u = uW - w + 0.45; u < uW - 0.2; u += 0.85) for (let vv = v0 + 0.5; vv < v1 - 0.3; vv += 1.05) {
-        q++; const j = ((q * 7919) % 17) / 17; const ys = -0.3 + (h0 + 0.3) * (u - (uW - w)) / w; const r = 0.62 + j * 0.3;
-        K.add(j > 0.6 ? SHRUB2 : SHRUB, new THREE.SphereGeometry(r, 8, 6).scale(1.25, 0.95 + j * 0.35, 1.2).translate(u + (j - 0.5) * 0.3, ys + 0.45 + j * 0.25, vv + (j - 0.5) * 0.4));
+      let q = 0; for (let u = uW - w + 0.5; u < uW - 0.2; u += 0.8) for (let vv = v0 + 0.5; vv < v1 - 0.3; vv += 0.95) {
+        q++; const j = ((q * 7919) % 17) / 17; const ys = -0.3 + (h0 + 0.3) * (u - (uW - w)) / w; const r = 0.85 + j * 0.4;
+        K.add(j > 0.6 ? SHRUB2 : SHRUB, new THREE.SphereGeometry(r, 8, 6).scale(1.2, 0.8 + j * 0.3, 1.15).translate(u + (j - 0.5) * 0.35, ys + 0.5 + j * 0.3, vv + (j - 0.5) * 0.45));
       }
     };
     berm(vN + 0.5, c - sw / 2 - 0.5); berm(c + sw / 2 + 0.5, vS - 0.5);

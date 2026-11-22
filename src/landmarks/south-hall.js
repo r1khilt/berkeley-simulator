@@ -182,7 +182,7 @@ export async function build(ctx) {
       const cap = new THREE.BoxGeometry(0.3, 0.12, Math.hypot(L, H) + 0.1); cap.rotateX(sgn * Math.atan2(H, L)); cap.translate(uR, g + H / 2 + 0.84, (vFoot + vTop) / 2); K.add(TR, cap);
       colliders.push(K.colPoly([[uR - 0.15, Math.min(vFoot, vTop)], [uR + 0.15, Math.min(vFoot, vTop)], [uR + 0.15, Math.max(vFoot, vTop)], [uR - 0.15, Math.max(vFoot, vTop)]], -1.0, top + 1.0));
       // newel pedestal + urn at the foot, black lantern outboard
-      const vn = vFoot + sgn * 0.3; K.box(TR, uR - 0.32, g - 0.3, vn - 0.32, uR + 0.32, g + 1.15, vn + 0.32); K.box(TR, uR - 0.37, g + 1.15, vn - 0.37, uR + 0.37, g + 1.23, vn + 0.37); urn(K, TR, uR, g + 1.23, vn, 0.55);
+      const vn = vFoot + sgn * 0.3; K.box(TR, uR - 0.25, g - 0.3, vn - 0.25, uR + 0.25, g + 1.2, vn + 0.25); K.box(PNL, uR - 0.27, g + 0.25, vn - 0.27, uR + 0.27, g + 0.95, vn + 0.27, { detail: true }); K.box(TR, uR - 0.31, g + 1.2, vn - 0.31, uR + 0.31, g + 1.28, vn + 0.31); urn(K, TR, uR, g + 1.28, vn, 0.75);
       colliders.push(K.colCyl(uR, vn, 0.42, g - 0.3, g + 1.8));
       const lv = vn + sgn * 1.0, lu = uR + 0.2, gl = K.g(lu, lv); const LM = M.blackPaint || M.iron;
       K.cyl(LM, lu, gl, lv, 0.14, 0.11, 0.45, 8, { detail: true }); K.cyl(LM, lu, gl + 0.45, lv, 0.06, 0.05, 2.25, 8, { detail: true });
@@ -208,10 +208,12 @@ export async function build(ctx) {
       // arched doorway set back under the arch: timber doors + fanlight
       const DOOR = new THREE.MeshStandardMaterial({ color: 0x6b3226, roughness: 0.7 }), dw = 1.0;
       K.box(DOOR, pu0 + 0.02, top, cv - dw, pu0 + 0.1, top + 2.55, cv + dw);
-      K.box(M.windowNight, pu0 + 0.02, top + 2.55, cv - dw, pu0 + 0.09, top + 3.2, cv + dw);
+      K.box(M.windowNight, pu0 + 0.02, top + 2.55, cv - dw - 0.05, pu0 + 0.09, top + 4.42, cv + dw + 0.05); // tall fanlight filling the arch
+      for (const yy of [top + 2.55, top + 3.3]) K.box(TR, pu0 + 0.09, yy - 0.04, cv - dw, pu0 + 0.14, yy + 0.04, cv + dw, { detail: true });
+      for (const dv of [-0.5, 0, 0.5]) K.box(TR, pu0 + 0.09, top + 2.55, cv + dv - 0.03, pu0 + 0.14, top + 4.4, cv + dv + 0.03, { detail: true });
       K.box(TR, pu0 + 0.03, top, cv - 0.04, pu0 + 0.12, top + 2.55, cv + 0.04, { detail: true });
       K.box(TR, pu0, top - 0.02, cv - w2, pf - 0.9, yE, cv - dw - 0.05); K.box(TR, pu0, top - 0.02, cv + dw + 0.05, pf - 0.9, yE, cv + w2); // reveal walls
-      K.box(TR, pu0, top + 3.2, cv - dw, pf - 0.9, yE, cv + dw);
+      K.box(TR, pu0, top + 4.45, cv - dw, pf - 0.9, yE, cv + dw); // wall above the arch crown only (the arch now frames the doors + fanlight)
       colliders.push(K.colPoly([[pf - 0.9, cv - w2], [pf, cv - w2], [pf, cv - w2 + 0.9], [pf - 0.9, cv - w2 + 0.9]], top, yE), K.colPoly([[pf - 0.9, cv + w2 - 0.9], [pf, cv + w2 - 0.9], [pf, cv + w2], [pf - 0.9, cv + w2]], top, yE));
     }
     // west door: three steps up from the path

@@ -64,13 +64,13 @@ export async function build(ctx) {
     for (const [s0, s1] of e.gap ? [[0, e.gap[0]], [e.gap[1], L]] : [[0, L]]) if (s1 - s0 > 0.2) colliders.push(K.colPoly([R.at(s0, 0.05), R.at(s1, 0.05), R.at(s1, -0.5), R.at(s0, -0.5)], Y - 0.3, Y + 1.15));
     // juniper bank at the foot of the tall Glade-side walls: a 3.5 m wedge of low spreading juniper rising ~1.1 m
     if (e.glade && Y - e.gOut > 2.0 && L > 2.5) {
-      const A0 = R.at(0, 0.02), A1 = R.at(L, 0.02), B0 = R.at(0, 4.2), B1 = R.at(L, 4.2);
-      const gA0 = K.g(A0[0], A0[1]) + 0.75, gA1 = K.g(A1[0], A1[1]) + 0.75, gB0 = K.g(B0[0], B0[1]) - 0.05, gB1 = K.g(B1[0], B1[1]) - 0.05;
+      const A0 = R.at(0, 0.02), A1 = R.at(L, 0.02), B0 = R.at(0, 5.0), B1 = R.at(L, 5.0);
+      const gA0 = K.g(A0[0], A0[1]) + 1.15, gA1 = K.g(A1[0], A1[1]) + 1.15, gB0 = K.g(B0[0], B0[1]) - 0.05, gB1 = K.g(B1[0], B1[1]) - 0.05;
       const geo = new THREE.BufferGeometry(); const P = [A0[0], gA0, A0[1], B0[0], gB0, B0[1], B1[0], gB1, B1[1], A0[0], gA0, A0[1], B1[0], gB1, B1[1], A1[0], gA1, A1[1]];
       geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.computeVertexNormals();
       if (geo.attributes.normal.getY(0) < 0) { const q = geo.attributes.position.array; for (let t = 0; t < q.length; t += 9) for (let c = 0; c < 3; c++) { const tmp = q[t + 3 + c]; q[t + 3 + c] = q[t + 6 + c]; q[t + 6 + c] = tmp; } geo.computeVertexNormals(); }
       K.add(JUNIPER, geo);
-      let q = 0; for (let s = 0.8; s < L - 0.6; s += 1.3) for (const d of [0.8, 2.0, 3.3]) { q++; const jit = ((q * 7919) % 13) / 13; const dd = d + (jit - 0.5) * 0.9 + (d > 3 ? jit * 0.8 : 0); const p = R.at(s + jit * 0.9, dd); const gy = K.g(p[0], p[1]) + 0.75 * Math.max(0, 1 - dd / 4.2); const r = 0.7 + jit * 0.5; K.add(q % 3 ? JUNIPER : JUNIPER2, new THREE.SphereGeometry(r, 7, 5).scale(1.4, 0.38 + jit * 0.12, 1.15).translate(p[0], gy + 0.1, p[1]), { detail: true }); }
+      let q = 0; for (let s = 0.8; s < L - 0.6; s += 1.25) for (const d of [0.8, 2.0, 3.2, 4.3]) { q++; const jit = ((q * 7919) % 13) / 13; const dd = d + (jit - 0.5) * 0.9 + (d > 4 ? jit * 0.9 : 0); const p = R.at(s + jit * 0.9, dd); const gy = K.g(p[0], p[1]) + 1.15 * Math.max(0, 1 - dd / 5.0); const r = 0.8 + jit * 0.55; K.add(q % 3 ? JUNIPER : JUNIPER2, new THREE.SphereGeometry(r, 7, 5).scale(1.4, 0.38 + jit * 0.12, 1.15).translate(p[0], gy + 0.1, p[1]), { detail: true }); }
     }
   }
   // ---- paving: concrete bands on a ~6 m grid over the brick field (clipped to the terrace), walk strip along Doe
@@ -84,13 +84,13 @@ export async function build(ctx) {
   for (const [u0, u1] of [[-26.6, -14.5], [-11.6, 18.6]]) K.box(WALK, u0, Y - 0.04, 14.4, u1, Y + 0.005, 17.3); // (the footprint has a notch at u -14.2..-11.9)
   // planter band by the facade (LiDAR: shrubs ~1.5-2 m along v 12-14.5)
   K.box(STONE, -6, Y - 0.1, 12.0, 17.5, Y + 0.45, 14.2); K.box(SOIL, -5.8, Y + 0.45, 12.2, 17.3, Y + 0.46, 14.0);
-  for (let u = -5.2; u < 17; u += 1.15) K.add(solid(0x2b3a26, 0.9, 0), new THREE.SphereGeometry(0.62, 7, 5).scale(1, 1.25, 0.95).translate(u, Y + 1.05, 13.1), { detail: true });
+  for (let u = -5.2; u < 17; u += 1.15) K.add(solid(0x40573a, 0.9, 0), new THREE.SphereGeometry(0.62, 7, 5).scale(1, 1.25, 0.95).translate(u, Y + 1.05, 13.1), { detail: true });
   colliders.push(K.colPoly([[-6, 12.0], [17.5, 12.0], [17.5, 14.2], [-6, 14.2]], Y - 0.1, Y + 1.6));
   // cast-stone slab benches along the walk, cylindrical bins
   for (let u = -24; u < 17; u += 5.5) { if (u > -15.6 && u < -10.6) continue; K.box(STONE, u - 0.9, Y + 0.33, 14.85, u + 0.9, Y + 0.45, 15.35, { detail: true }); for (const k of [-0.6, 0.6]) K.box(STONE, u + k - 0.12, Y, 14.95, u + k + 0.12, Y + 0.33, 15.25, { detail: true }); }
   for (const [u, v] of [[-14.5, 15.0], [9.2, 15.0], [12.5, -18.6]]) K.cyl(STONE, u, Y, v, 0.3, 0.3, 0.9, 12, { detail: true });
   // ---- skylight pavilions: cast-stone curb + low hipped glass roof with aluminium hips and frames
-  for (const [u0, v0, u1, v1] of [[-8.5, -16.5, -1.5, -8.5], [-1.5, 6.5, 5.5, 13.5]]) {
+  for (const [u0, v0, u1, v1] of [[-8.5, -16.5, -1.5, -8.5], [-1.5, 4.8, 5.5, 11.8]]) {
     const yC = Y + 1.2, rise = Math.min(u1 - u0, v1 - v0) / 2 * 0.5;
     K.box(STONE, u0, Y - 0.1, v0, u1, yC, v1); K.box(STONE, u0 - 0.08, yC, v0 - 0.08, u1 + 0.08, yC + 0.1, v1 + 0.08);
     colliders.push(K.colPoly([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], Y - 0.1, yC + rise + 0.2));
