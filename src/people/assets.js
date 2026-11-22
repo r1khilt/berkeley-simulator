@@ -24,7 +24,7 @@ async function _load() {
   for (const k of ['f', 'm']) {
     bodies[k].clips = retargetClips(raw, bodies[k].legLen / UAL_LEG);
     // relaxed hand = a third of the way from the flat rest hand to UAL's fist: fingers together, gently curled
-    const relaxed = {}; bodies[k].scene.traverse((o) => { if (o.isBone && fist[o.name]) relaxed[o.name] = o.quaternion.clone().slerp(fist[o.name], /^thumb/.test(o.name) ? 0.1 : 0.16).toArray(); });
+    const relaxed = {}; bodies[k].scene.traverse((o) => { if (o.isBone && fist[o.name]) relaxed[o.name] = o.quaternion.clone().slerp(fist[o.name], /^thumb/.test(o.name) ? 0.3 : 0.5).toArray(); }); // r4-people2: more curl (claw hands read as mannequins)
     bodies[k].relaxed = relaxed;
   }
   return { bodies, hair: prepHair(hair, bodies) };
@@ -157,7 +157,10 @@ function prepHair(gltf, bodies) {
   const src = { Hair_Buns: 'f', Hair_BuzzedFemale: 'f', Hair_Long: 'f', Eyebrows_Female: 'f', Hair_Buzzed: 'm', Hair_SimpleParted: 'm', Hair_Beard: 'm', Eyebrows_Regular: 'm' };
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return; let n = o.name; let p = o; while (p && !src[n]) { p = p.parent; n = p && p.name; } if (!src[n]) return;
-    const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); const B = bodies[src[n]];
+    let g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); const B = bodies[src[n]];
+    if (n === 'Hair_Long' && g.index) { // r4-people2: drop the front strands hanging over the chest (they cut through real clothes)
+      const P = g.attributes.position, ix = g.index.array, keep = []; const y0 = B.J.neck_01.y + 0.01, z0 = B.J.neck_01.z + 0.035;
+      const bad = (i) => P.getY(i) < y0 && P.getZ(i) > z0; for (let f = 0; f < ix.length; f += 3) if (!(bad(ix[f]) || bad(ix[f + 1]) || bad(ix[f + 2]))) keep.push(ix[f], ix[f + 1], ix[f + 2]); g.setIndex(keep); }
     g.applyMatrix4(B.headInv); // bind-pose world -> Head bone space
     g.computeBoundingSphere();
     out[n] = { geometry: g, material: o.material, src: src[n], ref: o.material.map ? textureMean(o.material.map, 0.5, 0.5, 0.45) : null };

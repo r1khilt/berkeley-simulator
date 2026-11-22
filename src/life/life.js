@@ -235,7 +235,7 @@ export class CampusLife {
   }
   _stepWalker(w, dt) {
     const G = this.walkG; const E = G.edges[w.e];
-    const ds = (w.speed * w.speedMul * dt) / E.len; w.t += w.dir ? ds : -ds;
+    const ds = (w.speed * (w.sm ?? w.speedMul) * dt) / E.len; w.t += w.dir ? ds : -ds; // r4-people2: eased speed (w.sm)
     if (w.t > 1 || w.t < 0) {
       const node = w.dir ? E.b : E.a; const nb = G.adj[node];
       if (nb.length <= 1) return false; // dead end: walked into a building
@@ -246,7 +246,7 @@ export class CampusLife {
       if (!cand.length) return false;
       let x = this.rand() * tot, pick = cand[0][0]; for (const [ne, wg] of cand) { x -= wg; if (x <= 0) { pick = ne; break; } }
       if (this.plugin?.pickEdge) { try { const ix = this.plugin.pickEdge(w, node, cand.map((c) => c[0])); if (ix != null && ix >= 0 && ix < cand.length) pick = cand[ix][0]; } catch (e) { console.warn('pickEdge failed', e); } }
-      const N = G.edges[pick]; w.e = pick; w.dir = N.a === node; w.t = w.dir ? 0 : 1; w.off = this._offFor(w, N);
+      const N = G.edges[pick]; w.e = pick; w.dir = N.a === node; w.t = w.dir ? 0 : 1; w.offT = this._offFor(w, N); // r4-people2: eased toward offT below
     }
     return true;
   }
@@ -326,12 +326,19 @@ export class CampusLife {
         try { plugin.steer(w, nb, player, dt); } catch (e) { console.warn('steer failed', e); this.plugin = null; }
       } else if (w.sx || w.sz) { w.sx *= 0.9; w.sz *= 0.9; if (Math.abs(w.sx) + Math.abs(w.sz) < 0.01) w.sx = w.sz = 0; }
       if (w.buddy) { const L = w.buddy; if (!live.has(L)) { w.buddy = null; w.groupId = 0; } else { w.e = L.e; w.dir = L.dir; w.t = L.t; w.speed = L.speed; w.speedMul = L.speedMul; w.off = L.off + 0.62 * (this.walkG.edges[L.e].hw > 1.2 ? 1 : 0.9); } }
+      if (w.offT != null && !w.buddy) { const d = w.offT - w.off; w.off += Math.max(-0.6 * dt, Math.min(0.6 * dt, d)); if (Math.abs(d) < 0.01) w.offT = null; } // r4-people2
       const alive = w.buddy ? true : this._stepWalker(w, dt);
       const p = alive ? this._walkPos(w) : null;
       if (!alive || (p[0] - cx) ** 2 + (p[1] - cz) ** 2 > far2 * 1.15) { const n = this._spawnWalker(cx, cz, true); if (n) { this.walkers[i] = n; live.add(n); } else this.walkers.splice(i, 1); continue; }
+      // r4-people2: speed eases (people decelerate/accelerate instead of stopping dead), the body faces the way it is
+      // actually moving (sidesteps and corner cuts included, no crab-walking) and turns at a human rate
+      w.sm = w.sm ?? w.speedMul; w.sm += Math.max(-dt * 2.2, Math.min(dt * 1.4, w.speedMul - w.sm));
+      const ox = w.vx, oz = w.vz;
       w.vx += (p[0] + (w.sx || 0) - w.vx) * k; w.vz += (p[1] + (w.sz || 0) - w.vz) * k;
-      let dh = p[2] - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); w.hd += dh * Math.min(1, dt * 6);
-      const v = w.speed * w.speedMul; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
+      const kv = 1 - Math.exp(-dt * 5); w.mvx = (w.mvx || 0) + ((w.vx - ox) / Math.max(dt, 1e-4) - (w.mvx || 0)) * kv; w.mvz = (w.mvz || 0) + ((w.vz - oz) / Math.max(dt, 1e-4) - (w.mvz || 0)) * kv;
+      const msp = Math.hypot(w.mvx, w.mvz); let want = p[2]; if (msp > 0.2) { const mh = Math.atan2(-w.mvx, -w.mvz); let dm = mh - p[2]; dm = Math.atan2(Math.sin(dm), Math.cos(dm)); want = p[2] + dm * Math.min(1, (msp - 0.2) / 0.4); }
+      let dh = want - w.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); const mt = (w.jog ? 3.6 : 2.6) * dt; w.hd += Math.max(-mt, Math.min(mt, dh * Math.min(1, dt * 6)));
+      const v = w.speed * w.sm; w.phase = (w.phase + dt * TAU * v / (w.jog ? 2.2 : 1.26)) % TAU;
     }
     // ---- riders
     const wantR = Math.round(this.Q.ride * T.ride);
@@ -358,8 +365,8 @@ export class CampusLife {
     };
     for (const w of this.walkers) {
       if ((w.vx - cam.x) ** 2 + (w.vz - cam.z) ** 2 > far2) continue;
-      w.x = w.vx; w.z = w.vz; w.y = this._groundY(w.vx, w.vz); w.heading = w.hd + (w.gaze ? 0 : 0); w.speed_ = w.speed * w.speedMul;
-      const stopped = w.speedMul < 0.05;
+      w.x = w.vx; w.z = w.vz; w.y = this._groundY(w.vx, w.vz); w.heading = w.hd + (w.gaze ? 0 : 0); w.speed_ = w.speed * (w.sm ?? w.speedMul);
+      const stopped = (w.sm ?? w.speedMul) < 0.05; // r4-people2: eased
       if (stopped) { w.pose = POSE.STAND; w.vari = STAND_VARI[w.state] ?? 0; } else { w.pose = POSE.WALK; w.vari = w.state === 'phone' ? 1 : w._vari0 ?? (w._vari0 = w.vari); }
       w.aux = w.jog; agents.push(w); draw(w);
     }
