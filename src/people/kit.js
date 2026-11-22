@@ -130,7 +130,7 @@ export function kitFor(B) {
   {
     const g = B.body.geometry, P = g.attributes.position, CL = g.attributes.aCloth; const tb = new THREE.Box3(); const v = new THREE.Vector3();
     for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (CL.getX(i) === REG.TRUNK && v.y > J.spine_02.y && v.y < J.spine_03.y + 0.1) tb.expandByPoint(v); }
-    const back = tb.min.z - 0.045, frontZ = tb.max.z + 0.02, shY = J.spine_03.y + 0.13, w = tb.max.x - tb.min.x;
+    const back = tb.min.z - 0.014, frontZ = tb.max.z + 0.02, shY = J.spine_03.y + 0.13, w = tb.max.x - tb.min.x;
     const body = new RoundedBoxGeometry(0.31, 0.42, 0.15, 3, 0.05); body.translate(0, J.spine_02.y + 0.06, back - 0.075); K.add(body, KP.backpack, KS.bag, 'spine_03');
     const pocket = new RoundedBoxGeometry(0.23, 0.17, 0.055, 2, 0.02); pocket.translate(0, J.spine_02.y - 0.04, back - 0.16); K.add(pocket, KP.backpack, KS.bag, 'spine_03');
     const zip = new THREE.TorusGeometry(0.15, 0.004, 3, 20, Math.PI); zip.scale(1, 1.25, 1); zip.translate(0, J.spine_02.y + 0.08, back - 0.152); K.add(zip, KP.backpack, KS.strap, 'spine_03');
@@ -205,13 +205,13 @@ export function kitMaterial() {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0, name: 'people:kit', side: THREE.DoubleSide });
   const cols = Array.from({ length: 14 }, () => new THREE.Color(0.5, 0.5, 0.5)); const rough = new Float32Array(14).fill(0.75);
   rough[KS.lens] = 0.08; rough[KS.frame] = 0.35; rough[KS.phones] = 0.4; rough[KS.sole] = 0.85; rough[KS.hair] = 0.68; rough[KS.upper] = 0.62;
-  const u = { uMask: { value: 0 }, uCols: { value: cols }, uRough: { value: rough } }; m.userData.u = u;
+  const u = { uMask: { value: 0 }, uCols: { value: cols }, uRough: { value: rough }, uPackOff: { value: 0 } }; m.userData.u = u;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-attribute vec2 aKit; uniform int uMask; flat varying int vSlot; varying vec3 vKitP;`)
+attribute vec2 aKit; uniform int uMask; uniform float uPackOff; flat varying int vSlot; varying vec3 vKitP;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
- { int pid = int(aKit.x + 0.5); if (((uMask >> pid) & 1) == 0) transformed = vec3(0.0); vSlot = int(aKit.y + 0.5); vKitP = position; }`);
+ { int pid = int(aKit.x + 0.5); if (pid == 4) transformed.z -= uPackOff; if (((uMask >> pid) & 1) == 0) transformed = vec3(0.0); vSlot = int(aKit.y + 0.5); vKitP = position; }`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 uniform vec3 uCols[14]; uniform float uRough[14]; flat varying int vSlot; varying vec3 vKitP;
 float kH(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }`)

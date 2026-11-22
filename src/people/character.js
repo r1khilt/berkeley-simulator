@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { REG } from './assets.js';
-import { buildOutfit, outfitMaterial, TOP, BOT } from './garments.js'; // r4-people2: modelled clothes
+import { garmentPart, bodyFor, outfitMaterial, TOP, BOT, SLEEVE, LEG } from './garments.js'; // r4-people2: modelled clothes
 import { kitFor, kitMaterial, kitGeometry, headFrame, KP, KS } from './kit.js';
 const faceFrame = (B) => { const H = headFrame(B); return { eyeY: H.eyeY, front: H.front, eyeX: Math.abs(H.eyes.l.x - H.eyes.r.x) / 2 }; }; // r4-people2: shoes, bags, hats, glasses, hair in one skinned mesh
 
@@ -56,6 +56,10 @@ float pHash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.
    skinC *= 1.0 - (0.35 + 0.35 * uFace.w) * lash;
    float lip = smoothstep(0.011, 0.0, length(vec2(vBind.x * 0.42, (fy + 0.066) * 1.3))) * step(uFace.y - 0.005, vBind.z);
    skinC = mix(skinC, skinC * vec3(1.05, 0.62, 0.62), lip * (0.45 + 0.35 * uFace.w));
+   float sock = smoothstep(0.026, 0.006, length(vec2((ax - uEyeX) * 0.8, (fy + 0.002) * 1.4))) * (1.0 - lash);
+   float nose = smoothstep(0.012, 0.0, length(vec2(vBind.x * 0.8, fy + 0.047))) * 0.6;
+   float chin = smoothstep(-0.105, -0.13, fy);
+   skinC *= 1.0 - 0.22 * sock - 0.18 * nose - 0.25 * chin;
    float cheek = smoothstep(0.024, 0.0, length(vec2(ax - 0.042, fy + 0.03)));
    skinC = mix(skinC, skinC * vec3(1.08, 0.86, 0.84), cheek * (0.25 + 0.3 * uFace.w));
    float jaw = smoothstep(-0.045, -0.06, fy) * smoothstep(-0.13, -0.095, fy) * smoothstep(0.065, 0.03, ax) * (1.0 - lip) + smoothstep(0.006, 0.0, abs(fy + 0.052)) * smoothstep(0.022, 0.008, ax);
@@ -161,7 +165,9 @@ export class Character {
     // both bound to this character's skeleton: 2 draw calls instead of ~14 prop meshes
     const bindTo = (m) => { m.frustumCulled = false; m.castShadow = castShadow; m.receiveShadow = true; this.body.parent.add(m); m.position.copy(this.body.position); m.quaternion.copy(this.body.quaternion); m.scale.copy(this.body.scale); m.bind(this.body.skeleton, this.body.bindMatrix); return m; };
     this.outMat = outfitMaterial(B); this.ou = this.outMat.userData.u;
-    this.outfit = bindTo(new THREE.SkinnedMesh(buildOutfit(B, { top: TOP.tee, sleeve: 0.42, bot: BOT.jeans, leg: 0.985 }).geometry, this.outMat)); this.outfit.name = 'people:outfit';
+    this.top = bindTo(new THREE.SkinnedMesh(garmentPart(B, 'top', TOP.tee, SLEEVE.tee[0]), this.outMat)); this.top.name = 'people:top';
+    this.bot = bindTo(new THREE.SkinnedMesh(garmentPart(B, 'bot', BOT.jeans, LEG.jeans), this.outMat)); this.bot.name = 'people:bottom';
+    this.strap = bindTo(new THREE.SkinnedMesh(garmentPart(B, 'strap', TOP.tee, SLEEVE.tee[0]), this.outMat)); this.strap.name = 'people:straps';
     this.kitMat = kitMaterial(); this.ku = this.kitMat.userData.u;
     this.kitBase = kitFor(B); this.kit = bindTo(new THREE.SkinnedMesh(this.kitBase, this.kitMat)); this.kit.name = 'people:kit';
     this.baseBodyGeo = this.body.geometry;
@@ -190,14 +196,17 @@ export class Character {
     const top = L.top || [0.1, 0.15, 0.3], bot = L.bot || [0.1, 0.1, 0.12];
     // ---- garments
     let tk, sleeve; const r1 = fr(1.7);
-    if (f & FL.SLEEVE) { tk = r1 < 0.27 ? TOP.hoodie : r1 < 0.41 ? TOP.crew : r1 < 0.55 ? TOP.jacket : r1 < 0.67 ? TOP.puffer : r1 < 0.8 ? TOP.flannel : TOP.long; sleeve = tk === TOP.jacket || tk === TOP.puffer ? 0.955 : 0.94; }
-    else { tk = TOP.tee; sleeve = 0.4 + fr(2.3) * 0.06; }
+    if (f & FL.SLEEVE) { tk = r1 < 0.29 ? TOP.hoodie : r1 < 0.45 ? TOP.crew : r1 < 0.6 ? TOP.jacket : r1 < 0.72 ? TOP.puffer : r1 < 0.81 ? TOP.flannel : TOP.long; sleeve = tk === TOP.jacket || tk === TOP.puffer ? SLEEVE.outer : SLEEVE.long; }
+    else { tk = TOP.tee; sleeve = SLEEVE.tee[fr(2.3) < 0.5 ? 0 : 1]; }
     const blue = bot[2] > bot[0] * 1.35 && bot[2] > bot[1] * 1.1, warm = bot[0] > bot[2] * 1.15; const r2 = fr(3.1);
     let bk, leg;
-    if (f & FL.PANTS) { bk = blue ? (r2 < 0.88 ? BOT.jeans : BOT.chinos) : warm ? BOT.chinos : (r2 < 0.36 ? BOT.jeans : r2 < 0.68 ? BOT.joggers : fem ? BOT.leggings : BOT.chinos); leg = bk === BOT.jeans ? 0.985 : bk === BOT.joggers ? 0.965 : 0.975; }
-    else if (f & FL.SKIRT) { bk = BOT.skirt; leg = 0.2 + fr(4.3) * 0.22; }
-    else { bk = BOT.shorts; leg = 0.34 + fr(5.1) * 0.1; }
-    const out = buildOutfit(this.B, { top: tk, sleeve, bot: bk, leg, straps: !!(f & FL.BACKPACK), sash: !(f & FL.BACKPACK) && !!(f & FL.BAG) }); this.outfit.geometry = out.geometry; this.body.geometry = out.body; this.outfitInfo = { tk, bk, tris: out.tris + out.bodyTris };
+    if (f & FL.PANTS) { bk = blue ? (r2 < 0.88 ? BOT.jeans : BOT.chinos) : warm ? BOT.chinos : (r2 < 0.36 ? BOT.jeans : r2 < 0.68 ? BOT.joggers : fem ? BOT.leggings : BOT.chinos); leg = bk === BOT.jeans ? LEG.jeans : bk === BOT.joggers ? LEG.joggers : LEG.chinos; }
+    else if (f & FL.SKIRT) { bk = BOT.skirt; leg = LEG.skirt[Math.floor(fr(4.3) * 3)]; }
+    else { bk = BOT.shorts; leg = LEG.shorts[fr(5.1) < 0.5 ? 0 : 1]; }
+    const gT = garmentPart(this.B, 'top', tk, sleeve), gB = bk === BOT.leggings ? null : garmentPart(this.B, 'bot', bk, leg);
+    const st0 = f & FL.BACKPACK ? 'strap' : f & FL.BAG ? 'sash' : null; const gS = st0 ? garmentPart(this.B, st0, tk, sleeve) : null;
+    this.top.geometry = gT; this.bot.visible = !!gB; if (gB) this.bot.geometry = gB; this.strap.visible = !!gS; if (gS) this.strap.geometry = gS;
+    this.body.geometry = bodyFor(this.B, gT, gB); this.outfitInfo = { tk, bk };
     const ou = this.ou; ou.uTopA.value.setRGB(...top); ou.uBotA.value.setRGB(...bot);
     const inner = [[0.85, 0.85, 0.82], [0.03, 0.03, 0.035], [0.35, 0.36, 0.38], [0.6, 0.52, 0.4]][Math.floor(fr(6.7) * 4)];
     if (tk === TOP.flannel) { const k = fr(7.9); ou.uTopB.value.setRGB(...(k < 0.5 ? [0.02, 0.02, 0.025] : k < 0.75 ? [top[0] * 0.35, top[1] * 0.35, top[2] * 0.35] : [0.5, 0.48, 0.42])); }
@@ -221,8 +230,9 @@ export class Character {
     else { set(KS.upper, shoe === KP.skate && fr(13.9) < 0.6 ? [0.02, 0.02, 0.025] : sh); set(KS.sole, shoe === KP.runner && fr(14.3) < 0.3 ? [0.04, 0.04, 0.04] : [0.88, 0.87, 0.84]);
       set(KS.accent, shoe === KP.skate ? [0.9, 0.9, 0.88] : [[0.9, 0.9, 0.9], [0.04, 0.04, 0.05], [0.55, 0.06, 0.05], [0.05, 0.12, 0.35], [0.85, 0.45, 0.05]][Math.floor(fr(15.1) * 5)]); set(KS.dark, [0.02, 0.02, 0.02]); }
     const bagC = [[0.03, 0.035, 0.045], [0.02, 0.06, 0.16], [0.25, 0.04, 0.03], [0.12, 0.13, 0.1], [0.4, 0.33, 0.22], [0.05, 0.16, 0.12], [0.5, 0.5, 0.52]][Math.floor(fr(16.3) * 7)];
-    set(KS.bag, bagC); set(KS.strap, [bagC[0] * 0.6, bagC[1] * 0.6, bagC[2] * 0.6]); ou.uStrap.value.setRGB(bagC[0] * 0.7, bagC[1] * 0.7, bagC[2] * 0.7);
+    set(KS.bag, bagC); set(KS.strap, [bagC[0] * 0.6, bagC[1] * 0.6, bagC[2] * 0.6]); ou.uStrap.value.setRGB(bagC[0] * 0.6 + 0.07, bagC[1] * 0.6 + 0.07, bagC[2] * 0.6 + 0.075); // webbing: mid-tone so it never reads as a hole
     if (f & FL.BACKPACK) on(KP.backpack); else if (f & FL.BAG) on(KP.bag);
+    this.ku.uPackOff.value = { [TOP.tee]: 0.004, [TOP.long]: 0.004, [TOP.crew]: 0.012, [TOP.flannel]: 0.012, [TOP.hoodie]: 0.02, [TOP.jacket]: 0.024, [TOP.puffer]: 0.045 }[tk] || 0.01; // pack rests on the top
     if (tk === TOP.hoodie) { on(KP.hood); on(KP.strings); set(KS.hood, top); set(KS.string, fr(17.1) < 0.6 ? [0.85, 0.85, 0.82] : top); }
     const hc = S.HAIR[L.hairC | 0] || S.HAIR[1]; set(KS.hair, hc);
     const st = L.hair | 0; let ubc = null; const r4 = fr(18.7), dark = (L.skin | 0) >= 3;

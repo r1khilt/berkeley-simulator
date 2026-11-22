@@ -6,9 +6,15 @@
 //   - steer(): pedestrians sidestep the player and each other (keep-right, passing), stop to check their phone, glance at
 //     walking buddies, flinch and stop when bumped, and look back when stared at;
 //   - pickEdge(): walkers have a real destination (a building door or a busy spot) and route toward it at each node.
+// r4-people2: the skinned people wear modelled clothes (garments.js: skinned cloth shells, straps) and one accessory mesh
+// (kit.js: shoes, bags, hats, glasses, headphones, hair), riders get skinned people posed on campus life's bikes and
+// scooters (IK), each near person casts a soft contact shadow, and steering adds yielding to crossing traffic, a hard
+// push-out from the player, and 'stop and face the player' when stared at or bumped. Walkers in campus life steer
+// forward-only (life.js, ?walkfix=0 for the old lane following). BSIM.people.stats: active, ms (CPU), tris, draws.
 import * as THREE from 'three';
 import { loadPeopleAssets } from './assets.js';
 import { Character } from './character.js';
+import { prebuildParts } from './garments.js'; // r4-people2
 import { SKIN, HAIR, SHOE } from '../life/people.js';
 
 const TAU = Math.PI * 2;
@@ -29,6 +35,12 @@ class People {
     this.group = new THREE.Group(); this.group.name = 'people'; ctx.scene.add(this.group);
     this.fr = new THREE.Frustum(); this.pm = new THREE.Matrix4(); this.sph = new THREE.Sphere(new THREE.Vector3(), 1.2);
     this.rand = mulberry(777); this.stats = {};
+    // r4-people2: soft contact shadow under every near person (one instanced draw): grounds them on any lighting
+    { const c = typeof document !== 'undefined' ? document.createElement('canvas') : null; let tex = null;
+      if (c) { c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); tex = new THREE.CanvasTexture(c); }
+      const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+      const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xffffff, name: 'people:blob' });
+      this.blobs = new THREE.InstancedMesh(g, m, Math.max(1, this.K)); this.blobs.count = 0; this.blobs.frustumCulled = false; this.blobs.renderOrder = 1; this.blobs.name = 'people:blobs'; this.group.add(this.blobs); this._bm = new THREE.Matrix4(); this._bq = new THREE.Quaternion(); this._bs = new THREE.Vector3(); this._bp = new THREE.Vector3(); }
     if (this.K > 0 && qs.get('people') !== '0') loadPeopleAssets().then((A) => this._build(A)).catch((e) => console.warn('people assets failed', e));
   }
   _build(A) {
@@ -36,6 +48,7 @@ class People {
     const shadow = this.ctx.quality !== 'low';
     for (let i = 0; i < this.K; i++) { const c = new Character(A, i % 2 ? 'm' : 'f', shadow); this.pool.push(c); this.group.add(c.root); }
     for (const sex of ['f', 'm']) calibrate(this.pool.find((c) => c.sex === sex));
+    for (const sex of ['f', 'm']) prebuildParts(A.bodies[sex]); // garments for the common outfits, in idle slices
     const setup = this.ctx.setupMaterials; if (setup) for (const c of this.pool) setup(c.root);
     // compile the character programs up front so the first person to walk up doesn't hitch the frame
     try { const r = window.BSIM && window.BSIM.composer && window.BSIM.composer.renderer; const c0 = this.pool[0];
@@ -73,6 +86,11 @@ class People {
       if (c.w0) { for (const k in c.w) c.w[k] = 0; c.w0 = false; c.update(0.001, a, camera); for (const k in c.w) c.w[k] = c.wt[k]; }
       c.update(dt, a, camera);
     }
+    if (this.blobs) { let bi = 0; const up = new THREE.Vector3(0, 1, 0);
+      for (const c of this.pool) { const a = c.agent; if (!a || bi >= this.blobs.instanceMatrix.count) continue; const m = c.mode; if (m === 'lie') continue;
+        const sc = m === 'cycle' ? [0.55, 1.5] : m === 'scoot' ? [0.45, 1.1] : m === 'sit' || m === 'ground' ? [0.9, 0.9] : m === 'walk' || m === 'jog' ? [0.62, 0.95] : [0.62, 0.62];
+        this._bq.setFromAxisAngle(up, a.heading); this._bp.set(a.x, a.y + 0.012, a.z); this._bs.set(sc[0], 1, sc[1]); this._bm.compose(this._bp, this._bq, this._bs); this.blobs.setMatrixAt(bi++, this._bm); }
+      this.blobs.count = bi; this.blobs.instanceMatrix.needsUpdate = true; }
     const ms = performance.now() - tStart; this._ms = this._ms == null ? ms : this._ms + (ms - this._ms) * 0.05;
     let tris = 0, draws = 0; if ((this._sf = (this._sf || 0) + 1) % 30 === 1) { for (const c of this.pool) if (c.agent) c.root.traverse((o) => { if (o.isMesh && o.visible && o.parent.visible) { const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; draws++; } }); this._tris = tris; this._draws = draws; }
     this.stats = { active: n, pool: this.pool.length, cand: cand.length, ms: +this._ms.toFixed(2), tris: this._tris, draws: this._draws };

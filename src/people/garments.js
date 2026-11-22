@@ -154,7 +154,7 @@ function bottomShell(B, kind, leg) {
       if (t > leg) return -1;
       if (kind === BOT.jeans) return 0.011 + 0.017 * sstep(0.42, 0.95, t) + (t > 0.86 ? 0.004 * Math.max(0, Math.sin((t - 0.86) * 95)) : 0);
       if (kind === BOT.chinos) return 0.01 + 0.011 * sstep(0.42, 0.9, t);
-      if (kind === BOT.joggers) { const g = t > 0.82 && t < 0.935 ? 0.006 * Math.max(0, Math.sin((t - 0.82) * 120)) : 0; return t > 0.935 ? 0.007 : 0.017 + 0.006 * sstep(0.4, 0.8, t) + g; }
+      if (kind === BOT.joggers) { const g = t > 0.82 && t < 0.935 ? 0.0035 * Math.pow(Math.sin((t - 0.82) * 82), 2) : 0; return t > 0.935 ? 0.008 : 0.017 + 0.006 * sstep(0.4, 0.8, t) + g; }
       if (kind === BOT.shorts) return 0.016 + 0.02 * sstep(leg - 0.2, leg, t);
       return 0.01;
     }
@@ -169,19 +169,19 @@ function strapShell(B, kind, sleeve) {
   const f = (i, p, n, reg, t) => {
     if (reg !== REG.TRUNK) return -1;
     const s = p.x > 0 ? 1 : -1; const front = p.z > zMid;
-    const cx = front ? xs : xs + Math.max(0, packTop - p.y) * 0.3; if (Math.abs(Math.abs(p.x) - cx) > 0.021) return -1;
-    if (front ? p.y < J.spine_02.y - 0.02 : p.y < packTop) return -1;
+    const lo = J.spine_02.y + 0.04; const cx = front ? xs + Math.max(0, lo - p.y) * 1.3 : xs + Math.max(0, packTop - p.y) * 0.3; if (Math.abs(Math.abs(p.x) - cx) > 0.021) return -1;
+    if (front ? p.y < J.spine_02.y - 0.07 || cx > 0.2 : p.y < packTop) return -1;
     const o = Math.max(0, fit(i, p, n, REG.TRUNK, 0)); return o + 0.011;
   };
   const snap = (c, reg, t, b) => { const s = b.x > 0 ? 1 : -1; const front = b.z > zMid; const cx = front ? xs : xs + Math.max(0, packTop - b.y) * 0.3; const e = Math.abs(b.x) - cx;
-    if (Math.abs(b.z - zMid) < 0.06 && b.y > J.spine_03.y + 0.05) return; if (front && b.y < J.spine_02.y + 0.005) c.y = J.spine_02.y - 0.02; else if (!front && b.y < packTop + 0.02) c.y = packTop; else if (Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
-  const r = shell(B, 3, f, snap, { minK: 0.85, relax: 3 }); r.hide = new Set(); return r;
+    if (Math.abs(b.z - zMid) < 0.06 && b.y > J.spine_03.y + 0.05) return; if (!front && b.y < packTop + 0.02) c.y = packTop; else if (!front && Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
+  const r = shell(B, 3, f, snap, { minK: 0.85, relax: 3, edgeRelax: 2 }); r.hide = new Set(); return r;
 }
 // messenger-bag strap: a diagonal band from the left hip over the right shoulder, front and back
 function sashShell(B, kind, sleeve) {
   const J = B.J; const { fit } = topFit(B, kind, sleeve); const A = [0.17, J.pelvis.y + 0.06], C = [-0.115, J.spine_03.y + 0.16]; const dx = C[0] - A[0], dy = C[1] - A[1], L = Math.hypot(dx, dy);
   const f = (i, p, n, reg, t) => { if (reg !== REG.TRUNK) return -1; const u = ((p.x - A[0]) * dx + (p.y - A[1]) * dy) / (L * L); if (u < 0 || u > 1.15) return -1;
-    const dist = Math.abs((p.x - A[0]) * dy - (p.y - A[1]) * dx) / L; if (dist > 0.019) return -1; return Math.max(0, fit(i, p, n, REG.TRUNK, 0)) + 0.01; };
+    const dist = Math.abs((p.x - A[0]) * dy - (p.y - A[1]) * dx) / L; if (dist > 0.023) return -1; return Math.max(0, fit(i, p, n, REG.TRUNK, 0)) + 0.01; };
   const r = shell(B, 3, f, null, { minK: 0.85, relax: 3, edgeRelax: 6 }); r.hide = new Set(); return r;
 }
 // lathed skirt hanging from the hips; soft weights to the thighs so it follows the stride
@@ -213,26 +213,44 @@ function skirtShell(B, len) {
   return { pos, nor, sIdx, sWt, gat, idx, hide: new Set() };
 }
 
-// ---------------------------------------------------------------- outfits (cached per body + key)
-const _outfits = new Map();
-export function outfitKey(o) { return `${o.top}:${o.sleeve.toFixed(2)}:${o.bot}:${o.leg.toFixed(2)}:${o.straps ? 1 : 0}${o.sash ? 1 : 0}`; }
-export function buildOutfit(B, o) {
-  const key = B.sex + '|' + outfitKey(o); let R = _outfits.get(key); if (R) return R;
-  const parts = [topShell(B, o.top, o.sleeve)];
-  if (o.bot === BOT.skirt) parts.push(skirtShell(B, o.leg)); else if (o.bot !== BOT.leggings) parts.push(bottomShell(B, o.bot, o.leg));
-  if (o.straps) parts.push(strapShell(B, o.top, o.sleeve)); else if (o.sash) parts.push(sashShell(B, o.top, o.sleeve));
-  const pos = [], nor = [], sIdx = [], sWt = [], gat = [], idx = []; const hide = new Set();
-  for (const p of parts) { const b = pos.length / 3; pos.push(...p.pos); nor.push(...p.nor); sIdx.push(...p.sIdx); sWt.push(...p.sWt); gat.push(...p.gat); for (const i of p.idx) idx.push(i + b); for (const h of p.hide) hide.add(h); }
+// ---------------------------------------------------------------- parts (cached per body + key, no combinatorial outfits)
+// A character wears up to three garment meshes (top, bottom, straps) sharing one material, plus a body index that drops the
+// triangles hidden under that top + bottom. Each part is built once per body on first use (~20-60 ms) or ahead of time by
+// prebuildParts() in idle slices after load; tee sleeves, shorts and skirt lengths are quantised so the cache stays small.
+const _parts = new Map(), _bodyIdx = new Map();
+function toGeometry(p) {
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(sIdx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sWt, 4)); g.setAttribute('aGarm', new THREE.Float32BufferAttribute(gat, 4));
-  g.setIndex(idx); g.computeBoundingSphere();
-  // the body under the clothes: same attributes, fewer triangles
-  const bg = B.body.geometry; const bix = bg.index.array; const keep = []; const BP = bg.attributes.position, BC = bg.attributes.aCloth; const fy = B.shoeY - 0.012; // feet are inside the kit's shoes
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(p.nor, 3));
+  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(p.sIdx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(p.sWt, 4)); g.setAttribute('aGarm', new THREE.Float32BufferAttribute(p.gat, 4));
+  g.setIndex(p.idx); g.computeBoundingSphere(); g.userData.hide = p.hide; return g;
+}
+export function partKey(type, kind, len) { return `${type}:${kind}:${len.toFixed(2)}`; }
+export function garmentPart(B, type, kind, len) {
+  const key = B.sex + '|' + partKey(type, kind, len); let g = _parts.get(key); if (g) return g;
+  const p = type === 'top' ? topShell(B, kind, len) : type === 'strap' ? strapShell(B, kind, len) : type === 'sash' ? sashShell(B, kind, len) : kind === BOT.skirt ? skirtShell(B, len) : bottomShell(B, kind, len);
+  g = toGeometry(p); _parts.set(key, g); return g;
+}
+export function hasPart(B, type, kind, len) { return _parts.has(B.sex + '|' + partKey(type, kind, len)); }
+// body geometry for a top + bottom: same attributes, minus hidden triangles and the feet (inside the kit's shoes)
+export function bodyFor(B, top, bot) {
+  const key = B.sex + '|' + (top ? top.uuid : '-') + '|' + (bot ? bot.uuid : '-'); let body = _bodyIdx.get(key); if (body) return body;
+  const hide = new Set(); for (const g of [top, bot]) if (g && g.userData.hide) for (const h of g.userData.hide) hide.add(h);
+  const bg = B.body.geometry; const bix = bg.index.array; const keep = []; const BP = bg.attributes.position, BC = bg.attributes.aCloth; const fy = B.shoeY - 0.012;
   const foot = (i) => BC.getX(i) === REG.LEG && BP.getY(i) < fy;
   for (let f = 0; f < bix.length; f += 3) if (!hide.has(f) && !(foot(bix[f]) && foot(bix[f + 1]) && foot(bix[f + 2]))) keep.push(bix[f], bix[f + 1], bix[f + 2]);
-  const body = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(bg.attributes)) body.setAttribute(k, a); body.setIndex(keep); body.boundingSphere = bg.boundingSphere; body.boundingBox = bg.boundingBox;
-  R = { geometry: g, body, tris: idx.length / 3, bodyTris: keep.length / 3 }; _outfits.set(key, R); return R;
+  body = new THREE.BufferGeometry(); for (const [k, a] of Object.entries(bg.attributes)) body.setAttribute(k, a); body.setIndex(keep); body.boundingSphere = bg.boundingSphere; body.boundingBox = bg.boundingBox;
+  _bodyIdx.set(key, body); return body;
+}
+// quantised garment choices
+export const SLEEVE = { tee: [0.4, 0.46], long: 0.94, outer: 0.955 }, LEG = { jeans: 0.985, chinos: 0.975, joggers: 0.965, shorts: [0.36, 0.43], skirt: [0.22, 0.3, 0.42] };
+// build the common parts ahead of time, one per idle slice, so the first people to walk up don't hitch the frame
+export function prebuildParts(B, budgetMs = 12) {
+  const todo = [];
+  for (const k of [TOP.hoodie, TOP.crew, TOP.jacket, TOP.puffer, TOP.flannel, TOP.long]) { const sl = k === TOP.jacket || k === TOP.puffer ? SLEEVE.outer : SLEEVE.long; todo.push(['top', k, sl], ['strap', k, sl], ['sash', k, sl]); }
+  for (const sl of SLEEVE.tee) todo.push(['top', TOP.tee, sl], ['strap', TOP.tee, sl], ['sash', TOP.tee, sl]);
+  todo.push(['bot', BOT.jeans, LEG.jeans], ['bot', BOT.chinos, LEG.chinos], ['bot', BOT.joggers, LEG.joggers]); for (const l of LEG.shorts) todo.push(['bot', BOT.shorts, l]); if (B.sex === 'f') for (const l of LEG.skirt) todo.push(['bot', BOT.skirt, l]);
+  const step = () => { const t0 = performance.now(); while (todo.length && performance.now() - t0 < budgetMs) { const [t, k, l] = todo.shift(); if (!hasPart(B, t, k, l)) garmentPart(B, t, k, l); } if (todo.length) setTimeout(step, 60); };
+  setTimeout(step, 400);
 }
 
 // ---------------------------------------------------------------- clothing material
