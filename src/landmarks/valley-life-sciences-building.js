@@ -57,7 +57,7 @@ export async function build(ctx) {
   const antefix = (R, s, y, d) => { const g = new THREE.ExtrudeGeometry(palm, { depth: 0.16, bevelEnabled: false, curveSegments: 2 }); g.scale(1.35, 1.35, 1); g.translate(s, y, d - 0.08); K.addRun(R, ST, g); };
 
   // [r5a] basement-window bottom just above the local grade (max of three samples 1 m out), or null if under 0.4 m would show
-  const lowY = (R, sc, hw) => { let gl = -1e9; for (const ds of [-hw, 0, hw]) gl = Math.max(gl, K.g(...R.at(sc + ds, 1.0))); const y0 = Math.max(0.0, gl + 0.3); return 2.4 - y0 >= 0.75 ? y0 : null; };
+  const lowY = (R, sc, hw) => { let gl = -1e9; for (const ds of [-hw, 0, hw]) gl = Math.max(gl, K.g(...R.at(sc + ds, 1.0))); const y0 = Math.max(0.0, gl + 0.45); return 2.4 - y0 >= 0.7 ? y0 : null; };
   const bwY = (R, sc, hw, y0n, y1n) => { let gl = -1e9; for (const ds of [-hw, 0, hw]) gl = Math.max(gl, K.g(...R.at(sc + ds, 1.0))); const y0 = Math.max(y0n, gl + 0.18); return y1n - y0 >= 0.4 ? y0 : null; };
   // ---------- the giant-order zone: pilasters + window strips (+ entrance bays) ----------
   // o: {top (cornice top), ct (capital top), floors:[spandrel y's], attic:bool, crest:bool, entrance:[bay idx], lattice, text}
@@ -251,7 +251,7 @@ export async function build(ctx) {
     const va = sgn < 0 ? land0 - len : land0, vb = sgn < 0 ? land0 : land0 + len; const vFoot = sgn < 0 ? va : vb;
     walkables.push(stairV(uA, uB, vFoot, sgn < 0 ? vb : va, g0, FLs, n));
     // the two bottom treads run 1.0 m wider each side
-    for (let i = 0; i < 2; i++) { const p0 = vFoot - sgn * T * i, p1 = vFoot - sgn * T * (i + 1); const y = g0 + rise * (i + 1);
+    if (sgn < 0) for (let i = 0; i < 2; i++) { const p0 = vFoot - sgn * T * i, p1 = vFoot - sgn * T * (i + 1); const y = g0 + rise * (i + 1); // (north only: photo evidence)
       for (const [x0, x1] of [[uA - 1.0, uA], [uB, uB + 1.0]]) { K.box(STEP, x0, g0 - 1, Math.min(p0, p1), x1, y, Math.max(p0, p1)); walkables.push(K.walkPoly(rect(x0, Math.min(p0, p1), x1, Math.max(p0, p1)), y)); } }
     // stepped cheek blocks: full height beside the landing, then three blocks stepping down the flight, stopping two treads short
     const vTopF = sgn < 0 ? vb : va, vStop = vFoot - sgn * T * 2; // flight top edge, cheek end
