@@ -21,7 +21,7 @@ import { installBigGame, BIG_GAME_PLACES } from './props/bigGame.js'; // Big Gam
 import { buildStreetscape } from './world/streetscape.js';
 import { buildSkyline, buildBridges } from './world/far.js';
 import { buildSigns } from './world/signs.js';
-import { Pedestrians } from './world/npcs.js';
+import { CampusLife } from './life/life.js'; // r4-campus-life: people, riders, Sproul tabling (replaces world/npcs.js)
 import { buildMidCity } from './world/midcity.js';
 import { Grass } from './world/grass.js';
 import { U, materials } from './materials.js';
@@ -155,7 +155,9 @@ async function boot() {
   scene.add(buildSkyline(skylineData, heightAt));
   const bridges = buildBridges(); scene.add(bridges.group); phase('far');
   const grass = (settings.quality === 'low' || qs.get('nograss')) ? null : new Grass({ sdf, gt, core: { x0: c.x0, z0: c.z0 }, heightAt, count: settings.quality === 'ultra' ? 32000 : 22000 }); if (grass) scene.add(grass.mesh);
-  const peds = new Pedestrians({ paths: vectors.paths, heightAt, max: { low: 50, medium: 110, high: 180, ultra: 260 }[settings.quality] || 180 }); scene.add(peds.mesh); BS.peds = peds;
+  // r4-campus-life: crowds follow the quality level; Settings > Graphics > People (settings.life) or ?life=0 turns them off
+  let life = null; try { life = new CampusLife({ scene, camera, vectors, pois, heightAt, physics, quality: settings.quality, streets, groundMask: BS.groundMask, trees, manifest, lmReady: (id) => BS.lm?.byId.get(id)?.state === 'ready', enabled: settings.life !== false && qs.get('life') !== '0' }); } catch (e) { console.warn('campus life unavailable', e); }
+  BS.life = life;
   await tick(); ui.progress(0.94);
   // ---- sky + CSM shadows
   const sky = new SkySystem({ renderer, scene, camera }); BS.sky = sky;
@@ -249,6 +251,7 @@ async function boot() {
   const onSetting = (k, v) => {
     settings[k] = v; store.set('settings', settings);
     if (k === 'sens') player.sens = v; if (k === 'invertY') player.invertY = v; if (k === 'volume') audio.setVolume(v);
+    if (k === 'life' && life) life.setEnabled(v); // r4-campus-life
     if (k === 'fov') { camera.fov = v; camera.updateProjectionMatrix(); csm.updateFrustums(); }
     if (k === 'quality') { ui.notify(`Switching to ${v} quality…`, { icon: 'gear', ms: 1500 }); setTimeout(() => location.reload(), 600); }
   };
@@ -321,7 +324,7 @@ async function boot() {
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
     bridges.update(U.uNight.value);
-    { const hr = pacificHour(date); const busy = hr < 6 ? 0.08 : hr < 8 ? 0.3 : hr < 18 ? 1.0 : hr < 22 ? 0.6 : 0.25; peds.update(dt, (state === 'play' ? player.pos : camera.position), busy); }
+    if (life) life.update(dt, { camera, focus: state === 'play' ? player.pos : camera.position, date, player: state === 'play' ? player : null }); // r4-campus-life
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
     // HUD (throttled)

@@ -435,6 +435,7 @@ export class UI {
     this.panel(`${this._head('Settings')}
       <section><h3>Graphics</h3>
         <div class="row"><span>Quality</span>${seg('quality', s.quality, [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}</div>
+        <div class="row"><span>People</span>${sw('life', s.life !== false)}</div>
         <p class="row-note">Changing quality reloads the page.</p></section>
       <section><h3>Controls</h3>
         <div class="row"><span>Look sensitivity</span>${range('sens', 0.3, 2.5, 0.05, s.sens)}</div>

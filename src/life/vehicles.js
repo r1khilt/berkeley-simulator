@@ -67,11 +67,9 @@ export function vehicleMaterial() {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = U.uNight;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aPaint; attribute float aGlow; varying float vGlow;')
-      .replace('#include <color_vertex>', `#if defined( USE_COLOR )
-  vColor = vec3( 1.0 ); vColor.xyz *= color.xyz;
-#endif
+      .replace('#include <color_vertex>', `#include <color_vertex>
 #ifdef USE_INSTANCING_COLOR
-  vColor.xyz = mix(vColor.xyz, instanceColor.xyz, aPaint);
+  vColor.xyz = mix(color.xyz, instanceColor.xyz, aPaint);
 #endif
   vGlow = aGlow;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNight; varying float vGlow;')

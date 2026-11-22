@@ -9,6 +9,11 @@ import * as THREE from 'three';
 import { U } from '../materials.js';
 
 export const POSE = { WALK: 0, STAND: 1, SIT: 2, GROUND: 3, LIE: 4, CYCLE: 5, SCOOTER: 6 };
+// colour palettes (linear RGB) indexed by look.skin / look.hairC / look.shoe; kept in sync with the GLSL arrays below
+export const SKIN = [[0.92, 0.74, 0.62], [0.83, 0.62, 0.47], [0.70, 0.50, 0.36], [0.55, 0.37, 0.25], [0.40, 0.26, 0.17], [0.27, 0.17, 0.11]];
+export const HAIR = [[0.035, 0.03, 0.028], [0.09, 0.06, 0.04], [0.2, 0.13, 0.07], [0.36, 0.24, 0.13], [0.62, 0.48, 0.28], [0.45, 0.44, 0.43], [0.42, 0.1, 0.07]];
+export const SHOE = [[0.86, 0.86, 0.84], [0.06, 0.06, 0.065], [0.42, 0.42, 0.43], [0.12, 0.16, 0.3], [0.45, 0.33, 0.2], [0.62, 0.12, 0.1]];
+export const HAIR_STYLE = ['buzz', 'short', 'long', 'ponytail', 'bun', 'beanie', 'cap'];
 export const FLAG = { SLEEVE: 1, PANTS: 2, BACKPACK: 4, SKIRT: 8, BAG: 16, PHONE: 32, BOOK: 64, CUP: 128 };
 const BONE = { pelvis: 0, torso: 1, head: 2, thighL: 3, shinL: 4, footL: 5, thighR: 6, shinR: 7, footR: 8, uarmL: 9, farmL: 10, uarmR: 11, farmR: 12 };
 const SLOT = { skin: 0, hair: 1, top: 2, bottom: 3, shoe: 4, sleeve: 5, shin: 6, bag: 7, accent: 8, sole: 9, dark: 10, paper: 11 };
