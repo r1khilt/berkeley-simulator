@@ -18,6 +18,10 @@ const EDGE_W = 0.12;      // path/plaza edging width
 const TILE = 128;         // kerb/edging tile size (m)
 const KERB_R = 170;       // kerbs/edging drawn within this radius
 const CAMPUS = (x, z) => x > -760 && x < 520 && z > -560 && z < 420;
+// [r5-audit-central] OSM step ways whose flights the landmark modules now model as part of a larger composition (a lone
+// 2.6 m groundworks flight with cheek walls and handrails would cut through them): Wheeler's grand south stair, and the
+// two-tier Dwinelle Plaza stair.
+const MODULE_STEPS = new Set([1364194341, 1318022263, 1318022265]);
 
 // ---------- samplers over the decoded arrays
 class HGrid {
@@ -153,6 +157,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const stairs = [];
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2) continue;
+    if (MODULE_STEPS.has(p.id)) continue; // [r5-audit-central] built by the landmark module itself
     const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
     const w = Math.max(1.2, Math.min(14, p.w || 2.6));

@@ -211,21 +211,31 @@ export async function build(ctx) {
   K.box(GD, tU0, -1.5, vS - 0.2, tU1, FL + 0.15, tV1);
   K.box(M.paving, tU0, FL + 0.15, vEB, tU1, FL + 0.17, tV1, {});
   const walkables = [K.walkPoly([[tU0, vEB], [tU1, vEB], [tU1, tV1], [tU0, tV1]], FL + 0.17)];
+  // [r5-audit-central] the plaza falls ~2.3 m from east to west along the front (LiDAR: +1.25 at the east end, -1.0 at the
+  // west), so the single flight loses risers eastward and dies into the grade; read the plaza where the flight lands
+  // (~6.5 m out at the west end) instead of 2.5 m out, so the lowest tread meets the paving instead of stopping on a hump.
   const segW = 2.45;
   for (let u = tU0; u < tU1 - 0.01; u += segW) {
-    const u1 = Math.min(tU1, u + segW); const gl = Math.min(K.g(u, tV1 + 2.5), K.g(u1, tV1 + 2.5));
+    const u1 = Math.min(tU1, u + segW); let gl = Infinity;
+    for (const vv of [2.5, 4.5, 6.5]) { const gg = Math.min(K.g(u, tV1 + vv), K.g(u1, tV1 + vv), K.g((u + u1) / 2, tV1 + vv)); const nn = Math.round((FL + 0.17 - gg) / 0.155); if (tV1 + nn * 0.38 >= tV1 + vv - 1.2) gl = Math.min(gl, gg); }
+    if (!Number.isFinite(gl)) gl = Math.min(K.g(u, tV1 + 2.5), K.g(u1, tV1 + 2.5));
     const n = Math.round((FL + 0.17 - gl) / 0.155); if (n < 1) continue;
     walkables.push(K.stairs(GD, u, tV1, u1, tV1 + n * 0.38, gl, FL + 0.17, '-v', n));
   }
-  // cheek walls at the terrace ends
-  for (const u of [tU0 - 0.6, tU1]) K.box(GD, u, -1.5, vS, u + 0.6, FL + 0.9, tV1 + 4.5);
+  // [r5-audit-central] one massive plain ashlar cheek block at the WEST end only (photos: ~1.6 m wide, running the full
+  // depth of the flight, ~2.7 m above the low plaza; LiDAR top +1.75); at the east end the flight simply runs out into the
+  // rising plaza, so the old thin east cheek wall is gone.
+  { const u0 = tU0 - 1.6, u1 = tU0, v1 = tV1 + 6.6, yTop = FL + 0.35;
+    K.box(GD, u0, -2.0, vS, u1, yTop, v1); K.box(G, u0 - 0.06, yTop, vS, u1 + 0.06, yTop + 0.16, v1 + 0.06);
+    for (const y of [FL - 0.55, FL - 1.55]) K.box(GD, u0 - 0.02, y - 0.02, vS, u1 + 0.02, y + 0.02, v1 + 0.02, { detail: true }); // ashlar courses
+  }
 
   // ---------- colliders ----------
   const colliders = [K.colPoly(outline, -2, 21)];
   colliders.push(K.colPoly([[uE0, vS], [uC0, vS], [uC0, vEB], [uE0, vEB]], -2, 21));
   colliders.push(K.colPoly([[uC1, vS], [uE1, vS], [uE1, vEB], [uC1, vEB]], -2, 21));
   colliders.push(K.colPoly([[uC0, vS], [uC1, vS], [uC1, vEB], [uC0, vEB]], -2, 21));
-  for (const u of [tU0 - 0.6, tU1]) colliders.push(K.colPoly([[u, vS], [u + 0.6, vS], [u + 0.6, tV1 + 4.5], [u, tV1 + 4.5]], -1.5, FL + 0.9));
+  colliders.push(K.colPoly([[tU0 - 1.6, vS], [tU0, vS], [tU0, tV1 + 6.6], [tU0 - 1.6, tV1 + 6.6]], -2.0, FL + 0.51)); // [r5-audit-central] west cheek block
 
   // refine-central: foundation planting, lamp posts and bike racks where the paths arrive
   siteDress(K, ctx, outline, { d: 1.2, lamps: 3 });
