@@ -9,7 +9,7 @@
 //  4. a thin white louvred roof canopy that oversails the glass, most dramatically at the west end.
 // Slender white round columns stand outside the glass on a ~8-9 m grid, each with the signature V of two tension rods rising
 // from its foot to the canopy beams, a shape-memory-alloy cable sleeve near the top of every rod (18 columns, 36 rods). A white steel stair and a white sign box sit on the west
-// (Glade-facing) front and a red-brick stair drops toward the Glade; a low planted strip runs along the flat east side.
+// (Glade-facing) front; a low planted strip runs along the flat east side.
 // Plan from 2025-26 aerial imagery (canopy ~61 x 34 m, rotated like the old Bechtel outline) plus SOM / Berkeley sources and
 // Dave Burk / SOM photos. The packet's 2021 LiDAR shows the old Bechtel and is NOT used for massing.
 import * as THREE from 'three';
@@ -252,8 +252,12 @@ export async function build(ctx) {
     sign(K, RB, 'Grimes Engineering Center', RB.L / 2, P1 - 0.1, 0.27, { color: '#3d3f41', metal: 0.2, spacing: 0.03 });
     colliders.push(K.colPoly(quad(bW - 1.4, bx.v0, bW + 0.05, bx.v1), -2, P1 + 1.1));
     // red-brick landscape stair down toward the Glade (south-west), concrete cheek walls, black handrails
+    // [r5-audit-north] disabled: this 6.8 m brick flight + ramp sat on top of OSM's short concrete flight (w/262173805, now
+    // built by groundworks) and borrowed the look of the real wide brick stair further south-west, the Glade -> McLaughlin
+    // East Patio flight (OSM w/262173804), which groundworks now builds with brick treads, landings and a centre rail.
+    const SW_BRICK_STAIR = false;
     const sv0 = 22.6, sv1 = 29.4, suTop = -36.6, suBot = -45.0; const yTop = K.g(suTop + 0.5, (sv0 + sv1) / 2), yBot = K.g(suBot - 0.5, (sv0 + sv1) / 2);
-    if (yTop - yBot > 0.45) {
+    if (SW_BRICK_STAIR && yTop - yBot > 0.45) {
       const ns = Math.round((yTop - yBot) / 0.15);
       walkables.push(K.stairs(G.slab, suBot, sv0, suTop, sv1, yBot, yTop, '+u', ns, { foot: 1.5 }));
       { const rise = (yTop - yBot) / ns, tr = (suTop - suBot) / ns; for (let i = 0; i < ns; i++) { const top = yBot + rise * (i + 1); K.box(G.brick, suBot + tr * i + 0.03, top, sv0 + 0.02, suBot + tr * (i + 1) - 0.01, top + 0.025, sv1 - 0.02); } }   // brick treads, concrete risers

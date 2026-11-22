@@ -151,15 +151,21 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   });
   // 2) stairs: plan from the (road-graded) terrain, then bed them in
   const stairs = [];
+  // [r5-audit-north] photo-matched flights: OSM only gives a centreline, so a few prominent stairs get their real width,
+  // tread material and landings here (flights = runs separated by flat landings of `landing` m, centre = middle handrail)
+  const STAIR_STYLE = {
+    262173804: { w: 5.0, mat: 'brick', flights: 3, landing: 2.2, centre: true }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025)
+  };
   // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
   const OWNED_STEPS = new Set([
-    262173805, // Grimes Engineering Center: brick landscape stair at the SW corner (grimes-engineering-center.js, with ramp)
+    // (262173805 at Grimes' SW corner used to be doubled by the Grimes module's brick stair; that copy is now disabled)
   ]);
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2 || OWNED_STEPS.has(p.id)) continue;
     const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
-    const w = Math.max(1.2, Math.min(14, p.w || 2.6));
+    const sty = STAIR_STYLE[p.id];
+    const w = sty ? sty.w : Math.max(1.2, Math.min(14, p.w || 2.6));
     const C = [0]; for (let k = 1; k < P.length; k++) C.push(C[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
     // skip indoor steps and anything hugging a landmark (landmark modules build their own entrance steps)
     let skip = false;
@@ -172,13 +178,15 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     if (!up) { ha = ha2; hb = hb2; }
     const rise = Math.abs(hb - ha); if (rise < 0.12) continue;
     let n = Math.max(1, Math.round(rise / 0.155)); if (L / n < 0.27) n = Math.max(1, Math.floor(L / 0.27));
+    if (sty) n = Math.max(sty.flights * 3, Math.round(rise / 0.145));
     const lo = Math.min(ha, hb), hi = Math.max(ha, hb);
     // the stair must roughly agree with the ground it climbs: skip ones whose bed would cut > 1.1 m or that stand > 1.4 m
     // above the terrain (elevated flights, bridges, mis-tagged indoor stairs)
     let worstCut = 0, worstFill = 0;
     for (let s2 = 0; s2 <= L; s2 += 0.7) { const [x, z] = along(P, C, s2); const sl = up ? s2 : L - s2; const ramp = lo + (hi - lo) * (sl / L); const dz = G.at(x, z) - ramp; worstCut = Math.max(worstCut, dz); worstFill = Math.max(worstFill, -dz); }
     if (worstCut > 1.1 || worstFill > 1.4) continue;
-    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45 });
+    stairs.push({ P, C, L, w, n, lo, hi, up, mat: sty ? sty.mat : /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45,
+      flights: sty ? sty.flights : 1, landing: sty ? sty.landing : 0, centre: !!(sty && sty.centre) });
   }
   // landings first (blend toward the landing heights), then beds (only ever lowered, so treads always cover terrain)
   for (const st of stairs) {
@@ -200,7 +208,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const bb = bbox(P, hw + 1);
     G.each(bb[0], bb[1], bb[2], bb[3], (x, z, k) => {
       const q = project(P, C, x, z); if (Math.abs(q.d) > hw || q.s < -0.2 || q.s > L + 0.2) return;
-      const sl = Math.max(0, Math.min(L, up ? q.s : L - q.s)); const ramp = lo + (hi - lo) * (sl / L) - 0.04;
+      const sl = Math.max(0, Math.min(L, up ? q.s : L - q.s)); const ramp = Math.min(lo + (hi - lo) * (sl / L), st.flights > 1 ? stairTop(st, sl) : 1e9) - 0.04;
       if (heights[k] > ramp) heights[k] = ramp;
     });
   }
@@ -269,6 +277,23 @@ export function reseatTrees(plan, trees) {
   if (!plan || !plan.orig || !trees) return 0; const O = new HGrid(plan.orig, plan.c); let n = 0;
   for (let i = 0; i < trees.n; i++) { const x = trees.x[i] / 10, z = trees.z[i] / 10; if (!plan.G.inside(x, z, 2)) continue; const d = plan.G.at(x, z) - O.at(x, z); if (Math.abs(d) > 0.02) { trees.y[i] = Math.max(0, Math.round(trees.y[i] + d * 100)); n++; } }
   plan.orig = null; return n;
+}
+// [r5-audit-north] tread spans (from the low end) for flights split by landings; one flight = the old uniform spacing
+function stairSpans(st) {
+  if (st._spans) return st._spans;
+  const { L, n } = st; const f = st.flights || 1, Ld = f > 1 ? st.landing : 0; const t = (L - (f - 1) * Ld) / n;
+  const S0 = new Float64Array(n), S1 = new Float64Array(n), land = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const fi = Math.min(f - 1, Math.floor(i * f / n)); S0[i] = i * t + fi * Ld; S1[i] = S0[i] + t; if (fi < f - 1 && Math.floor((i + 1) * f / n) !== fi) { S1[i] += Ld; land[i] = 1; } }
+  return (st._spans = { S0, S1, t, land });
+}
+function stairTop(st, sl) { const { S0, S1 } = stairSpans(st); const r = (st.hi - st.lo) / st.n; if (sl < S0[0]) return st.lo; for (let i = 0; i < st.n; i++) if (sl <= S1[i]) return st.lo + (i + 1) * r; return st.hi; }
+// nosing line one tread ahead (cheek walls / rails): linear along each flight, flat across landings
+function stairNose(st, sl) {
+  const { lo, hi, L, n } = st; const SP = stairSpans(st); const t = SP.t;
+  if ((st.flights || 1) <= 1) return lo + (hi - lo) * Math.min(1, (sl + t) / L);
+  const r = (hi - lo) / n; let i = 0; while (i < n - 1 && sl > SP.S1[i]) i++;
+  if (SP.land[i] && sl > SP.S0[i] + t) return Math.min(hi, lo + (i + 1) * r);
+  return Math.min(hi, lo + r * (i + 1 + Math.max(0, Math.min(1, (sl - SP.S0[i]) / t))));
 }
 function inRing(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c; } return c; }
 function bbox(P, m) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0 - m, z0 - m, x1 + m, z1 + m]; }
@@ -356,7 +381,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     const yBase = (x, z) => Math.min(heightAt(x, z), lo) - 0.35;
     for (let i = 0; i < n; i++) {
       // tread i spans [s0, s1] measured from the LOW end; top at lo + (i+1) r; 2.5 cm nosing over the riser below
-      const s0 = i * t, s1 = (i + 1) * t; const sa = up ? s0 : L - s0, sb = up ? s1 : L - s1;
+      const SP = stairSpans(st); const s0 = SP.S0[i], s1 = SP.S1[i]; const sa = up ? s0 : L - s0, sb = up ? s1 : L - s1;
       const A = along(P, C, sa), B = along(P, C, sb); const dx = B[0] - A[0], dz = B[1] - A[1], l = Math.hypot(dx, dz) || 1;
       const a = [A[0] - dx / l * 0.025, A[1] - dz / l * 0.025], b = [B[0], B[1]];
       const y1 = lo + (i + 1) * r;
@@ -365,6 +390,15 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       { const ux = dx / l, uz = dz / l, nx = -uz, nz = ux, e = hw - 0.06; const n0 = [a[0], a[1]], n1 = [a[0] + ux * 0.08, a[1] + uz * 0.08];
         (st.mat === 'brick' ? bucket(mid[0], mid[1], 'gran') : railGeo).quad([n0[0] - nx * e, y1 + 0.004, n0[1] - nz * e], [n0[0] + nx * e, y1 + 0.004, n0[1] + nz * e], [n1[0] + nx * e, y1 + 0.004, n1[1] + nz * e], [n1[0] - nx * e, y1 + 0.004, n1[1] - nz * e], [0, 1, 0], [[0, 0], [1, 0], [1, 0.03], [0, 0.03]]); }
       nTreads++;
+    }
+    if (st.centre && hi - lo > 0.9) { // [r5-audit-north] middle handrail on wide photo-matched flights
+      const nP = Math.max(2, Math.ceil(L / 1.6) + 1); let prev = null;
+      for (let k = 0; k < nP; k++) {
+        const s = (k / (nP - 1)) * L; const A = along(P, C, s); const ls = up ? s : L - s; const yb = stairTop(st, ls), top = stairNose(st, ls) + 0.9;
+        slab(railGeo, [A[0] - A[2] * 0.02, A[1] - A[3] * 0.02], [A[0] + A[2] * 0.02, A[1] + A[3] * 0.02], 0.02, yb, top, top, { top: 0, front: 1, back: 1, left: 1, right: 1 });
+        if (prev) slab(railGeo, [prev[0], prev[1]], [A[0], A[1]], 0.024, [prev[2] - 0.05, top - 0.05], prev[2], top);
+        prev = [A[0], A[1], top];
+      }
     }
     if (st.cheeks) {
       // cheek walls follow the nosing line (+0.12 m) and step down to the landing at both ends
@@ -375,7 +409,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
           const sa = (k / N) * L, sb = ((k + 1) / N) * L; const A = along(P, C, sa), B = along(P, C, sb);
           const pa = [A[0] - A[3] * off * sd, A[1] + A[2] * off * sd], pb = [B[0] - B[3] * off * sd, B[1] + B[2] * off * sd];
           const la = up ? sa : L - sa, lb = up ? sb : L - sb; // distance from the low end
-          const ya = lo + (hi - lo) * Math.min(1, (la + t) / L) + 0.12, yb = lo + (hi - lo) * Math.min(1, (lb + t) / L) + 0.12;
+          const ya = stairNose(st, la) + 0.12, yb = stairNose(st, lb) + 0.12;
           // keep the cheek above the soil it retains on the outside
           const ga = heightAt(pa[0] - A[3] * 0.5 * sd, pa[1] + A[2] * 0.5 * sd), gb = heightAt(pb[0] - B[3] * 0.5 * sd, pb[1] + B[2] * 0.5 * sd);
           slab(cheekGeo, pa, pb, thick / 2, [yBase(pa[0], pa[1]), yBase(pb[0], pb[1])], Math.max(ya, ga + 0.05), Math.max(yb, gb + 0.05), { top: 1, front: k === 0, back: k === N - 1, left: 1, right: 1 });
@@ -385,7 +419,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
           const nP = Math.max(2, Math.ceil(L / 1.6) + 1); let prev = null;
           for (let k = 0; k < nP; k++) {
             const s = (k / (nP - 1)) * L; const A = along(P, C, s); const p = [A[0] - A[3] * off * sd, A[1] + A[2] * off * sd]; const ls = up ? s : L - s;
-            const y = lo + (hi - lo) * Math.min(1, (ls + t) / L) + 0.12; const top = y + 0.86;
+            const y = stairNose(st, ls) + 0.12; const top = y + 0.86;
             slab(railGeo, [p[0] - A[2] * 0.02, p[1] - A[3] * 0.02], [p[0] + A[2] * 0.02, p[1] + A[3] * 0.02], 0.02, y, top, top, { top: 0, front: 1, back: 1, left: 1, right: 1 });
             if (prev) slab(railGeo, [prev[0], prev[1]], [p[0], p[1]], 0.024, [prev[2] - 0.05, top - 0.05], prev[2], top);
             prev = [p[0], p[1], top];
