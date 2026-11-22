@@ -383,10 +383,13 @@ export async function build(ctx) {
       const thb = thOfXZ(cx, cz);
       const isGate = gateTh.some((g) => Math.abs(((thb - g + 540) % 360) - 180) < 2.6) && Hw > 6;
       const openGate = isGate && Math.abs(((thb - 180 + 540) % 360) - 180) < 2.6; // only the north tunnel passes through; other gates are grilled
-      const tallEnough = Hw > 9.5 && dk.walled;
+      // [r5-east2] the west face along Gayley Road is the same Roman arcade at a lower height (photos: blind arches with
+      // grilles all along the west wall under the press box); it was plain boxes because the wall there is < 9.5 m
+      const westFace = !(typeof location !== 'undefined' && /[?&]r5st=0/.test(location.search)) && thb > 200 && thb < 340; // ?r5st=0: A/B
+      const tallEnough = (Hw > 9.5 && dk.walled) || (westFace && Hw > 5.6);
       const m4 = new THREE.Matrix4().makeRotationY(rotY).setPosition(ic[0], 0, ic[1]);
       if (tallEnough || isGate) {
-        const ow = isGate ? 4.6 : 3.7, spring = isGate ? 5.6 : 5.2, Ha = Math.min(Hw - 0.5, 9.0);
+        const Ha = Math.min(Hw - 0.5, 9.0), ow = isGate ? 4.6 : 3.7, spring = Math.min(isGate ? 5.6 : 5.2, Ha - ow / 2 - 0.55); // [r5-east2] spring clamps on lower walls
         const eg = new THREE.ExtrudeGeometry(archShape(w + 0.02, Ha, ow, spring), { depth: T * 0.55, bevelEnabled: false, curveSegments: 10 });
         eg.translate(0, gmin, T / 2 - T * 0.55); eg.applyMatrix4(m4); wallParts.push(eg);
         if (!openGate) { // recessed infill (dark iron grille) behind blind arches and closed gates
