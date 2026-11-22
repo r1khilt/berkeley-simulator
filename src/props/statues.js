@@ -4,8 +4,9 @@
 //   golden-bear      Tom Hardy's gilded walking bear (1980) on its 18 ft concrete pillar, Lower Sproul Plaza
 //   grizzly-bear     Raymond Puccinelli's granite grizzly (1955) on a rock slab by Strawberry Creek
 //   cal-bear         Douglas Van Howd's 10 ft bronze "California Golden Bear" (1996), outside Memorial Stadium
-//   bench-1920       Class of 1920 WWI memorial bench at the foot of Sather Tower, Jo Mora's two mourning bears on its piers
+//   bench-1920       Class of 1920 WWI memorial bench by the Sather Tower entrance, Jo Mora's two mourning bears on its piers
 //   bench-1955       Class of 1955 "Beneficiary to Benefactor" bench beside it
+//   laughing-pelican Frances Rich's bronze "Laughing Pelican" (1958) outside Anthony Hall, the Pelican Building
 //   mining-pool      the round pool at the centre of Hearst Mining Circle with Bruce Beasley's "Rondo II" (2013) on it
 // installStatues() is called once from main.js; ?nostatues=1 skips it.
 import * as THREE from 'three';
@@ -82,6 +83,8 @@ function mats() {
     steel: new THREE.MeshStandardMaterial({ color: 0xc9ccce, metalness: 1, roughness: 0.2, name: 'statue:stainless' }),
     plaque: new THREE.MeshStandardMaterial({ color: 0x3d3326, metalness: 0.8, roughness: 0.45, name: 'statue:plaque' }),
     poolFloor: tint(M.concrete, 0x7d8a86, { name: 'statue:poolFloor' }),
+    flag: tint(M.paving, 0xa8aca8, { name: 'statue:flagstones' }),
+    verdigris: new THREE.MeshStandardMaterial({ color: 0x55695f, metalness: 0.45, roughness: 0.58, vertexColors: true, name: 'statue:verdigrisBronze' }),
     water: tint(M.water, 0x1d363b, { name: 'statue:poolWater', envMapIntensity: 0.9, roughness: 0.08 }),
   };
   return _m;
@@ -192,6 +195,15 @@ export async function bench1955() { // cast-stone "Beneficiary to Benefactor" be
   return g;
 }
 
+export async function laughingPelican() { // Anthony Hall: Frances Rich's bronze pelican on a low pad of laid flagstones
+  const K = mats(), B = new Bag(), g = new THREE.Group();
+  const pad = new THREE.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2, r = 1 + 0.08 * Math.sin(a * 3 + 1) + 0.05 * Math.sin(a * 7); const p = [Math.cos(a) * 1.55 * r, Math.sin(a) * 1.05 * r]; i ? pad.lineTo(...p) : pad.moveTo(...p); }
+  B.add(K.flag, new THREE.ExtrudeGeometry(pad, { depth: 0.38, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.03, bevelSegments: 1, curveSegments: 4 }).rotateX(-Math.PI / 2).rotateY(Math.PI / 2).translate(0, -0.3, 0.1));
+  B.flush(g, { name: 'pelican' });
+  const bird = await sculpt('pelican', K.verdigris, { near: 35, ao: 0.85 }); bird.position.y = 0.11; g.add(bird);
+  return g;
+}
+
 export async function miningPool(R = 7.5) { // granite-coped round pool, dark water, Beasley's intertwined stainless rings
   const K = mats(), B = new Bag(), g = new THREE.Group();
   const top = 0.32, e = 0.03;
@@ -219,8 +231,10 @@ export const PLACEMENTS = [
   { id: 'golden-bear', build: goldenBear, x: -223.2, z: 305.1, face: [-205, 326], r: 0.45, clearTrees: 1.6, col: (P, x, y, z) => P.addBox(x - 0.4, y - 1, z - 0.4, x + 0.4, y + 5.5, z + 0.4, 'statue') },
   { id: 'grizzly-bear', build: grizzlyBear, x: -241.7, z: 236.1, rot: Math.PI / 2, r: 1.1, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.62, 1.3) },
   { id: 'cal-bear', build: calBear, x: 464.5, z: 54.5, face: [440, 54], r: 1.4, clearTrees: 2.6, col: (P, x, y, z) => P.addCircle(x, z, 0.9, y - 1, y + 3, 'statue') },
-  { id: 'bench-1920', build: bench1920, at: towerPt(0, TOWER.hw + 0.75), rot: TOWER.rot, r: 1.2, clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
+  // "the stone bench at the Campanile entrance": north face, beside the 1960s canopy
+  { id: 'bench-1920', build: bench1920, at: towerPt(4.1, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
   { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
+  { id: 'laughing-pelican', build: laughingPelican, x: -25.2, z: 164.7, rot: 1.99, r: 1.2, clearTrees: 1.6, col: (P, x, y, z) => P.addCircle(x, z, 1.0, y - 1, y + 2.4, 'statue') },
   { id: 'mining-pool', build: () => miningPool(7.0), x: 75.0, z: -178.2, rot: 0, r: 7.6, level: 'max', clearTrees: 7.8, col: (P, x, y, z) => P.addCircle(x, z, 7.5, y - 1, y + 0.32, 'statue') },
 ];
 function obb(P, x, y, z, rot, hx, hz, h, oz = 0) { // oriented box collider (local half-sizes hx, hz, centred oz along local z)

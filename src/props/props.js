@@ -294,11 +294,19 @@ export function fireHydrant() { // California wet-barrel hydrant: two hose outle
   return { ...P.build(), collider: { type: 'cyl', r: 0.17, h: 0.72 } };
 }
 
-function posterTex() {
+function posterTex() { // r4-props2: a Cal Performances season poster instead of a blue card with a gold dot
   return texCache('poster', () => canvasTex(256, 512, (g, w, h) => {
-    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#0a3d6b'); gr.addColorStop(1, '#2b7bb8'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#fdb515'; g.beginPath(); g.arc(w * 0.5, h * 0.36, w * 0.28, 0, TAU); g.fill();
-    g.fillStyle = '#fff'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.fillText('TRANSIT', w / 2, h * 0.72); g.font = '22px sans-serif'; g.fillText('ride to campus', w / 2, h * 0.8);
+    const gr = g.createLinearGradient(0, 0, w * 0.4, h); gr.addColorStop(0, '#1b1530'); gr.addColorStop(0.55, '#5a1f3d'); gr.addColorStop(1, '#c2462e'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    // a dancer silhouette in a pool of light
+    const sp = g.createRadialGradient(w * 0.55, h * 0.42, 6, w * 0.55, h * 0.42, w * 0.55); sp.addColorStop(0, 'rgba(255,214,150,0.85)'); sp.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = sp; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#16101f'; g.beginPath(); g.ellipse(w * 0.56, h * 0.25, 13, 15, 0, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(w * 0.53, h * 0.28); g.quadraticCurveTo(w * 0.36, h * 0.2, w * 0.22, h * 0.12); g.lineTo(w * 0.24, h * 0.15); g.quadraticCurveTo(w * 0.4, h * 0.27, w * 0.5, h * 0.33);
+    g.lineTo(w * 0.48, h * 0.47); g.quadraticCurveTo(w * 0.4, h * 0.6, w * 0.3, h * 0.66); g.lineTo(w * 0.33, h * 0.68); g.quadraticCurveTo(w * 0.47, h * 0.62, w * 0.56, h * 0.5);
+    g.quadraticCurveTo(w * 0.68, h * 0.58, w * 0.8, h * 0.62); g.lineTo(w * 0.8, h * 0.6); g.quadraticCurveTo(w * 0.7, h * 0.5, w * 0.62, h * 0.45); g.lineTo(w * 0.6, h * 0.31);
+    g.quadraticCurveTo(w * 0.74, h * 0.24, w * 0.86, h * 0.17); g.lineTo(w * 0.84, h * 0.15); g.quadraticCurveTo(w * 0.72, h * 0.2, w * 0.59, h * 0.28); g.closePath(); g.fill();
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.font = 'bold 26px Georgia, serif'; g.fillText('Cal', 18, h * 0.76); g.fillText('Performances', 18, h * 0.76 + 28);
+    g.fillStyle = '#fdb515'; g.fillRect(18, h * 0.84, w - 36, 3);
+    g.fillStyle = '#f2e6d8'; g.font = '15px sans-serif'; g.fillText('2026–27 SEASON · ZELLERBACH HALL', 18, h * 0.89); g.fillText('calperformances.org', 18, h * 0.93);
   }));
 }
 export function busShelter() { // r4-props2: AC Transit-style shelter: three rear posts, curved cantilevered perforated-metal roof, fritted
