@@ -1,5 +1,5 @@
 // r4-props2: close-up viewer for src/props/statues.js builders under game-like light.
-// URL: /dev/statues.html?id=bench1920   window.__st.view(az, el, dist, targetY) then screenshot.
+// URL: /dev/statues.html?id=bench1920  (or ?prop=busShelter,infoKiosk for street props)   window.__st.view(az, el, dist, targetY) then screenshot.
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { materials, U } from '../src/materials.js';

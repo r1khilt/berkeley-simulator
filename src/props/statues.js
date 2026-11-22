@@ -7,7 +7,7 @@
 //   bench-1920       Class of 1920 WWI memorial bench by the Sather Tower entrance, Jo Mora's two mourning bears on its piers
 //   bench-1955       Class of 1955 "Beneficiary to Benefactor" bench beside it
 //   (the baked Laughing Pelican is placed by src/landmarks/anthony-hall.js, replacing its primitive bird; laughingPelican() is for /dev/statues.html)
-//   mining-pool      the round pool at the centre of Hearst Mining Circle with Bruce Beasley's "Rondo II" (2013) on it
+//   (Mining Circle pool + Rondo II: see src/world/water.js)
 // installStatues() is called once from main.js; ?nostatues=1 skips it.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -78,15 +78,11 @@ function mats() {
     travertine: tint(M.marble, 0xdfcdad, { name: 'statue:travertine', roughness: 0.85 }),
     travBear: ao(tint(M.marble, 0xd6c4a0, { name: 'statue:travertineBear', roughness: 0.88 })),
     castStone: tint(M.stucco, 0xcfcdc5, { name: 'statue:castStone', roughness: 0.9 }),
-    coping: tint(M.granite, 0xbcb7ad, { name: 'statue:coping' }),
     pad: tint(M.concrete, 0xa29e96, { name: 'statue:pad' }),
     mulch: new THREE.MeshStandardMaterial({ map: chipTex(), roughness: 1, name: 'statue:mulch' }),
-    steel: new THREE.MeshStandardMaterial({ color: 0xc9ccce, metalness: 1, roughness: 0.2, name: 'statue:stainless' }),
     plaque: new THREE.MeshStandardMaterial({ color: 0x3d3326, metalness: 0.8, roughness: 0.45, name: 'statue:plaque' }),
-    poolFloor: tint(M.concrete, 0x7d8a86, { name: 'statue:poolFloor' }),
     flag: tint(M.paving, 0xa8aca8, { name: 'statue:flagstones' }),
     verdigris: new THREE.MeshStandardMaterial({ color: 0x55695f, metalness: 0.45, roughness: 0.58, vertexColors: true, name: 'statue:verdigrisBronze' }),
-    water: tint(M.water, 0x1d363b, { name: 'statue:poolWater', envMapIntensity: 0.9, roughness: 0.08 }),
   };
   return _m;
 }
@@ -206,28 +202,8 @@ export async function laughingPelican() { // Anthony Hall: Frances Rich's bronze
   return g;
 }
 
-export async function miningPool(R = 7.5) { // granite-coped round pool, dark water, Beasley's intertwined stainless rings
-  const K = mats(), B = new Bag(), g = new THREE.Group();
-  const top = 0.32, e = 0.03;
-  const CW = 0.6, e2 = 0.06; B.add(K.coping, lathe([[R, -0.25], [R, top - e2], [R + e2 * 0.3, top - e2 * 0.3], [R + e2, top], [R + CW - e2, top], [R + CW - e2 * 0.3, top - e2 * 0.3], [R + CW, top - e2], [R + CW, -1.2]].reverse(), 128));
-  B.add(K.poolFloor, new THREE.CircleGeometry(R, 64).rotateX(-Math.PI / 2).translate(0, -0.25, 0));
-  B.flush(g, { name: 'mining-pool' });
-  const water = new THREE.Mesh(new THREE.CircleGeometry(R + 0.01, 96).rotateX(-Math.PI / 2).translate(0, top - 0.12, 0), K.water);
-  water.name = 'mining-pool:water'; water.receiveShadow = true; g.add(water); // plain still water; the water pass can restyle meshes named *:water
-  // Rondo II: four polished stainless rings intertwined, resting just on the surface (hi/lo LOD: the rings are most of the tris)
-  const y = top - 0.12, rings = [[0.0, 0.0, 1.9], [Math.PI / 2, 0.55, 1.9], [0.9, 1.45, 1.75], [-0.7, 2.4, 1.75]];
-  const lod = new THREE.LOD(); lod.name = 'statue:rondo-ii';
-  for (const [rs, ts, dist] of [[12, 96, 0], [6, 40, 60]]) {
-    const S = new Bag(), lvl = new THREE.Group();
-    for (const [rx, ry, Rr] of rings) {
-      const t = new THREE.TorusGeometry(Rr, 0.075, rs, ts); t.rotateX(rx); t.rotateY(ry); t.rotateZ(0.35);
-      t.computeBoundingBox(); t.translate(0, y - t.boundingBox.min.y - 0.12, 0); S.add(K.steel, t, { uv: false }); // dips just under the surface
-    }
-    S.flush(lvl, { name: 'rondo-ii' }); lod.addLevel(lvl, dist);
-  }
-  lod.addLevel(new THREE.Object3D(), 700); g.add(lod);
-  return g;
-}
+// (r4-props2: the Mining Circle pool + Rondo II builder was dropped after merging r4-campanile: src/world/water.js owns the
+// pool, its coping, water, bubbler, sound and Rondo II stand-in, so there is one of each.)
 
 // ------------------------------------------------------------------ placement
 // Sather Tower frame (matches src/landmarks/sather-tower.js: anchor + shaft centre offset, frame rotated 15.25°)
@@ -240,7 +216,6 @@ export const PLACEMENTS = [
   // "the stone bench at the Campanile entrance": north face, beside the 1960s canopy
   { id: 'bench-1920', build: bench1920, at: towerPt(4.35, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, level: 'max', clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
   { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, level: 'max', clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
-  { id: 'mining-pool', build: () => miningPool(7.0), x: 75.0, z: -178.2, rot: 0, r: 7.6, level: 'max', clearTrees: 7.8, col: (P, x, y, z) => P.addCircle(x, z, 7.5, y - 1, y + 0.32, 'statue') },
 ];
 function obb(P, x, y, z, rot, hx, hz, h, oz = 0) { // oriented box collider (local half-sizes hx, hz, centred oz along local z)
   const c = Math.cos(rot), s = Math.sin(rot); const pt = (u, v) => [x + u * c + v * s, z - u * s + v * c];
