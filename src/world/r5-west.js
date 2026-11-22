@@ -498,24 +498,20 @@ function buildAsucWall(A, MAT, heightAt, water, physics, group, quality) {
   for (let pass = 0; pass < 3; pass++) for (let i = 1; i < W.length - 1; i++) W[i].d = (W[i - 1].d + W[i].d * 2 + W[i + 1].d) / 4;
   const pts = W.map((w) => { const x = w.cx + w.nx * (w.d + 0.12), z = w.cz + w.nz * (w.d + 0.12); const behind = heightAt(x + w.nx * 1.2, z + w.nz * 1.2); return { x, z, bot: w.lev - 0.45, top: Math.max(w.lev + 1.25, behind + 0.2) }; });
   for (let pass = 0; pass < 2; pass++) for (let i = 1; i < pts.length - 1; i++) pts[i].top = (pts[i - 1].top + pts[i].top * 2 + pts[i + 1].top) / 4;
-  const wallMat = tint(MAT.conc, 0x9c978c, 0.97);
+  const wallMat = tint(MAT.conc, 0xb5afa2, 0.97);
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1]; const top = (a.top + b.top) / 2, bot = Math.min(a.bot, b.bot);
     A.seg(wallMat, [a.x, (top + bot) / 2, a.z], [b.x, (top + bot) / 2, b.z], 0.32, top - bot);
     A.seg(MAT.concDark, [a.x, top + 0.05, a.z], [b.x, top + 0.05, b.z], 0.4, 0.1);
     if (physics) physics.addSeg(a.x, a.z, b.x, b.z, bot, top, 'r5-wall');
   }
-  // ivy hanging over the coping in patches (the photo's bank wall)
-  const ivy = new THREE.MeshStandardMaterial({ color: 0x2f4a25, roughness: 0.95 });
-  for (let i = 2; i < pts.length - 2; i += 3) { const h = Math.abs(Math.sin(i * 12.9898) * 43758.5) % 1; if (h < 0.35) continue; const a = pts[i]; const w = W[i];
-    const g = new THREE.BoxGeometry(1.6 + h * 1.6, 0.5 + h * 0.6, 0.12); const m = new THREE.Mesh(g, ivy); m.position.set(a.x - w.nx * 0.2, a.top - 0.2 - h * 0.25, a.z - w.nz * 0.2); m.rotation.y = -Math.atan2(-w.nx, w.nz) ; m.lookAt(a.x - w.nx * 5, m.position.y, a.z - w.nz * 5); m.castShadow = false; m.receiveShadow = true; m.name = 'r5-ivy'; group.add(m); }
   // stepping stones across the bed
   const c = nc(STEPPING[0], STEPPING[1]);
   if (c) {
-    const [sx, sz, lev] = c.s; const t = (() => { const a = nc(STEPPING[0] + 1.5, STEPPING[1]), b = nc(STEPPING[0] - 1.5, STEPPING[1]); return a && b ? norm2(b.s[0] - a.s[0], b.s[1] - a.s[1]) : [1, 0]; })();
-    const nx = -t[1], nz = t[0]; const geo = new THREE.CylinderGeometry(0.34, 0.4, 0.4, 7); geo.translate(0, -0.2, 0);
+    const [sx, sz, lev] = c.s; const t = norm2(-16.8, -1.6);   // mapped flow direction here (west)
+    const nx = -t[1], nz = t[0]; const geo = new THREE.CylinderGeometry(0.3, 0.36, 0.28, 7); geo.translate(0, -0.14, 0);
     const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const k = 1 + 0.12 * Math.sin(x * 9.1 + z * 6.3); p.setX(i, x * k); p.setZ(i, z * k * 0.85); } geo.computeVertexNormals();
-    const stones = []; for (let k = -2; k <= 2; k++) { const o = k * 0.68; stones.push([sx + nx * o + t[0] * (k % 2) * 0.12, lev + 0.13, sz + nz * o + t[1] * (k % 2) * 0.12]); }
+    const stones = []; for (let k = -2; k <= 2; k++) { const o = k * 0.82; stones.push([sx + nx * o + t[0] * (k % 2) * 0.15, lev + 0.08, sz + nz * o + t[1] * (k % 2) * 0.15]); }
     const im = new THREE.InstancedMesh(geo, MAT.stone, stones.length); const m4 = new THREE.Matrix4();
     stones.forEach(([x, y, z], i) => { m4.makeRotationY(i * 1.7); m4.setPosition(x, y, z); im.setMatrixAt(i, m4); }); im.castShadow = true; im.receiveShadow = true; im.name = 'r5-stepping-stones'; group.add(im);
     if (physics) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, , z] of stones) { x0 = Math.min(x0, x - 0.5); x1 = Math.max(x1, x + 0.5); z0 = Math.min(z0, z - 0.5); z1 = Math.max(z1, z + 0.5); }
