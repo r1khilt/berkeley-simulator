@@ -19,7 +19,18 @@ export async function build(ctx) {
   const colliders = [], walkables = [];
   const poly = orient(ctx.footprints[0].outer.map(([x, z]) => [x, z]));
   const top = 5.7;
-  K.prism(M.brick, poly, -2.5, top);
+  // r4-sweep: cylindrical UVs on the brick drum (box projection flips axis every 45 deg around a round wall, squashing and
+  // seaming the brick courses into smears): u = arc length around the drum centre, v = height; metres / 2 like boxUV
+  { const g = K.prism(M.brick, poly, -2.5, top); const p = g.attributes.position, uv = g.attributes.uv, n = g.attributes.normal;
+    let cx = 0, cz = 0; for (const [x, z] of poly) { cx += x; cz += z; } cx /= poly.length; cz /= poly.length;
+    let r = 0; for (const [x, z] of poly) r += Math.hypot(x - cx, z - cz); r /= poly.length;
+    for (let i = 0; i < p.count; i += 3) {
+      if (Math.abs(n.getY(i)) > 0.5) continue; // caps keep their planar UVs
+      const a = [0, 1, 2].map((k) => Math.atan2(p.getZ(i + k) - cz, p.getX(i + k) - cx));
+      if (Math.max(...a) - Math.min(...a) > Math.PI) for (let k = 0; k < 3; k++) if (a[k] < 0) a[k] += 2 * Math.PI; // seam
+      for (let k = 0; k < 3; k++) uv.setXY(i + k, a[k] * r * 0.5, p.getY(i + k) * 0.5);
+    }
+    uv.needsUpdate = true; }
   // concrete coping + flat roof
   K.loop(M.concrete, poly, [[0.12, top - 0.05], [0.12, top + 0.45], [-0.5, top + 0.45], [-0.5, top - 0.05]]);
   K.prism(M.concreteDark, poly.map(([x, z]) => [x * 0.97, z * 0.97]), top - 0.2, top + 0.2);
