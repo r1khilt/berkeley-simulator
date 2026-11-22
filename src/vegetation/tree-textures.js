@@ -137,7 +137,7 @@ export const LEAF_KINDS = {
 // r4-trees2: hero-LOD sprigs (M = sprig card size in metres, o = broadleaf overrides: fewer shoots/sides so a sprig
 // is one small twig carrying a dozen or two real-size leaves)
 export const SPRIGS = {
-  oak: { M: 0.75, o: { shoots: 5, sides: 8, sub: 2, fan: 0.85, len: 0.95 } },
+  oak: { M: 0.85, o: { shoots: 5, sides: 9, sub: 2, fan: 0.85, len: 0.95 } },
   bay: { M: 0.5, o: { shoots: 2, sides: 4, sub: 1, fan: 0.6 } },
   shrub: { M: 0.3, o: { shoots: 2, sides: 4, sub: 1 } },
   magnolia: { M: 0.75, o: { shoots: 2, sides: 2, sub: 0, nodes: 6 } },

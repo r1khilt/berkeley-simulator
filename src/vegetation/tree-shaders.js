@@ -206,14 +206,17 @@ export function patchBark(mat, uni) {
   mat.onBeforeCompile = (sh) => {
     withUniforms(sh, uni, false);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\nvarying float vBarkTone;\n')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = treeWind(transformed);\n')
+      .replace('#include <common>', '#include <common>\n' + WIND + 'attribute float aRad;\nuniform float uTypH;\nuniform float uViewH;\nvarying float vPx;\nvarying float vBarkTone;\n' +
+        // r4-trees2: wood thickness follows the tree's height, not its (LiDAR) crown radius, so tall trees with narrow
+        // crowns (redwoods, eucalyptus) keep massive trunks instead of turning into poles; twigs are left alone
+        'float treeWoodF() { mat4 m = treeObjM(); return mix(1.0, clamp(length(m[1].xyz) / max(length(m[0].xyz), 1e-4), 1.0, 2.0), smoothstep(0.004, 0.012, aRad)); }\n')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normal * aRad * (treeWoodF() - 1.0);\ntransformed = treeWind(transformed);\n')
       .replace('#include <uv_vertex>', `#include <uv_vertex>
       {
         // geometry UVs are metres at the species' typical size: rescale to this instance so bark keeps ~1 m tiles
         mat4 bm = treeObjM();
         float bsx = length(bm[0].xyz), bsy = length(bm[1].xyz), bsz = length(bm[2].xyz);
-        vec2 k = vec2(0.5 * (bsx + bsz), pow(bsx * bsy * bsz, 1.0 / 3.0)) / uTypH;
+        vec2 k = vec2(0.5 * (bsx + bsz) * treeWoodF(), pow(bsx * bsy * bsz, 1.0 / 3.0)) / uTypH; // (x treeWoodF: no stretched bark on thickened trunks)
         // gfx-trees: per-tree pattern offset + tone so neighbouring trunks don't look like clones
         vec2 bo = vec2(treeHash(bm[3].xz * 0.71 + 5.3), treeHash(bm[3].xz * 0.37 + 9.1));
         vBarkTone = 0.86 + 0.28 * treeHash(bm[3].xz * 1.13 + 2.7);
@@ -236,7 +239,7 @@ export function patchBark(mat, uni) {
       .replace('#include <color_fragment>', 'diffuseColor.rgb *= vBarkTone;'); // bark ignores the foliage tint (per-tree tone only)
     lodFade(sh); // r4-trees2
   };
-  mat.customProgramCacheKey = () => 'tree-bark-7';
+  mat.customProgramCacheKey = () => 'tree-bark-8';
   return noFadeAttr(mat);
 }
 

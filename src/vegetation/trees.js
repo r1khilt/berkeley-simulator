@@ -359,6 +359,11 @@ function genPollard(d, rnd) {
 }
 
 // ---------------------------------------------------------------- LOD builders
+function capTube(pts, rads) { // r4-trees2: close an open tube end with a short rounded tip
+  const n = pts.length, r = rads[n - 1]; if (n < 2 || r < 0.015) return [pts, rads];
+  const dir = pts[n - 1].clone().sub(pts[n - 2]).normalize();
+  return [[...pts, pts[n - 1].clone().addScaledVector(dir, r * 0.7), pts[n - 1].clone().addScaledVector(dir, r * 1.1)], [...rads, r * 0.6, r * 0.04]];
+}
 function buildBark(sk, d, lod) {
   const acc = new Acc(['aRad']);
   const tSeg = lod === 0 ? (d.trunk.seg ?? 8) : 6;
@@ -368,9 +373,9 @@ function buildBark(sk, d, lod) {
   }
   const limbs = lod === 0 ? sk.limbs : sk.limbs.filter((l) => !l.thin).slice(0, d.lod1Limbs ?? 7);
   // (lod0 draws secondaries with 3 sides)
-  for (const l of limbs) {
-    if (lod === 0) tube(acc, l.pts, l.rads, l.thin ? 3 : (d.limbSeg ?? 5));
-    else { const n = l.pts.length, idx = [0, Math.floor(n / 2), n - 1]; tube(acc, idx.map((i) => l.pts[i]), idx.map((i) => l.rads[i]), 4); }
+  for (const l of limbs) { // r4-trees2: limb ends closed with a short rounded tip (no blunt cut-off stubs poking out of crowns)
+    if (lod === 0) tube(acc, ...capTube(l.pts, l.rads), l.thin ? 3 : (d.limbSeg ?? 5));
+    else { const n = l.pts.length, idx = [0, Math.floor(n / 2), n - 1]; tube(acc, ...capTube(idx.map((i) => l.pts[i]), idx.map((i) => l.rads[i])), 5); }
   }
   if (lod === 0) for (const t of sk.twigs) tube(acc, t.pts.length > 2 && d.arche !== 'pollard' ? [t.pts[0], t.pts[t.pts.length - 1]] : t.pts, t.pts.length > 2 && d.arche !== 'pollard' ? [t.rads[0], t.rads[t.rads.length - 1]] : t.rads, 3);
   else if (d.arche === 'pollard') sk.twigs.forEach((t, i) => { if (i % 3 === 0) tube(acc, [t.pts[0], t.pts[t.pts.length - 1]], [t.rads[0] * 1.5, t.rads[t.rads.length - 1] * 1.5], 3); }); // keep the whip silhouette
@@ -609,6 +614,19 @@ function buildPuffs(sk, d, rnd, density, N, o = {}) {
     const wl = (d.pollard?.whipLen?.[1] ?? 2) * 0.55, r = wl * (o.fistK ?? 0.75) * (0.6 + 0.6 * Math.min(1, density * 2));
     list.push({ c: kn.c.clone().add(V3(0, wl * 0.55, 0)).addScaledVector(V3(kn.c.x, 0, kn.c.z).normalize(), wl * 0.2), r });
   }
+  { // r4-trees2: no small puffs floating on their own beside the crown: isolated ones are pulled in until they overlap
+    // a neighbour (toward the crown axis), and tiny isolated ones are dropped
+    const rs = list.map((p) => p.r).sort((a, b) => a - b), med = rs.length ? rs[rs.length >> 1] : 1;
+    for (let it = 0; it < 2; it++) for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i]; let gap = 1e9, nb = null;
+      for (const q of list) { if (q === p) continue; const g = p.c.distanceTo(q.c) - p.r - q.r; if (g < gap) { gap = g; nb = q; } }
+      if (!nb || gap < -0.25 * p.r) continue;
+      if (p.r < 0.5 * med && list.length > 4) { list.splice(i, 1); continue; }
+      const toNb = nb.c.clone().sub(p.c), dd = toNb.length(), need = gap + 0.3 * Math.min(p.r, nb.r);
+      if (dd > 1e-4) p.c.addScaledVector(toNb, Math.min(1, need / dd) * 0.7); // most of the way toward its neighbour
+      const ax = V3(-p.c.x, 0, -p.c.z), al = ax.length(); if (al > 1e-4) p.c.addScaledVector(ax, Math.min(1, need * 0.3 / al)); // and a little toward the axis
+    }
+  }
   const nc = o.core ?? P.core ?? 2; // dark core so the crown never reads hollow between the shell puffs
   for (let i = 0; i < nc; i++) { const y = lerp(env.base, env.top, (o.coreY ?? 0.36) + 0.22 * i / Math.max(1, nc - 1)); const re = env.r(y, i) || R * 0.5; list.push({ c: V3((rnd() - 0.5) * re * 0.25, y, (rnd() - 0.5) * re * 0.25), r: Math.min(re * (o.coreR ?? 0.5), (env.top - env.base) * 0.36, 4.5), core: true }); }
   for (const p of list) { const sH = clamp((p.c.y - env.base) / Math.max(env.top - env.base, 1e-3), 0, 1); puffQuad(acc, p.c, p.r, nrm(p.c), (p.core ? 0.6 : Math.min(1, ao(p.c) * 1.04)) * (0.8 + 0.2 * sH) * (o.aoK ?? 1), rnd(), rnd() < 0.5 ? 0 : 1, rnd()); } // lower puffs sit in the crown's own shade
@@ -640,10 +658,14 @@ function heroAttach(sk) { // branch points a tertiary twig may grow from (resamp
 function heroRosettes(sk, d, rnd, nRos) {
   const env = sk.env, R = env.R, H = env.top - env.base, Sp = d.sprigM, HH = d.hero || {}, sh = HH.shellR ?? [0.55, 1.0];
   const attach = heroAttach(sk), ros = [];
+  // true surface-area weighting (ring radius x slope factor), so the flat top of a dome and the crown's underside get
+  // their share of leaf clusters (a canopy you can't see the sky through from below)
+  const hy = H * 0.01, wAt = (y, th) => { const re = env.r(y, th), g = (env.r(Math.min(y + hy, env.top - 1e-3), th) - env.r(Math.max(y - hy, env.base + 1e-3), th)) / (2 * hy); return re * Math.sqrt(1 + Math.min(g * g, 64)); };
+  let wMax = 1e-6; for (let i = 0; i <= 64; i++) for (let j = 0; j < 4; j++) wMax = Math.max(wMax, wAt(env.base + H * (0.02 + 0.96 * i / 64), j * 1.57));
   let tries = 0;
   while (ros.length < nRos && tries++ < nRos * 80) {
     const y = env.base + H * (0.02 + 0.96 * rnd()), th = rnd() * TAU, re = env.r(y, th);
-    if (re < 0.12 || rnd() > re / R) continue; // area-weighted over the crown
+    if (re < 0.12 || rnd() * wMax * 1.1 > wAt(y, th)) continue; // area-weighted over the crown
     const rr = Math.max(0, re * lerp(sh[0], sh[1], Math.pow(rnd(), HH.shellPow ?? 0.55)) - Sp * 0.5); // mostly in the outer shell
     const P = V3(Math.cos(th) * rr, Math.min(y, env.top - Sp * 0.5), Math.sin(th) * rr);
     let best = null, bd = 1e9; for (const a of attach) { const dd = a.p.distanceToSquared(P); if (dd < bd) { bd = dd; best = a; } }
@@ -726,11 +748,7 @@ function buildLeavesHero(sk, d, rnd, density, budget) {
 }
 function buildBarkHero(sk, d, ros) { // smoother wood than LOD0 + the tertiary twigs that carry the rosettes
   const acc = new Acc(['aRad']), twR = d.clumps?.twigR ?? 0.05;
-  const capped = (pts, rads) => { // close open tube ends with a short rounded tip (no blunt open cylinders)
-    const n = pts.length, r = rads[n - 1]; if (r < 0.015) return [pts, rads];
-    const dir = pts[n - 1].clone().sub(pts[n - 2]).normalize();
-    return [[...pts, pts[n - 1].clone().addScaledVector(dir, r * 0.7), pts[n - 1].clone().addScaledVector(dir, r * 1.1)], [...rads, r * 0.6, r * 0.04]];
-  };
+  const capped = capTube;
   for (const t of sk.trunks) tube(acc, ...capped(t.pts, t.rads), (d.trunk.seg ?? 8) + 4);
   for (const l of sk.limbs) tube(acc, ...capped(l.pts, l.rads), l.thin ? 5 : (d.limbSeg ?? 5) + 3);
   for (const t of sk.twigs) tube(acc, t.pts, t.rads, 3);
@@ -739,7 +757,8 @@ function buildBarkHero(sk, d, ros) { // smoother wood than LOD0 + the tertiary t
     if (!r.a) continue;
     const L = r.a.distanceTo(r.c); if (L < 0.08) continue;
     const r0 = Math.min(r.ar * 0.5, twR * 1.0), r1 = twR * 0.22; // thin stalks, mostly hidden in the foliage
-    if (L < 1.5) tube(acc, [r.a, r.c], [r0, r1], 3);
+    if (L > 2.2) continue; // long straight stalks read as sticks: those rosettes just sit among their neighbours
+    if (L < 1.0) tube(acc, [r.a, r.c], [r0, r1], 3);
     else { const m = r.a.clone().lerp(r.c, 0.45); m.y += 0.1 * L; tube(acc, [r.a, m, r.c], [r0, (r0 + r1) * 0.5, r1], 3); }
   }
   return acc;
@@ -749,13 +768,13 @@ function buildBarkHero(sk, d, ros) { // smoother wood than LOD0 + the tertiary t
 const SPECIES_DEF = {
   oak: {
     lod2K: 0.65, cardK: 1.5, name: 'Coast live oak', arche: 'decurrent', leaf: 'oak', bark: 'oak', seed: 101, typical: { height: 12, crownR: 9.5 },
-    trunk: { h: 2.3, r0: 0.62, r1: 0.5, lean: 0.06, flare: 0.4, wiggle: 0.05, seg: 9 },
-    crown: { base: 1.6, top: 12, R: 9.5, shape: ['superegg', 0.3, 2.3], irr: 0.15 },
+    trunk: { h: 2.9, r0: 0.62, r1: 0.5, lean: 0.06, flare: 0.4, wiggle: 0.05, seg: 9 }, // r4-trees2: crown lifted (2.4 m, was 1.6) so walkers fit under campus oaks
+    crown: { base: 2.4, top: 12, R: 9.5, shape: ['superegg', 0.3, 2.3], irr: 0.15 },
     limbs: { n: 7, h0: 0.65, h1: 1.0, up: [0.15, 0.55], reach: [0.62, 0.9], r: 0.5, arch: -0.1, wiggle: 1.2 },
     branch2: { n: 5, spread: 1.0, twigs: 3, up: [-0.55, 0.65] },
     clumps: { twigR: 0.045 },
     cards: { n: 1500, vbias: 0.25, out: 1.0, face: 0.6, jit: 0.5 },
-    normal: 'ellipsoid', lod1Core: true, hero: { budgetK: 1.4, spread: 0.85, shell: 0.65 }, // r4-trees2: dense evergreen dome
+    normal: 'ellipsoid', lod1Core: true, hero: { budgetK: 1.3, spread: 0.85, shell: 0.65, shellR: [0.3, 1.0], shellPow: 0.45 }, // r4-trees2: dense evergreen dome, some leaves inside
     look: { cols: ['#4f5c30', '#5d6a3a', '#767c55'], ramp: [0.45, 0.93, 0.12, 0.08], twig: '#5b5045', rough: 0.55, leafSpec: 0.3, transBack: 0.45, transWrap: 0.3, blobK: 0.91, sway: 0.007, flutter: 0.0010, tintK: 1.0 },
   },
   plane: {
@@ -784,7 +803,7 @@ const SPECIES_DEF = {
     crown: { base: 7.5, top: 35, R: 5, shape: ['cone', 0.8, 5], irr: 0.24 }, // r4-trees: clear red bole below a ragged, narrow crown (not a generic cone)
     whorls: { spacing: 1.15, n: 4, elev: [-0.35, 0.3], droop: 0.12, r: 0.07, lenK: [0.85, 1.0], clumpK: 0.35, clumpR: [0.6, 1.4] },
     cards: { n: 1500, size: 1.5, vbias: 0.05, out: 1.0, face: 0.35, flat: 0.45, jit: 0.35 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 24, rK0: 0.85, n1: 56, n2: 26, rK: 0.85, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, sprigK: 0.75, hero: { faceJit: 0.8, droop: 0.4, jit: 0.35 }, // dense, flat, ragged branch-spray tiers (the near cards alone read as a scrawny bottlebrush)
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 24, rK0: 0.85, n1: 56, n2: 26, rK: 0.85, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, sprigK: 1.0, hero: { faceJit: 0.75, droop: 0.45, jit: 0.25 }, // r4-trees2: drooping, tilted sprays (flat ones vanish edge-on from eye level) // dense, flat, ragged branch-spray tiers (the near cards alone read as a scrawny bottlebrush)
     look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
@@ -1035,7 +1054,7 @@ function buildSpecies(id, d, season, opts) {
   const dp0 = puffTex ? makePuffDepthMaterials(uni, puffP0) : null;
   const dl = makeDepthMaterials(uni, true), db = makeDepthMaterials(uni, false);
   // r4-trees2: hero leaves use the sprig atlas (real-size leaves on small twigs)
-  const heroMat = useHero && gH.leaves ? patchLeaf(new THREE.MeshStandardMaterial({ map: leafTexture(d.leaf, opts.leafTexSize, true), alphaTest: 0.42, alphaToCoverage: !!opts.alphaToCoverage, side: THREE.DoubleSide, roughness: Math.max(0.75, look.rough ?? 0.8), metalness: 0 }), uni) : null;
+  const heroMat = useHero && gH.leaves ? patchLeaf(new THREE.MeshStandardMaterial({ map: leafTexture(d.leaf, opts.leafTexSize, true), alphaTest: 0.42, alphaToCoverage: false /* sub-pixel leaves dithered into a visible dot grid under A2C */, side: THREE.DoubleSide, roughness: Math.max(0.75, look.rough ?? 0.8), metalness: 0 }), uni) : null;
   if (heroMat) heroMat.name = `tree:${id}:hero`;
   const dh = heroMat ? makeDepthMaterials(uni, true) : null;
   const P = (geometry, material, kind, dm) => ({ geometry, material, kind, depthMaterial: dm ? dm.depth : null, distanceMaterial: dm ? dm.distance : null, castShadow: true, receiveShadow: true });
