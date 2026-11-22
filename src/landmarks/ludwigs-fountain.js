@@ -80,6 +80,8 @@ export async function build(ctx) {
   // animated water surface: clear and pale so the basin floor shows through, with ripples spreading from each jet
   const waterMat = M.water.clone();
   waterMat.name = 'ludwigWater'; waterMat.color.set(0x8fa6aa); waterMat.transparent = true; waterMat.opacity = 0.62; waterMat.depthWrite = false;
+  // r4-campanile: deeper teal body + sharper reflections so the pool reads as water, not a pale disc (was 0x8fa6aa @ 0.62)
+  waterMat.color.set(0x48737c); waterMat.opacity = 0.78; waterMat.roughness = 0.07; waterMat.envMapIntensity = 0.6; // sky-only env: tame grazing glare
   waterMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRipXZ;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRipXZ = position.xz;');
