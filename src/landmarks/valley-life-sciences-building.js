@@ -260,8 +260,11 @@ export async function build(ctx) {
       // stepped cubes descending outward from the cheek (photo 04)
       { const out = u < UC ? -1 : 1; for (let k = 1; k <= 2; k++) { const x0 = out < 0 ? u - 1.15 * k : u + 1.2 + 1.15 * (k - 1), x1 = x0 + 1.15, yt = Math.max(g0 + 0.45, FLs + 0.55 - 0.8 * k);
         K.box(ST, x0, g0 - 1, Math.min(land0, land1), x1, yt, Math.max(land0, land1)); K.box(ST, x0 - 0.04, yt, Math.min(land0, land1) - 0.04, x1 + 0.04, yt + 0.08, Math.max(land0, land1) + 0.04); } }
-      for (let k = 0; k < 3; k++) { const f0 = k / 3, f1 = (k + 1) / 3; const pa = vTopF + (vStop - vTopF) * f0, pb = vTopF + (vStop - vTopF) * f1;
-        const yb = FLs - (FLs - g0) * (f1 * (len - 2 * T) / len) + 0.75; K.box(ST, u, g0 - 1, Math.min(pa, pb), u + 1.2, yb, Math.max(pa, pb)); }
+      { // [r5a] low sloped cheek wall along the flight (coping ~0.85 m above the nosings) instead of tall stepped blocks that hid the treads from the side
+        const yN = (v) => g0 + (FLs - g0) * Math.abs(v - vFoot) / len; const sh = new THREE.Shape(); sh.moveTo(vTopF, g0 - 1); sh.lineTo(vTopF, FLs + 0.85); sh.lineTo(vStop, yN(vStop) + 0.85); sh.lineTo(vStop, g0 - 1); sh.closePath();
+        const g = new THREE.ExtrudeGeometry(sh, { depth: 0.9, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(u < UC ? u + 1.2 : u + 0.9, 0, 0); K.add(ST, g);
+        const cp = new THREE.Shape(); cp.moveTo(vTopF, FLs + 0.85); cp.lineTo(vStop, yN(vStop) + 0.85); cp.lineTo(vStop, yN(vStop) + 0.93); cp.lineTo(vTopF, FLs + 0.93); cp.closePath();
+        const cg = new THREE.ExtrudeGeometry(cp, { depth: 1.0, bevelEnabled: false }); cg.rotateY(-Math.PI / 2); cg.translate(u < UC ? u + 1.25 : u + 0.95, 0, 0); K.add(STD, cg); }
       colliders.push(K.colPoly(rect(u, Math.min(vStop, land1), u + 1.2, Math.max(vStop, land1)), g0 - 1, FLs + 0.9));
     }
     // [r5a] north: raised semicircular concrete forecourt, one low step above the lawn, where the walk meets the flight (photo 00)
