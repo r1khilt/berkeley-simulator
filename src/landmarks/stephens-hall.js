@@ -21,7 +21,7 @@ export async function build(ctx) {
   // refine-central: smooth pale buff painted concrete (not textured cream stucco), plain coped parapets (no battlements),
   // wide flat-headed multi-light steel casements in pairs/triples with grey-green frames, the STEPHENS HALL inscription and
   // lanterns at the breezeway, downspouts and planting.
-  const K = new Kit(ctx, ANG); const M = ctx.M; const S = tint(M.stuccoWhite, 0xebe6d3), SD = M.concreteDark; // r5-east: cooler, paler cream paint (was 0xece2b8, read butter-yellow)
+  const K = new Kit(ctx, ANG); const M = ctx.M; const S = tint(M.stuccoWhite, 0xeee6cd), SD = M.concreteDark; // r5-east: a cooler, paler cream (was 0xece2b8 butter-yellow; 0xebe6d3 read grey in renders)
   K.curveSeg = 3; // flat Tudor arches need few segments (keeps the many grouped windows within budget)
   const colliders = [], walkables = [];
   const frame = tint(M.whitePaint, 0xc4cac3); // r5-east: light grey steel casements as in the photos (was 0x7f8c8a)

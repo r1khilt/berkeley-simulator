@@ -18,6 +18,8 @@ function remapSpecies(t) {
   const DEC = 8, OAK = 0, BAY = 11;
   // r4-trees: the London planes lining Sproul Plaza (Sather Gate to Bancroft) are pollarded, like the Campanile esplanade's
   for (let i = 0; i < t.n; i++) { if (t.sp[i] !== 1) continue; const x = t.x[i] / 10, z = t.z[i] / 10; if (x >= -170 && x <= -95 && z >= 232 && z <= 334) t.sp[i] = 2; }
+  // [r5-east] Faculty Glade's big trees are coast live oaks (photos): its LiDAR 'deciduous'/'plane' crowns over 6 m become oaks
+  for (let i = 0; i < t.n; i++) { if (t.sp[i] !== DEC && t.sp[i] !== 1) continue; const x = t.x[i] / 10, z = t.z[i] / 10; if (x >= 95 && x <= 175 && z >= 0 && z <= 95 && t.h[i] > 600) t.sp[i] = OAK; }
   for (let i = 0; i < t.n; i++) {
     if (t.sp[i] !== DEC) continue;
     const x = t.x[i] / 10, z = t.z[i] / 10;

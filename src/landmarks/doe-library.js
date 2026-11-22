@@ -301,7 +301,7 @@ export async function build(ctx) {
   { const F = k.side('E', BA.u1); bancroftFace(F, F.s(BA.v1), F.s(BA.v0), F.s(5.2));
     // r5-east: the east entrance as photographed (Commons "The Bancroft Library, Berkeley, 2022"): incised "THE BANCROFT
     // LIBRARY" on the frieze band over the doorway, and a grey cast-metal lantern on a post beside the steps
-    const e = F.s(5.2), lg = new THREE.PlaneGeometry(6.6, 0.56); lg.translate(e, 8.38, 0.104);
+    const e = F.s(5.2), lg = new THREE.PlaneGeometry(6.6, 0.56); if (F.m && F.m.determinant() < 0) lg.scale(-1, 1, 1); lg.translate(e, 8.38, 0.104); // mirrored side frames would cull/reverse the lettering
     F.box(stone, e - 3.45, e + 3.45, 8.04, 8.72, 0, 0.1); // raised frieze panel (clears the pilasters)
     F.geom(signMat('THE BANCROFT LIBRARY', { bg: '#d8d2c3', fg: '#46423a', font: 'Georgia, serif', weight: '500', w: 1536, h: 130 }), lg);
     const lx = e + 4.6, ly = gBe + 0.02, metal = M.iron;

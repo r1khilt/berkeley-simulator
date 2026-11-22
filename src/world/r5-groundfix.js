@@ -10,7 +10,7 @@
 // OSM stair id -> overrides: pts (re-centred between its cheek walls), w (m), mat, rails (handrails at both edges)
 const OFF = typeof location !== 'undefined' && /[?&]r5fix=0/.test(location.search); // ?r5fix=0: A/B without these fixes
 export const STAIR_FIX = OFF ? {} : {
-  224038047: { pts: [[-21.6, 8.25], [-11.2, 5.7]], w: 7.3, mat: 'granite', rails: true },
+  224038047: { pts: [[-21.6, 8.25], [-11.2, 5.7]], w: 7.3, mat: 'brick', rails: true }, // red brick treads, light granite nosings
 };
 // OSM wall ids that carry a stone balustrade (cheek walls of the west stair + terrace-edge retaining walls)
 export const BALUSTRADE = new Set(OFF ? [] : [235955418, 235955411, 235955415, 235955416]);
@@ -45,7 +45,7 @@ export function balustrade(geo, P, yb, off) {
     const tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l, o = off(k - 1) * (1 - t) + off(k) * t;
     return [a[0] + (b[0] - a[0]) * t - tz * o, a[1] + (b[1] - a[1]) * t + tx * o, yb(k - 1) * (1 - t) + yb(k) * t, tx, tz];
   };
-  const PL = 0.16, BH = 0.56, RH = 0.12; // plinth, baluster, rail heights
+  const PL = 0.2, BH = 0.62, RH = 0.13; // plinth, baluster, rail heights (~1.05 m over the coping, as photographed)
   // plinth + rail in ~1 m pieces following the slope
   const seg = Math.max(1, Math.ceil(L / 1.0));
   for (let i = 0; i < seg; i++) {
@@ -55,10 +55,10 @@ export function balustrade(geo, P, yb, off) {
     box(geo, p, q, 0.115, A[2] + PL + BH - 0.04, B[2] + PL + BH - 0.04, A[2] + PL + BH, B[2] + PL + BH);   // rail soffit fillet
   }
   // vase balusters (8-sided lathe), skipping the pier zones
-  const prof = [[0, 0.062], [0.06, 0.062], [0.075, 0.05], [0.2, 0.078], [0.3, 0.062], [0.4, 0.04], [0.47, 0.05], [0.5, 0.062], [0.56, 0.062]];
+  const prof = [[0, 0.065], [0.065, 0.065], [0.08, 0.052], [0.22, 0.085], [0.33, 0.066], [0.44, 0.042], [0.52, 0.053], [0.555, 0.066], [0.62, 0.066]];
   const SIDES = 8;
   const piers = []; { const np = Math.max(1, Math.round(L / 3.2)); for (let i = 0; i <= np; i++) piers.push(L * i / np); }
-  const nearPier = (s) => piers.some((q) => Math.abs(q - s) < 0.42);
+  const nearPier = (s) => piers.some((q) => Math.abs(q - s) < 0.5);
   let nb = 0;
   for (let s = 0.14; s < L - 0.1; s += 0.28) {
     if (nearPier(s)) continue;
@@ -78,8 +78,8 @@ export function balustrade(geo, P, yb, off) {
   // square piers with a projecting cap
   for (const s of piers) {
     const [x, z, y, tx, tz] = at(Math.max(0.25, Math.min(L - 0.25, s))); const top = y + PL + BH + RH + 0.1;
-    box(geo, [x - tx * 0.26, z - tz * 0.26], [x + tx * 0.26, z + tz * 0.26], 0.26, y - 0.02, y - 0.02, top, top);
-    box(geo, [x - tx * 0.32, z - tz * 0.32], [x + tx * 0.32, z + tz * 0.32], 0.32, top, top, top + 0.09, top + 0.09);
+    box(geo, [x - tx * 0.33, z - tz * 0.33], [x + tx * 0.33, z + tz * 0.33], 0.33, y - 0.02, y - 0.02, top, top);
+    box(geo, [x - tx * 0.4, z - tz * 0.4], [x + tx * 0.4, z + tz * 0.4], 0.4, top, top, top + 0.1, top + 0.1);
   }
   return nb;
 }

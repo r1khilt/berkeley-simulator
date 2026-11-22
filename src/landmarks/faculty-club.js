@@ -69,7 +69,8 @@ export async function build(ctx) {
   function timberBand(R, fl) { // dark redwood upper storey projecting on carved brackets, small casement groups
     const y0 = fl + 3.35, y1 = 6.7;
     K.rbox(R, TIM, 0, y0, 0, R.L, y1, 0.32);
-    for (const t of [0.18, 0.4, 0.62, 0.84]) for (const dx of [-0.5, 0.5]) { const s = R.L * t + dx; K.rbox(R, M.windowNight, s - 0.42, y0 + 0.75, 0.32, s + 0.42, y0 + 1.95, 0.34); K.rbox(R, M.creamPaint || X.creamPaint, s - 0.46, y0 + 0.7, 0.33, s + 0.46, y0 + 0.78, 0.38, { detail: true }); for (const yy of [y0 + 1.15, y0 + 1.55]) K.rbox(R, X.creamPaint, s - 0.42, yy - 0.02, 0.34, s + 0.42, yy + 0.02, 0.37, { detail: true }); K.rbox(R, X.creamPaint, s - 0.02, y0 + 0.75, 0.34, s + 0.02, y0 + 1.95, 0.37, { detail: true }); }
+    // r5-east: a near-continuous ribbon of small-paned casements with dark green frames (photos), not 4 sparse cream-framed pairs
+    for (const t of [0.1, 0.22, 0.34, 0.46, 0.58, 0.7, 0.82, 0.94]) for (const dx of [-0.36, 0.36]) { const s = R.L * t + dx; K.rbox(R, M.windowNight, s - 0.32, y0 + 0.75, 0.32, s + 0.32, y0 + 1.95, 0.34); K.rbox(R, X.trimGreen, s - 0.35, y0 + 0.7, 0.33, s + 0.35, y0 + 0.78, 0.38, { detail: true }); for (const yy of [y0 + 1.15, y0 + 1.55]) K.rbox(R, X.trimGreen, s - 0.32, yy - 0.02, 0.34, s + 0.32, yy + 0.02, 0.37, { detail: true }); K.rbox(R, X.trimGreen, s - 0.02, y0 + 0.75, 0.34, s + 0.02, y0 + 1.95, 0.37, { detail: true }); }
     for (let i = 0; i <= 10; i++) { const s = 0.2 + (R.L - 0.4) * i / 10; K.rbox(R, TIM, s - 0.09, y0 - 0.55, 0, s + 0.09, y0, 0.3); K.rbox(R, TIM, s - 0.07, y0 + 0.1, 0.32, s + 0.07, y1 - 0.1, 0.4, { detail: true }); }
     K.rbox(R, TIM, -0.1, y0 - 0.12, 0, R.L + 0.1, y0 + 0.08, 0.45);
   }
