@@ -265,7 +265,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
 }
 
 const FACADE_GLSL = /* glsl */`
-uniform sampler2D uNoise; uniform float uNight; uniform vec3 uSkyZen, uSkyHor;
+uniform sampler2D uNoise; uniform float uNight; uniform vec3 uSkyZen, uSkyHor; uniform vec3 uSunDir;
 flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF; // flat: per-wall constants are hashed, interpolation noise would scramble rooms
 ${INTERIOR_GLSL}
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
@@ -285,6 +285,7 @@ void styleParams(int s, out vec4 A, out vec4 B){
   else {A=vec4(3.0,4.4,0.30,0.45);B=vec4(0.32,3.2,0.07,11.0);}
 }
 vec3 fCol; float fRough; float fMetal; vec3 fEmis; float fBump;
+float fSunOcc = 1.0; float fAmbOcc = 1.0; float fNrmK = 1.0;   // r4-generic: window reveal sun shadow / recess AO / relief mask
 void facade(vec3 wallC){
   // vFac.x packs style + 16*use (use drives the furnished interiors in interiors.js)
   int sAll = int(vFac.x+0.5); int s = sAll - (sAll/16)*16; int bUse = sAll/16; float seed = vFac.y; float edgeLen = vFac.z; float topH = vFac.w;
@@ -326,7 +327,7 @@ void facade(vec3 wallC){
   float bi = floor(u / bw); float fu = fract(u / bw);
   float ww = winW, wh = winH, sl = sill;
   if (fi < 0.5) {
-    if (s==7) { ww = 0.86; wh = 0.72; sl = 0.06; }            // storefront
+    if (s==7) { ww = 0.86; wh = 0.66; sl = 0.1; }             // storefront (r4-generic: 0.45 m bulkhead)
     else if (s==0) { ww = 0.30; wh = 0.42; sl = 0.30; }
     else if (s==4) { ww = 0.94; wh = 0.85; sl = 0.04; }
   }
@@ -343,17 +344,70 @@ void facade(vec3 wallC){
     float inX = 1.0 - smoothstep(hwx-ax, hwx+ax, hx);
     float inY = smoothstep(y0-ay, y0+ay, y) * (1.0 - smoothstep(y1-ay, y1+ay, y));
     // arched tops for classical & church
-    if ((s==0 && fi > 0.5) || s==9) { float rr = hwx; float cy = y1 - rr; if (y > cy) { float d = length(vec2(hx, y-cy)); inY *= 1.0 - smoothstep(rr-ax, rr+ax, d); } }
+    bool arch = (s==0 && fi > 0.5) || s==9;
+    if (arch) { float rr = hwx; float cy = y1 - rr; if (y > cy) { float d = length(vec2(hx, y-cy)); inY *= 1.0 - smoothstep(rr-ax, rr+ax, d); } }
     float win = inX*inY;
     float fw = frameW;
-    float sideRev = smoothstep(hwx-0.14, hwx, hx) * step(0.5, fu); col = mix(col, col*0.62, sideRev*win*(1.0-lodW)*0.0);
     float inXf = 1.0 - smoothstep(hwx+fw-ax, hwx+fw+ax, hx), inYf = smoothstep(y0-fw-ay, y0-fw+ay, y)*(1.0-smoothstep(y1+fw-ay, y1+fw+ay, y));
     float frame = clamp(inXf*inYf - win, 0.0, 1.0);
     vec3 frameC = (s==3||s==4||s==10||s==8) ? vec3(0.16,0.17,0.18) : (s==1||s==5||s==11||s==0||s==2) ? vec3(0.86,0.85,0.8) : vec3(0.3);
-    // glass: dark, slight blue, reflective; recess shadow at top
-    vec3 glass = vec3(0.05,0.06,0.07);
-    float rec = smoothstep(y1 - 0.35*fh*wh, y1, y);
-    glass *= 1.0 - 0.35*rec;
+    // r4-generic: storefront ground floors (shops): bulkhead, transom bar, door bay, sign band
+    bool shop = fi < 0.5 && (s == 7 || (bUse == 5 && s != 0 && s != 9 && s != 4));
+    float bh = h21(vec2(seed * 41.0, 3.7));    // per-building dice
+    vec3 wallBase = col;
+    if (shop) {
+      // sign band / fascia between the storefront head and the first floor
+      float sb0 = y1 + 0.12, sb1 = groundH - 0.12;
+      if (y > sb0 && y < sb1 && bh < 0.75) {
+        vec3 sc = bh < 0.2 ? vec3(0.05, 0.05, 0.055) : bh < 0.35 ? vec3(0.62, 0.57, 0.48) : bh < 0.47 ? vec3(0.32, 0.07, 0.06) : bh < 0.58 ? vec3(0.07, 0.17, 0.11) : bh < 0.66 ? vec3(0.06, 0.09, 0.2) : wallBase * 0.55;
+        float edge = smoothstep(sb0, sb0 + 0.06, y) * (1.0 - smoothstep(sb1 - 0.06, sb1, y));
+        col = mix(col, sc, edge); rough = mix(rough, 0.5, edge);
+      }
+      // bulkhead (kick plate) under the glass: dark tile, stone or painted panel
+      if (y < y0 && hx < hwx + 0.05) {
+        float kb = h21(vec2(seed * 13.0, 9.1));
+        vec3 kc = kb < 0.35 ? vec3(0.05, 0.05, 0.05) : kb < 0.55 ? vec3(0.42, 0.4, 0.37) : kb < 0.75 ? wallBase * 0.6 : vec3(0.18, 0.12, 0.1);
+        float top = 1.0 - smoothstep(y0 - 0.05, y0 - 0.03, y);
+        col = mix(col, kc, top * inX); rough = mix(rough, 0.45, top * inX);
+      }
+    }
+    // ---- r4-generic: recessed glass. The glass sits dRev behind the wall; jambs, head and sill show with parallax
+    // and cast sun shadow on the glass (fSunOcc scales direct light after the light loop).
+    float dRev = s==4 ? 0.03 : (s==0||s==9) ? 0.24 : s==10 ? 0.3 : s==1 ? 0.17 : (s==5||s==11) ? 0.07 : s==6 ? 0.08 : 0.12;
+    if (shop) dRev = 0.1;
+    vec3 Nw = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tw = vec3(-Nw.z, 0.0, Nw.x);   // Tw: direction of increasing u
+    vec3 Vw = normalize(vWPosF - cameraPosition);
+    vec3 rdW = vec3(dot(Vw, Tw), Vw.y, max(-dot(Vw, Nw), 0.04));   // window space: x along u, y up, +z into the wall
+    float lx = (fu - 0.5) * bw;                                     // across the bay, 0 = opening centre
+    float tG = dRev / rdW.z;
+    float tX = (sign(rdW.x) * hwx - lx) / (abs(rdW.x) < 1e-4 ? 1e-4 : rdW.x);
+    float tY = ((rdW.y > 0.0 ? y1 : y0) - y) / (abs(rdW.y) < 1e-4 ? 1e-4 : rdW.y);
+    float tH = min(tG, min(max(tX, 0.0), max(tY, 0.0)));
+    vec3 hp = vec3(lx, y, 0.0) + rdW * tH;                         // first surface hit inside the opening
+    float onGlass = (tG <= tX && tG <= tY) ? 1.0 : 0.0;
+    float revK = win * (1.0 - lodW) * (1.0 - onGlass);              // pixel shows a reveal surface
+    vec3 jambN = (tX < tY) ? -sign(rdW.x) * Tw : vec3(0.0, rdW.y > 0.0 ? -1.0 : 1.0, 0.0);
+    vec3 Ls = normalize(uSunDir); vec3 sW = vec3(dot(Ls, Tw), Ls.y, -dot(Ls, Nw));
+    float sunOcc = 1.0;
+    if (sW.z < -0.02) { vec2 q = hp.xy + sW.xy * (hp.z / -sW.z); float e = 0.015 + ax;
+      sunOcc = (1.0 - smoothstep(hwx - e, hwx + e, abs(q.x))) * smoothstep(y0 - e, y0 + e, q.y) * (1.0 - smoothstep(y1 - e, y1 + e, q.y)); }
+    // glass-plane coordinates for sash, mullions and the room behind
+    float gx = hp.x, gy = hp.y;
+    float sw = (s==5||s==11) ? 0.07 : (s==0||s==1||s==2||s==9) ? 0.06 : 0.045;
+    float dEdge = min(hwx - abs(gx), min(gy - y0, y1 - gy));
+    float bar = 1.0 - smoothstep(sw - ax, sw + ax, dEdge);
+    bool oldSash = s==0||s==1||s==2||s==5||s==6||s==11;
+    if (shop) {
+      float tb = min(2.75, y1 - 0.5);
+      bar = max(bar, 1.0 - smoothstep(0.03 - ay, 0.03 + ay, abs(gy - tb)));             // transom bar
+      if (hwx > 1.2) bar = max(bar, 1.0 - smoothstep(0.03 - ax, 0.03 + ax, abs(gx)));    // centre mullion
+    } else {
+      if (oldSash && !arch && wh * fh > 1.1) bar = max(bar, 1.0 - smoothstep(0.035 - ay, 0.035 + ay, abs(gy - (y0 + y1) * 0.52)));   // meeting rail
+      if (2.0 * hwx > 1.35 && s != 4) bar = max(bar, 1.0 - smoothstep(0.03 - ax, 0.03 + ax, abs(abs(gx) - (2.0 * hwx > 2.6 ? hwx / 3.0 : 0.0))));
+    }
+    if (s == 4) bar = max(bar, 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04));
+    vec3 sashC = oldSash ? (bh < 0.7 ? vec3(0.82, 0.81, 0.77) : bh < 0.85 ? vec3(0.08, 0.1, 0.09) : vec3(0.3, 0.2, 0.14))
+                         : (bh < 0.55 ? vec3(0.07, 0.07, 0.075) : bh < 0.8 ? vec3(0.5, 0.5, 0.48) : vec3(0.16, 0.12, 0.09));
     // furnished interiors (interiors.js): floors share a room type; rooms span 1-4 bays; lights per room
     int rType = irFloorType(bUse, fi, h21(vec2(fi + 0.5, seed * 17.0)), fract(seed * 7.13));
     float span = min(irSpanOf(rType, h21(vec2(fi + 1.5, seed * 5.0))), nb);
@@ -361,55 +415,68 @@ void facade(vec3 wallC){
     float rseed = floor(h21(vec2(ri + seed * 31.0, fi * 1.7 + seed * 7.0)) * 997.0) + fi * 13.0;
     float lit = irLitOf(rType, fract(rseed * 0.618 + 0.11));
     vec3 litC = irLampColor(rType, fract(rseed * 0.618));
+    float wseed = h21(vec2(bi * 3.1 + seed, fi * 7.3)) * 911.0;
     vec3 interior = vec3(0.0);
     float farK = smoothstep(0.15, 0.6, pxu / bw * 8.0);   // tiny windows: average room colour, skip the trace
+    vec4 cv = irCoverAvg(rType, wseed);                   // blinds / curtains (albedo, coverage)
+    float covA = cv.a * 0.85; vec3 covAlb = cv.rgb;       // far: a blind covers part of the pane on average
     if (farK > 0.0 || uInteriors < 0.5) interior = irAverage(rType, rseed, lit, litC);
     if (lodW < 0.95 && abs(vWNF.y) < 0.5 && win > 0.001 && farK < 0.999 && uInteriors > 0.5) {
-      vec3 N = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tu = vec3(-N.z, 0.0, N.x);   // Tu: direction of increasing u
-      vec3 Vd = vWPosF - cameraPosition; float camD = length(Vd); vec3 V = Vd / max(camD, 1e-4);
       float Wr = min(span, nb - ri * span) * bw, Hr = fh - 0.3;
       float bx = (bi - ri * span) * bw + bw * 0.5;
-      vec3 ro = vec3(u - ri * span * bw, min(fv * fh, Hr - 0.01), 0.0);
-      vec3 rm = irRoom(ro, vec3(dot(V, Tu), V.y, -dot(V, N)), vec3(Wr, Hr, irDepthOf(rType, fract(rseed * 0.31))), rType, rseed,
-                        h21(vec2(bi * 3.1 + seed, fi * 7.3)) * 911.0, lit, vec4(bx - hwx, y0, bx + hwx, y1), max(pxu, pxv), camD);
+      vec3 ro = vec3(u - ri * span * bw + (gx - lx), min(gy, Hr - 0.01), 0.0);
+      irSplit = true;
+      vec3 rm = irRoom(ro, rdW, vec3(Wr, Hr, irDepthOf(rType, fract(rseed * 0.31))), rType, rseed,
+                        wseed, lit, vec4(bx - hwx, y0, bx + hwx, y1), max(pxu, pxv), length(vWPosF - cameraPosition));
+      irSplit = false;
       interior = mix(rm, interior, farK);
+      covA = mix(irCovOut.a, covA, farK); covAlb = mix(irCovAlb, covAlb, farK);
     }
-    // mullions
-    float mul = 0.0;
-    if (s==4) { mul = 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04); }
-    else if (ww*bw > 1.2) { float mu = abs(fract((hx/(hwx))*1.0 + 0.0)-0.0); mul = 1.0 - smoothstep(0.02, 0.02+ax, abs(hx - 0.0)); }
-    float wmask = win * (1.0 - lodW);
-    col = mix(col, frameC, frame*(1.0-lodW));
-    col = mix(col, glass, wmask);
-    col = mix(col, frameC*0.6, mul*wmask);
-    rough = mix(rough, 0.06, wmask); fMetal = mix(0.0, 0.35, wmask);
-    // daytime: dim room seen through glass; night: lit rooms glow (with their interior detail)
-    // fake reflection of sky / street in the glass with Fresnel
-    vec3 Nw = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Vw = normalize(vWPosF - cameraPosition);
-    vec3 Rf = reflect(Vw, Nw); float cosT = clamp(dot(-Vw, Nw), 0.0, 1.0);
-    float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
+    // ---- glass: Fresnel reflection of sky / opposite buildings / street over a dim room (daylight interiors are far
+    // darker than the street). Each pane is tilted a hair differently so reflections break between panes.
+    float ph = h21(vec2(bi * 7.1 + seed * 13.0 + step(0.0, gx) * 3.0, fi * 3.3 + step((y0 + y1) * 0.52, gy) * 1.7));
+    vec3 Rf = reflect(Vw, Nw); Rf = normalize(Rf + Tw * (ph - 0.5) * 0.06 + vec3(0.0, (fract(ph * 7.3) - 0.5) * 0.05, 0.0));
+    float cosT = clamp(-dot(Vw, Nw), 0.0, 1.0);
+    float F0 = s == 4 ? 0.2 : 0.09;
+    float F = F0 + (1.0 - F0) * pow(1.0 - cosT, 5.0);
+    float lumH = dot(uSkyHor, vec3(0.2126, 0.7152, 0.0722));
     float cl = textureLod(uNoise, Rf.xz / max(0.3, Rf.y + 0.45) * 0.03 + seed, 2.0).r;
-    vec3 skyR = mix(uSkyHor, uSkyZen, smoothstep(0.0, 0.6, Rf.y)) * (0.9 + 0.35 * smoothstep(0.55, 0.75, cl));
-    float ang = atan(Rf.x, Rf.z); float skyline = 0.05 + 0.14 * textureLod(uNoise, vec2(ang * 0.5, seed), 2.5).g;   // smooth: reads as a soft reflection over the interiors
-    vec3 streetR = mix(uSkyHor * 0.08, uSkyHor * 0.22, smoothstep(-0.4, 0.0, Rf.y)) * (0.75 + 0.5 * textureLod(uNoise, vec2(ang * 0.6, seed), 1.0).r);
-    vec3 refl = mix(streetR, skyR, smoothstep(skyline - 0.06, skyline + 0.06, Rf.y));
-    float wobble = (texture(uNoise, vec2(bi * 0.37 + seed, fi * 0.21)).b - 0.5) * 0.15;
-    refl *= 1.0 + wobble;
-    float kRefl = mix(mix(0.2, 0.9, F), mix(0.25, 0.95, F), lodW);
-    fEmis = interior * vec3(0.9, 0.94, 0.94) * wmask * (1.0 - kRefl * 0.8) * (1.0 - rec*0.3) + refl * kRefl * wmask * 0.85;
-    col = mix(col, vec3(0.02, 0.025, 0.03), wmask); rough = mix(rough, 0.4, wmask); fMetal = mix(fMetal, 0.0, wmask);
-    // far LOD: average window coverage
+    vec3 skyR = mix(uSkyHor, uSkyZen, smoothstep(0.02, 0.6, Rf.y)) * (0.9 + 0.35 * smoothstep(0.55, 0.75, cl));
+    float ang = atan(Rf.x, Rf.z);
+    float skyline = 0.04 + 0.17 * textureLod(uNoise, vec2(ang * 0.5, seed), 2.5).g;
+    float treeK = smoothstep(0.42, 0.62, textureLod(uNoise, vec2(ang * 1.3, seed * 3.0 + 0.5), 2.0).r);
+    vec3 oppR = mix(vec3(0.6, 0.56, 0.5) * (0.55 + 0.6 * textureLod(uNoise, vec2(ang * 2.3, seed + 0.25), 1.5).b), vec3(0.16, 0.2, 0.14), treeK) * lumH;
+    vec3 streetR = vec3(0.3, 0.29, 0.28) * lumH * (0.35 + 0.3 * smoothstep(-0.5, 0.0, Rf.y));
+    vec3 refl = mix(mix(streetR, oppR, smoothstep(-0.04, 0.01, Rf.y)), skyR, smoothstep(skyline - 0.015, skyline + 0.015, Rf.y));
+    float dayK = mix(0.38, 1.0, uNight);                // daylight rooms read dim behind glass
+    float paneK = win * (1.0 - lodW) * onGlass * (1.0 - bar);
+    float sashK = win * (1.0 - lodW) * onGlass * bar;
+    // compose: casing trim on the wall plane, reveal surfaces, sash, then glass (blind = lit albedo, room + reflection = emissive)
+    col = mix(col, frameC, frame*(1.0-lodW));
+    col = mix(col, wallBase * 0.92, revK);                       // reveal returns: same material, lit with their own normal
+    fNrm = mix(fNrm, jambN - Nw, revK);
+    col = mix(col, sashC, sashK); rough = mix(rough, 0.5, sashK);
+    vec3 glassAlb = covAlb * covA * 0.8 * (1.0 - F);
+    col = mix(col, glassAlb, paneK);
+    rough = mix(rough, 0.25, paneK * (1.0 - covA)); rough = mix(rough, 0.6, paneK * covA);
+    fEmis = (refl * F + interior * dayK * vec3(0.9, 0.94, 0.94) * (1.0 - covA) * (1.0 - F) * 0.85 + covAlb * covA * litC * lit * 0.35 * uNight) * paneK;
+    fSunOcc = mix(1.0, sunOcc, win * (1.0 - lodW));
+    fAmbOcc = mix(1.0, 0.72 + 0.28 * onGlass, win * (1.0 - lodW));
+    fNrmK = mix(1.0, 0.0, paneK);
+    // far LOD: average window coverage (glass darkens the wall, reflects the sky at grazing angles, lit rooms glow at night)
     float cover = ww*wh;
-    col = mix(col, mix(col, vec3(0.1,0.11,0.12), cover*0.8), lodW);
+    float covF = cv.a * 0.6;
+    col = mix(col, mix(col, mix(vec3(0.02, 0.022, 0.025), covAlb * 0.75, covF), cover * 0.85), lodW);
+    fEmis += (refl * F + interior * dayK * 0.6) * cover * 0.85 * (1.0 - covF) * lodW;
     fEmis += litC * lit * cover * 0.45 * uNight * lodW;   // far LOD: lit rooms as a soft glow
   }
   fCol = col; fRough = rough;
 }`;
 
-function makeWallMaterial() {
+export function makeWallMaterial() { // exported for QA hot-swap (tools)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials
+    sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; sh.uniforms.uSunDir = U.uSunDir; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials; r4-generic: uSunDir for window reveals
     sh.uniforms.uInteriors = IR.uInteriors; // interiors.js detail level
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFac = aFac; vUvF = uv; vWPosF = (modelMatrix*vec4(transformed,1.0)).xyz; vWNF = normalize(mat3(modelMatrix)*normal);');
@@ -418,12 +485,13 @@ function makeWallMaterial() {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = fRough;')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = fMetal;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += fEmis;')
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * step(0.5, fRough), 0.0)).xyz);'); // gfx-materials: wall relief (not on glass)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * fNrmK, 0.0)).xyz);') // gfx-materials: wall relief (not on glass); r4-generic: fNrmK mask, reveal normals
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.directDiffuse *= fSunOcc; reflectedLight.directSpecular *= fSunOcc; reflectedLight.indirectDiffuse *= fAmbOcc;'); // r4-generic: window reveal shadow + recess AO
   };
-  mat.customProgramCacheKey = () => 'facade-v5-interiors-pbr1-' + IR.level;
+  mat.customProgramCacheKey = () => 'facade-v6-r4-' + IR.level;
   return mat;
 }
-function makeRoofMaterial() {
+export function makeRoofMaterial() {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.9, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNoise = { value: noiseTexture() }; pbrUniforms(sh.uniforms); // gfx-materials
