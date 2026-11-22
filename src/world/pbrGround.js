@@ -99,11 +99,12 @@ void groundShadePBR(vec2 w, float dist) {
       mu.c = mix(vec3(0.05, 0.032, 0.022), mu.c, 0.55);
       PS gc = gTapT(w, gWP, 0.33, 2.0, L_LAWN, 1.0 - kIso, near);                  // leafy set at 3x scale -> broad leaves
       vec3 gm = vec3(0.0743, 0.1139, 0.0376);
-      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(1.5)) * vec3(0.6, 0.76, 0.68) * (0.8 + 0.35 * n1.r); // deeper blue-green
-      gc.r = mix(gc.r, 0.7, 0.5);
+      // dark, glossy, high-contrast ivy so a bed never reads as a darker (or worn) patch of lawn
+      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(2.0)) * vec3(0.4, 0.52, 0.42) * (0.8 + 0.35 * n1.r);
+      gc.r = mix(gc.r, 0.55, 0.6);
       float cov = n1.g * 0.45 + n2.r * 0.35 + n0.g * 0.2 + (gc.h - mu.h) * 0.25;
-      float kc = smoothstep(0.3, 0.4, cov) * smoothstep(0.05, 0.4, dD);           // ~85 % cover; clean mulch strip at the edge
-      mu.c *= 0.75 + 0.25 * (1.0 - smoothstep(0.3, 0.45, cov));                    // gaps sit in the plants' shade
+      float kc = smoothstep(0.2, 0.28, cov) * smoothstep(0.05, 0.35, dD);          // ~95 % cover; clean mulch strip at the edge
+      mu.c *= 0.75 + 0.25 * (1.0 - smoothstep(0.2, 0.32, cov));                    // gaps sit in the plants' shade
       a = pbrMix(mu, gc, kc);
       a.c *= 0.92 + 0.16 * n0.b;
     } else {
