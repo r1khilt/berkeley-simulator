@@ -98,6 +98,7 @@ export function buildTabling({ line, heightAt, ok, rand = Math.random }) {
         for (const [lx, lz] of [[-hw, -hw], [hw, -hw], [-hw, hw], [hw, hw]]) { const p = new THREE.BoxGeometry(0.035, H, 0.035); p.translate(lx, H / 2, lz + oz); set.m.add(place(p, x, y, z, yaw), hex('#b5b8bc')); }
         const roof = new THREE.ConeGeometry(hw * Math.SQRT2, 0.6, 4, 1, true); roof.rotateY(Math.PI / 4); roof.translate(0, H + 0.3, oz); set.f.add(place(roof, x, y, z, yaw), cc);
         for (const [lx, lz, a] of [[0, -hw, 0], [0, hw, 0], [-hw, 0, Math.PI / 2], [hw, 0, Math.PI / 2]]) { const v = new THREE.BoxGeometry(hw * 2, 0.22, 0.01); v.rotateY(a); v.translate(lx, H - 0.08, lz + oz); set.f.add(place(v, x, y, z, yaw), cc); }
+        const cb = cell(new THREE.PlaneGeometry(1.3, 0.5)); cb.rotateY(Math.PI); cb.translate(0, H - 0.45, -hw + oz - 0.012); set.b.add(place(cb, x, y, z, yaw), [1, 1, 1]); // club banner hung from the front valance
       }
       // A-frame sandwich board out in front of a third of the tables
       if (rand() < 0.33) {
@@ -106,7 +107,15 @@ export function buildTabling({ line, heightAt, ok, rand = Math.random }) {
         for (const a of [0.2, -0.2]) { const p = new THREE.BoxGeometry(0.6, 0.85, 0.02); p.translate(0, 0.42, 0); p.rotateX(a); p.translate(0, 0, a > 0 ? -0.17 : 0.17); set.f.add(place(p, x + wx, y, z + wz, ay), hex(c[2]));
           const face = cell(new THREE.PlaneGeometry(0.56, 0.36)); if (a > 0) face.rotateY(Math.PI); face.translate(0, 0.52, a > 0 ? -0.012 : 0.012); face.rotateX(a); face.translate(0, 0, a > 0 ? -0.17 : 0.17); set.b.add(place(face, x + wx, y, z + wz, ay), [1, 1, 1]); }
       }
-      tables.push({ x, z, y, yaw, core, canopy, club: c[0] });
+      let chair = null;
+      if (rand() < 0.4) { // folding chair behind the table for a seated tabler
+        const lx = rand() < 0.5 ? -0.45 : 0.45, cz0 = 0.68; const ch = hex('#3c3f44');
+        const seat = new THREE.BoxGeometry(0.42, 0.03, 0.4); seat.translate(lx, 0.45, cz0); set.m.add(place(seat, x, y, z, yaw), ch);
+        const back = new THREE.BoxGeometry(0.42, 0.3, 0.025); back.rotateX(-0.1); back.translate(lx, 0.75, cz0 + 0.2); set.m.add(place(back, x, y, z, yaw), ch);
+        for (const [px, pz] of [[-0.19, -0.18], [0.19, -0.18], [-0.19, 0.2], [0.19, 0.2]]) { const lg = new THREE.CylinderGeometry(0.011, 0.011, 0.45, 4); lg.translate(lx + px, 0.225, cz0 + pz); set.m.add(place(lg, x, y, z, yaw), hex('#9a9da1')); }
+        chair = { lx, lz: cz0 };
+      }
+      tables.push({ x, z, y, yaw, core, canopy, club: c[0], chair });
     }
   }
   const group = new THREE.Group(); group.name = 'life:tabling';

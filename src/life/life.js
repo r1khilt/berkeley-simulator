@@ -29,7 +29,7 @@ const QL = { // per quality level: walkers, riders, static-spot share, draw dist
   ultra: { walk: 300, ride: 56, spots: 1, far: 230, lod: 60, nearMax: 260, farMax: 620, shadow: true },
 };
 // hotspots: [x, z, sigma, weight]
-const HOT = [[-135, 255, 55, 3.2], [-147, 206, 28, 2.0], [-140, -118, 65, 1.6], [0, -25, 55, 1.6], [-185, -25, 55, 1.2], [-180, 110, 70, 1.6], [-378, 67, 55, 1.0],
+const HOT = [[-135, 255, 55, 4.4], [-147, 206, 28, 2.0], [-140, -118, 65, 1.6], [0, -25, 55, 1.6], [-185, -25, 55, 1.2], [-180, 110, 70, 1.6], [-378, 67, 55, 1.0],
   [-85, 520, 80, 1.0], [-40, -330, 85, 1.1], [-250, 320, 45, 1.2], [270, 220, 60, 0.8], [420, 60, 60, 0.7], [80, 270, 50, 0.7], [-300, 150, 60, 0.9]];
 const hot = (x, z) => { let w = (x > -720 && x < 470 && z > -520 && z < 420) ? 0.3 : 0.12; for (const [hx, hz, s, k] of HOT) { const d2 = (x - hx) ** 2 + (z - hz) ** 2; w += k * Math.exp(-d2 / (2 * s * s)); } return w; };
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -55,7 +55,7 @@ export class CampusLife {
     this.trunks = new Map(); if (trees) for (let i = 0; i < trees.n; i++) { if (trees.h[i] < 250) continue; const x = trees.x[i] / 10, z = trees.z[i] / 10; const k = cellKey(x, z, 8); let l = this.trunks.get(k); if (!l) this.trunks.set(k, (l = [])); l.push([x, z, Math.min(1.1, 0.25 + trees.h[i] / 100 * 0.015)]); }
     this.fps = []; if (manifest) for (const l of manifest.landmarks) for (const fp of l.footprints || []) if (fp.length > 2) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of fp) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } this.fps.push({ fp, b: [x0, z0, x1, z1] }); }
     // ---- graphs
-    this.graph = this.walkG = buildGraph(vectors.paths.filter((L) => !L.tunnel && (L.hw === 'footway' || L.hw === 'pedestrian' || L.hw === 'path' || L.hw === 'steps')), (L) => ({ pedestrian: 2.6, footway: 1, path: 0.7, steps: 0.45 }[L.hw] || 1), (L) => (L.hw === 'pedestrian' ? 2.7 : Math.max(0.35, (L.w || 2) / 2 - 0.25)), 40);
+    this.graph = this.walkG = buildGraph(vectors.paths.filter((L) => !L.tunnel && (L.hw === 'footway' || L.hw === 'pedestrian' || L.hw === 'path' || L.hw === 'steps')), (L) => ({ pedestrian: 3.2, footway: 1, path: 0.7, steps: 0.45 }[L.hw] || 1), (L) => (L.hw === 'pedestrian' ? 2.7 : Math.max(0.35, (L.w || 2) / 2 - 0.25)), 40);
     const campus = (x, z) => x > -720 && x < 470 && z > -520 && z < 420;
     const rideRoads = vectors.roads.filter((r) => !r.tunnel && r.hw !== 'construction' && (r.hw !== 'service' || campus(r.pts[0][0], r.pts[0][1])));
     const BUSY = new Set(['Bancroft Way', 'Telegraph Avenue', 'Durant Avenue', 'College Avenue', 'Hearst Avenue', 'Oxford Street', 'Piedmont Avenue', 'Channing Way', 'Dana Street', 'Bowditch Street', 'Shattuck Avenue', 'Fulton Street']); // student bike routes around campus
@@ -178,7 +178,8 @@ export class CampusLife {
       const g = this._group({ cat: 'table', table: t });
       const fx = -Math.sin(t.yaw), fz = -Math.cos(t.yaw); // table front (walkway side)
       const rx = Math.cos(t.yaw), rz = -Math.sin(t.yaw);    // table local +x
-      const nT = R() < 0.7 ? 1 : 2;
+      if (t.chair) { const lx = t.chair.lx, lz = t.chair.lz; this._spot({ cat: 'table', table: t, x: t.x + rx * lx - fx * lz + fx * 0.05, z: t.z + rz * lx - fz * lz + fz * 0.05, y: t.y, yaw: t.yaw, pose: POSE.SIT, vari: [5, 5, 1, 0][Math.floor(R() * 4)], aux: 0.46, p: 0.9, groupId: g.id }); }
+      const nT = t.chair ? (R() < 0.5 ? 1 : 0) : R() < 0.7 ? 1 : 2;
       for (let k = 0; k < nT; k++) { const lx = nT === 1 ? (R() - 0.5) * 0.6 : (k ? 0.45 : -0.45); this._spot({ cat: 'table', table: t, x: t.x + rx * lx - fx * 0.75, z: t.z + rz * lx - fz * 0.75, y: t.y, yaw: t.yaw, pose: POSE.STAND, vari: [6, 6, 4, 4, 1, 0, 5][Math.floor(R() * 7)], aux: 0, p: 0.92, groupId: g.id }); }
       if (R() < 0.6) { const lx = (R() - 0.5) * 1.2; this._spot({ cat: 'table', table: t, x: t.x + rx * lx + fx * (0.95 + R() * 0.3), z: t.z + rz * lx + fz * (0.95 + R() * 0.3), y: t.y, yaw: t.yaw + Math.PI + (R() - 0.5) * 0.5, pose: POSE.STAND, vari: [0, 2, 3, 5][Math.floor(R() * 4)], aux: 0, p: 0.6, groupId: g.id }); }
     }

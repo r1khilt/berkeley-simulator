@@ -113,7 +113,7 @@ export function personGeometry(detail = 1) {
     B.add(limb(0.055, 0.04, s * 0.092, 0.5, 0.1, 0.008, L, 1, 1.05), sh, SLOT.shin, 0, femLeg);
     const shoe = hi ? new THREE.CapsuleGeometry(0.047, 0.16, 3, 6) : new THREE.BoxGeometry(0.095, 0.26, 0.09); shoe.rotateX(Math.PI / 2); shoe.scale(1, 0.95, 1); shoe.translate(s * 0.094, 0.05, -0.06);
     B.add(shoe, ft, SLOT.shoe);
-    if (hi) B.add(box(0.098, 0.022, 0.255, s * 0.094, 0.011, -0.06), ft, SLOT.sole);
+    if (hi) B.add(box(0.088, 0.02, 0.245, s * 0.094, 0.01, -0.06), ft, SLOT.sole);
   }
   // ---- arms (shoulder ball + upper arm, elbow ball + forearm + hand)
   const femArm = (x) => [-Math.sign(x) * 0.016, 0, 0];
@@ -326,7 +326,7 @@ vec3 bsimColor(){
   if (slot == 6) return (fl & 2) != 0 ? bot : skin * 0.97;
   if (slot == 7) { float h = fract(aCol1.r * 7.13 + aCol0.g * 3.1); return h < 0.45 ? vec3(0.06, 0.065, 0.075) : h < 0.6 ? vec3(0.02, 0.12, 0.28) : h < 0.75 ? vec3(0.35, 0.1, 0.08) : h < 0.88 ? vec3(0.18, 0.22, 0.16) : vec3(0.5, 0.42, 0.3); }
   if (slot == 8) { float h = fract(aCol0.b * 5.7 + aCol1.g * 2.3); return h < 0.4 ? vec3(0.0, 0.11, 0.25) : h < 0.6 ? vec3(0.85, 0.62, 0.08) : h < 0.8 ? vec3(0.05) : vec3(0.55, 0.53, 0.5); }
-  if (slot == 9) return vec3(0.8, 0.79, 0.76);
+  if (slot == 9) return int(aStyle.w + 0.5) == 0 ? vec3(0.78, 0.77, 0.74) : vec3(0.09, 0.09, 0.095); // rubber sole: white only under white sneakers
   if (slot == 10) return vec3(0.03, 0.03, 0.035);
   return vec3(0.88, 0.86, 0.8);
 }
