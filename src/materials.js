@@ -224,7 +224,7 @@ export function materials() {
     asphalt: T.asphalt ? std({ color: 0x9a9a9c, roughness: 0.95 }, T.asphalt) : std({ color: 0x45474a, roughness: 0.95 }, T.concrete), // gfx-materials
     whitePaint: std({ color: 0xf3f1ec, roughness: 0.6 }),
     blackPaint: std({ color: 0x18191b, roughness: 0.5 }),
-    turf: std({ color: 0x4c7a33, roughness: 0.95 }),
+    turf: Object.assign(std({ color: 0x52663a, roughness: 0.95 }), { userData: { groundTurf: true } }), // r4-ground: lawn-matched colour; world-space lawn texture via pbr.js turfWorld (was flat 0x4c7a33 'neon')
     calBlue: std({ color: 0x003262, roughness: 0.7 }),     // Berkeley Blue
     calGold: std({ color: 0xfdb515, roughness: 0.6 }),     // California Gold
     seatBlue: std({ color: 0x0b3a6e, roughness: 0.6 }),

@@ -21,6 +21,22 @@ PS gTapS(vec2 uv, float Lr, float near) {
   if (near < 1.0) { PS f = pbrFarPS(Lr); s.c = mix(f.c, s.c, near); s.g *= near; }
   return s;
 }
+// r4-ground: geometric (heightfield) normal, unnormalised with y = 2 like the lighting normal; set by terrain.js
+// before groundShade*(). Used for slope-aware texturing so banks and berms are not stretched/striped.
+vec3 gGeoNr = vec3(0.0, 2.0, 0.0);
+// slope-aware tap for natural surfaces: blends in side projections (x-facing / z-facing) on steep ground
+PS gTapT(vec2 w, vec3 wp, float sc, float size, float Lr, float k, float near) {
+  PS s = gTap(w * sc, size, Lr, k, near);
+  vec3 nn = normalize(gGeoNr);
+  float st = smoothstep(0.92, 0.74, nn.y);                 // ~23 deg .. ~42 deg
+  if (st <= 0.0 || near <= 0.0) return s;
+  vec2 a = nn.xz * nn.xz + 1e-5; a /= (a.x + a.y);
+  vec3 c = vec3(0.0); float r = 0.0, h = 0.0, ws = 0.0;
+  if (a.x > 0.08) { PS t = gTap(vec2(wp.z, -wp.y) * sc, size, Lr, k, near); c += t.c * a.x; r += t.r * a.x; h += t.h * a.x; ws += a.x; }
+  if (a.y > 0.08) { PS t = gTap(vec2(wp.x, -wp.y) * sc, size, Lr, k, near); c += t.c * a.y; r += t.r * a.y; h += t.h * a.y; ws += a.y; }
+  s.c = mix(s.c, c / ws, st); s.r = mix(s.r, r / ws, st); s.h = mix(s.h, h / ws, st); s.g *= 1.0 - st;
+  return s;
+}
 // anti-aliased thin line from a signed distance-like value d (units of its own gradient)
 float aaLine(float d, float wdt) { float fw = max(fwidth(d), 1e-5); float ww = max(wdt, fw * 0.75); return (1.0 - smoothstep(ww - fw * 0.5, ww + fw * 0.5, abs(d))) * (wdt / ww); }
 // joint mask from distance-to-joint jd (metres) and half-width jw: sub-pixel joints get wider but fainter instead of dashed
@@ -36,7 +52,10 @@ void groundShadePBR(vec2 w, float dist) {
   float det = 1.0 - smoothstep(25.0, 90.0, dist);         // small decals (joints, cracks, gum)
   float edgeN = (n1.g - 0.5) * 0.9 + (n2.b - 0.5) * 0.35;
   float dA = (s.r - 0.5) * 6.0, dP = (s.g - 0.5) * 6.0, dG = (s.b - 0.5) * 6.0, dD = (s.a - 0.5) * 6.0;
-  float mA = aaStep(dA + 0.05), mP = aaStep(dP + 0.05 + (n2.b - 0.5) * 0.06), mG = aaStep(dG + edgeN * 0.7), mD = aaStep(dD + edgeN);
+  // r4-ground: maintained beds (special id 8) get a crisp, clean edge; natural areas keep the organic wobble
+  float bedK = step(abs(sp - 8.0), 0.5);
+  vec3 gWP = vec3(w.x, vWPos.y, w.y);
+  float mA = aaStep(dA + 0.05), mP = aaStep(dP + 0.05 + (n2.b - 0.5) * 0.06), mG = aaStep(dG + edgeN * 0.7 * (1.0 - bedK)), mD = aaStep(dD + mix(edgeN, (n2.b - 0.5) * 0.05, bedK));
   float lush = ax.r, ao = ax.g;
   float kIso = n1.r;
   // final layer weights (same stacking order as the procedural shader: natural < lawn < dirt < pavement < asphalt)
@@ -48,26 +67,45 @@ void groundShadePBR(vec2 w, float dist) {
   // ---- natural ground: dry golden November grass, greener where irrigated / lush
   if (wN > 0.001) {
     float kl = smoothstep(0.25, 0.85, lush + (n1.g - 0.5) * 0.25);
-    PS d = gTap(w, 2.0, L_DRYGRASS, kIso, near);
-    if (kl > 0.01) { PS l = gTap(w * 1.03, 2.0, L_LAWN, 1.0 - kIso, near); d = pbrMix(d, l, smoothstep(0.0, 1.0, kl + (l.h - d.h) * 0.3)); }
+    PS d = gTapT(w, gWP, 1.0, 2.0, L_DRYGRASS, kIso, near);
+    if (kl > 0.01) { PS l = gTapT(w, gWP, 1.03, 2.0, L_LAWN, 1.0 - kIso, near); d = pbrMix(d, l, smoothstep(0.0, 1.0, kl + (l.h - d.h) * 0.3)); }
     d.c *= 0.86 + 0.28 * n0.g;
     col += wN * d.c; rough += wN * mix(d.r, 0.97, 0.5); g += wN * d.g * 0.9; bump += wN;
   }
   // ---- lawn: irrigated turf with dry patches and faint mowing stripes
   if (wG > 0.001) {
-    PS l = gTap(w, 2.0, L_LAWN, kIso, near);
+    PS l = gTapT(w, gWP, 1.0, 2.0, L_LAWN, kIso, near);
     float dryP = smoothstep(0.6, 0.85, n0.r + (n1.b - 0.5) * 0.2) * 0.35 + smoothstep(0.7, 0.98, 1.0 - lush) * 0.3;
-    if (dryP > 0.02) { PS d = gTap(w * 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
+    if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
     l.c *= 0.84 + 0.3 * n0.g;
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
+    // r4-ground: crisp edges. A thin spade-cut line where lawn meets a planted bed and a faint shadow line along paving
+    float cut = bedK * (1.0 - smoothstep(0.03, 0.11, -dD)) * step(dD, 0.0) * det;
+    float pe = (1.0 - smoothstep(0.06, 0.16, -dP)) * step(dP, 0.0) * det;
+    l.c *= (1.0 - 0.55 * cut) * (1.0 - 0.22 * pe);
     col += wG * l.c; rough += wG * l.r; g += wG * l.g; bump += wG;
   }
   // ---- forest floor / dirt: eucalyptus + oak litter over packed dirt
   if (wD > 0.001) {
-    PS a = gTap(w, 3.0, L_LITTER, kIso, near);
-    float kd = smoothstep(0.42, 0.62, n1.g + (n2.r - 0.5) * 0.3);
-    if (kd > 0.01) { PS b = gTap(w * 1.01, 3.0, L_DIRT, 1.0 - kIso, near); a = pbrMix(a, b, clamp(kd + (b.h - a.h) * 0.5, 0.0, 1.0)); }
-    a.c *= 0.85 + 0.3 * n0.b;
+    PS a;
+    if (bedK > 0.5) {
+      // r4-ground: maintained planting bed = dark shredded-bark mulch under patchy low evergreen groundcover
+      // (ivy / star jasmine / agapanthus), instead of bare brown dirt
+      PS mu = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
+      float lmu = dot(mu.c, vec3(0.2126, 0.7152, 0.0722));
+      mu.c = mix(vec3(lmu), mu.c, 0.5) * vec3(1.0, 0.78, 0.6) * 0.8;
+      PS gc = gTapT(w, gWP, 0.55, 2.0, L_LAWN, 1.0 - kIso, near);   // leafy set at ~2x scale reads as broad-leaf cover
+      gc.c *= vec3(0.66, 0.84, 0.62) * (0.8 + 0.4 * n2.g);
+      float cov = n1.g * 0.5 + n0.g * 0.3 + n2.r * 0.2 + 0.08 * (1.0 - fade);
+      float kc = smoothstep(0.4, 0.52, cov + (gc.h - mu.h) * 0.3) * smoothstep(0.0, 0.35, dD);  // mulch shows along the cut edge
+      a = pbrMix(mu, gc, kc);
+      a.c *= 0.9 + 0.2 * n0.b;
+    } else {
+      a = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
+      float kd = smoothstep(0.5, 0.7, n1.g + (n2.r - 0.5) * 0.3);
+      if (kd > 0.01) { PS b = gTapT(w, gWP, 1.01, 3.0, L_DIRT, 1.0 - kIso, near); b.c = mix(vec3(dot(b.c, vec3(0.2126, 0.7152, 0.0722))), b.c, 0.75); a = pbrMix(a, b, clamp(kd + (b.h - a.h) * 0.5, 0.0, 1.0)); }
+      a.c *= 0.85 + 0.3 * n0.b;
+    }
     col += wD * a.c; rough += wD * a.r; g += wD * a.g; bump += wD;
   }
   // ---- pavement

@@ -202,14 +202,13 @@ void groundShade(vec2 w, float dist){
 }`)
         .replace('void groundShade(vec2 w, float dist){', PBR_GLSL + GROUND_PBR_GLSL + '\nvoid groundShade(vec2 w, float dist){') // gfx-materials
         .replace('#include <map_fragment>', `float gDist = length(vWPos - cameraPosition);
+ { float e0 = 1.0; gGeoNr = vec3(coreHf(vWPos.xz - vec2(e0,0.0)) - coreHf(vWPos.xz + vec2(e0,0.0)), 2.0*e0, coreHf(vWPos.xz - vec2(0.0,e0)) - coreHf(vWPos.xz + vec2(0.0,e0))); } // r4-ground: heightfield normal once, for slope-aware texturing + lighting
  if (uPbrOn > 0.5) groundShadePBR(vWPos.xz, gDist); else groundShade(vWPos.xz, gDist);
  diffuseColor.rgb = gCol;`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
  roughnessFactor = gRough;`)
         .replace('#include <normal_fragment_begin>', `
- float e = 1.0;
- float hL = coreHf(vWPos.xz - vec2(e,0.0)), hR = coreHf(vWPos.xz + vec2(e,0.0)), hD = coreHf(vWPos.xz - vec2(0.0,e)), hU = coreHf(vWPos.xz + vec2(0.0,e));
- vec3 wN = normalize(vec3(hL-hR, 2.0*e, hD-hU) + gBumpN);
+ vec3 wN = normalize(gGeoNr + gBumpN); // r4-ground: gGeoNr computed before groundShade (same 4 height taps as before)
  vec3 normal = normalize((viewMatrix * vec4(wN,0.0)).xyz);
  vec3 nonPerturbedNormal = normal;
  float faceDirection = 1.0;`)
@@ -219,7 +218,7 @@ void groundShade(vec2 w, float dist){
         .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  reflectedLight.indirectDiffuse *= gAO; reflectedLight.indirectSpecular *= gAO; reflectedLight.directDiffuse *= mix(1.0, gAO, 0.35);`);
     };
-    mat.customProgramCacheKey = () => 'coreTerrain-v7-pbr1';
+    mat.customProgramCacheKey = () => 'coreTerrain-v7-pbr1-r4g';
     return mat;
   }
   update(camera) {

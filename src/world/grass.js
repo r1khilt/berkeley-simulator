@@ -3,10 +3,12 @@ import * as THREE from 'three';
 import { U } from '../materials.js';
 function bladeClump() {
   const pos = [], col = [];
-  const blades = 9;
+  // r4-ground: mown campus lawn -> short (3-7 cm) blades spread over the whole cell instead of tall 10-20 cm tufts,
+  // which read as an unmown field and aliased into vertical streaks / a 'hedge band' at mid distance
+  const blades = 14;
   for (let b = 0; b < blades; b++) {
-    const a = (b / blades) * Math.PI * 2 + Math.random() * 0.6, r = Math.random() * 0.09;
-    const x0 = Math.cos(a) * r, z0 = Math.sin(a) * r, h = 0.09 + Math.random() * 0.12, w = 0.009 + Math.random() * 0.007;
+    const a = (b / blades) * Math.PI * 2 + Math.random() * 0.6, r = Math.sqrt(Math.random()) * 0.2;
+    const x0 = Math.cos(a) * r, z0 = Math.sin(a) * r, h = 0.03 + Math.random() * 0.04, w = 0.006 + Math.random() * 0.004;
     const lean = (Math.random() - 0.5) * 0.12, dir = Math.random() * Math.PI * 2; const dx = Math.cos(dir), dz = Math.sin(dir);
     const nx = -dz * w, nz = dx * w;
     const tipx = x0 + Math.cos(a) * lean, tipz = z0 + Math.sin(a) * lean;
@@ -20,7 +22,7 @@ function bladeClump() {
   return g;
 }
 export class Grass {
-  constructor({ sdf, gt, core, heightAt, count = 22000, radius = 26 }) {
+  constructor({ sdf, gt, core, heightAt, count = 22000, radius = 11 }) { // r4-ground: 26 -> 11 m (blades are sub-pixel beyond)
     this.sdf = sdf; this.gt = gt; this.core = core; this.heightAt = heightAt; this.radius = radius; this.count = count; this.last = new THREE.Vector3(1e9, 0, 0);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
@@ -28,28 +30,28 @@ export class Grass {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aTip; uniform float uTime, uWind, uR; varying float vTip;')
         .replace('#include <begin_vertex>', `vec3 transformed = position; vTip = aTip;
  vec4 wpI = instanceMatrix * vec4(0.0,0.0,0.0,1.0);
- float d = distance(wpI.xz, cameraPosition.xz); float fade = 1.0 - smoothstep(uR*0.3, uR, d);
+ float d = distance(wpI.xz, cameraPosition.xz); float fade = 1.0 - smoothstep(uR*0.45, uR, d);
  transformed.y *= fade;
  float w = sin(uTime*1.8 + wpI.x*0.35 + wpI.z*0.27) * 0.5 + sin(uTime*3.1 + wpI.x*1.3) * 0.25;
  transformed.x += aTip * w * 0.05 * (0.4 + uWind); transformed.z += aTip * w * 0.03 * (0.4 + uWind);`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTip;').replace('#include <color_fragment>', `#include <color_fragment>
- diffuseColor.rgb *= mix(0.75, 1.35, vTip);`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+ diffuseColor.rgb *= mix(0.7, 1.15, vTip);`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
  normal = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);`);
     };
-    mat.customProgramCacheKey = () => 'grass2';
+    mat.customProgramCacheKey = () => 'grass3';
     this.mesh = new THREE.InstancedMesh(bladeClump(), mat, count); this.mesh.frustumCulled = false; this.mesh.receiveShadow = true; this.mesh.castShadow = false; this.mesh.name = 'grass';
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3); this.mesh.count = 0;
   }
   isGrass(x, z) {
     const gt = this.gt, c = this.core; const j = Math.floor((x - c.x0) / gt.step), i = Math.floor((z - c.z0) / gt.step);
     if (i < 0 || j < 0 || i >= gt.nz || j >= gt.nx) return 0; const k = (i * gt.nx + j) * 4; const s = this.sdf;
-    if (s[k] > 120 || s[k + 1] > 120) return 0; return s[k + 2] > 140 ? 1 : 0;
+    if (s[k] > 120 || s[k + 1] > 120 || s[k + 3] > 120) return 0; return s[k + 2] > 140 ? 1 : 0; // r4-ground: not in beds either
   }
   update(cam) {
     if (cam.y - this.heightAt(cam.x, cam.z) > 40) { this.mesh.count = 0; return; }
     if (cam.distanceToSquared(this.last) < 9) return; this.last.copy(cam);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sc = new THREE.Vector3();
-    const R = this.radius, step = 0.36; let k = 0; const arr = this.mesh.instanceMatrix.array; const col = this.mesh.instanceColor.array;
+    const R = this.radius, step = 0.3; let k = 0; const arr = this.mesh.instanceMatrix.array; const col = this.mesh.instanceColor.array;
     const x0 = Math.floor((cam.x - R) / step), x1 = Math.ceil((cam.x + R) / step), z0 = Math.floor((cam.z - R) / step), z1 = Math.ceil((cam.z + R) / step);
     for (let gi = x0; gi <= x1 && k < this.count; gi++) for (let gj = z0; gj <= z1 && k < this.count; gj++) {
       const h = Math.sin(gi * 127.1 + gj * 311.7) * 43758.5453; const r1 = h - Math.floor(h); const h2 = Math.sin(gi * 269.5 + gj * 183.3) * 43758.5453; const r2 = h2 - Math.floor(h2);
@@ -57,7 +59,7 @@ export class Grass {
       if (!this.isGrass(x, z)) continue;
       p.set(x, this.heightAt(x, z), z); q.setFromAxisAngle(up, r1 * 6.283); const s = 0.75 + r2 * 0.6; sc.set(s, s * (0.8 + r1 * 0.5), s);
       m.compose(p, q, sc); m.toArray(arr, k * 16);
-      const t = 0.85 + r2 * 0.3; const dry = r1 > 0.8 ? 1.25 : 1.0; col[k * 3] = 0.15 * t * dry; col[k * 3 + 1] = 0.24 * t; col[k * 3 + 2] = 0.075 * t;
+      const t = 0.85 + r2 * 0.3; const dry = r1 > 0.8 ? 1.2 : 1.0; col[k * 3] = 0.085 * t * dry; col[k * 3 + 1] = 0.13 * t; col[k * 3 + 2] = 0.045 * t; // r4-ground: ~lawn texture albedo
       k++;
     }
     this.mesh.count = k; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;

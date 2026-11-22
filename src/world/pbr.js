@@ -199,6 +199,7 @@ export function initPBR(quality = 'high') {
 import { noiseTexture } from './noiseTex.js';
 export function isPBRMat(m) { if (!PBR_ENABLED || !m || !m.map) return false; for (const k in PBR.maps) if (PBR.maps[k].map === m.map) return true; return false; }
 export function pbrWeather(mat) {
+  if (mat && mat.userData && mat.userData.groundTurf) { turfWorld(mat); return; } // r4-ground: shared turf -> real lawn texture
   if (!isPBRMat(mat) || mat.userData.pbrWeather) return;
   mat.userData.pbrWeather = 1;
   const k0 = mat.customProgramCacheKey ? String(mat.customProgramCacheKey()) : '';
@@ -231,5 +232,37 @@ export function pbrWeather(mat) {
   };
   if (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map) { mat.defines = Object.assign({}, mat.defines, { PBR_ASHLAR: '' }); }
   mat.customProgramCacheKey = () => k0 + '|pbrw' + (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map ? 'a' : '');
+  mat.needsUpdate = true;
+}
+
+// r4-ground: the shared 'turf' material (planter lawns, grassy berms, hedges cloned from it) was a flat untextured green
+// that read as a neon patch next to the textured terrain lawn. This samples the same CC0 lawn set as the terrain in
+// world space (triplanar, so custom geometry without UVs works) and keeps the authored colour as the mean.
+export function turfWorld(mat) {
+  if (!PBR_ENABLED || mat.userData.turfWorld) return;
+  mat.userData.turfWorld = 1;
+  const k0 = mat.customProgramCacheKey ? String(mat.customProgramCacheKey()) : '';
+  const prev = mat.onBeforeCompile;
+  const mean = LAYERS[L.lawn][2].map((v) => v.toFixed(4)).join(',');
+  mat.onBeforeCompile = function (sh, r) {
+    if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r);
+    if (sh.vertexShader.includes('varying vec3 vWPT')) return;
+    sh.uniforms.uPbrA = PBR.uA; sh.uniforms.uPbrOn = PBR.uOn;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPT; varying vec3 vWNT;')
+      .replace('#include <fog_vertex>', `#include <fog_vertex>
+ { vec4 wpt = vec4(transformed, 1.0); vec3 nt = objectNormal;
+   #ifdef USE_INSTANCING
+   wpt = instanceMatrix * wpt; nt = mat3(instanceMatrix) * nt;
+   #endif
+   vWPT = (modelMatrix * wpt).xyz; vWNT = normalize(mat3(modelMatrix) * nt); }`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPT; varying vec3 vWNT; uniform highp sampler2DArray uPbrA; uniform float uPbrOn;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+ if (uPbrOn > 0.5) {
+   vec3 an = abs(vWNT) + 1e-3; an = an * an * an; an /= an.x + an.y + an.z;
+   vec3 tt = texture(uPbrA, vec3(vWPT.xz * 0.5, ${L.lawn}.0)).rgb * an.y + texture(uPbrA, vec3(vWPT.zy * 0.5, ${L.lawn}.0)).rgb * an.x + texture(uPbrA, vec3(vWPT.xy * 0.5, ${L.lawn}.0)).rgb * an.z;
+   diffuseColor.rgb *= clamp(tt / vec3(${mean}), 0.0, 3.0);
+ }`);
+  };
+  mat.customProgramCacheKey = () => k0 + '|turfw';
   mat.needsUpdate = true;
 }
