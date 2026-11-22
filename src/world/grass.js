@@ -44,9 +44,13 @@ export class Grass {
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3); this.mesh.count = 0;
   }
   isGrass(x, z) {
-    const gt = this.gt, c = this.core; const j = Math.floor((x - c.x0) / gt.step), i = Math.floor((z - c.z0) / gt.step);
-    if (i < 0 || j < 0 || i >= gt.nz || j >= gt.nx) return 0; const k = (i * gt.nx + j) * 4; const s = this.sdf;
-    if (s[k] > 120 || s[k + 1] > 120 || s[k + 3] > 120) return 0; return s[k + 2] > 140 ? 1 : 0; // r4-ground: not in beds either
+    // r4-ground: bilinear SDF lookup (was nearest 1.6 m texel, so blades spilled up to ~1 m onto paths) and no blades in
+    // beds; blade cells stay >= ~0.35 m off paving so tufts (r 0.2 m) don't overhang the path edge
+    const gt = this.gt, c = this.core; const fx = (x - c.x0) / gt.step - 0.5, fz = (z - c.z0) / gt.step - 0.5;
+    const j = Math.floor(fx), i = Math.floor(fz); if (i < 0 || j < 0 || i >= gt.nz - 1 || j >= gt.nx - 1) return 0;
+    const tx = fx - j, tz = fz - i, s = this.sdf, k = (i * gt.nx + j) * 4, kx = k + 4, kz = k + gt.nx * 4, kxz = kz + 4;
+    const v = (o) => (s[k + o] * (1 - tx) + s[kx + o] * tx) * (1 - tz) + (s[kz + o] * (1 - tx) + s[kxz + o] * tx) * tz;
+    if (v(0) > 112 || v(1) > 112 || v(3) > 120) return 0; return v(2) > 140 ? 1 : 0;
   }
   update(cam) {
     if (cam.y - this.heightAt(cam.x, cam.z) > 40) { this.mesh.count = 0; return; }
