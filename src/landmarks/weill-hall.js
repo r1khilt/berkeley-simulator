@@ -111,7 +111,9 @@ export async function build(ctx) {
     const nb = Math.max(1, Math.round(L / 2.1)); const bw = L / nb;
     const cs = []; for (let k = 0; k < nb; k++) cs.push(bw * (k + 0.5));
     const ops = [];
-    for (const c of cs) {
+    const endFace = L < 30; // [r5a] the short end walls flanking the corner pavilions read mostly solid, with sparse small square windows (photo)
+    for (const [k, c] of cs.entries()) {
+      if (endFace) { if (k % 2 === 0 || c < 2.5 || c > L - 2.5) continue; for (let f = 1; f < 6; f++) ops.push({ s0: c - 0.5, s1: c + 0.5, y0: floors[f] + 1.15, y1: floors[f] + 2.25, mull: 0, tran: 0.0 }); continue; }
       ops.push({ s0: c - 0.45, s1: c + 0.45, y0: FL + 0.7, y1: FL + 3.4, mull: 0, tran: 0.75 });             // tall ground-floor slot
       for (let f = 1; f < 6; f++) ops.push({ s0: c - 0.42, s1: c + 0.42, y0: floors[f] + 0.55, y1: floors[f] + 2.75, mull: 0, tran: 0.0, vent: true });
     }

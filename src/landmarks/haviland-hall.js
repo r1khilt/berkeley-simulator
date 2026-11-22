@@ -49,7 +49,7 @@ export async function build(ctx) {
   {
     const uF = -11.0, uP = -13.4, v0 = -3.2, v1 = 3.2, yT = FL + 5.4;
     const yL = Math.max(K.g(-12.2, 0), K.g(-14.4, 0), K.g(-12.2, -2.6), K.g(-12.2, 2.6)) + 0.12; // landing: one low step above the terrace walk
-    const LAND = tint(M.granite, 0xc8c0b0), CON = tint(M.concrete, 0xc9c4b8), BRK = tint(M.brick, 0x9a4636), NOSE = tint(M.concrete, 0xb9aea0), RAIL = solid(0x1b1b1b, 0.5, 0.6);
+    const LAND = tint(M.granite, 0xc8c0b0), CON = tint(M.concrete, 0xc9c4b8), BRK = tint(M.brick, 0x9a4636), NOSE = tint(M.concrete, 0xb48e7e), RAIL = solid(0x1b1b1b, 0.5, 0.6);
     K.box(LAND, uP - 0.6, yL - 0.9, v0 - 0.3, uF, yL, v1 + 0.3);
     walkables.push(K.walkPoly(rect(uP - 0.6, v0 - 0.3, uF, v1 + 0.3), yL));
     const yC = yL + 0.9; // pedestal top
@@ -66,11 +66,16 @@ export async function build(ctx) {
     // doorway: 6 m round-arched opening from the landing, double doors under a tall gridded transom
     // (the frontispiece now stands 0.25 m proud of the façade: the recessed door used to sit behind the solid bay-7 wall face and never showed)
     const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 6.0, arch: true, doorTop: yL + 3.0 };
-    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); K.fill(R, o, { kind: 'door', door: tint(M.woodDark, 0x6b3a22), rev: 0.15 });
+    const WD = tint(M.woodDark, 0x5e3320);
+    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); K.fill(R, o, { kind: 'door', door: WD, glass: M.glass, rev: 0.15 }); // dark glass: no lit interior behind the fanlight
+    { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 - rr; // gridded fanlight (photo: ~5 x 6 lights)
+      for (let k = 1; k < 5; k++) { const x = o.s0 + w * k / 5, dx = x - cx, top = spring + Math.sqrt(Math.max(0, rr * rr - dx * dx)) - 0.02; K.rbox(R, WD, x - 0.025, o.doorTop, -0.15, x + 0.025, top, -0.11, { detail: true }); }
+      for (let j = 1; j < 6; j++) { const y = o.doorTop + (o.y1 - o.doorTop) * j / 6; const hw = y <= spring ? rr : Math.sqrt(Math.max(0, rr * rr - (y - spring) ** 2)); if (hw < 0.15) continue; K.rbox(R, WD, cx - hw + 0.02, y - 0.025, -0.15, cx + hw - 0.02, y + 0.025, -0.11, { detail: true }); }
+      K.rbox(R, WD, o.s0, o.doorTop - 0.06, -0.16, o.s1, o.doorTop + 0.08, -0.08, { detail: true }); }
     // balcony railing on the portico roof: balusters, a large central seal medallion and two smaller roundels
     { const RB = K.run([uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]); K.rbox(RB, CU, 0, yT + 2.1, -0.05, RB.L, yT + 2.17, 0.05); K.rbox(RB, CU, 0, yT + 1.27, -0.04, RB.L, yT + 1.33, 0.04);
-      for (let s = 0.15; s < RB.L; s += 0.16) { const c = RB.L / 2; if (Math.abs(s - c) < 0.42 || Math.abs(Math.abs(s - c) - 1.75) < 0.26) continue; K.rbox(RB, CU, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); }
-      for (const [dv, r] of [[0, 0.36], [-1.75, 0.22], [1.75, 0.22]]) { const g = new THREE.TorusGeometry(r, 0.035, 5, 18); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.69, dv); K.add(CU, g, { detail: true });
+      for (let s = 0.12; s < RB.L; s += 0.12) { const c = RB.L / 2; if (Math.abs(s - c) < 0.5 || Math.abs(Math.abs(s - c) - 1.75) < 0.3) continue; K.rbox(RB, CU, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); }
+      for (const [dv, r] of [[0, 0.44], [-1.75, 0.26], [1.75, 0.26], [-0.95, 0.13], [0.95, 0.13], [-2.6, 0.13], [2.6, 0.13]]) { const g = new THREE.TorusGeometry(r, 0.035, 5, 18); g.rotateY(Math.PI / 2); g.translate(uP - 0.2, yT + 1.69, dv); K.add(CU, g, { detail: true });
         const d = new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 14); d.rotateZ(Math.PI / 2); d.translate(uP - 0.2, yT + 1.69, dv); K.add(CU, d, { detail: true }); } }
     // one long straight red-brick flight from the lower walk up to the landing
     const uTop = uP - 0.6, TR = 0.39, RS = 0.155, sw = 2.3;
@@ -79,7 +84,6 @@ export async function build(ctx) {
     const n = Math.max(3, Math.round((yL - gF) / RS)); uFoot = uTop - n * TR; const rise = (yL - gF) / n;
     walkables.push(K.stairs(BRK, uFoot, -sw, uTop, sw, gF, yL, '+u', n, { foot: 1.8 }));
     for (let i = 0; i < n; i++) K.box(NOSE, uFoot + TR * i - 0.004, gF + rise * (i + 1) - 0.035, -sw + 0.01, uFoot + TR * i + 0.06, gF + rise * (i + 1) + 0.004, sw - 0.01, { detail: true }); // pale nosings
-    K.box(BRK, uFoot - 1.2, gF - 0.6, -sw - 0.4, uFoot, gF + 0.02, sw + 0.4); walkables.push(K.walkPoly(rect(uFoot - 1.2, -sw - 0.4, uFoot, sw + 0.4), gF + 0.02)); // brick apron where the flight meets the walk
     const slope = (yL - gF) / (uTop - uFoot), yAt = (u) => gF + (u - uFoot) * slope; // nosing line
     const pipe = (mat, a, b, r) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(mat, g, { detail: true }); };
     for (const vs of [-1, 1]) {
@@ -97,8 +101,9 @@ export async function build(ctx) {
       const np = Math.max(2, Math.round((ub - ua) / 1.5)); for (let k = 0; k <= np; k++) { const u = ua + (ub - ua) * k / np; pipe(RAIL, [u, yAt(u) + 0.25, vc], [u, yAt(u) + 0.95, vc], 0.02); }
       // spreading juniper masses on the slope beside the flight
       const X = rnMats(M);
-      for (let k = 0; k < 6; k++) { const u = uFoot + 0.8 + (uTop - uFoot - 1.6) * (k + 0.5) / 6, v = vs * (sw + 1.25 + ((k * 7) % 3) * 0.45);
-        const jg = new THREE.IcosahedronGeometry(1, 1); jg.scale(1.45 + (k % 2) * 0.35, 0.55, 1.05); jg.translate(u, Math.max(K.g(u, v), yAt(u) - 0.35) + 0.15, v); K.add(k % 3 ? X.leafA : X.leafC, jg, { detail: true }); }
+      for (let k = 0; k < 10; k++) { const u = uFoot + 0.6 + (uTop - uFoot - 1.2) * (k + 0.5) / 10, v = vs * (sw + 1.05 + ((k * 7) % 3) * 0.55);
+        const jg = new THREE.IcosahedronGeometry(1, 1); jg.scale(1.35 + (k % 2) * 0.4, 0.68, 1.15); jg.translate(u, Math.max(K.g(u, v), yAt(u) - 0.3) + 0.2, v); K.add(k % 3 ? X.leafA : X.leafC, jg, { detail: true });
+        if (k % 2) { const jg2 = new THREE.IcosahedronGeometry(1, 1); jg2.scale(1.2, 0.6, 1.0); const v2 = v + vs * 1.9; jg2.translate(u + 0.4, Math.max(K.g(u + 0.4, v2), yAt(u) - 0.5) + 0.18, v2); K.add(X.leafA, jg2, { detail: true }); } }
     }
     { const X = rnMats(M); const RW = K.run([-11.0, -26.6], [-11.0, 26.6]); planting(K, RW, 1.0, RW.L - 1.0, { d0: 0.1, depth: 1.3, h: 0.9, skip: [[RW.L / 2 - 4.2, RW.L / 2 + 4.2]], seed: 61 }); }
     // black cast-iron campus lamp in the planting south of the flight
@@ -110,7 +115,7 @@ export async function build(ctx) {
   }
   // [r5a] diaper-relief pier panels marking the centre block's outer bay divisions on the long fronts (photo: grey-beige
   // stamped lattice strips, #a9a391), and a fuller garland + cartouche on each attic panel so the reliefs read at distance
-  { const PAN = tint(M.stucco, 0xb3ad9c), DIA = tint(M.stucco, 0xcfc8b6);
+  { const PAN = tint(M.stucco, 0xa7a49a), DIA = tint(M.stucco, 0xc6c2b6);
     for (const [a, b] of [[[-11.0, -26.6], [-11.0, 26.6]], [[11.0, 26.6], [11.0, -26.6]]]) { const R = K.run(a, b); const bwid = R.L / Math.round(R.L / 3.55);
       for (const s of [bwid * 4, R.L - bwid * 4]) {
         K.rbox(R, PAN, s - 0.4, FL + 0.35, 0.0, s + 0.4, 10.15, 0.035);
