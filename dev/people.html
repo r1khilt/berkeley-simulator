@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><title>people harness</title><style>html,body{margin:0;background:#9db4c8}canvas{display:block}</style></head>
+<body><script type="module">
+// Dev harness for src/people: a lineup of skinned characters in every state, for screenshots (?n=, ?state=, ?t=)
+import * as THREE from 'three';
+import { loadPeopleAssets } from '/src/people/assets.js';
+import { Character } from '/src/people/character.js';
+import { SKIN, HAIR, SHOE, randomLook, FLAG } from '/src/life/people.js';
+const qs = new URLSearchParams(location.search);
+const W = +(qs.get('w') || 1280), H = +(qs.get('h') || 720);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setSize(W, H); renderer.shadowMap.enabled = true; renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9db4c8);
+scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x6b5b45, 1.4)); const sun = new THREE.DirectionalLight(0xfff1dc, 2.6); sun.position.set(-6, 10, 7); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 }); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const bench = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.45), new THREE.MeshStandardMaterial({ color: 0x6b4a2b })); bench.castShadow = true; bench.receiveShadow = true; scene.add(bench); bench.visible = false;
+const camera = new THREE.PerspectiveCamera(+(qs.get('fov') || 35), W / H, 0.05, 200);
+const A = await loadPeopleAssets(); A.palette = { SKIN, HAIR, SHOE };
+let seed = +(qs.get('seed') || 7); const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const states = (qs.get('states') || 'walk,walk,idle,talk,phone,sit,lawn,lie,jog,walk').split(',');
+const N = states.length; const chars = [];
+// calibrate like index.js
+for (let i = 0; i < N; i++) {
+  const look = randomLook(rand); if (qs.get('fem')) look.fem = +qs.get('fem');
+  const c = new Character(A, look.fem ? 'f' : 'm', true); scene.add(c.root); c.root.visible = true;
+  const st = states[i]; const a = { kind: st === 'sit' || st === 'lawn' || st === 'lie' || st === 'talk' ? 'spot' : 'walker', x: (i - (N - 1) / 2) * 1.1, y: 0, z: 0, heading: +(qs.get('yaw') || 0), speed_: st === 'walk' ? 1.3 : st === 'jog' ? 3 : 0, state: st, phase: i * 0.7, aux: st === 'jog' ? 1 : st === 'sit' ? 0.47 : 0, vari: st === 'lawn' ? (i % 2 ? 3 : 0) : st === 'lie' ? 0 : 0, gaze: 0, look, extra: st === 'phone' ? FLAG.PHONE : 0, seed: rand() };
+  c.setLook(look, a.extra, a.seed); chars.push([c, a]);
+}
+window.chars = chars; window.A = A;
+// phase/seat calibration (same as index.js)
+const idx = await import('/src/people/index.js');
+for (const sex of ['f', 'm']) { const c = chars.find(([c]) => c.sex === sex); if (c && idx.calibrate) idx.calibrate(c[0]); }
+const t = +(qs.get('t') || 0.5);
+for (const [c, a] of chars) { for (const k in c.w) c.w[k] = 0; c.update(0.001, a, camera); for (const k in c.w) c.w[k] = c.wt[k]; c.update(t, a, camera); if (a.state === 'walk' || a.state === 'jog') { a.phase += t * 6; c.update(0.016, a, camera); } }
+const cam = (qs.get('cam') || `0,1.5,${Math.max(6, N * 0.9)},0,0.9,0`).split(',').map(Number);
+camera.position.set(cam[0], cam[1], cam[2]); camera.lookAt(cam[3], cam[4], cam[5]);
+renderer.render(scene, camera); window.ready = true;
+window.step = (dt, n = 1) => { for (let k = 0; k < n; k++) for (const [c, a] of chars) { if (a.state === 'walk' || a.state === 'jog') a.phase += dt * 6.2831 * a.speed_ / (a.state === 'jog' ? 2.25 : 1.42); c.update(dt, a, camera); } renderer.render(scene, camera); };
+window.setCam = (a) => { camera.position.set(a[0], a[1], a[2]); camera.lookAt(a[3], a[4], a[5]); renderer.render(scene, camera); };
+</script></body></html>
