@@ -69,6 +69,7 @@ function mats() {
   const ao = (m) => { m.vertexColors = true; return m; }; // baked cavity AO rides in the sculpt's vertex colours
   _m = {
     pillar: tint(M.stucco, 0xd9c7a2, { name: 'statue:pillar', roughness: 0.92 }),
+    joint: tint(M.stucco, 0xb9a887, { name: 'statue:pillarJoint', roughness: 0.95 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xdcaa4a, metalness: 1, roughness: 0.34, vertexColors: true, name: 'statue:goldLeaf' }),
     granite: ao(tint(M.granite, 0xb3b2ac, { name: 'statue:greyGranite', roughness: 0.92 })),
     plinth: tint(M.granite, 0xa9a8a3, { name: 'statue:plinth', roughness: 0.9 }),
@@ -106,12 +107,13 @@ export async function goldenBear() { // Lower Sproul: chamfered concrete pillar 
   const sh = new THREE.Shape(); sh.moveTo(-a + c, -a); sh.lineTo(a - c, -a); sh.lineTo(a, -a + c); sh.lineTo(a, a - c); sh.lineTo(a - c, a); sh.lineTo(-a + c, a); sh.lineTo(-a, a - c); sh.lineTo(-a, -a + c); sh.closePath();
   const shaft = new THREE.ExtrudeGeometry(sh, { depth: H - 0.45 + 0.6, bevelEnabled: false }); shaft.rotateX(-Math.PI / 2); shaft.translate(0, -0.6, 0);
   B.add(K.pillar, shaft);
-  B.add(K.pillar, box(1.05, 0.22, 1.05, 0, -0.2, 0)); B.add(K.pillar, new THREE.CylinderGeometry(0.43 * Math.SQRT2, 0.525 * Math.SQRT2, 0.12, 4, 1).rotateY(Math.PI / 4).translate(0, 0.08, 0)); // chamfered base block
+  B.add(K.pillar, box(1.2, 0.34, 1.2, 0, -0.2, 0)); B.add(K.pillar, new THREE.CylinderGeometry(0.44 * Math.SQRT2, 0.6 * Math.SQRT2, 0.16, 4, 1).rotateY(Math.PI / 4).translate(0, 0.22, 0)); // chamfered base block
   // cap: 2.4 m square slab, 0.2 m at the edge, inverted-pyramid soffit down onto the shaft
-  B.add(K.pillar, box(2.4, 0.22, 2.4, 0, H - 0.07, 0));
-  B.add(K.pillar, new THREE.ConeGeometry(1.2 * Math.SQRT2, 0.5, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.25, 0));
+  B.add(K.pillar, box(2.6, 0.22, 2.6, 0, H - 0.07, 0));
+  B.add(K.pillar, new THREE.ConeGeometry(1.3 * Math.SQRT2, 0.55, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.275, 0));
+  for (const yy of [1.4, 2.8, 4.2]) B.add(K.joint, box(2 * a - 2 * c + 0.012, 0.014, 2 * a + 0.006, 0, yy, 0)), B.add(K.joint, box(2 * a + 0.006, 0.014, 2 * a - 2 * c + 0.012, 0, yy, 0)); // faint formwork lift joints
   B.flush(g, { name: 'golden-bear' });
-  const bear = await sculpt('bear-hardy', K.gold, { s: 1.3, ao: 0.5 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
+  const bear = await sculpt('bear-hardy', K.gold, { s: 1.4, ao: 0.5 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
   return g;
 }
 
@@ -160,7 +162,7 @@ export async function bench1920() { // travertine WWI memorial bench: square end
     B.add(K.travertine, extrudeX(con, 0.1, x - 0.05).translate(0, 0, PZ + 0.06));
     for (const [zz, yy, rr] of [[0.34, 0.28, 0.06], [0.19, 0.07, 0.05]]) B.add(K.travertine, new THREE.CylinderGeometry(rr, rr, 0.12, 14).rotateZ(Math.PI / 2).translate(x, yy, PZ + 0.06 + zz));
   }
-  B.add(K.pad, box(2.9, 0.05, 1.6, 0, -0.035, 0.2));
+  B.add(K.pad, box(2.9, 0.5, 1.6, 0, -0.45, 0.2));                      // pad, deep enough to bridge a sloping site
   B.flush(g, { name: 'bench-1920' });
   const ins = new THREE.Mesh(new THREE.PlaneGeometry(1.44, 0.42), textDecal(1.44, 0.42, ['THIS SEAT IS DEDICATED BY', 'THE CLASS OF 1920', 'TO THE SONS OF THE UNIVERSITY', 'WHO DIED IN THE GREAT WAR'], { color: 'rgba(120,104,80,0.75)' }));
   ins.position.set(0, 0.8, PZ + 0.061); g.add(ins);
@@ -187,7 +189,7 @@ export async function bench1955() { // cast-stone "Beneficiary to Benefactor" be
     B.add(K.castStone, box(0.26, 0.05, 0.4, sx * 0.8, 0, 0.08));        // foot block
     B.add(K.castStone, lathe([[0, 0.05], [0.11, 0.05], [0.115, 0.075], [0.085, 0.12], [0.07, 0.17], [0.095, 0.24], [0.12, 0.3], [0.125, 0.34], [0, 0.34]], 20).scale(1, 1, 1.4).translate(sx * 0.8, 0, 0.08));
   }
-  B.add(K.pad, box(2.6, 0.05, 1.3, 0, -0.035, 0.05));
+  B.add(K.pad, box(2.6, 0.5, 1.3, 0, -0.45, 0.05));
   B.flush(g, { name: 'bench-1955' });
   const panels = (gx, w, h) => { gx.strokeStyle = 'rgba(90,90,84,0.6)'; gx.lineWidth = 6; const y0 = h * 0.06, y1 = h * 0.96; for (const [a, b] of [[0.02, 0.3], [0.34, 0.66], [0.7, 0.98]]) gx.strokeRect(w * a, y0, w * (b - a), y1 - y0); };
   const ins = new THREE.Mesh(new THREE.PlaneGeometry(1.76, 0.36), textDecal(1.76, 0.36, ['BENEFICIARY', 'TO', 'BENEFACTOR', { t: 'CLASS OF 1955', s: 0.9 }], { font: 'Helvetica, Arial, sans-serif', color: 'rgba(100,100,94,0.8)', px: 1024, gap: 1.18, scale: 0.72, extra: panels }));
@@ -236,8 +238,8 @@ export const PLACEMENTS = [
   { id: 'grizzly-bear', build: grizzlyBear, x: -241.7, z: 236.1, rot: Math.PI / 2, r: 1.1, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.62, 1.3) },
   { id: 'cal-bear', build: calBear, x: 464.5, z: 54.5, face: [440, 54], r: 1.4, clearTrees: 2.6, col: (P, x, y, z) => P.addCircle(x, z, 0.9, y - 1, y + 3, 'statue') },
   // "the stone bench at the Campanile entrance": north face, beside the 1960s canopy
-  { id: 'bench-1920', build: bench1920, at: towerPt(4.1, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
-  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
+  { id: 'bench-1920', build: bench1920, at: towerPt(4.35, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, level: 'max', clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
+  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, level: 'max', clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
   { id: 'laughing-pelican', build: laughingPelican, x: -25.2, z: 164.7, rot: 1.99, r: 1.2, clearTrees: 1.6, col: (P, x, y, z) => P.addCircle(x, z, 1.0, y - 1, y + 2.4, 'statue') },
   { id: 'mining-pool', build: () => miningPool(7.0), x: 75.0, z: -178.2, rot: 0, r: 7.6, level: 'max', clearTrees: 7.8, col: (P, x, y, z) => P.addCircle(x, z, 7.5, y - 1, y + 0.32, 'statue') },
 ];
