@@ -154,7 +154,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   // [r5-audit-north] photo-matched flights: OSM only gives a centreline, so a few prominent stairs get their real width,
   // tread material and landings here (flights = runs separated by flat landings of `landing` m, centre = middle handrail)
   const STAIR_STYLE = {
-    262173804: { w: 5.0, mat: 'brickm', flights: 3, landing: 2.2, centre: true, cheekH: 0.85 }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025): muted brick treads, stepped concrete side walls
+    262173804: { w: 5.0, mat: 'brickm', flights: 3, landing: 2.6, centre: true, cheekH: 0.95 }, // Glade -> McLaughlin East Patio below Grimes (SOM / Dave Burk 2025): muted brick treads, stepped concrete side walls
     1377317325: { w: 3.4, mat: 'concrete', flights: 1, landing: 0 }, // Hearst -> Cory/SDH courtyard under the Newton bridge: wide ~20-riser flight, board-formed cheeks (C. Sequin 2009)
   };
   // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
@@ -403,7 +403,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     }
     if (st.cheeks) {
       // cheek walls follow the nosing line (+0.12 m) and step down to the landing at both ends
-      const thick = 0.26, off = hw + thick / 2;
+      const thick = st.cheekH ? 0.42 : 0.26, off = hw + thick / 2; // [r5-audit-north] photo-matched flights get chunky board-formed side walls
       for (const sd of [1, -1]) {
         const N = Math.max(1, Math.ceil(L / 1.0));
         for (let k = 0; k < N; k++) {
@@ -488,8 +488,8 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(H.c, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
     const m = new THREE.Mesh(g, hedgeMat); m.position.set(H.cx, y, H.cz); m.castShadow = true; m.receiveShadow = true; m.name = 'gw:hedge'; m.matrixAutoUpdate = false; m.updateMatrix(); group.add(m); statics.push(m);
   }
-  // [r5-audit-north] muted brown-grey brick for photo-matched brick treads (the wall brick reads saturated red on a flight)
-  const brickM = new THREE.MeshStandardMaterial({ map: M.brick.map || null, normalMap: M.brick.normalMap || null, roughnessMap: M.brick.roughnessMap || null, color: new THREE.Color(0.75, 1.15, 1.35), roughness: 0.92 }); // ~#6A554D brown-grey
+  // [r5-audit-north] muted brown-grey 'brick' treads for photo-matched flights
+  const brickM = new THREE.MeshStandardMaterial({ map: (M.paving || M.concrete).map || null, normalMap: (M.paving || M.concrete).normalMap || null, roughnessMap: (M.paving || M.concrete).roughnessMap || null, color: new THREE.Color(0.95, 0.76, 0.64), roughness: 0.9 }); // tinted precast pavers, muted brown-grey (a multiplied wall-brick map stays tomato red)
   const matFor = (key) => key === 'brickm' ? brickM : key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron; // walls/cheeks a shade darker than treads and copings
   for (const b of buckets.values()) {
     if (!b.geo.count) continue; const y = heightAt(b.cx, b.cz);

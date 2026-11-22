@@ -172,10 +172,10 @@ export async function build(ctx) {
       const c = (a0 + a1) / 2; F.geom(M.lampGreen, new THREE.CylinderGeometry(0.07, 0.09, 3.0, 10).translate(c, top + 1.12 + 1.5, D0 + 0.6), { detail: true });
       F.geom(M.lampGlow, new THREE.SphereGeometry(0.24, 12, 8).scale(1, 1.25, 1).translate(c, top + 1.12 + 3.25, D0 + 0.6), { detail: true }); }
     { // [r5-audit-north] forecourt apron: bright rust-red brick paving (photos), not the dark wall brick
-      const pave = new THREE.MeshStandardMaterial({ color: new THREE.Color(1.27, 1.1, 1.1) /* lifts the wall brick (~#8E4A39) to rust red ~#B5523F */, roughness: 0.9, map: M.brick.map, normalMap: M.brick.normalMap, roughnessMap: M.brick.roughnessMap });
+      const pave = new THREE.MeshStandardMaterial({ color: new THREE.Color(1.12, 1.02, 1.02) /* a touch brighter than the wall brick: dull brick red, centred on the entrance */, roughness: 0.9, map: M.brick.map, normalMap: M.brick.normalMap, roughnessMap: M.brick.roughnessMap });
       // laid in 1 m strips that follow the forecourt's grade (a flat slab at the stair foot sank under the rising lawn)
       for (let t = D1; t < D1 + 6.99; t += 1.0) { const gy = Math.max(gF, k.ground(CTR, P.v1 + t + 0.5)), t1 = Math.min(D1 + 7.0, t + 1.0);
-        F.box(pave, sA - 4, sB + 4, gy - 0.4, gy + 0.04, t, t1); } }
+        F.box(pave, sA - 1.0, sB + 1.0, gy - 0.4, gy + 0.04, t, t1); } }
     walkables.push({ type: 'poly', pts: k.polyLocal([[sA, P.v1 - 0.9], [sB, P.v1 - 0.9], [sB, P.v1 + D0], [sA, P.v1 + D0]]), y: top });
     { const steps = (x, z) => { const [u, v] = k.uv(x, z); if (u < sA || u > sB || v < P.v1 + D0 - 0.05 || v > P.v1 + D1 + 0.05) return null; const i = Math.min(nS - 1, Math.max(0, Math.floor((v - P.v1 - D0) / tr))); return top - ((i + 1) * (top - gF)) / nS; };
       const cs = [[sA, P.v1 + D0], [sB, P.v1 + D0], [sB, P.v1 + D1], [sA, P.v1 + D1]].map(([u, v]) => k.xz(u, v)); walkables.push({ type: 'fn', bounds: [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1])), Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))], heightAt: steps }); }
