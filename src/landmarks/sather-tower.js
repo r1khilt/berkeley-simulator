@@ -7,6 +7,8 @@
 // Massing heights (cornice 70.2 m, balustrade 72.7 m, drum 75.9 m, spire, lantern) fitted to the 2021 LiDAR.
 import * as THREE from 'three';
 import { Bucket, Soup, squareLathe, boxMM, boxC, extrudeShape, archPts, lathe, baluster, instanced, trs, frameMatrix, toLocal, rectPoly } from './lib/campanile-kit.js';
+import { buildInterior, LIFT } from './lib/campanile-interior.js'; // r4-campanile: lobby, elevator, 7th-floor landing, 38 steps
+import { buildCarillon } from './lib/campanile-bells.js';           // r4-campanile: struck bells (clappers, hour hammer)
 
 export const info = {
   id: 'sather-tower',
@@ -87,11 +89,6 @@ function romanGeom(str, h) {
   return parts;
 }
 
-function bellGeom() { // unit-diameter bell (lip at y=0), hollow shell
-  const inner = [[0.0, 0.70], [0.2, 0.69], [0.27, 0.62], [0.29, 0.5], [0.31, 0.36], [0.35, 0.22], [0.41, 0.1], [0.455, 0.02]];
-  const outer = [[0.5, 0.0], [0.5, 0.05], [0.455, 0.11], [0.39, 0.24], [0.35, 0.38], [0.333, 0.53], [0.322, 0.66], [0.29, 0.75], [0.2, 0.795], [0.0, 0.81]];
-  return lathe([...inner, ...outer], 16);
-}
 
 // pale weathered-copper patina of the spire (photos: clearly cooler/greener than the granite, far paler than fresh verdigris)
 function spireMaterial() {
@@ -174,10 +171,7 @@ export async function build(ctx) {
     }
     if (isN) {
       reveal(-DOOR_HW, DOOR_HW, doorY0, doorY1, -REC_D, -REC_D - 0.75);
-      // bronze doors with transom
-      main.add(M.darkBronze, boxC(0, (doorY0 + 3.05) / 2, -REC_D - 0.7, 2.4, 3.05 - doorY0, 0.08), { matrix: Fm });
-      for (const sx of [-0.6, 0.6]) for (const yy of [0.95, 2.2]) fine.add(M.bronze, boxC(sx, doorY0 + yy, -REC_D - 0.64, 0.8, 0.9, 0.05), { matrix: Fm });
-      fine.add(M.bronze, boxC(0, (doorY0 + 3.05) / 2, -REC_D - 0.63, 0.06, 3.0 - doorY0, 0.06), { matrix: Fm });
+      // bronze door leaves: animated (they swing open as you approach), built with the interior below; transom stays
       main.add(M.darkBronze, boxC(0, 3.1, -REC_D - 0.62, 2.4, 0.12, 0.14), { matrix: Fm });
       main.add(M.windowNight, new THREE.PlaneGeometry(2.4, 0.74).translate(0, 3.53, -REC_D - 0.7), { matrix: Fm });
       for (const sx of [-0.6, 0, 0.6]) fine.add(M.darkBronze, boxC(sx, 3.53, -REC_D - 0.66, 0.05, 0.74, 0.05), { matrix: Fm });
@@ -209,13 +203,13 @@ export async function build(ctx) {
     }
   }
   // upper shaft block with the clocks
-  main.add(ashlar, squareLathe([[Y_REC1, hwAt(Y_REC1)], [57.6, hwAt(57.6)]]));
+  main.add(ashlar, squareLathe([[Y_REC1, hwAt(Y_REC1)], [57.6, hwAt(57.6)]], { capTop: false })); // r4: no internal caps (landing room)
   // crowning moulding of the shaft
-  main.add(granite, squareLathe([[57.6, hwAt(57.6)], [57.68, 4.72], [57.8, 4.78], [57.95, 4.84], [58.12, 4.84], [58.12, HW1]]));
+  main.add(granite, squareLathe([[57.6, hwAt(57.6)], [57.68, 4.72], [57.8, 4.78], [57.95, 4.84], [58.12, 4.84], [58.12, HW1]], { capBottom: false, capTop: false }));
   // belfry pedestal with its frieze of rosettes, then the projecting sill course
-  main.add(ashlar, squareLathe([[58.12, HW1], [60.5, HW1]], { capBottom: false }));
+  main.add(ashlar, squareLathe([[58.12, HW1], [60.5, HW1]], { capBottom: false, capTop: false }));
   main.add(granite, squareLathe([[58.3, HW1], [58.38, HW1 + 0.06], [59.12, HW1 + 0.06], [59.2, HW1]], { capBottom: false, capTop: false }));
-  main.add(granite, squareLathe([[60.5, HW1], [60.5, 4.72], [60.62, 4.8], [61.0, 4.8], [61.0, HW1]]));
+  main.add(granite, squareLathe([[60.5, HW1], [60.5, 4.72], [60.62, 4.8], [61.0, 4.8], [61.0, HW1]], { capBottom: false, capTop: false }));
   {
     const ros = new THREE.CylinderGeometry(0.2, 0.2, 0.07, 12).rotateX(Math.PI / 2);
     const boss = new THREE.SphereGeometry(0.09, 8, 6);
@@ -248,7 +242,8 @@ export async function build(ctx) {
     }
   }
   // ---------- loggia (observation level) ----------
-  main.add(M.paving, boxMM(-IN_HW - 0.1, 60.7, -IN_HW - 0.1, IN_HW + 0.1, DECK_Y, IN_HW + 0.1));
+  // r4: deck slab in four pieces around the stair well (u ±0.55, v -1.37..1.45, inside the carillonist's cabin)
+  for (const [u0, v0, u1, v1] of [[-IN_HW - 0.1, -IN_HW - 0.1, IN_HW + 0.1, -1.37], [-IN_HW - 0.1, 1.45, IN_HW + 0.1, IN_HW + 0.1], [-IN_HW - 0.1, -1.37, -0.55, 1.45], [0.55, -1.37, IN_HW + 0.1, 1.45]]) main.add(M.paving, boxMM(u0, 60.7, v0, u1, DECK_Y, v1));
   const balPos = [], barMats = [];
   const colGeo = lathe([[0.0, 0], [0.24, 0], [0.24, 0.1], [0.2, 0.16], [0.17, 0.24], [0.15, 4.69], [0.17, 4.75], [0.17, 4.81], [0.0, 4.81]], 12);
   const capGeo = lathe([[0.0, 0], [0.16, 0], [0.2, 0.12], [0.27, 0.26], [0.3, 0.32], [0.0, 0.32]], 8);
@@ -301,7 +296,7 @@ export async function build(ctx) {
   }
   const balGeo = baluster(0.88, 0.1, 8);
   detailG.add(instanced(balGeo, granite, balPos, F, { detail: true }));
-  detailG.add(instanced(new THREE.BoxGeometry(0.05, 1, 0.05), M.iron, barMats, F, { detail: true, shadow: false }));
+  detailG.add(instanced(new THREE.CylinderGeometry(0.016, 0.016, 1, 6), M.iron, barMats, F, { detail: true, shadow: false })); // r4: slimmer round bars
   // ceiling over the loggia + lamps
   main.add(M.concreteDark, boxMM(-IN_HW - 0.05, ENT0, -IN_HW - 0.05, IN_HW + 0.05, ENT0 + 0.3, IN_HW + 0.05));
   for (const [u, v] of [[0, -2.6], [2.6, 0], [0, 2.6], [-2.6, 0]]) fine.add(M.lampGlow, boxC(u, ENT0 - 0.04, v, 0.3, 0.08, 0.3));
@@ -406,13 +401,13 @@ export async function build(ctx) {
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) main.add(lanternMat, new THREE.ConeGeometry(0.045, 0.55, 6).translate(sx * 0.52, LT + 0.45, sz * 0.52), { smooth: true, uv: 'keep' });
   }
   // ---------- carillon: cabin, frame and 61 bells ----------
+  let carillon = null;
   {
-    main.add(M.woodDark, boxMM(-1.45, DECK_Y, -1.45, 1.45, 63.3, 1.45));
+    // r4: the cabin is hollow now (buildInterior): the 38 steps arrive inside it and you leave by its south doorway
     main.add(M.iron, boxMM(-1.6, 63.3, -1.6, 1.6, 63.45, 1.6));
     for (const f of FACES) {
       const Fm = faceMat(f, 1.45);
-      for (const sx of [-0.8, 0.8]) main.add(M.windowNight, boxC(sx, 62.35, 0.01, 0.9, 0.8, 0.02), { matrix: Fm });
-      if (f.key === 'N') main.add(M.wood, boxC(0, 62.05, 0.012, 0.85, 2.05, 0.02), { matrix: Fm });
+      for (const sx of (f.key === 'S' ? [-0.95, 0.95] : [-0.8, 0.8])) main.add(M.windowNight, boxC(sx, 62.35, 0.01, f.key === 'S' ? 0.6 : 0.9, 0.8, 0.02), { matrix: Fm });
     }
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) main.add(M.iron, boxC(sx * 1.45, 65.4, sz * 1.45, 0.22, 3.9, 0.22));
     for (const y of [65.4, 67.05]) {
@@ -433,14 +428,13 @@ export async function build(ctx) {
     slots.push(...ring(2.62, 12, 65.3));
     slots.push(...ring(2.62, 16, 66.95));
     for (let i = 0; i < 29; i++) { const gx = i % 6, gz = Math.floor(i / 6); slots.push([-1.5 + gx * 0.6, 67.2, -1.2 + gz * 0.6 + (gx % 2) * 0.15]); }
-    const bellM = [], yokeM = [];
+    const yokeM = [];
     D.forEach((d, i) => {
       const [u, yh, v] = slots[i];
-      const h = 0.81 * d;
-      bellM.push(trs(u, yh - 0.07 - h, v, 0, d, d, d));
       yokeM.push(trs(u, yh - 0.05, v, 0, d * 0.45, 0.1, d * 0.2));
     });
-    detailG.add(instanced(bellGeom(), M.bronze, bellM, F, { detail: false }));
+    carillon = buildCarillon(M, F, slots, D, { quality: ctx.quality || (typeof window !== 'undefined' && window.BSIM && window.BSIM.settings && window.BSIM.settings.quality) || 'high' }); // r4: clappers + hour hammer
+    for (const o of carillon.objects) detailG.add(o);
     detailG.add(instanced(new THREE.BoxGeometry(1, 1, 1), M.iron, yokeM, F, { detail: true }));
   }
   // ---------- 1960s steel-framed entrance canopy (Gardner Dailey) ----------
@@ -455,9 +449,28 @@ export async function build(ctx) {
       main.add(M.iron, new THREE.CylinderGeometry(0.06, 0.06, 2.74 - g0, 10).translate(u, (2.74 + g0) / 2, v), { smooth: true });
     }
   }
+  // ---------- r4-campanile: walk-in lobby, elevator, seventh-floor landing and the 38 steps (lib/campanile-interior.js) ----------
+  const innerG = new THREE.Group(); innerG.name = 'campanile-interior'; innerG.visible = false; root.add(innerG);
+  const fg = new THREE.Group(); fg.name = 'campanile-interior-anim'; fg.matrixAutoUpdate = false; fg.matrix.copy(F); innerG.add(fg);
+  let FL = doorY0 + 0.05; for (let u = -3.6; u <= 3.61; u += 0.9) for (let v = -3.6; v <= 3.61; v += 0.9) FL = Math.max(FL, gAt(u, v) + 0.03);
+  const TL = DECK_Y - 38 * 0.18, CEIL = FL + 4.25;           // the elevator stops 38 steps (6.84 m) below the deck
+  const inner = new Bucket(bUV), innerFine = new Bucket(bUV);   // interior-only geometry, drawn only near the tower
+  const ix = buildInterior(M, { inner, innerFine, outer: main }, fg, { HW0, DECK_Y, FL, TL, CEIL, doorY1 });
+  // bronze entrance leaves hinged at the jambs; they swing into the lobby when someone comes near (see update)
+  const leaves = [-1, 1].map((side) => {
+    const g = new THREE.Group(); g.position.set(side * DOOR_HW, 0, -4.30); fg.add(g);
+    const w = DOOR_HW, x0 = side < 0 ? 0 : -w;
+    g.add(new THREE.Mesh(boxMM(x0, doorY0, -0.04, x0 + w, 3.05, 0.04), M.darkBronze));
+    for (const yy of [0.95, 2.2]) for (const z of [-0.05, 0.05]) g.add(new THREE.Mesh(boxC(x0 + w / 2, doorY0 + yy, z, 0.8, 0.9, 0.02), M.bronze));
+    g.userData.open = side < 0 ? -Math.PI / 2 : Math.PI / 2; return g;
+  });
+  // the clavier's batons go down with each note (driven from carillon strikes)
+  const batons = new Map(), bm4 = new THREE.Matrix4();
+  if (carillon) { const strike0 = carillon.strike; carillon.strike = (i, vel = 1) => { strike0(i, vel); if (i >= 0 && i < ix.batonBase.length) batons.set(i, 0); }; }
   // ---------- assemble ----------
   main.flush(root, F, { name: 'campanile-' });
   fine.flush(detailG, F, { detail: true, name: 'campanile-detail-' });
+  inner.flush(innerG, F, { name: 'campanile-in-' }); innerFine.flush(innerG, F, { name: 'campanile-in-fine-' });
   // clock hands (instanced so update() can sweep them cheaply)
   const hourShape = [[-0.09, -0.42], [0.09, -0.42], [0.075, 0], [0.05, 1.12], [0.17, 1.28], [0.0, 1.62], [-0.17, 1.28], [-0.05, 1.12], [-0.075, 0]];
   const minShape = [[-0.075, -0.6], [0.075, -0.6], [0.06, 0], [0.035, 1.95], [0.12, 2.05], [0.0, 2.36], [-0.12, 2.05], [-0.035, 1.95], [-0.06, 0]];
@@ -493,8 +506,9 @@ export async function build(ctx) {
   // ---------- gameplay data (local coordinates) ----------
   const poly = (u0, v0, u1, v1) => rectPoly(F, u0, v0, u1, v1);
   const colliders = [
-    { type: 'poly', pts: poly(-HW0 - 0.3, -HW0 - 0.3, HW0 + 0.3, HW0 + 0.3), y0: -2, y1: 1.4 },
-    { type: 'poly', pts: poly(-HW0 - 0.02, -HW0 - 0.02, HW0 + 0.02, HW0 + 0.02), y0: 1.4, y1: DECK_Y - 0.35 },
+    // r4: walk-in lobby: solid wall slabs (with the door gap) up to the lobby ceiling, then the solid shaft up to the deck
+    ...ix.lobby.walls.map(([u0, v0, u1, v1]) => ({ type: 'poly', pts: poly(u0, v0, u1, v1), y0: -2, y1: CEIL + 0.2 })),
+    { type: 'poly', pts: poly(-HW0 - 0.02, -HW0 - 0.02, HW0 + 0.02, HW0 + 0.02), y0: CEIL + 0.2, y1: DECK_Y - 0.35 },
     // loggia walls / balustrades / bars keep players on the deck
     { type: 'poly', pts: poly(-HW1, -HW1, HW1, -IN_HW), y0: DECK_Y - 0.35, y1: 70.2 },
     { type: 'poly', pts: poly(-HW1, IN_HW, HW1, HW1), y0: DECK_Y - 0.35, y1: 70.2 },
@@ -505,18 +519,32 @@ export async function build(ctx) {
     { type: 'poly', pts: poly(-5.45, -5.45, 5.45, 5.45), y0: 70.2, y1: 93.6 },
   ];
   for (const [u, v] of [[-2.8, -10.2], [2.8, -10.2], [-2.8, -7.7], [2.8, -7.7]]) { const p = L(u, 0, v); colliders.push({ type: 'cyl', x: +p[0].toFixed(3), z: +p[2].toFixed(3), r: 0.12, y0: -1, y1: 2.8 }); }
-  const walkables = [{ type: 'poly', pts: poly(-IN_HW, -IN_HW, IN_HW, IN_HW), y: DECK_Y }];
-  const doorOut = L(0, 0, -HW0 - 1.3), doorG = groundAt(doorOut[0], doorOut[2]);
-  const downPos = L(0, 0, -HW0 - 2.4), downG = groundAt(downPos[0], downPos[2]);
-  const deckArrive = L(1.0, DECK_Y, -2.6), deckLift = L(-2.6, DECK_Y + 1.0, -2.6);
+  const walkables = [{ type: 'poly', pts: poly(-IN_HW, -IN_HW, IN_HW, IN_HW), y: DECK_Y }, ...ix.lobby.floor.map(([u0, v0, u1, v1]) => ({ type: 'poly', pts: poly(u0, v0, u1, v1), y: FL }))];
   const r3 = (p) => p.map((v) => +v.toFixed(3));
+  // r4: `action` is run by src/props/campanile.js (the scripted ride: lift, landing, 38 steps); `teleport` is the fallback
   const interactions = [
-    { id: 'campanile-elevator-up', pos: r3([doorOut[0], doorG + 1.0, doorOut[2]]), radius: 2.4, label: 'Ride the elevator to the observation deck', teleport: r3(deckArrive) },
-    { id: 'campanile-elevator-down', pos: r3(deckLift), radius: 1.4, label: 'Take the elevator back down', teleport: r3([downPos[0], downG, downPos[2]]) },
+    { id: 'campanile-lift-up', action: 'campanile-up', pos: r3(L(0, FL + 1.0, 1.5)), radius: 1.5, label: 'Ride the elevator to the observation deck', teleport: r3(L(0, DECK_Y, 2.5)) },
+    { id: 'campanile-lift-down', action: 'campanile-down', pos: r3(L(0, DECK_Y + 1.0, 2.2)), radius: 1.3, label: 'Head back down: 38 steps and the elevator', teleport: r3(L(0, FL, 0.6)) },
   ];
+  let doorW = null, doorOpen = 0, rootW = null;
+  const BSIM_FORCE_INNER = () => typeof window !== 'undefined' && window.BSIM && window.BSIM.campanileRide === true; // the ride keeps it on
   return {
     object3d: root, colliders, walkables, interactions,
-    anchors: { bells: r3(L(0, 65.6, 0)), deck: r3(L(0, DECK_Y, 0)), clock: r3(L(0, YC, -HW0)) },
-    update(dt, env) { setHands(env && env.time instanceof Date ? env.time : new Date()); },
+    anchors: { bells: r3(L(0, 65.6, 0)), deck: r3(L(0, DECK_Y, 0)), clock: r3(L(0, YC, -HW0)), lobby: r3(L(0, FL, 0)) },
+    // r4-campanile: handles for src/props/campanile.js (ride director + bells)
+    campanile: { frame: F, ix, carillon, consts: { FL, TL, DECK_Y, CEIL, HW0, LIFT }, root },
+    update(dt, env) {
+      setHands(env && env.time instanceof Date ? env.time : new Date());
+      // entrance doors swing open when the camera comes within ~8 m; the interior is drawn only within ~32 m
+      if (env && env.camera) {
+        if (!rootW) { root.updateMatrixWorld(); rootW = new THREE.Vector3().setFromMatrixPosition(root.matrixWorld); }
+        const cp = env.camera.position; innerG.visible = Math.hypot(cp.x - rootW.x, cp.z - rootW.z) < 32 || BSIM_FORCE_INNER();
+        if (!doorW) { root.updateMatrixWorld(); doorW = new THREE.Vector3(...L(0, 1.5, -4.3)).applyMatrix4(root.matrixWorld); }
+        const want = env.camera.position.distanceTo(doorW) < 8 ? 1 : 0;
+        if (Math.abs(want - doorOpen) > 1e-3) { doorOpen += Math.sign(want - doorOpen) * Math.min(Math.abs(want - doorOpen), dt * 0.9); const e = doorOpen * doorOpen * (3 - 2 * doorOpen); for (const g of leaves) g.rotation.y = g.userData.open * e; }
+      }
+      if (carillon) carillon.update(dt);
+      if (batons.size) { for (const [i, t] of batons) { const t2 = t + dt; const dn = t2 < 0.05 ? t2 / 0.05 : Math.max(0, 1 - (t2 - 0.05) / 0.2); bm4.copy(ix.batonBase[i]).multiply(new THREE.Matrix4().makeRotationZ(-0.12 * dn)); ix.clavier.setMatrixAt(i, bm4); if (t2 > 0.3) { ix.clavier.setMatrixAt(i, ix.batonBase[i]); batons.delete(i); } else batons.set(i, t2); } ix.clavier.instanceMatrix.needsUpdate = true; }
+    },
   };
 }
