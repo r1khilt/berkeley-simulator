@@ -29,6 +29,10 @@ export const R5W_OFF = qs.get('nor5w') === '1';
 const CARVE = [[-336.0, 204.6, 72.3], [-339.5, 203.6, 72.2], [-343.0, 199.3, 72.0], [-349.0, 195.0, 71.75], [-358.0, 192.0, 71.4], [-363.5, 189.2, 71.15], [-367.5, 186.8, 71.0]];
 const NF_LOWER = [[-562.4, 49.0, 65.6], [-565.4, 51.7, 65.55], [-568.5, 54.8, 65.6], [-572.5, 58.5, 65.55], [-576.0, 62.0, 65.4], [-579.0, 65.9, 65.2], [-582.0, 72.0, 64.95], [-585.0, 79.0, 64.55], [-585.2, 86.0, 64.3], [-585.4, 92.9, 63.85], [-583.4, 99.0, 63.3], [-581.1, 104.6, 62.8]];
 const OXFORD_APRON = [[-673.0, 189.6, 59.45], [-676.0, 187.6, 59.3], [-678.6, 186.85, 59.25], [-679.8, 186.6, 59.25]];
+// creek below the ASUC complex: "a high concrete wall forming the south bank", and the "makeshift stepping stones" of
+// students late for class in Dwinelle (Loafer's Guide); OSM centreline points, east to west
+const ASUC_REACH = [[-176.5, 214.9], [-181.6, 218.5], [-192.0, 223.4], [-202.5, 228.4], [-214.0, 229.8], [-230.8, 228.2], [-244.0, 224.9]];
+const STEPPING = [-221.5, 229.6];
 const BRIDGES = [
   { id: 'asuc-arch', style: 'arch', pts: [[-259.8, 219.2], [-258.7, 230.8]], w: 2.5, camber: 0.7 },
   { id: 'octagon', style: 'octagon', pts: [[-345.9, 191.6], [-345.7, 202.4]], w: 9.4, off: -1.9, tree: [-342.8, 194.8], flat: true },
@@ -151,7 +155,7 @@ function planBridge(b, H) {
   for (const q of D) { x0 = Math.min(x0, q.cx - hw); x1 = Math.max(x1, q.cx + hw); z0 = Math.min(z0, q.cz - hw); z1 = Math.max(z1, q.cz + hw); }
   // deck top at (x,z) or null (nearest sample; lateral within half width + pad, along within the deck)
   const deckAt = (x, z, pad = 0.05) => {
-    if (x < x0 || x > x1 || z < z0 || z > z1) return null;
+    if (x < x0 - pad || x > x1 + pad || z < z0 - pad || z > z1 + pad) return null;
     let bi = -1, bd = 1e9; for (let i = 0; i < D.length; i++) { const d = (D[i].cx - x) ** 2 + (D[i].cz - z) ** 2; if (d < bd) { bd = d; bi = i; } }
     const q = D[bi]; const rx = x - q.cx, rz = z - q.cz; const lat = -rx * q.tz + rz * q.tx, al = rx * q.tx + rz * q.tz;
     if (Math.abs(lat) > b.w / 2 + pad) return null;
@@ -205,6 +209,7 @@ export function installR5West({ scene, heightAt, physics, water, setupMaterials,
   for (const p of plans) if (p) { try { buildBridge(A, MAT, p, physics, heightAt); stats.bridges++; } catch (e) { console.warn('r5-west bridge', p.b.id, e); } }
   try { stats.weirs = buildCreekWorks(A, MAT, heightAt, water, physics, quality, group); stats.weirSites = buildCreekWorks.sites; } catch (e) { console.warn('r5-west creek works', e); }
   try { buildGatewaySign(A, MAT, heightAt, physics, group); } catch (e) { console.warn('r5-west sign', e); }
+  try { stats.wall = buildAsucWall(A, MAT, heightAt, water, physics, group, quality); } catch (e) { console.warn('r5-west wall', e); }
   A.build(group, 'r5-west');
   // open the creek under the decks (the water module hid it wherever the path SDF was paved)
   let nOpen = 0;
@@ -466,4 +471,44 @@ function buildGatewaySign(A, MAT, heightAt, physics, group) {
     if (physics) { const a = [hx - dx * len / 2, hz - dz * len / 2], b2 = [hx + dx * len / 2, hz + dz * len / 2]; physics.addSeg(a[0], a[1], b2[0], b2[1], hg - 1, hg + 0.95, 'r5-gate'); }
   }
   if (physics) { const a = P(-LEN / 2 - 0.5, 0), b2 = P(LEN / 2 + 0.5, 0); physics.addSeg(a[0], a[2], b2[0], b2[2], g0 - 1, g0 + 2.2, 'r5-gate'); }
+}
+
+// ------------------------------------------------------------------ ASUC reach: south-bank retaining wall + stepping stones
+function buildAsucWall(A, MAT, heightAt, water, physics, group, quality) {
+  const nc = water && water.nearestCreek; if (!nc) return 0;
+  const S = resample(ASUC_REACH, 1.0, 0); const W = [];
+  for (const q of S) {
+    const c = nc(q.x, q.z); if (!c || c.d > 3.5) continue; const [cx, cz, lev] = c.s;
+    let nx = -q.tz, nz = q.tx; if (nz < 0) { nx = -nx; nz = -nz; }          // south normal
+    let d = 0.7; for (; d < 3.6; d += 0.1) if (heightAt(cx + nx * d, cz + nz * d) > lev + 0.42) break;
+    W.push({ cx, cz, lev, nx, nz, d });
+  }
+  if (W.length < 4) return 0;
+  for (let pass = 0; pass < 3; pass++) for (let i = 1; i < W.length - 1; i++) W[i].d = (W[i - 1].d + W[i].d * 2 + W[i + 1].d) / 4;
+  const pts = W.map((w) => { const x = w.cx + w.nx * (w.d + 0.12), z = w.cz + w.nz * (w.d + 0.12); const behind = heightAt(x + w.nx * 1.2, z + w.nz * 1.2); return { x, z, bot: w.lev - 0.45, top: Math.max(w.lev + 1.25, behind + 0.2) }; });
+  for (let pass = 0; pass < 2; pass++) for (let i = 1; i < pts.length - 1; i++) pts[i].top = (pts[i - 1].top + pts[i].top * 2 + pts[i + 1].top) / 4;
+  const wallMat = tint(MAT.conc, 0x9c978c, 0.97);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1]; const top = (a.top + b.top) / 2, bot = Math.min(a.bot, b.bot);
+    A.seg(wallMat, [a.x, (top + bot) / 2, a.z], [b.x, (top + bot) / 2, b.z], 0.32, top - bot);
+    A.seg(MAT.concDark, [a.x, top + 0.05, a.z], [b.x, top + 0.05, b.z], 0.4, 0.1);
+    if (physics) physics.addSeg(a.x, a.z, b.x, b.z, bot, top, 'r5-wall');
+  }
+  // ivy hanging over the coping in patches (the photo's bank wall)
+  const ivy = new THREE.MeshStandardMaterial({ color: 0x2f4a25, roughness: 0.95 });
+  for (let i = 2; i < pts.length - 2; i += 3) { const h = Math.abs(Math.sin(i * 12.9898) * 43758.5) % 1; if (h < 0.35) continue; const a = pts[i]; const w = W[i];
+    const g = new THREE.BoxGeometry(1.6 + h * 1.6, 0.5 + h * 0.6, 0.12); const m = new THREE.Mesh(g, ivy); m.position.set(a.x - w.nx * 0.2, a.top - 0.2 - h * 0.25, a.z - w.nz * 0.2); m.rotation.y = -Math.atan2(-w.nx, w.nz) ; m.lookAt(a.x - w.nx * 5, m.position.y, a.z - w.nz * 5); m.castShadow = false; m.receiveShadow = true; m.name = 'r5-ivy'; group.add(m); }
+  // stepping stones across the bed
+  const c = nc(STEPPING[0], STEPPING[1]);
+  if (c) {
+    const [sx, sz, lev] = c.s; const t = (() => { const a = nc(STEPPING[0] + 1.5, STEPPING[1]), b = nc(STEPPING[0] - 1.5, STEPPING[1]); return a && b ? norm2(b.s[0] - a.s[0], b.s[1] - a.s[1]) : [1, 0]; })();
+    const nx = -t[1], nz = t[0]; const geo = new THREE.CylinderGeometry(0.34, 0.4, 0.4, 7); geo.translate(0, -0.2, 0);
+    const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const k = 1 + 0.12 * Math.sin(x * 9.1 + z * 6.3); p.setX(i, x * k); p.setZ(i, z * k * 0.85); } geo.computeVertexNormals();
+    const stones = []; for (let k = -2; k <= 2; k++) { const o = k * 0.68; stones.push([sx + nx * o + t[0] * (k % 2) * 0.12, lev + 0.13, sz + nz * o + t[1] * (k % 2) * 0.12]); }
+    const im = new THREE.InstancedMesh(geo, MAT.stone, stones.length); const m4 = new THREE.Matrix4();
+    stones.forEach(([x, y, z], i) => { m4.makeRotationY(i * 1.7); m4.setPosition(x, y, z); im.setMatrixAt(i, m4); }); im.castShadow = true; im.receiveShadow = true; im.name = 'r5-stepping-stones'; group.add(im);
+    if (physics) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, , z] of stones) { x0 = Math.min(x0, x - 0.5); x1 = Math.max(x1, x + 0.5); z0 = Math.min(z0, z - 0.5); z1 = Math.max(z1, z + 0.5); }
+      physics.addWalkable({ type: 'fn', tag: 'r5-stones', bounds: [x0, z0, x1, z1], heightAt: (x, z) => { for (const [sx2, sy, sz2] of stones) if ((x - sx2) ** 2 + (z - sz2) ** 2 < 0.13) return sy; return null; } }); }
+  }
+  return pts.length;
 }
