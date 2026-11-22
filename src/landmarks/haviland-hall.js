@@ -50,7 +50,7 @@ export async function build(ctx) {
   {
     const uF = -11.0, uP = -13.4, v0 = -2.8, v1 = 2.8, yT = FL + 3.55; // [r5a] porch narrowed to ~5.6 m and one storey tall: entablature just under the second-floor sills, balcony at the second floor (photo)
     const yL = Math.max(K.g(-12.2, 0), K.g(-14.4, 0), K.g(-12.2, -2.6), K.g(-12.2, 2.6)) + 0.12; // landing: one low step above the terrace walk
-    const LAND = tint(M.granite, 0xc8c0b0), CON = tint(M.concrete, 0xc9c4b8), BRK = tint(M.brick, 0x9a4636), NOSE = tint(M.concrete, 0xb48e7e), RAIL = solid(0x1b1b1b, 0.5, 0.6);
+    const CON = tint(M.concrete, 0xc9c4b8), LAND = BASE, BRK = tint(M.brick, 0x9a4636), NOSE = CON, RAIL = solid(0x1b1b1b, 0.5, 0.6); // (shared materials keep the draw-call count down)
     K.box(LAND, uP - 0.6, yL - 0.9, v0 - 0.3, uF, yL, v1 + 0.3);
     walkables.push(K.walkPoly(rect(uP - 0.6, v0 - 0.3, uF, v1 + 0.3), yL));
     const yC = yL + 0.9; // pedestal top
@@ -71,7 +71,7 @@ export async function build(ctx) {
     K.wall(R, ST, 0.3, (v1 - v0) - 0.3, yL, yT, [o], 0.25); const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x4a565e); DKG.envMapIntensity = 1.8; // reflective, mid-dark
     K.fill(R, o, { kind: 'door', door: WD, glass: DKG, rev: 0.15 }); // dark glass: no lit interior behind the transom
     { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 + 99; // gridded transom (photo: ~5 x 6 lights)
-      { const ag = new THREE.TorusGeometry(rr - 0.08, 0.07, 5, 20, Math.PI); ag.translate(cx, o.doorTop - rr + 0.02, -0.12); K.addRun(R, WD, ag, { detail: true }); const tg = new THREE.Shape(); tg.moveTo(o.s0, o.doorTop); tg.lineTo(o.s0, o.doorTop - rr); tg.absarc(cx, o.doorTop - rr, rr, Math.PI, 0, true); tg.lineTo(o.s1, o.doorTop); tg.lineTo(o.s0, o.doorTop); const sg = new THREE.ShapeGeometry(tg, 8); sg.translate(0, 0, -0.135); K.addRun(R, tint(M.woodDark, 0x6e4228), sg, { detail: true }); } // arched head of the door leaves
+      { const ag = new THREE.TorusGeometry(rr - 0.08, 0.07, 5, 20, Math.PI); ag.translate(cx, o.doorTop - rr + 0.02, -0.12); K.addRun(R, WD, ag, { detail: true }); const tg = new THREE.Shape(); tg.moveTo(o.s0, o.doorTop); tg.lineTo(o.s0, o.doorTop - rr); tg.absarc(cx, o.doorTop - rr, rr, Math.PI, 0, true); tg.lineTo(o.s1, o.doorTop); tg.lineTo(o.s0, o.doorTop); const sg = new THREE.ShapeGeometry(tg, 8); sg.translate(0, 0, -0.135); K.addRun(R, WD, sg, { detail: true }); } // arched head of the door leaves
       for (let k = 1; k < 5; k++) { const x = o.s0 + w * k / 5, dx = x - cx, top = Math.min(o.y1 - 0.02, spring + Math.sqrt(Math.max(0, rr * rr - dx * dx)) - 0.02); K.rbox(R, WD, x - 0.025, o.doorTop, -0.15, x + 0.025, top, -0.11, { detail: true }); }
       for (let j = 1; j < 6; j++) { const y = o.doorTop + (o.y1 - o.doorTop) * j / 6; const hw = y <= spring ? rr : Math.sqrt(Math.max(0, rr * rr - (y - spring) ** 2)); if (hw < 0.15) continue; K.rbox(R, WD, cx - hw + 0.02, y - 0.025, -0.15, cx + hw - 0.02, y + 0.025, -0.11, { detail: true }); }
       K.rbox(R, WD, o.s0, o.doorTop - 0.06, -0.16, o.s1, o.doorTop + 0.08, -0.08, { detail: true }); }
@@ -128,7 +128,7 @@ export async function build(ctx) {
         for (let y = FL + 0.6; y < 10.0; y += 0.42) for (const dx of [-0.17, 0.17]) { const g = new THREE.BoxGeometry(0.21, 0.21, 0.04); g.rotateZ(Math.PI / 4); g.translate(s + dx, y + (dx > 0 ? 0.21 : 0), 0.05); K.addRun(R, DIA, g, { detail: true }); }
       } } }
   // [r5a] black iron grilles over the basement windows (all round), as in the photos
-  { const IRON = solid(0x202020, 0.55, 0.5);
+  { const IRON = solid(0x1b1b1b, 0.5, 0.6);
     for (const R of runs || []) { const nb = Math.round(R.L / 3.55); const bw = R.L / nb;
       for (let i = 0; i < nb; i++) { if (R.L > 40 && i === 7) continue; const c = (i + 0.5) * bw;
         for (let k = 0; k <= 5; k++) { const s = c - 0.6 + 0.24 * k; K.rbox(R, IRON, s - 0.017, BWY - 0.02, 0.0, s + 0.017, BWY + 0.97, 0.05, { detail: true }); }
