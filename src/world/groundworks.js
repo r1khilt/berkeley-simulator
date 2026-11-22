@@ -10,6 +10,7 @@
 //  ?nogw=1 disables both passes (A/B comparisons).
 import * as THREE from 'three';
 import { materials, TEX_M } from '../materials.js';
+import { noiseTexture } from './noiseTex.js';
 
 const KERB = 0.13;        // road surface drop below the sidewalk (m)
 const KERB_W = 0.17;      // kerb top width
@@ -82,11 +83,34 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const G = new HGrid(heights, c), S = new SDF(sdf, gt, c);
   const orig = heights.slice(); // pre-grading copy: things baked against the old terrain (trees) are reseated by the delta
   const bmask = buildingMask(G, bjson, manifest);
+  const tA = performance.now();
+  // 0b) denoise campus ground: the 2021 LiDAR DTM carries 10-60 cm bumps (people, benches, sparse returns under
+  //     canopies) that read as lumpy plazas and lawns. Masked Gaussian (sigma 2.5 m, buildings excluded) with the
+  //     correction clamped to +-0.3 m, so real terraces, berms and the creek ravine (left alone within 10 m) survive.
+  { const R = { x0: -760, z0: -560, x1: 520, z1: 420 };
+    const j0 = Math.max(0, Math.ceil((R.x0 - G.x0) / G.s)), j1 = Math.min(G.nx - 1, Math.floor((R.x1 - G.x0) / G.s));
+    const i0 = Math.max(0, Math.ceil((R.z0 - G.z0) / G.s)), i1 = Math.min(G.nz - 1, Math.floor((R.z1 - G.z0) / G.s));
+    const W = j1 - j0 + 1, Hn = i1 - i0 + 1, N = W * Hn;
+    const num = new Float32Array(N), den = new Float32Array(N), keep = new Float32Array(N);
+    for (let i = 0; i < Hn; i++) for (let j = 0; j < W; j++) { const x = G.x0 + (j0 + j) * G.s, z = G.z0 + (i0 + i) * G.s; const w = bmask.at(x, z) ? 0 : 1; const k = (i0 + i) * G.nx + j0 + j; num[i * W + j] = heights[k] * w; den[i * W + j] = w; keep[i * W + j] = w; }
+    for (const wv of vectors.water || []) { const P = wv.pts; for (let q = 0; q < P.length - 1; q++) { const a = P[q], b = P[q + 1]; const bx0 = Math.min(a[0], b[0]) - 10, bx1 = Math.max(a[0], b[0]) + 10, bz0 = Math.min(a[1], b[1]) - 10, bz1 = Math.max(a[1], b[1]) + 10;
+      for (let z = Math.ceil(bz0 - G.z0); z <= bz1 - G.z0; z++) for (let x = Math.ceil(bx0 - G.x0); x <= bx1 - G.x0; x++) { const i = z - i0, j = x - j0; if (i < 0 || j < 0 || i >= Hn || j >= W) continue; const wx = G.x0 + x, wz = G.z0 + z; const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((wx - a[0]) * dx + (wz - a[1]) * dz) / L2)); if (Math.hypot(a[0] + t * dx - wx, a[1] + t * dz - wz) < 10) keep[i * W + j] = 0; } } }
+    const sig = 2.5, rad = 7, ker = []; let ks = 0; for (let o = -rad; o <= rad; o++) { const v = Math.exp(-o * o / (2 * sig * sig)); ker.push(v); ks += v; } for (let o = 0; o < ker.length; o++) ker[o] /= ks;
+    const blur = (src) => { const tmp = new Float32Array(N), out = new Float32Array(N);
+      for (let i = 0; i < Hn; i++) { const r = i * W; for (let j = 0; j < W; j++) { let acc = 0; for (let o = -rad; o <= rad; o++) { const jj = j + o; if (jj >= 0 && jj < W) acc += src[r + jj] * ker[o + rad]; } tmp[r + j] = acc; } }
+      for (let i = 0; i < Hn; i++) for (let j = 0; j < W; j++) { let acc = 0; for (let o = -rad; o <= rad; o++) { const ii = i + o; if (ii >= 0 && ii < Hn) acc += tmp[ii * W + j] * ker[o + rad]; } out[i * W + j] = acc; }
+      return out; };
+    const bn = blur(num), bd = blur(den);
+    for (let i = 0; i < Hn; i++) for (let j = 0; j < W; j++) { const q = i * W + j; if (!keep[q] || bd[q] < 0.3) continue; const k = (i0 + i) * G.nx + j0 + j; const d = bn[q] / bd[q] - heights[k]; heights[k] += Math.max(-0.3, Math.min(0.3, d)) * Math.min(1, (bd[q] - 0.3) / 0.4); }
+  }
+  const tB = performance.now();
   // 0) landmark aprons: where the DTM bulges up against a landmark wall (the LiDAR fill under the footprint) and falls
   //    away outward, cut it back toward the outer ground so plinths and basement windows show. Only ever lowers, never
   //    below the building's base (anchor y), never under other buildings, and leaves flat plazas and uphill sides alone.
   let nApron = 0;
+  const APRON_SKIP = new Set(['doe-library', 'sproul-hall']); // the quality bar: leave their ground exactly as authored
   for (const l of (manifest && manifest.landmarks) || []) {
+    if (l.always || APRON_SKIP.has(l.id)) continue;
     const ay = l.anchor ? l.anchor.y : -1e9;
     for (const fp of l.footprints || []) {
       if (fp.length < 3) continue; const n = fp.length;
@@ -99,14 +123,14 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
           const px = a[0] + dx * k / ns, pz = a[1] + dz * k / ns; if (!G.inside(px, pz, 8)) continue;
           const h1 = G.at(px + nx * 1.0, pz + nz * 1.0), h5 = G.at(px + nx * 5.5, pz + nz * 5.5);
           if (h1 - h5 < 0.2) continue;
-          const target = Math.max(h5 + 0.05, ay - 0.15); if (target >= h1 - 0.05) continue;
+          const target = Math.max(h5 + 0.05, ay - 0.05); if (target >= h1 - 0.05) continue;
           nApron++;
           G.each(px - 6.5, pz - 6.5, px + 6.5, pz + 6.5, (x, z, idx) => {
             const rx = x - px, rz = z - pz; const d = rx * nx + rz * nz, lat = Math.abs(-rx * nz + rz * nx);
-            if (d < -0.6 || d > 5.5 || lat > 0.8 + 0.5 * (k === 0 || k === ns ? 1 : 0)) return;
+            if (d < 0 || d > 5.5 || lat > 0.8 + 0.5 * (k === 0 || k === ns ? 1 : 0)) return;
             if (bmask.at(x, z) === 1) return;
             const cur = heights[idx]; if (cur <= target) return;
-            const w = 1 - smooth(2.5, 5.5, d); heights[idx] = Math.max(cur - 1.5, cur - (cur - target) * w);
+            const w = 1 - smooth(2.5, 5.5, d); heights[idx] = Math.max(orig[idx] - 0.8, cur - (cur - target) * w); // overlapping samples never cut > 0.8 m in total
           });
         }
       }
@@ -145,7 +169,12 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const rise = Math.abs(hb - ha); if (rise < 0.12) continue;
     let n = Math.max(1, Math.round(rise / 0.155)); if (L / n < 0.27) n = Math.max(1, Math.floor(L / 0.27));
     const lo = Math.min(ha, hb), hi = Math.max(ha, hb);
-    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : (p.surface === 'brick' ? 'brick' : 'concrete'), cheeks: w <= 5.5 && rise >= 0.45 });
+    // the stair must roughly agree with the ground it climbs: skip ones whose bed would cut > 1.1 m or that stand > 1.4 m
+    // above the terrain (elevated flights, bridges, mis-tagged indoor stairs)
+    let worstCut = 0, worstFill = 0;
+    for (let s2 = 0; s2 <= L; s2 += 0.7) { const [x, z] = along(P, C, s2); const sl = up ? s2 : L - s2; const ramp = lo + (hi - lo) * (sl / L); const dz = G.at(x, z) - ramp; worstCut = Math.max(worstCut, dz); worstFill = Math.max(worstFill, -dz); }
+    if (worstCut > 1.1 || worstFill > 1.4) continue;
+    stairs.push({ P, C, L, w, n, lo, hi, up, mat: /stone|granite|sett|paving/.test(p.surface || '') ? 'granite' : 'concrete' /* brick-tagged flights read as a red smear: concrete treads instead */, cheeks: w <= 5.5 && rise >= 0.45 });
   }
   // landings first (blend toward the landing heights), then beds (only ever lowered, so treads always cover terrain)
   for (const st of stairs) {
@@ -156,9 +185,10 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
       const sl = up ? s : L - s; // distance from the low end along the stair
       const side = 1 - smooth(hw, hw + pad, d);
       if (side <= 0) return;
-      if (sl < 0 && sl > -1.5 - pad) { const wgt = side * (1 - smooth(1.2, 1.2 + pad, -sl)); heights[k] += (lo - heights[k]) * wgt; }
-      else if (sl > L && sl < L + 1.5 + pad) { const wgt = side * (1 - smooth(1.2, 1.2 + pad, sl - L)); heights[k] += (hi - heights[k]) * wgt; }
-      else if (!st.cheeks && sl >= 0 && sl <= L && d > hw) { const ramp = lo + (hi - lo) * (sl / L); heights[k] += (ramp - heights[k]) * side; }
+      const lim = (v) => Math.max(orig[k] - 0.9, Math.min(orig[k] + 0.9, v)); // landings and side grading move ground <= 0.9 m
+      if (sl < 0 && sl > -1.5 - pad) { const wgt = side * (1 - smooth(1.2, 1.2 + pad, -sl)); heights[k] = lim(heights[k] + (lo - heights[k]) * wgt); }
+      else if (sl > L && sl < L + 1.5 + pad) { const wgt = side * (1 - smooth(1.2, 1.2 + pad, sl - L)); heights[k] = lim(heights[k] + (hi - heights[k]) * wgt); }
+      else if (!st.cheeks && sl >= 0 && sl <= L && d > hw) { const ramp = lo + (hi - lo) * (sl / L); heights[k] = lim(heights[k] + (ramp - heights[k]) * side); }
     });
   }
   for (const st of stairs) {
@@ -185,7 +215,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const hl = [], hr = [];
     for (let k = 0; k < P.length; k++) { const [, , dx, dz] = along(P, C, Math.min(L, C[k] + 0.01)); const nx = -dz, nz = dx; hl.push(G.at(P[k][0] + nx * 2.3, P[k][1] + nz * 2.3)); hr.push(G.at(P[k][0] - nx * 2.3, P[k][1] - nz * 2.3)); }
     const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
-    const dH = mean(hl) - mean(hr); const ret = Math.abs(dH) >= 0.35 && b.type !== 'city_wall';
+    const dH = mean(hl) - mean(hr); const ret = Math.abs(dH) >= (b.type === 'retaining_wall' ? 0.35 : 0.8) && Math.abs(dH) <= 4.0 && b.type !== 'city_wall'; // plain walls on gentle slopes stay freestanding seat walls; > 4 m: smoothed cliffs/structures, leave the ground alone
     const sgn = dH >= 0 ? 1 : -1; // +1: high side on the left normal
     const sm = (a, r) => a.map((_, k) => { let s = 0, n = 0; for (let o = -r; o <= r; o++) { const v = a[k + o]; if (v != null) { s += v; n++; } } return s / n; });
     // terrace tops read as level runs: a straight fit when the high ground varies little along the wall, else a wide average
@@ -194,7 +224,18 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     const H = spanH < 0.8 ? fit(rawH) : sm(rawH, 4), Lo = sm(sgn > 0 ? hr : hl, 2);
     const defaultH = Math.abs(b.h - 1.4) < 1e-6; // bake default for untagged walls: campus walls are mostly seat height
     const hFree = defaultH ? (CAMPUS(P[0][0], P[0][1]) ? 0.55 : 1.1) : Math.max(0.4, Math.min(2.5, b.h));
-    walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h });
+    walls.push({ P, C, L, ret, sgn, H, Lo, hFree, bh: b.h, hlS: sm(hl, 2), hrS: sm(hr, 2) });
+  }
+  for (const wl of walls) {
+    if (wl.ret) continue;
+    // freestanding: the 2021 DTM counts low walls as ground, leaving a ~0.3-0.5 m ridge along the line that buries the
+    // new wall. Lower ground within 1.6 m of the line to each side's level (sampled 2.3 m out); never raise.
+    const { P, C, L } = wl; const bb = bbox(P, 2.2);
+    G.each(bb[0], bb[1], bb[2], bb[3], (x, z, k) => {
+      const q = project(P, C, x, z); if (q.s < -0.4 || q.s > L + 0.4 || Math.abs(q.d) > 1.6) return;
+      const fi = Math.max(0, Math.min(P.length - 1, Math.round(q.s))); const side = q.d >= 0 ? wl.hlS[fi] : wl.hrS[fi];
+      const w = 1 - smooth(0.9, 1.6, Math.abs(q.d)); if (heights[k] > side) heights[k] = Math.max(orig[k] - 0.8, heights[k] - (heights[k] - side) * w);
+    });
   }
   for (const wl of walls) {
     if (!wl.ret) continue;
@@ -205,13 +246,17 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
       if (dl < -3.0 || dl > 3.0) return;
       const fi = Math.max(0, Math.min(P.length - 1, Math.round(q.s))); // samples every ~1 m
       const endFade = 1 - smooth(0, 0.3, Math.max(-q.s, q.s - L));
-      if (dl < -0.48) { const wgt = endFade * (1 - smooth(1.3, 3.0, -dl)); heights[k] += (H[fi] - 0.02 - heights[k]) * wgt; }
-      else { const wgt = endFade * (1 - smooth(1.3, 3.0, dl)); heights[k] += (Lo[fi] - heights[k]) * wgt; }
+      const lim = (v) => Math.max(orig[k] - 2.5, Math.min(orig[k] + 2.5, v));
+      if (dl < -0.48) { const wgt = endFade * (1 - smooth(1.3, 3.0, -dl)); heights[k] = lim(heights[k] + (H[fi] - 0.02 - heights[k]) * wgt); }
+      else { const wgt = endFade * (1 - smooth(1.3, 3.0, dl)); heights[k] = lim(heights[k] + (Lo[fi] - heights[k]) * wgt); }
     });
   }
+  // 4) hedges: collected here, swept with a clipped-hedge profile in buildGroundworks (replaces streetscape's boxes)
+  const hedges = [];
+  for (const b of vectors.barriers) { if (b.type !== 'hedge' || b.pts.length < 2 || !b.pts.every(([x, z]) => G.inside(x, z, 4))) continue; const P = resample(b.pts.map((q) => [q[0], q[1]]), 0.8); if (polyLen(P) < 0.8) continue; hedges.push({ P, h: Math.max(0.6, Math.min(1.6, b.h || 1.1)) }); }
   const ms = Math.round(performance.now() - t0);
-  console.log('groundworks grade', JSON.stringify({ ms, lowered: nLow, soft: nSoft, aprons: nApron, stairs: stairs.length, walls: walls.length, retaining: walls.filter((w) => w.ret).length }));
-  return { G, S, bmask, stairs, walls, c, gt, orig, aprons: nApron };
+  console.log('groundworks grade', JSON.stringify({ ms, denoiseMs: Math.round(tB - tA), lowered: nLow, soft: nSoft, aprons: nApron, stairs: stairs.length, walls: walls.length, retaining: walls.filter((w) => w.ret).length }));
+  return { G, S, bmask, stairs, walls, hedges, c, gt, orig, aprons: nApron };
 }
 // trees were baked against the ungraded terrain: move each by the local grading delta (cm units, as decoded)
 export function reseatTrees(plan, trees) {
@@ -221,17 +266,29 @@ export function reseatTrees(plan, trees) {
 }
 function inRing(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c; } return c; }
 function bbox(P, m) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0 - m, z0 - m, x1 + m, z1 + m]; }
-// nearest point on polyline: s = arc length (may run past the ends along the end tangents), d = signed (left +)
+// nearest point on polyline: s = arc length (may run past the ends along the end tangents), d = signed (left +).
+// Long polylines get a 4 m segment hash (built on first use, margin 4 m) so grading loops stay linear.
 function project(P, C, x, z) {
+  if (P.length > 6) {
+    let H = P._hash; if (!H) { H = P._hash = new Map(); for (let k = 0; k < P.length - 1; k++) { const a = P[k], b = P[k + 1]; for (let i = Math.floor((Math.min(a[0], b[0]) - 4) / 4); i <= Math.floor((Math.max(a[0], b[0]) + 4) / 4); i++) for (let j = Math.floor((Math.min(a[1], b[1]) - 4) / 4); j <= Math.floor((Math.max(a[1], b[1]) + 4) / 4); j++) { const key = i * 65536 + j; let l = H.get(key); if (!l) H.set(key, (l = [])); l.push(k); } } }
+    const l = H.get(Math.floor(x / 4) * 65536 + Math.floor(z / 4)); if (!l) return { dd: 1e9, s: -1e9, d: 1e9 };
+    let best = null; for (const k of l) { const r = projSeg(P, C, k, x, z); if (!best || r.dd < best.dd) best = r; } return best;
+  }
   let best = null;
   for (let k = 0; k < P.length - 1; k++) {
     const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1e-9; const L = Math.sqrt(L2);
     let t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; const first = k === 0, last = k === P.length - 2;
     const tc = Math.max(first ? -1e9 : 0, Math.min(last ? 1e9 : 1, t));
     const px = a[0] + dx * tc, pz = a[1] + dz * tc; const dd = Math.hypot(x - px, z - pz);
-    if (!best || dd < best.dd) { const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L; best = { dd, s: C[k] + tc * L, d: -cr }; }
+    if (!best || dd < best.dd) { const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L; best = { dd, s: C[k] + tc * L, d: cr }; } // cr > 0 on the left normal (-dz, dx) side
   }
   return best; // left normal = (-dz, dx): d > 0 on that side
+}
+function projSeg(P, C, k, x, z) {
+  const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1e-9; const L = Math.sqrt(L2);
+  const t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; const tc = Math.max(k === 0 ? -1e9 : 0, Math.min(k === P.length - 2 ? 1e9 : 1, t));
+  const px = a[0] + dx * tc, pz = a[1] + dz * tc; const cr = (dx * (z - a[1]) - dz * (x - a[0])) / L;
+  return { dd: Math.hypot(x - px, z - pz), s: C[k] + tc * L, d: cr };
 }
 
 // =====================================================================================================================
@@ -273,7 +330,7 @@ function slab(geo, a, b, hw, y0, y1a, y1b, faces = { top: 1, front: 1, back: 1, 
   if (faces.right) geo.quadB([D[0], y0a, D[1]], [Cc[0], y0b, Cc[1]], [Cc[0], y1b, Cc[1]], [D[0], y1a, D[1]], [-nx, 0, -nz]);
 }
 
-export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physics, pois }) {
+export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physics, pois, vectors }) {
   const t0 = performance.now();
   const { G, S, bmask } = plan; const M = materials();
   const group = new THREE.Group(); group.name = 'groundworks'; scene.add(group);
@@ -289,7 +346,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   for (const st of plan.stairs) {
     const { P, C, L, w, n, lo, hi, up } = st; const r = (hi - lo) / n, t = L / n, hw = w / 2;
     const mid = along(P, C, L / 2); const key = st.mat === 'granite' ? 'gran' : st.mat === 'brick' ? 'brick' : 'conc';
-    const geo = bucket(mid[0], mid[1], key), cheekGeo = bucket(mid[0], mid[1], 'conc'), railGeo = bucket(mid[0], mid[1], 'rail');
+    const geo = bucket(mid[0], mid[1], key), cheekGeo = bucket(mid[0], mid[1], 'concd'), railGeo = bucket(mid[0], mid[1], 'rail');
     const yBase = (x, z) => Math.min(heightAt(x, z), lo) - 0.35;
     for (let i = 0; i < n; i++) {
       // tread i spans [s0, s1] measured from the LOW end; top at lo + (i+1) r; 2.5 cm nosing over the riser below
@@ -298,6 +355,9 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       const a = [A[0] - dx / l * 0.025, A[1] - dz / l * 0.025], b = [B[0], B[1]];
       const y1 = lo + (i + 1) * r;
       slab(geo, a, b, hw, [yBase(a[0], a[1]), yBase(b[0], b[1])], y1, y1, { top: 1, front: 1, back: i === n - 1, left: 1, right: 1 });
+      // dark anti-slip nosing strip along each tread edge: makes the flight read as steps from mid distance
+      { const ux = dx / l, uz = dz / l, nx = -uz, nz = ux, e = hw - 0.06; const n0 = [a[0], a[1]], n1 = [a[0] + ux * 0.08, a[1] + uz * 0.08];
+        (st.mat === 'brick' ? bucket(mid[0], mid[1], 'gran') : railGeo).quad([n0[0] - nx * e, y1 + 0.004, n0[1] - nz * e], [n0[0] + nx * e, y1 + 0.004, n0[1] + nz * e], [n1[0] + nx * e, y1 + 0.004, n1[1] + nz * e], [n1[0] - nx * e, y1 + 0.004, n1[1] - nz * e], [0, 1, 0], [[0, 0], [1, 0], [1, 0.03], [0, 0.03]]); }
       nTreads++;
     }
     if (st.cheeks) {
@@ -332,7 +392,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   let nWallSeg = 0;
   for (const wl of plan.walls) {
     const { P, C, L, ret, sgn, H, Lo, hFree } = wl;
-    const mid = along(P, C, L / 2); const geo = bucket(mid[0], mid[1], 'conc'), cap = bucket(mid[0], mid[1], 'gran');
+    const mid = along(P, C, L / 2); const geo = bucket(mid[0], mid[1], 'concd'), cap = bucket(mid[0], mid[1], 'gran');
     for (let k = 0; k < P.length - 1; k++) {
       const a = P[k], b = P[k + 1]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); if (l < 0.05) continue;
       const nx = -dz / l * sgn, nz = dx / l * sgn; // unit normal toward the HIGH side
@@ -358,8 +418,35 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       nWallSeg++;
     }
   }
-  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron;
   const statics = [];
+  // ---- hedges: clipped profile (flared base, rounded shoulders), lumpy, seated 15 cm into the soil, leaf-tone jitter
+  const hedgeGeo = new Map();
+  for (const hd of plan.hedges || []) {
+    const { P, h } = hd; const mid = P[Math.floor(P.length / 2)]; const k = Math.floor(mid[0] / BK) + ',' + Math.floor(mid[1] / BK);
+    let H = hedgeGeo.get(k); if (!H) hedgeGeo.set(k, (H = { p: [], c: [], cx: (Math.floor(mid[0] / BK) + 0.5) * BK, cz: (Math.floor(mid[1] / BK) + 0.5) * BK }));
+    const prof = [[-0.40, -0.15], [-0.46, 0.22], [-0.45, 0.62], [-0.38, 0.9], [-0.2, 1.0], [0.2, 1.0], [0.38, 0.9], [0.45, 0.62], [0.46, 0.22], [0.40, -0.15]];
+    const ring = (i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; const nx = -dz / l, nz = dx / l; const [x, z] = P[i];
+      const g = Math.min(heightAt(x + nx * 0.45, z + nz * 0.45), heightAt(x - nx * 0.45, z - nz * 0.45));
+      return prof.map(([d, t], j) => { const jit = Math.sin(x * 3.1 + z * 2.3 + j * 1.7) * 0.05 + Math.sin(x * 7.7 - z * 5.9 + j) * 0.03; const w = t < 0 ? d : d * (1 + jit); const y = t < 0 ? g + t : g + t * h * (1 + jit * 0.4); return [x + nx * w, y, z + nz * w, 0.5 + jit * 4]; }); };
+    let prev = ring(0);
+    const col = (v) => { const k2 = Math.max(0, Math.min(1, v)); return [0.17 + 0.05 * k2, 0.27 + 0.07 * k2, 0.12 + 0.03 * k2]; };
+    const tri = (a, b, c) => { H.p.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); H.c.push(...col(a[3]), ...col(b[3]), ...col(c[3])); };
+    const cap = (R, flip) => { for (let j = 1; j < R.length - 1; j++) flip ? tri(R[0], R[j + 1], R[j]) : tri(R[0], R[j], R[j + 1]); };
+    cap(prev, true);
+    for (let i = 1; i < P.length; i++) { const cur = ring(i); for (let j = 0; j < prof.length - 1; j++) { tri(prev[j], cur[j + 1], cur[j]); tri(prev[j], prev[j + 1], cur[j + 1]); } prev = cur; } // outward winding
+    cap(prev, false);
+  }
+  const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x9fb48f, vertexColors: true, roughness: 1 }); hedgeMat.name = 'gw-hedge';
+  hedgeMat.onBeforeCompile = (sh) => { sh.uniforms.uNoise = { value: noiseTexture() }; // leaf clumps (same recipe as the old streetscape hedges)
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWH;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWH=(modelMatrix*vec4(transformed,1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uNoise; varying vec3 vWH;').replace('#include <map_fragment>', '#include <map_fragment>\nfloat hn = texture(uNoise, vWH.xz*0.9+vWH.y*0.7).b*0.6 + texture(uNoise, vec2(vWH.x+vWH.z, vWH.y)*0.6).g*0.4; diffuseColor.rgb *= 0.55 + 0.75*hn;'); };
+  hedgeMat.customProgramCacheKey = () => 'gw-hedge';
+  for (const H of hedgeGeo.values()) {
+    if (!H.p.length) continue; const y = heightAt(H.cx, H.cz); const pos = new Float32Array(H.p); for (let i = 0; i < pos.length; i += 3) { pos[i] -= H.cx; pos[i + 1] -= y; pos[i + 2] -= H.cz; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(H.c, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, hedgeMat); m.position.set(H.cx, y, H.cz); m.castShadow = true; m.receiveShadow = true; m.name = 'gw:hedge'; m.matrixAutoUpdate = false; m.updateMatrix(); group.add(m); statics.push(m);
+  }
+  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'concd' ? (M.concreteDark || M.concrete) : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron; // walls/cheeks a shade darker than treads and copings
   for (const b of buckets.values()) {
     if (!b.geo.count) continue; const y = heightAt(b.cx, b.cz);
     const mesh = new THREE.Mesh(b.geo.geometry([b.cx, y, b.cz]), matFor(b.key)); mesh.position.set(b.cx, y, b.cz);
@@ -385,9 +472,14 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     if (items.length) grates = makeGrates(items, M); if (grates) group.add(grates);
   }
   // ---- kerbs + edging: traced per tile from the ground SDF, built on demand near the camera
-  const crossings = []; for (const [x, z, kind] of (pois && pois.p && pois.p.crossing) || []) if (kind !== 'no') crossings.push([x, z]);
+  // kerb ramps: no kerb where a marked crossing meets the kerb line, i.e. within ~1.9 m (along the road) of the crossing
+  // line; the gap radius is grown by the road's half width since crossing nodes sit on the centreline
+  const roadHW = (x, z) => { let best = 4, bd = 15 * 15; for (const r of roadsNear(x, z)) { const P = r.pts; for (let k = 0; k < P.length - 1; k++) { const a = P[k], b = P[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L2)); const d = (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2; if (d < bd) { bd = d; best = (r.w || 8) / 2; } } } return best; };
+  const rHash = new Map(); for (const r of (vectors && vectors.roads) || []) { if (r.tunnel) continue; const seen = new Set(); for (const [x, z] of r.pts) { const k = Math.floor(x / 64) + ',' + Math.floor(z / 64); if (seen.has(k)) continue; seen.add(k); let l = rHash.get(k); if (!l) rHash.set(k, (l = [])); l.push(r); } }
+  function roadsNear(x, z) { const out = new Set(); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const r of rHash.get((Math.floor(x / 64) + i) + ',' + (Math.floor(z / 64) + j)) || []) out.add(r); return out; }
+  const crossings = []; for (const [x, z, kind] of (pois && pois.p && pois.p.crossing) || []) if (kind !== 'no' && G.inside(x, z, 4)) { const hw = roadHW(x, z); crossings.push([x, z, Math.hypot(hw + 0.3, 1.9)]); }
   const xHash = new Map(); for (const [x, z] of crossings) { const k = Math.floor(x / 8) + ',' + Math.floor(z / 8); let l = xHash.get(k); if (!l) xHash.set(k, (l = [])); l.push([x, z]); }
-  const nearCrossing = (x, z, r) => { const i0 = Math.floor((x - r) / 8), i1 = Math.floor((x + r) / 8), j0 = Math.floor((z - r) / 8), j1 = Math.floor((z + r) / 8); for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = xHash.get(i + ',' + j); if (l) for (const p of l) if ((p[0] - x) ** 2 + (p[1] - z) ** 2 < r * r) return true; } return false; };
+  const nearCrossing = (x, z) => { const r = 9; const i0 = Math.floor((x - r) / 8), i1 = Math.floor((x + r) / 8), j0 = Math.floor((z - r) / 8), j1 = Math.floor((z + r) / 8); for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = xHash.get(i + ',' + j); if (l) for (const p of l) if ((p[0] - x) ** 2 + (p[1] - z) ** 2 < p[2] * p[2]) return true; } return false; };
   const tiles = new Map(); let lastCP = null; const kerbStats = { tiles: 0, segs: 0 };
   const buildTile = (ti, tj) => {
     const x0 = ti * TILE, z0 = tj * TILE; const geo = new Geo();
@@ -469,7 +561,7 @@ function classify(ch, p, q, S, G, bmask, nearCrossing) {
   const ox = mx - n[0] * 0.6, oz = mz - n[1] * 0.6; // outside probe
   if (bmask.at(ox, oz) || bmask.at(mx, mz)) return null;
   if (ch === 0) {
-    if (nearCrossing(mx, mz, 2.2)) return null; // kerb ramps at crossings
+    if (nearCrossing(mx, mz)) return null; // kerb ramps at crossings
     if (S.at(ox, oz, 0) > -0.2) return null; // asphalt both sides (lanes, lots)
     return 'kerb';
   }
@@ -526,9 +618,9 @@ function orientQuad(geo, a, b, c, d, want) {
 function makeGrates(items, M) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
   // weathered cast iron (sunlit mid grey-brown), dark slots showing soil, mulch ring around the trunk
-  x.fillStyle = '#857e74'; x.fillRect(0, 0, 128, 128);
-  x.fillStyle = '#5e4a37'; x.beginPath(); x.arc(64, 64, 21, 0, 7); x.fill();
-  x.strokeStyle = '#3b352f'; x.lineWidth = 1.6; for (let r = 30; r < 62; r += 7) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
+  x.fillStyle = '#958d81'; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = '#6a5440'; x.beginPath(); x.arc(64, 64, 18, 0, 7); x.fill();
+  x.strokeStyle = '#4a433b'; x.lineWidth = 1.4; for (let r = 30; r < 62; r += 7) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
   x.lineWidth = 2.0; for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; x.beginPath(); x.moveTo(64 + Math.cos(t) * 23, 64 + Math.sin(t) * 23); x.lineTo(64 + Math.cos(t) * 90, 64 + Math.sin(t) * 90); x.stroke(); }
   x.strokeStyle = '#948c80'; x.lineWidth = 5; x.strokeRect(2.5, 2.5, 123, 123);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -542,13 +634,13 @@ function makeGrates(items, M) {
   const inst = new THREE.Group(); inst.name = 'gw:grates';
   const cap = Math.min(items.length, 900);
   const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); return m; };
-  const meshes = [mk(g, grateMat), mk(fg.geometry(), M.graniteDark)]; inst.add(...meshes);
+  const meshes = [mk(g, grateMat), mk(fg.geometry(), M.concrete)]; inst.add(...meshes); // frame in the paving's concrete tone
   const mats = new Float32Array(items.length * 16); { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const qy = new THREE.Quaternion();
     items.forEach(([px, py, pz, r, s, nrm], k) => { q.setFromUnitVectors(up, nrm).multiply(qy.setFromAxisAngle(up, r)); m4.compose(new THREE.Vector3(px, py, pz), q, new THREE.Vector3(s, 1, s)); m4.toArray(mats, k * 16); }); }
   inst.count = items.length;
-  // only grates within ~160 m are drawn (refilled as the camera moves)
-  inst.userData.update = (cp) => { let k = 0; const R2 = 160 * 160;
+  // only grates within ~90 m are drawn (refilled as the camera moves): beyond that they only read as dark specks
+  inst.userData.update = (cp) => { let k = 0; const R2 = 90 * 90;
     for (let n = 0; n < items.length && k < cap; n++) { const dx = items[n][0] - cp.x, dz = items[n][2] - cp.z; if (dx * dx + dz * dz > R2) continue; for (const m of meshes) m.instanceMatrix.array.set(mats.subarray(n * 16, n * 16 + 16), k * 16); k++; }
     for (const m of meshes) { m.count = k; m.instanceMatrix.needsUpdate = true; } };
   return inst;

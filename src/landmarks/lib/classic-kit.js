@@ -298,6 +298,7 @@ export class Kit {
   // Steps rising from (yLo) to (yHi) along direction: run R (s along width, climbing toward -d i.e. toward the wall)
   // simple axis-aligned version in building frame: climbs along +u or -u or +v or -v.
   stairs(mat, u0, v0, u1, v1, yLo, yHi, dir, n, { foot = 1.0 } = {}) {
+    (this._stairs || (this._stairs = [])).push([Math.min(u0, u1), Math.min(v0, v1), Math.max(u0, u1), Math.max(v0, v1)]); // [r4-ground] foundation planting keeps off steps
     const rise = (yHi - yLo) / n; const span = dir === '+u' || dir === '-u' ? u1 - u0 : v1 - v0; const tread = span / n;
     for (let i = 0; i < n; i++) { // each step is its own tread strip (no overlapping volumes / coplanar side faces)
       const top = yLo + rise * (i + 1); const bot = yLo - foot;

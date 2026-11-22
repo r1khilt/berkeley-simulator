@@ -173,18 +173,26 @@ export function planter(K, u0, v0, u1, v1, { h = 0.55, mat = null, shrubs = true
 }
 // One low clipped shrub (flat-shaded icosahedron) at (u,v), base height y (default ground).
 export function shrubAt(K, u, v, y = null, { size = 0.55, h = 0.8, i = 0 } = {}) {
-  // [r4-ground] was a sphere sunk 8% into the ground ("blobs sunk into it"): now a lumpy clipped dome with a flat,
-  // slightly flared base that sits ON the soil, over a dark mulch disc that grounds it visually.
-  const yy = y ?? Math.min(K.g(u, v), K.g(u + size * 0.8, v), K.g(u - size * 0.8, v), K.g(u, v + size * 0.8), K.g(u, v - size * 0.8));
-  const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
-  const g = new THREE.IcosahedronGeometry(r, 2); const P = g.attributes.position;
-  for (let k = 0; k < P.count; k++) { // deterministic lumps + flattened, flared base
+  // [r4-ground] was a sphere sunk 8% into the ground ("blobs sunk into it"): now a lumpy clipped dome whose base is
+  // draped onto the terrain (no burying on the uphill side, no floating downhill), over a dark mulch bed that also
+  // follows the ground. With an explicit y (planters, terraces) the base stays flat at that height.
+  const yc = y ?? K.g(u, v); const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
+  const gAt = y != null ? () => y : (x, z) => K.g(x, z);
+  const g = new THREE.IcosahedronGeometry(r, 1); const P = g.attributes.position; const cache = new Map(); // detail 1: 80 tris (flat-shaded anyway)
+  for (let k = 0; k < P.count; k++) { // deterministic lumps + flattened, flared base (local y from 0 at the base to ~h)
     const x = P.getX(k), yv = P.getY(k), z = P.getZ(k); const n = 1 + 0.1 * Math.sin(x * 9.1 + i * 1.3) * Math.cos(z * 8.3 - i) + 0.07 * Math.sin(yv * 11.7 + i * 2.1);
-    const flare = yv < 0 ? 1.08 : 1; P.setXYZ(k, x * n * flare, yv < 0 ? yv * 0.32 : yv * n, z * n * flare);
+    const flare = yv < 0 ? 1.08 : 1; P.setXYZ(k, x * n * flare, ((yv < 0 ? yv * 0.32 : yv * n) + 0.32 * r) * h / (1.32 * r), z * n * flare);
   }
-  g.computeVertexNormals(); g.scale(1.25, h / (1.32 * r), 1.1); g.rotateY(i * 1.7); g.translate(u, yy - 0.04 + h * 0.32 / 1.32, v);
+  g.scale(1.25, 1, 1.1); g.rotateY(i * 1.7); g.translate(u, 0, v);
+  for (let k = 0; k < P.count; k++) { // drape: low vertices ride the ground under them, the crown stays level
+    const x = P.getX(k), z = P.getZ(k), yl = P.getY(k); const key = Math.round(x * 50) + ',' + Math.round(z * 50);
+    let gg = cache.get(key); if (gg == null) { gg = gAt(x, z); cache.set(key, gg); }
+    const w = 1 - Math.min(1, Math.max(0, yl / (0.6 * h))); P.setY(k, yl - 0.05 + yc + (gg - yc) * w);
+  }
+  g.computeVertexNormals();
   K.add(i % 3 ? shrubMat() : shrubMat2(), g, { detail: true, uvMode: 'keep' });
-  const m = new THREE.CircleGeometry(r * 1.45, 10); m.rotateX(-Math.PI / 2); m.scale(1.2, 1, 1.1); m.rotateY(i * 1.7); m.translate(u, yy + 0.025, v);
+  const m = new THREE.CircleGeometry(r * 1.4, 10); m.rotateX(-Math.PI / 2); m.scale(1.2, 1, 1.1); m.rotateY(i * 1.7); m.translate(u, 0, v);
+  const Q = m.attributes.position; for (let k = 0; k < Q.count; k++) Q.setY(k, gAt(Q.getX(k), Q.getZ(k)) + 0.025);
   K.add(mulchMat(), m, { detail: true, uvMode: 'keep' });
 }
 export function mulchMat() { return local('mulch', () => { const m = new THREE.MeshStandardMaterial({ color: 0x4a3828, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); m.name = 'rc-mulch'; return m; }); }
@@ -245,22 +253,22 @@ export function autoEntries(K, ctx, runs, { y0 = 0.3, max = 3, minLen = 8, exclu
   return walks;
 }
 // Foundation planting along the base of a run (gaps where `skip` s-ranges are given, e.g. doors).
-export function baseShrubs(K, R, s0, s1, { skip = [], d = 0.9, size = 0.5 } = {}) {
+export function baseShrubs(K, R, s0, s1, { skip = [], d = 0.9, size = 0.5, clear = [] } = {}) {
   let segs = [[s0, s1]];
   for (const [a, b] of skip) { const ns = []; for (const [p, q] of segs) { if (b <= p || a >= q) { ns.push([p, q]); continue; } if (a > p) ns.push([p, a]); if (b < q) ns.push([b, q]); } segs = ns; }
-  let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
+  let i = 0; for (const [p, q] of segs) { if (q - p < 1.5) continue; const n = Math.max(1, Math.round((q - p) / (size * 1.6))); for (let k = 0; k < n; k++) { const [u, v] = R.at(p + (q - p) * (k + 0.5) / n, d); if (clear.some(([cu, cv, cr]) => (u - cu) ** 2 + (v - cv) ** 2 < cr * cr) || (K._stairs || []).some(([a0, b0, a1, b1]) => u > a0 - 0.8 && u < a1 + 0.8 && v > b0 - 0.8 && v < b1 + 0.8)) continue; shrubAt(K, u, v, null, { size, h: size * 1.5, i: i++ }); } }
 }
 
 // Finish a rectangular/polygonal building's surroundings: foundation planting along every face (gaps where packet paths
 // arrive), campus lamp posts and a bike rack near the busiest arrival. poly: building-frame outline (any orientation).
-export function siteDress(K, ctx, poly, { shrubs = true, lamps = 2, racks = true, d = 1.0, gap = 3.2, skipSides = [] } = {}) {
+export function siteDress(K, ctx, poly, { shrubs = true, lamps = 2, racks = true, d = 1.0, gap = 3.2, skipSides = [], clear = [] } = {}) { // clear: [[u, v, r]] keep-out discs for planting
   let a = 0; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += p[0] * q[1] - q[0] * p[1]; }
   const P = a > 0 ? poly.slice().reverse() : poly.slice(); const arrivals = [];
   for (let i = 0; i < P.length; i++) {
     const R = K.run(P[i], P[(i + 1) % P.length]); if (R.L < 4) continue;
     const side = Math.abs(R.n[0]) > Math.abs(R.n[1]) ? (R.n[0] > 0 ? 'E' : 'W') : (R.n[1] > 0 ? 'S' : 'N'); if (skipSides.includes(side)) continue;
     const hits = pathArrivals(K, ctx, R, { maxD: 6, minGap: 5 }); for (const s of hits) arrivals.push({ R, s });
-    if (shrubs) baseShrubs(K, R, 1.2, R.L - 1.2, { skip: hits.map((s) => [s - gap, s + gap]), d });
+    if (shrubs) baseShrubs(K, R, 1.2, R.L - 1.2, { skip: hits.map((s) => [s - gap, s + gap]), d, clear });
   }
   arrivals.slice(0, lamps).forEach(({ R, s }, k) => { for (const sg of [-1, 1]) { const [u, v] = R.at(Math.min(R.L - 1, Math.max(1, s + sg * (gap + 1.2))), 3.2); if (k < lamps) lampPost(K, u, v); } });
   if (racks && arrivals.length) { const { R, s } = arrivals[0]; const ss = Math.min(R.L - 6, s + gap + 3); if (ss > 1) { const [u, v] = R.at(ss, 2.6); bikeRack(K, u, v, Math.atan2(R.t[1], R.t[0]), 5); } }
