@@ -64,8 +64,9 @@ export async function build(ctx) {
     const RF = K.run([uP - 0.06, v0], [uP - 0.06, v1]);
     inscription(K, RF, 0.6, 5.8, yT + 0.25, yT + 0.75, 0.005, 'HAVILAND HALL', { fg: '#6a6252', cut: true });
     // doorway: 6 m round-arched opening from the landing, double doors under a tall gridded transom
-    const R = K.run([uF, v0], [uF, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 6.0, arch: true, doorTop: yL + 3.0 };
-    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.2); K.fill(R, o, { kind: 'door', door: tint(M.woodDark, 0x6b3a22), rev: 0.15 });
+    // (the frontispiece now stands 0.25 m proud of the façade: the recessed door used to sit behind the solid bay-7 wall face and never showed)
+    const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 6.0, arch: true, doorTop: yL + 3.0 };
+    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); K.fill(R, o, { kind: 'door', door: tint(M.woodDark, 0x6b3a22), rev: 0.15 });
     // balcony railing on the portico roof: balusters, a large central seal medallion and two smaller roundels
     { const RB = K.run([uP - 0.2, v0 - 0.2], [uP - 0.2, v1 + 0.2]); K.rbox(RB, CU, 0, yT + 2.1, -0.05, RB.L, yT + 2.17, 0.05); K.rbox(RB, CU, 0, yT + 1.27, -0.04, RB.L, yT + 1.33, 0.04);
       for (let s = 0.15; s < RB.L; s += 0.16) { const c = RB.L / 2; if (Math.abs(s - c) < 0.42 || Math.abs(Math.abs(s - c) - 1.75) < 0.26) continue; K.rbox(RB, CU, s - 0.015, yT + 1.25, -0.015, s + 0.015, yT + 2.1, 0.015, { detail: true }); }

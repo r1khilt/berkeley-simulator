@@ -25,6 +25,7 @@ export async function build(ctx) {
   const GL = M.windowNight;
   const colliders = [], walkables = [];
   const FL = 5.3, CT = 18.0, EN = 20.9, AT = 24.2, TOP = 25.3;
+  const SOUTH_Y = 4.5; // [r5a] south entrance landing/doors (LiDAR ~4.5 m; OSM flight only ~4 m long from Campanile Way)
   const PW = 1.85; // pilaster width
 
   // clip a line (through p with direction dir) to the rectangle [a,b]x[y0,y1] (run coords) -> segment or null
@@ -60,9 +61,12 @@ export async function build(ctx) {
       const yl = lowY(R, s0 + c, 0.65); if (yl != null) bw.push({ s0: c - 0.65, s1: c + 0.65, y0: yl, y1: 2.4 }); } // + a lower row where the slope exposes the sub-basement
     K.wall(RP, STD, 0, s1 - s0, gmin - 1.5, 4.05, bw, 0.8);
     for (const w of bw) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR });
-    K.rbox(R, STD, s0, 4.0, -0.6, s1, 4.18, 0.3); // water table
-    K.rbox(R, ST, s0, 4.18, -0.6, s1, FL, 0.12); // base frieze band
-    for (let i = 0; i < nb; i++) { const c = s0 + (i + 0.5) * p; // roundel + paired stems
+    // [r5a] o.doorY < FL (south front: LiDAR landing ~4.5 m): the water table and frieze band stop at the entrance bays so the doors drop to the landing
+    const dY = o.doorY ?? FL, ents = o.entrance || [], lowDoor = dY < FL - 0.01 && ents.length;
+    const spans = lowDoor ? [[s0, s0 + Math.min(...ents) * p + PW / 2], [s0 + (Math.max(...ents) + 1) * p - PW / 2, s1]] : [[s0, s1]];
+    for (const [x0, x1] of spans) { K.rbox(R, STD, x0, 4.0, -0.6, x1, 4.18, 0.3); K.rbox(R, ST, x0, 4.18, -0.6, x1, FL, 0.12); } // water table + base frieze band
+    if (lowDoor) for (const i of ents) for (const x of [s0 + i * p, s0 + (i + 1) * p]) { if (x <= spans[0][1] + 0.01 || x >= spans[1][0] - 0.01) continue; K.rbox(R, ST, x - PW / 2, dY - 0.05, -0.6, x + PW / 2, FL, 0.12); } // pier bases between the doors
+    for (let i = 0; i < nb; i++) { const c = s0 + (i + 0.5) * p; if (lowDoor && ents.includes(i)) continue; // roundel + paired stems
       const g = new THREE.CylinderGeometry(0.42, 0.42, 0.12, 16); g.rotateX(Math.PI / 2); g.translate(c, 4.74, 0.18); K.addRun(R, ST, g, { detail: true });
       const g2 = new THREE.CylinderGeometry(0.3, 0.3, 0.06, 12); g2.rotateX(Math.PI / 2); g2.translate(c, 4.74, 0.26); K.addRun(R, STD, g2, { detail: true });
       for (const dx of [-1.15, -0.95, 0.95, 1.15]) K.rbox(R, ST, c + dx - 0.05, 4.28, 0.12, c + dx + 0.05, 5.2, 0.2, { detail: true });
@@ -81,15 +85,15 @@ export async function build(ctx) {
     // strips
     for (let i = 0; i < nb; i++) {
       const a = s0 + i * p + PW / 2, b = s0 + (i + 1) * p - PW / 2; const ent = (o.entrance || []).includes(i);
-      K.rbox(R, ST, a, FL, -0.62, b, FL + 0.32, -0.28); // sill ledge
+      if (!(lowDoor && ent)) K.rbox(R, ST, a, FL, -0.62, b, FL + 0.32, -0.28); // sill ledge
       K.rbox(R, FR, a, ct - 0.18, -0.62, b, ct, -0.5); // head
       K.rbox(R, GL, a, FL + 0.32, -0.66, b, ct - 0.18, -0.6);
       if (ent) {
         // [r5a] glazed bronze double doors (were flat black slabs): frame, two glass leaves, centre stile, push bars, gridded transom
-        K.rbox(R, DOOR, a + 0.25, FL, -0.66, b - 0.25, FL + 2.8, -0.6);
-        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, GL, x0, FL + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, FL + 1.0, -0.585, x1 - 0.08, FL + 1.06, -0.55, { detail: true }); }
+        K.rbox(R, DOOR, a + 0.25, dY, -0.66, b - 0.25, FL + 2.8, -0.6); if (lowDoor) K.rbox(R, STD, a, dY - 0.1, -0.8, b, FL + 0.4, -0.66); // backing below the strip glass
+        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, GL, x0, dY + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, dY + 1.0, -0.585, x1 - 0.08, dY + 1.06, -0.55, { detail: true }); }
           K.rbox(R, GL, a + 0.42, FL + 2.18, -0.6, b - 0.42, FL + 2.68, -0.585, { uvMode: 'keep' }); for (let k = 1; k < 4; k++) { const x = a + 0.42 + (b - a - 0.84) * k / 4; K.rbox(R, FR, x - 0.03, FL + 2.18, -0.585, x + 0.03, FL + 2.68, -0.56, { detail: true }); } }
-        K.rbox(R, FR, (a + b) / 2 - 0.05, FL, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
+        K.rbox(R, FR, (a + b) / 2 - 0.05, dY, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
         K.rbox(R, FR, a - 0.05, FL + 2.85, -0.6, b + 0.05, FL + 3.45, 0.95); // marquee canopy
         // diamond lattice grille over the rest of the strip
         const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.58; // [r5a] finer, denser lattice (photo), was 0.9 m with 0.11 bars
@@ -157,7 +161,7 @@ export async function build(ctx) {
   const RS = K.run([U0, V1], [U1, V1]); // south façade (west→east), on Campanile Way
   for (const [R, txt] of [[RN, 'THE · LIFE · SCIENCES'], [RS, null]]) {
     punched(R, 0, PAV, 2, { d0: 0.7, text: R === RN ? 'BACTERIOLOGY' : null, door: R === RN ? [1] : [] });
-    giant(R, PAV, R.L - PAV, 17, { floors, attic: true, entrance: [7, 8, 9], text: txt, ret0: false, ret1: false });
+    giant(R, PAV, R.L - PAV, 17, { floors, attic: true, entrance: [7, 8, 9], text: txt, ret0: false, ret1: false, doorY: R === RS ? SOUTH_Y : FL });
     punched(R, R.L - PAV, R.L, 2, { d0: 0.7, door: R === RN ? [0] : [] }); // [r5a] north corner pavilions: side entrances (OSM steps ~u=+-43, LiDAR terraces at ~5.3 m)
   }
   // short returns of the main block east and west of the end wings
@@ -222,24 +226,25 @@ export async function build(ctx) {
     return K.stairs(STEP, uA, Math.min(vFoot, vTop), uB, Math.max(vFoot, vTop), yLo, yHi, sg > 0 ? '+v' : '-v', n); };
   const UC = (U0 + U1) / 2;
   for (const [sgn, vF] of [[-1, V0], [1, V1]]) {
+    const FLs = sgn < 0 ? FL : SOUTH_Y;
     const uA = UC - 7.5, uB = UC + 7.5; const g0 = Math.min(K.g(UC, vF + sgn * 9), K.g(UC - 6, vF + sgn * 8), K.g(UC + 6, vF + sgn * 8));
     const land0 = vF + sgn * 1.9, land1 = vF - sgn * 0.62;
-    K.box(STD, uA, g0 - 1, Math.min(land0, land1), uB, FL, Math.max(land0, land1));
-    walkables.push(K.walkPoly(rect(uA, Math.min(land0, land1), uB, Math.max(land0, land1)), FL));
-    const n = Math.max(3, Math.round((FL - g0) / 0.16)); const T = 0.34, len = n * T, rise = (FL - g0) / n;
+    K.box(STD, uA, g0 - 1, Math.min(land0, land1), uB, FLs, Math.max(land0, land1));
+    walkables.push(K.walkPoly(rect(uA, Math.min(land0, land1), uB, Math.max(land0, land1)), FLs));
+    const n = Math.max(3, Math.round((FLs - g0) / 0.16)); const T = 0.34, len = n * T, rise = (FLs - g0) / n;
     const va = sgn < 0 ? land0 - len : land0, vb = sgn < 0 ? land0 : land0 + len; const vFoot = sgn < 0 ? va : vb;
-    walkables.push(stairV(uA, uB, vFoot, sgn < 0 ? vb : va, g0, FL, n));
+    walkables.push(stairV(uA, uB, vFoot, sgn < 0 ? vb : va, g0, FLs, n));
     // the two bottom treads run 1.6 m wider each side
     for (let i = 0; i < 2; i++) { const p0 = vFoot - sgn * T * i, p1 = vFoot - sgn * T * (i + 1); const y = g0 + rise * (i + 1);
       for (const [x0, x1] of [[uA - 1.6, uA], [uB, uB + 1.6]]) { K.box(STEP, x0, g0 - 1, Math.min(p0, p1), x1, y, Math.max(p0, p1)); walkables.push(K.walkPoly(rect(x0, Math.min(p0, p1), x1, Math.max(p0, p1)), y)); } }
     // stepped cheek blocks: full height beside the landing, then three blocks stepping down the flight, stopping two treads short
     const vTopF = sgn < 0 ? vb : va, vStop = vFoot - sgn * T * 2; // flight top edge, cheek end
     for (const u of [uA - 1.2, uB]) {
-      K.box(ST, u, g0 - 1, Math.min(land0, land1), u + 1.2, FL + 0.75, Math.max(land0, land1));
-      K.box(ST, u - 0.06, FL + 0.75, Math.min(land0, land1) - 0.06, u + 1.26, FL + 0.85, Math.max(land0, land1) + 0.06);
+      K.box(ST, u, g0 - 1, Math.min(land0, land1), u + 1.2, FLs + 0.75, Math.max(land0, land1));
+      K.box(ST, u - 0.06, FLs + 0.75, Math.min(land0, land1) - 0.06, u + 1.26, FLs + 0.85, Math.max(land0, land1) + 0.06);
       for (let k = 0; k < 3; k++) { const f0 = k / 3, f1 = (k + 1) / 3; const pa = vTopF + (vStop - vTopF) * f0, pb = vTopF + (vStop - vTopF) * f1;
-        const yb = FL - (FL - g0) * (f1 * (len - 2 * T) / len) + 0.75; K.box(ST, u, g0 - 1, Math.min(pa, pb), u + 1.2, yb, Math.max(pa, pb)); }
-      colliders.push(K.colPoly(rect(u, Math.min(vStop, land1), u + 1.2, Math.max(vStop, land1)), g0 - 1, FL + 0.9));
+        const yb = FLs - (FLs - g0) * (f1 * (len - 2 * T) / len) + 0.75; K.box(ST, u, g0 - 1, Math.min(pa, pb), u + 1.2, yb, Math.max(pa, pb)); }
+      colliders.push(K.colPoly(rect(u, Math.min(vStop, land1), u + 1.2, Math.max(vStop, land1)), g0 - 1, FLs + 0.9));
     }
     // [r5a] north: raised semicircular concrete forecourt, one low step above the lawn, where the walk meets the flight (photo 00)
     if (sgn < 0) { const ya = g0 + 0.02, Rr = 6.8; const sh = new THREE.Shape(); sh.moveTo(UC - Rr, vFoot); for (let k = 0; k <= 24; k++) { const t = Math.PI * k / 24; sh.lineTo(UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr); } sh.lineTo(UC - Rr, vFoot);
@@ -247,7 +252,7 @@ export async function build(ctx) {
       const cg = new THREE.TorusGeometry(Rr, 0.07, 4, 32, Math.PI); cg.rotateX(Math.PI / 2); cg.scale(1, 1, -1); cg.translate(UC, ya - 0.05, vFoot); K.add(STD, cg, { detail: true });
       walkables.push({ type: 'poly', pts: K.polyXZ(Array.from({ length: 25 }, (_, k) => { const t = Math.PI * k / 24; return [UC - Math.cos(t) * Rr, vFoot - Math.sin(t) * Rr]; })), y: ya }); }
     // four pipe rails
-    for (const u of [uA + 0.3, UC - 2.47, UC + 2.47, uB - 0.3]) railV(u, vFoot - sgn * 0.15, g0 + rise * 0.5, vTopF + sgn * 0.05, FL);
+    for (const u of [uA + 0.3, UC - 2.47, UC + 2.47, uB - 0.3]) railV(u, vFoot - sgn * 0.15, g0 + rise * 0.5, vTopF + sgn * 0.05, FLs);
   }
   // [r5a] north corner-pavilion side entrances: landing at the floor in front of the pavilion door, two short flights with a
   // half landing down to the north walk (LiDAR: ramp ~v -47.5 -> -40 with a level at v ~-43.5), blocky cheek walls, pipe rails.
