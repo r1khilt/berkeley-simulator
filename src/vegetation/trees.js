@@ -749,7 +749,11 @@ function buildLeavesHero(sk, d, rnd, density, budget) {
 function buildBarkHero(sk, d, ros) { // smoother wood than LOD0 + the tertiary twigs that carry the rosettes
   const acc = new Acc(['aRad']), twR = d.clumps?.twigR ?? 0.05;
   const capped = capTube;
-  for (const t of sk.trunks) tube(acc, ...capped(t.pts, t.rads), (d.trunk.seg ?? 8) + 4);
+  for (const t of sk.trunks) { // broadleaf trunks taper into their top limbs (hidden inside the limb bases, no stump); leaders get a tip
+    if (d.arche === 'conifer') { tube(acc, ...capped(t.pts, t.rads), (d.trunk.seg ?? 8) + 4); continue; }
+    const n = t.rads.length, rr = t.rads.slice(); rr[n - 1] *= 0.45; if (n > 2) rr[n - 2] *= 0.8;
+    tube(acc, t.pts, rr, (d.trunk.seg ?? 8) + 4);
+  }
   for (const l of sk.limbs) tube(acc, ...capped(l.pts, l.rads), l.thin ? 5 : (d.limbSeg ?? 5) + 3);
   for (const t of sk.twigs) tube(acc, t.pts, t.rads, 3);
   for (const k of sk.knobs) { ico(acc, k.c, k.r, 0.85); if (d.arche === 'pollard' && k.r > 0.2) ico(acc, k.c.clone().add(V3(k.r * 0.45, k.r * 0.3, -k.r * 0.3)), k.r * 0.7, 0.9); }
