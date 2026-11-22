@@ -16,7 +16,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshSta
 const camera = new THREE.PerspectiveCamera(+(qs.get('fov') || 35), W / H, 0.05, 200);
 const A = await loadPeopleAssets(); A.palette = { SKIN, HAIR, SHOE };
 const ids = (qs.get('ids') || 'female_08,male_12').split(',');
-const t0 = performance.now(); const avs = await loadRocketbox(A, { only: ids }); window.loadMs = performance.now() - t0;
+const t0 = performance.now(); const avs = await loadRocketbox(A, { only: ids, renderer }); window.loadMs = performance.now() - t0;
 const states = (qs.get('states') || 'idle').split(',');
 let seed = +(qs.get('seed') || 7); const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 const chars = []; const gap = +(qs.get('gap') || 0.9);

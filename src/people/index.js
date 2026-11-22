@@ -64,7 +64,9 @@ class People {
   // on its measured colours (rocketbox.js measureLook), so the hand-off to the near LOD adds detail, not new clothes.
   _rbLoad(A) {
     if (!this.useRB || typeof window === 'undefined') return;
-    const go = () => loadRocketbox(A).then((list) => this._rbReady(list)).catch((e) => console.warn('rocketbox people failed', e));
+    const renderer = window.BSIM && (window.BSIM.renderer || (window.BSIM.composer && window.BSIM.composer.renderer));
+    if (!renderer || !renderer.isWebGLRenderer) return; // (KTX2 transcoding needs the WebGL renderer; WebGPU keeps the Quaternius people)
+    const go = () => loadRocketbox(A, { renderer }).then((list) => this._rbReady(list)).catch((e) => console.warn('rocketbox people failed', e));
     const wait = () => { const game = window.BSIM && window.BSIM.qs; if (!game || window.BSIM.ready) setTimeout(go, 500); else setTimeout(wait, 400); }; // game: after BSIM.ready
     wait();
   }
