@@ -203,7 +203,7 @@ export function installR5West({ scene, heightAt, physics, water, setupMaterials,
   const plans = PLANS || BRIDGES.map((b) => planBridge(b, heightAt));
   const stats = { bridges: 0, weirs: 0 };
   for (const p of plans) if (p) { try { buildBridge(A, MAT, p, physics, heightAt); stats.bridges++; } catch (e) { console.warn('r5-west bridge', p.b.id, e); } }
-  try { stats.weirs = buildCreekWorks(A, MAT, heightAt, water, physics, quality, group); } catch (e) { console.warn('r5-west creek works', e); }
+  try { stats.weirs = buildCreekWorks(A, MAT, heightAt, water, physics, quality, group); stats.weirSites = buildCreekWorks.sites; } catch (e) { console.warn('r5-west creek works', e); }
   try { buildGatewaySign(A, MAT, heightAt, physics, group); } catch (e) { console.warn('r5-west sign', e); }
   A.build(group, 'r5-west');
   // open the creek under the decks (the water module hid it wherever the path SDF was paved)
@@ -355,15 +355,15 @@ function buildCreekWorks(A, MAT, heightAt, water, physics, quality, group) {
     [[-367, 187], [-381, 184], [-398, 191], [-414, 192], [-428, 185], [-440, 181], [-454, 178], [-460, 169], [-462, 151], [-462, 135], [-466, 125], [-471, 124], [-495, 122], [-506, 112], [-507, 97], [-514, 93], [-526, 95], [-535, 103], [-553, 96], [-571, 98], [-581, 105], [-582, 120], [-589, 130], [-604, 132], [-615, 145], [-622, 156], [-642, 179], [-658, 190], [-674, 189]],
     [[-569, 56], [-579, 66], [-585, 79], [-585, 93], [-581, 105]],
   ];
-  const rocks = []; let lastW = null, nW = 0;
+  const rocks = []; let lastW = null, nW = 0; buildCreekWorks.sites = [];
   for (const R of reaches) {
     const S = resample(R, 1.0, 0); const lv = S.map((q) => { const c = nc(q.x, q.z); return c && c.d < 4 ? c.s : null; });
     for (let i = 3; i < S.length - 3; i++) {
       const a = lv[i - 3], c = lv[i + 3], m0 = lv[i]; if (!a || !c || !m0) continue;
       const drop = a[2] - c[2]; if (drop < 0.2) continue;
       if (lastW && Math.hypot(m0[0] - lastW[0], m0[1] - lastW[1]) < 13) continue;
-      if (BRIDGES.some((b) => b.pts.some((p) => Math.hypot(p[0] - m0[0], p[1] - m0[1]) < 7))) continue;
-      lastW = m0; nW++;
+      if ((PLANS || []).some((p) => p && p.deckAt(m0[0], m0[1], 3.5) != null) || BRIDGES.some((b) => b.pts.some((p) => Math.hypot(p[0] - m0[0], p[1] - m0[1]) < 6))) continue;
+      lastW = m0; nW++; buildCreekWorks.sites.push([+m0[0].toFixed(1), +m0[1].toFixed(1), +m0[2].toFixed(2), nW % 3 === 0 ? 'dam' : 'pool']);
       const t = norm2(c[0] - a[0], c[1] - a[1]); const nx = -t[1], nz = t[0];
       let hwid = 0.8; for (; hwid < 2.4; hwid += 0.1) if (heightAt(m0[0] + nx * hwid, m0[1] + nz * hwid) > m0[2] + 0.25 && heightAt(m0[0] - nx * hwid, m0[1] - nz * hwid) > m0[2] + 0.25) break;
       if (nW % 3 === 0) {   // an old cut-stone check dam (late-1800s style): a straight sill of squared blocks across the bed
