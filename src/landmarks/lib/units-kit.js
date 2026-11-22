@@ -59,17 +59,25 @@ export function tower(ctx, P) {
   const { u0, u1, v0, v1 } = P; const nb = P.nb ?? 9; const NF = P.floors ?? 8; const u3 = P.style === 'u3';
   const rnd = rng(P.seed || 'unit');
   const T = P.tint || {};
-  const mWall = paintTint(M, T.wall ?? 0xd8d0b8), mSpan = paintTint(M, T.span ?? 0xe0d9c6);
+  // r4-sweep-outer2: Units 1/2 surfaces were flat paint (untextured), so the towers read as pale boxes. Their concrete now
+  // uses the shared concrete texture (photo PBR when on), and the module tints step the recessed spandrels below the pier /
+  // brace frame so the structure reads at distance. Unit 3 keeps paint; P.flatPaint restores the old surfaces.
+  const surf = (u3 || P.flatPaint) ? paintTint : concreteTint;
+  const mWall = surf(M, T.wall ?? 0xd8d0b8), mSpan = surf(M, T.span ?? 0xe0d9c6);
   // refine-south-west: windows use the shared M.windowNight (the furnished-room window shader upgrade lands there);
   // P.sharedGlass === false restores the old local glass.
   const mGlass = P.sharedGlass === false ? glassMat(M) : M.windowNight, mCurt = curtainMat(M), mFrame = plainMat(M, 'units-frame', { color: 0xc9c6b2, roughness: 0.5, metalness: 0.2 }), mRail = charcoalMat(M);
-  const mBrace = T.brace != null ? paintTint(M, T.brace) : mWall; // seismic frame colour (Unit 2 braces are a contrasting terracotta)
+  // r4-sweep-outer2: the end walls are colour-blocked on the real towers (slate blue, pale grey, sand, grey-green); T.end
+  // paints the end-wall panels (joints a shade darker) while the corner piers stay the frame colour.
+  const mEnd = T.end != null ? surf(M, T.end) : mWall;
+  const mEndJ = T.end != null ? surf(M, new THREE.Color(T.end).multiplyScalar(0.84).getHex()) : mSpan;
+  const mBrace = T.brace != null ? surf(M, T.brace) : mWall; // seismic frame colour (Unit 2 braces are a contrasting terracotta)
   const mGround = concreteTint(M, T.ground ?? 0xa9a59b); // recessed ground storey: plain board-formed concrete
   const mBase = mGround;
   const mFas = charcoalMat(M); const mPave = concreteTint(M, 0x9f998e); // warmer, darker apron paving (light concrete in tower shadow read as sky-blue in-game)
   K.siteMats = { galv: mFrame, dark: mFas };
   const NAME = (P.name || String(P.seed || '').replace(/-/g, ' ')).toUpperCase();
-  const mRoof = M.concreteDark, mRing = paintTint(M, T.ring ?? T.wall ?? 0xe4dcc4);
+  const mRoof = M.concreteDark, mRing = surf(M, T.ring ?? T.wall ?? 0xe4dcc4);
   const colliders = [], walkables = [];
   // entrance level & vertical grid
   const eFace = P.entrance?.face || 'S'; const eU = P.entrance?.u ?? (u0 + u1) / 2;
@@ -242,11 +250,11 @@ export function tower(ctx, P) {
       }
     }
     const top = u3 ? deck + 0.55 : deck;
-    K.wall(R, mWall, 0.0, Wd, F0 + GH, top, ops, 0.4);
+    K.wall(R, mEnd, 0.0, Wd, F0 + GH, top, ops, 0.4);
     for (const o of ops) K.fill(R, o, { rev: o.big ? 0.25 : 0.32, glass: o.big ? mGlass : M.windowNight, frame: mFrame, mull: o.big ? 1 : 0, sill: false });
     // panel joints (staggered) as shallow grooves
-    for (let f = 0; f <= NF; f++) K.rbox(R, mSpan, 0.05, fy(f) - 0.03, -0.02, Wd - 0.05, fy(f) + 0.03, 0.015, { detail: true });
-    for (let f = 0; f < NF; f++) for (let q = 0; q < 2; q++) { const s = 1.5 + ((f * 0.37 + q * 0.5 + 0.13) % 1) * (Wd - 3); K.rbox(R, mSpan, s - 0.03, fy(f), -0.02, s + 0.03, fy(f + 1), 0.015, { detail: true }); }
+    for (let f = 0; f <= NF; f++) K.rbox(R, mEndJ, 0.05, fy(f) - 0.03, -0.02, Wd - 0.05, fy(f) + 0.03, 0.015, { detail: true });
+    for (let f = 0; f < NF; f++) for (let q = 0; q < 2; q++) { const s = 1.5 + ((f * 0.37 + q * 0.5 + 0.13) % 1) * (Wd - 3); K.rbox(R, mEndJ, s - 0.03, fy(f), -0.02, s + 0.03, fy(f + 1), 0.015, { detail: true }); }
     // ground storey: recessed dark wall
     K.wall(R, mBase, 0.0, Wd, F0, F0 + GH, [{ s0: Wd * 0.4, s1: Wd * 0.6, y0: F0 + 1.2, y1: F0 + 2.7 }], 0.3);
     K.fill(R, { s0: Wd * 0.4, s1: Wd * 0.6, y0: F0 + 1.2, y1: F0 + 2.7 }, { rev: 0.18, frame: mFrame, mull: 1, sill: false });
