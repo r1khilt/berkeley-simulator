@@ -6,6 +6,7 @@
 // Movement modes are generic: built-ins (walk/bike/fly) plus any player.plugins entry with a key, label or icon.
 import { LOOKS, AVATARS } from '../player/avatar.js'; // r5-avatar: AVATARS = realistic player looks (Rocketbox)
 import { icon, LOGO } from './icons.js';
+import { MOVE } from '../player/player.js'; // r5-controls: walk / run / sprint speeds for the Settings readout
 import { pacificHour } from '../time.js';
 import { PRESETS, sunEvents, fmtHour, fmtDay, dayGradient, pacificDay, presetHour } from './timeofday.js';
 
@@ -16,7 +17,7 @@ const KEYS = { Space: 'Space', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlL
 export const keyName = (code) => (!code ? '' : KEYS[code] || String(code).replace(/^(Key|Digit|Numpad|Arrow)/, ''));
 const kbd = (...k) => k.map((x) => `<kbd>${esc(x)}</kbd>`).join('');
 const BUILTIN_MODES = [
-  { id: 'walk', label: 'Walk', icon: 'walk', hint: 'Shift run · Space jump · +/- speed' },
+  { id: 'walk', label: 'Walk', icon: 'walk', hint: 'Shift run (hold to sprint) · Space jump · +/- speed' },
   { id: 'bike', label: 'Bike', key: 'KeyB', icon: 'bike', hint: 'W pedal · Shift faster · A/D steer · B off' }, // r5-controls: hints double as the on-screen key strip
   { id: 'fly', label: 'Fly', key: 'KeyF', icon: 'drone', hint: 'Space up · C down · Shift boost · Scroll/+/- speed · F land' },
 ];
@@ -216,7 +217,7 @@ export class UI {
     }
     // r5-controls: walk and fly show their adjustable speed in the stepper; vehicles keep the live speed readout
     const kind = p.speedKind ? p.speedKind() : null;
-    const spdTxt = kind === 'fly' ? this.fmtSpeed(p.flySpeed) : kind === 'walk' ? this.fmtSpeed(p.sprinting ? p.runSpeed : p.walkSpeed) : null;
+    const spdTxt = kind === 'fly' ? this.fmtSpeed(p.flySpeed) : kind === 'walk' ? this.fmtSpeed(p.sprinting ? p.sprintSpeed : p.running ? p.runSpeed : p.walkSpeed) : null;
     if (spdTxt !== this._spdTxt) { this._spdTxt = spdTxt; this.spdEl.classList.toggle('hidden', !spdTxt); if (spdTxt) { this.spdOut.textContent = spdTxt; this.spdEl.title = kind === 'fly' ? 'Fly speed · scroll or + / -' : 'Walk speed · + / - (Shift runs)'; } }
     const sp = p.speed || 0, show = !kind && sp > 0.6, txt = show ? this.fmtSpeed(sp) : '';
     if (txt !== this._spd) { this._spd = txt; this.modeSpeed.textContent = txt; }
@@ -226,7 +227,7 @@ export class UI {
   speedChanged(kind, v) {
     this.modes(); if (!this.spdEl) return;
     this.spdEl.classList.remove('bump'); void this.spdEl.offsetWidth; this.spdEl.classList.add('bump'); clearTimeout(this._sb); this._sb = setTimeout(() => this.spdEl.classList.remove('bump'), 700);
-    const p = this.player; this.notify(kind === 'fly' ? `Fly speed ${this.fmtSpeed(v)} · Shift for ${this.fmtSpeed(v * 3)}` : `Walk ${this.fmtSpeed(p.walkSpeed)} · run ${this.fmtSpeed(p.runSpeed)}`, { icon: kind === 'fly' ? 'drone' : 'walk', ms: 1600 });
+    const p = this.player; this.notify(kind === 'fly' ? `Fly speed ${this.fmtSpeed(v)} · Shift for ${this.fmtSpeed(v * 3)}` : `Walk ${this.fmtSpeed(p.walkSpeed)} · run ${this.fmtSpeed(p.runSpeed)} · sprint ${this.fmtSpeed(p.sprintSpeed)}`, { icon: kind === 'fly' ? 'drone' : 'walk', ms: 1800 });
   }
   // r5-controls: the keys for a mode, as a short strip of key caps (from the mode's one-line hint, e.g. 'W throttle · S brake')
   modeHint(m, force = false) {
@@ -448,7 +449,7 @@ export class UI {
       <div class="sc-grid">
         <section><h3>Move</h3>
           ${row(kbd('W', 'A', 'S', 'D'), 'Move', 'Arrow keys work too')}
-          ${row(kbd('Shift'), 'Run')}${row(kbd('Space'), 'Jump')}
+          ${row(kbd('Shift'), 'Run', 'Keep holding to sprint')}${row(kbd('Space'), 'Jump')}
           ${row(kbd('Mouse'), 'Look around', 'Click the view to capture the mouse, or drag')}
           ${row(kbd('V'), 'First or third person')}
           ${row(kbd('Scroll'), 'Camera distance', 'In fly mode, scroll sets the fly speed')}
@@ -471,7 +472,7 @@ export class UI {
     const seg = (k, val, opts) => `<div class="seg" data-k="${k}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(val) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     // r5-controls: walk speed (multiplier) and fly speed (m/s, log slider 3-150) live here too
     const FLY0 = 3, FLY1 = 150, toLog = (v) => Math.round(Math.log(v / FLY0) / Math.log(FLY1 / FLY0) * 1000), fromLog = (u) => FLY0 * Math.pow(FLY1 / FLY0, u / 1000);
-    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%`, walkSpeed: (v) => this.fmtSpeed(4.2 * v), flySpeed: (u) => this.fmtSpeed(fromLog(u)) };
+    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%`, walkSpeed: (v) => this.fmtSpeed(MOVE.walk * v), flySpeed: (u) => this.fmtSpeed(fromLog(u)) };
     const range = (k, min, max, step, val) => `<div class="range"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${k}"><output>${fmts[k](val)}</output></div>`;
     const sw = (k, on) => `<label class="switch"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}><i></i></label>`;
     this.panel(`${this._head('Settings')}
@@ -483,7 +484,7 @@ export class UI {
         <div class="row"><span>Walk speed</span>${range('walkSpeed', 0.5, 2, 0.05, s.walkSpeed ?? 1)}</div>
         <div class="row"><span>Fly speed</span>${range('flySpeed', 0, 1000, 1, toLog(s.flySpeed ?? 25))}</div>
         <div class="row"><span>Camera follows movement</span>${sw('camFollow', s.camFollow !== false)}</div>
-        <p class="row-note">Shift runs at about twice your walk speed. In the game, + and − change the speed of the mode you're in, and in fly mode so does the scroll wheel.</p></section>
+        <p class="row-note">Shift runs, and holding it breaks into a sprint. In the game, + and − change the speed of the mode you're in, and in fly mode so does the scroll wheel.</p></section>
       <section><h3>Controls</h3>
         <div class="row"><span>Look sensitivity</span>${range('sens', 0.3, 2.5, 0.05, s.sens)}</div>
         <div class="row"><span>Invert vertical look</span>${sw('invertY', s.invertY)}</div>

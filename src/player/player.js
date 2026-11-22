@@ -28,7 +28,9 @@ function smoothDamp(cur, target, st, smoothTime, dt) {
 }
 // ---- tuning (metres, seconds)
 export const MOVE = {
-  walk: 4.2, run: 8.0,                  // m/s at speedScale 1 (Settings > Walk speed scales both, 0.5x-2x)
+  // m/s at speedScale 1 (Settings > Walk speed scales all three, 0.5x-2x). The default walk reads as a real walk on the
+  // mocap avatar (its walk loop is ~1.4 m/s, jog ~2.3); Shift runs, and keeping Shift held breaks into a sprint.
+  walk: 2.0, run: 4.6, sprint: 7.6, sprintAfter: 1.1, sprintAccel: 6,
   accel: 26, decel: 30, turnGrip: 22,   // m/s^2: speeding up, stopping with no input, extra grip when reversing
   airAccel: 7, turnRate: 15,            // m/s^2 in the air; max body turn rate (rad/s)
   jumpV: 6.8, gUp: 22, gDown: 31, coyote: 0.12, jumpBuffer: 0.15,
@@ -52,7 +54,7 @@ export class Player {
     this.plugins = {}; // movement-mode plugins: see src/player/modes/README.md
     // r5-controls state (readable by the avatar / HUD): see MOVE for units
     this.speedScale = 1; this.flySpeed = MOVE.fly.def; this.camFollow = true; this.onSpeedChange = null;
-    this.sprinting = false; this.moveSpeed = 0; this.groundSlope = 0; this.visDy = 0; this.flyClip = /[?&]flyclip\b/.test(typeof location !== 'undefined' ? location.search : '');
+    this.running = false; this.sprinting = false; this.moveSpeed = 0; this.groundSlope = 0; this._runT = 0; this.visDy = 0; this.flyClip = /[?&]flyclip\b/.test(typeof location !== 'undefined' ? location.search : '');
     this._coyote = 0; this._jumpBuf = 0; this._jumping = false; this._mouseIdle = 9; this._wheelAcc = 0; this._wheelT = 0;
     this._cam = { init: false, y: 0, vy: 0, col: 99, last: new THREE.Vector3() };
     this._bindInput();
@@ -114,6 +116,7 @@ export class Player {
   // target ground speeds (m/s) after the Settings multiplier
   get walkSpeed() { return MOVE.walk * this.speedScale; }
   get runSpeed() { return MOVE.run * this.speedScale; }
+  get sprintSpeed() { return MOVE.sprint * this.speedScale; }
   setMode(m) {
     if (m === this.mode) return;
     const nextPl = this.plugins[m]; if (nextPl && nextPl.canEnter && !nextPl.canEnter(this)) return false;
@@ -122,7 +125,7 @@ export class Player {
     const prev = this.mode;
     this.mode = m; this.bike.root.visible = m === 'bike'; this.avatar.root.visible = true;
     if (m === 'fly') { this.vel.y = Math.max(0, this.vel.y); this.onGround = false; this._flyP = this._flyB = 0; } // keep horizontal momentum
-    if (prev === 'fly') { this.avatar.root.rotation.set(0, this.yaw, 0, 'XYZ'); this._jumping = false; this.airTime = 0; const hs = Math.hypot(this.vel.x, this.vel.z), cap = this.runSpeed; if (hs > cap) { this.vel.x *= cap / hs; this.vel.z *= cap / hs; } this.vel.y = Math.min(this.vel.y, 0); }
+    if (prev === 'fly') { this.avatar.root.rotation.set(0, this.yaw, 0, 'XYZ'); this._jumping = false; this.airTime = 0; const hs = Math.hypot(this.vel.x, this.vel.z), cap = this.sprintSpeed; if (hs > cap) { this.vel.x *= cap / hs; this.vel.z *= cap / hs; } this.vel.y = Math.min(this.vel.y, 0); }
     if (nextPl && nextPl.enter) nextPl.enter(this);
     this.onModeChange && this.onModeChange(m);
   }
@@ -184,14 +187,17 @@ export class Player {
   _walkStep(h, inp, fwd, right) {
     const M = MOVE, first = this.view === 'first';
     const wx = fwd.x * inp.f + right.x * inp.s, wz = fwd.z * inp.f + right.z * inp.s, wl = Math.hypot(wx, wz);
-    const run = !!inp.sprint, top = (run ? M.run : M.walk) * this.speedScale * Math.min(1, wl);
-    this.sprinting = run && wl > 0.1; this.moveSpeed = top;
+    const run = !!inp.sprint && wl > 0.1;
+    this._runT = run && this.onGround ? (this._runT || 0) + h : run ? (this._runT || 0) : 0; // hold Shift a moment to sprint
+    const sprint = run && this._runT > M.sprintAfter;
+    const top = (sprint ? M.sprint : run ? M.run : M.walk) * this.speedScale * Math.min(1, wl);
+    this.running = run; this.sprinting = sprint; this.moveSpeed = top;
     const tx = wl > 1e-3 ? wx / wl * top : 0, tz = wl > 1e-3 ? wz / wl * top : 0;
     let vx = this.vel.x, vz = this.vel.z; const sp = Math.hypot(vx, vz), grip = Math.max(1, this.speedScale);
     let rate;
     if (this.onGround) {
       if (top < 0.01) rate = M.decel * grip;
-      else { const dot = sp > 0.2 ? (vx * tx + vz * tz) / (sp * top) : 1; rate = (M.accel + (1 - dot) * M.turnGrip) * grip; if (sp > top + 0.05 && dot > 0.7) rate = M.decel * grip; }
+      else { const dot = sp > 0.2 ? (vx * tx + vz * tz) / (sp * top) : 1; rate = (M.accel + (1 - dot) * M.turnGrip) * grip; if (sp > top + 0.05 && dot > 0.7) rate = M.decel * grip; else if (sprint && dot > 0.7 && sp > M.run * this.speedScale * 0.9) rate = M.sprintAccel * grip; /* ease up into the sprint */ }
     } else rate = top < 0.01 ? 0.6 : M.airAccel * grip;
     const dx = tx - vx, dz = tz - vz, dl = Math.hypot(dx, dz), mx = rate * h;
     if (dl <= mx) { vx = tx; vz = tz; } else { vx += dx / dl * mx; vz += dz / dl * mx; }
