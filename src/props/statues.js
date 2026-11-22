@@ -211,12 +211,12 @@ export async function laughingPelican() { // Anthony Hall: Frances Rich's bronze
 const TOWER = { x: 0.66 + 1.35, z: 2.1, rot: Math.atan2(2.78, 10.2), hw: 5.15 + 0.32 };
 const towerPt = (u, v) => [TOWER.x + u * Math.cos(TOWER.rot) + v * Math.sin(TOWER.rot), TOWER.z - u * Math.sin(TOWER.rot) + v * Math.cos(TOWER.rot)];
 export const PLACEMENTS = [
-  { id: 'golden-bear', build: goldenBear, x: -223.2, z: 305.1, face: [-205, 326], r: 0.45, clearTrees: 1.6, col: (P, x, y, z) => P.addBox(x - 0.4, y - 1, z - 0.4, x + 0.4, y + 5.5, z + 0.4, 'statue') },
-  { id: 'grizzly-bear', build: grizzlyBear, x: -241.7, z: 236.1, rot: Math.PI / 2, r: 1.1, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.62, 1.3) },
-  { id: 'cal-bear', build: calBear, x: 464.5, z: 54.5, face: [440, 54], r: 1.4, clearTrees: 2.6, col: (P, x, y, z) => P.addCircle(x, z, 0.9, y - 1, y + 3, 'statue') },
+  { id: 'golden-bear', build: goldenBear, x: -223.2, z: 305.1, face: [-205, 326], r: 0.45, far: 420, clearTrees: 1.6, col: (P, x, y, z) => P.addBox(x - 0.4, y - 1, z - 0.4, x + 0.4, y + 5.5, z + 0.4, 'statue') },
+  { id: 'grizzly-bear', build: grizzlyBear, x: -241.7, z: 236.1, rot: Math.PI / 2, r: 1.1, far: 160, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.62, 1.3) },
+  { id: 'cal-bear', build: calBear, x: 464.5, z: 54.5, face: [440, 54], r: 1.4, far: 280, clearTrees: 2.6, col: (P, x, y, z) => P.addCircle(x, z, 0.9, y - 1, y + 3, 'statue') },
   // "the stone bench at the Campanile entrance": north face, beside the 1960s canopy
-  { id: 'bench-1920', build: bench1920, at: towerPt(4.35, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, level: 'max', clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
-  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, level: 'max', clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
+  { id: 'bench-1920', build: bench1920, at: towerPt(4.35, -TOWER.hw - 0.75), rot: TOWER.rot + Math.PI, r: 1.2, level: 'max', far: 150, clearTrees: 1.8, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.2, 0.3, 1.4, -0.08) },
+  { id: 'bench-1955', build: bench1955, at: towerPt(-TOWER.hw - 0.75, 0.5), rot: Math.atan2(-Math.cos(TOWER.rot), Math.sin(TOWER.rot)), r: 1.1, level: 'max', far: 150, clearTrees: 1.6, col: (P, x, y, z, rot) => obb(P, x, y, z, rot, 1.08, 0.36, 0.95) },
 ];
 function obb(P, x, y, z, rot, hx, hz, h, oz = 0) { // oriented box collider (local half-sizes hx, hz, centred oz along local z)
   const c = Math.cos(rot), s = Math.sin(rot); const pt = (u, v) => [x + u * c + v * s, z - u * s + v * c];
@@ -233,7 +233,9 @@ export async function installStatues({ scene, physics, heightAt, setupMaterials,
       const hs = [heightAt(x, z)]; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; hs.push(heightAt(x + Math.cos(a) * p.r, z + Math.sin(a) * p.r)); }
       const y = p.level === 'max' ? Math.max(...hs) : Math.min(...hs);
       const obj = await p.build(); obj.name = 'statue:' + p.id;
-      obj.position.set(x, y, z); obj.rotation.y = rot; root.add(obj); obj.updateMatrixWorld(true);
+      // whole statue (stonework + sculpt LODs, main pass and shadow cascades) drops out past p.far; the sculpts inside keep their own hi/lo LODs
+      const vis = new THREE.LOD(); vis.name = 'statue-vis:' + p.id; vis.addLevel(obj, 0); vis.addLevel(new THREE.Object3D(), p.far || 260);
+      vis.position.set(x, y, z); vis.rotation.y = rot; root.add(vis); vis.updateMatrixWorld(true);
       if (setupMaterials) setupMaterials(obj);
       if (physics && p.col) p.col(physics, x, y, z, rot);
       if (trees && p.clearTrees) trees.hideNear([[x, z, p.clearTrees]]);
