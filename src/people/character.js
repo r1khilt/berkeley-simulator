@@ -9,6 +9,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { REG } from './assets.js';
 import { garmentPart, bodyFor, outfitMaterial, TOP, BOT, SLEEVE, LEG } from './garments.js'; // r4-people2: modelled clothes
 import { kitFor, kitMaterial, kitGeometry, headFrame, KP, KS } from './kit.js';
+const STRAPS = typeof location !== 'undefined' && new URLSearchParams(location.search).get('straps') === '1';
 const faceFrame = (B) => { const H = headFrame(B); return { eyeY: H.eyeY, front: H.front, eyeX: Math.abs(H.eyes.l.x - H.eyes.r.x) / 2 }; }; // r4-people2: shoes, bags, hats, glasses, hair in one skinned mesh
 
 const TAU = Math.PI * 2;
@@ -204,7 +205,7 @@ export class Character {
     else if (f & FL.SKIRT) { bk = BOT.skirt; leg = LEG.skirt[Math.floor(fr(4.3) * 3)]; }
     else { bk = BOT.shorts; leg = LEG.shorts[fr(5.1) < 0.5 ? 0 : 1]; }
     const gT = garmentPart(this.B, 'top', tk, sleeve), gB = bk === BOT.leggings ? null : garmentPart(this.B, 'bot', bk, leg);
-    const st0 = f & FL.BACKPACK ? 'strap' : f & FL.BAG ? 'sash' : null; const gS = st0 ? garmentPart(this.B, st0, tk, sleeve) : null;
+    const st0 = !STRAPS ? null : f & FL.BACKPACK ? 'strap' : f & FL.BAG ? 'sash' : null; const gS = st0 ? garmentPart(this.B, st0, tk, sleeve) : null; // cloth straps still break up on the chest: off unless ?straps=1
     this.top.geometry = gT; this.bot.visible = !!gB; if (gB) this.bot.geometry = gB; this.strap.visible = !!gS; if (gS) this.strap.geometry = gS;
     this.body.geometry = bodyFor(this.B, gT, gB); this.outfitInfo = { tk, bk };
     const ou = this.ou; ou.uTopA.value.setRGB(...top); ou.uBotA.value.setRGB(...bot);

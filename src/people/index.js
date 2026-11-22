@@ -117,10 +117,10 @@ class People {
     let tca = vv > 1e-4 ? -(dx * vx + dz * vz) / vv : 0; tca = Math.max(0, Math.min(3, tca));
     const cx = dx + vx * tca, cz = dz + vz * tca, dmin = Math.hypot(cx, cz);
     const along = dx * fx + dz * fz, lat = dx * rx + dz * rz;
-    if (dmin < 1.4 && (tca < 3 || (along > -0.5 && along < 4.5)) && d < 11) { const latC = cx * rx + cz * rz;
+    if (dmin < 1.7 && (tca < 3.2 || (along > -0.5 && along < 5)) && d < 12) { const latC = cx * rx + cz * rz;
       // pick a side once and stick to it (no dithering), preferring the side away from the player's predicted path
       if (!S.side || S.sideT <= 0) S.side = latC > 0.05 ? -1 : latC < -0.05 ? 1 : (lat >= 0 ? -1 : 1); S.sideT = 1.2;
-      want += S.side * (1.45 - dmin) * (d < 4 ? 1.15 : 1);
+      want += S.side * (1.75 - dmin) * (d < 4 ? 1.15 : 1); // personal space: pass the player with ~1 m between shoulders
       if (along > 0 && along < 2.2 && Math.abs(lat) < 0.75 && w.stateT <= 0) w.speedMul = Math.min(w.speedMul, 0.35 + 0.25 * along); } // boxed in: slow down too
     S.sideT = (S.sideT || 0) - dt;
     // -- bumped: flinch, stop, look at the player, then carry on
@@ -146,7 +146,7 @@ class People {
       else if (head > 0.5 && o.speed * (o.speedMul ?? 1) < sp - 0.1) want += (la > 0 ? -0.5 : 0.5) * (1 - al / 4.5); // overtake on the clear side
     }
     if (w.buddy) want += 0.14; // walking pairs: a little more elbow room than the rail spacing
-    want = Math.max(-1.4, Math.min(1.4, want));
+    want = Math.max(-1.7, Math.min(1.7, want));
     S.off += (want - S.off) * Math.min(1, dt * (Math.abs(want) > Math.abs(S.off) ? 2.4 : 0.9));
     w.sx = (w.sx || 0) * Math.max(0, 1 - dt * 2) + rx * S.off * Math.min(1, dt * 2); w.sz = (w.sz || 0) * Math.max(0, 1 - dt * 2) + rz * S.off * Math.min(1, dt * 2);
     // -- stared at: the walker notices, looks back, slows down

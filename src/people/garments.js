@@ -169,20 +169,20 @@ function strapShell(B, kind, sleeve) {
   const f = (i, p, n, reg, t) => {
     if (reg !== REG.TRUNK) return -1;
     const s = p.x > 0 ? 1 : -1; const front = p.z > zMid;
-    const lo = J.spine_02.y + 0.04; const cx = front ? xs + Math.max(0, lo - p.y) * 1.3 : xs + Math.max(0, packTop - p.y) * 0.3; if (Math.abs(Math.abs(p.x) - cx) > 0.021) return -1;
-    if (front ? p.y < J.spine_02.y - 0.07 || cx > 0.2 : p.y < packTop) return -1;
-    const o = Math.max(0, fit(i, p, n, REG.TRUNK, 0)); return o + 0.011;
+    const cx = front ? xs : xs + Math.max(0, packTop - p.y) * 0.3; if (Math.abs(Math.abs(p.x) - cx) > 0.021) return -1;
+    if (front ? p.y < J.spine_02.y - 0.04 : p.y < packTop) return -1;
+    const o = Math.max(0, fit(i, p, n, REG.TRUNK, 0)); return o + 0.034; // above the relaxed top shell (it bridges hollows up to +2 cm)
   };
   const snap = (c, reg, t, b) => { const s = b.x > 0 ? 1 : -1; const front = b.z > zMid; const cx = front ? xs : xs + Math.max(0, packTop - b.y) * 0.3; const e = Math.abs(b.x) - cx;
-    if (Math.abs(b.z - zMid) < 0.06 && b.y > J.spine_03.y + 0.05) return; if (!front && b.y < packTop + 0.02) c.y = packTop; else if (!front && Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
-  const r = shell(B, 3, f, snap, { minK: 0.85, relax: 3, edgeRelax: 2 }); r.hide = new Set(); return r;
+    if (Math.abs(b.z - zMid) < 0.06 && b.y > J.spine_03.y + 0.05) return; if (front && b.y < J.spine_02.y - 0.015) c.y = J.spine_02.y - 0.04; else if (!front && b.y < packTop + 0.02) c.y = packTop; else if (Math.abs(e) > 0.008) c.x = s * (cx + Math.sign(e) * 0.021); };
+  const r = shell(B, 3, f, snap, { minK: 1.0, relax: 2, edgeRelax: 1 }); r.hide = new Set(); return r;
 }
 // messenger-bag strap: a diagonal band from the left hip over the right shoulder, front and back
 function sashShell(B, kind, sleeve) {
   const J = B.J; const { fit } = topFit(B, kind, sleeve); const A = [0.17, J.pelvis.y + 0.06], C = [-0.115, J.spine_03.y + 0.16]; const dx = C[0] - A[0], dy = C[1] - A[1], L = Math.hypot(dx, dy);
   const f = (i, p, n, reg, t) => { if (reg !== REG.TRUNK) return -1; const u = ((p.x - A[0]) * dx + (p.y - A[1]) * dy) / (L * L); if (u < 0 || u > 1.15) return -1;
-    const dist = Math.abs((p.x - A[0]) * dy - (p.y - A[1]) * dx) / L; if (dist > 0.023) return -1; return Math.max(0, fit(i, p, n, REG.TRUNK, 0)) + 0.01; };
-  const r = shell(B, 3, f, null, { minK: 0.85, relax: 3, edgeRelax: 6 }); r.hide = new Set(); return r;
+    const dist = Math.abs((p.x - A[0]) * dy - (p.y - A[1]) * dx) / L; if (dist > 0.023) return -1; return Math.max(0, fit(i, p, n, REG.TRUNK, 0)) + 0.034; };
+  const r = shell(B, 3, f, null, { minK: 1.0, relax: 2, edgeRelax: 6 }); r.hide = new Set(); return r;
 }
 // lathed skirt hanging from the hips; soft weights to the thighs so it follows the stride
 function skirtShell(B, len) {
@@ -246,11 +246,13 @@ export const SLEEVE = { tee: [0.4, 0.46], long: 0.94, outer: 0.955 }, LEG = { je
 // build the common parts ahead of time, one per idle slice, so the first people to walk up don't hitch the frame
 export function prebuildParts(B, budgetMs = 12) {
   const todo = [];
-  for (const k of [TOP.hoodie, TOP.crew, TOP.jacket, TOP.puffer, TOP.flannel, TOP.long]) { const sl = k === TOP.jacket || k === TOP.puffer ? SLEEVE.outer : SLEEVE.long; todo.push(['top', k, sl], ['strap', k, sl], ['sash', k, sl]); }
-  for (const sl of SLEEVE.tee) todo.push(['top', TOP.tee, sl], ['strap', TOP.tee, sl], ['sash', TOP.tee, sl]);
+  for (const k of [TOP.hoodie, TOP.crew, TOP.jacket, TOP.puffer, TOP.flannel, TOP.long]) todo.push(['top', k, k === TOP.jacket || k === TOP.puffer ? SLEEVE.outer : SLEEVE.long]);
+  for (const sl of SLEEVE.tee) todo.push(['top', TOP.tee, sl]);
   todo.push(['bot', BOT.jeans, LEG.jeans], ['bot', BOT.chinos, LEG.chinos], ['bot', BOT.joggers, LEG.joggers]); for (const l of LEG.shorts) todo.push(['bot', BOT.shorts, l]); if (B.sex === 'f') for (const l of LEG.skirt) todo.push(['bot', BOT.skirt, l]);
-  const step = () => { const t0 = performance.now(); while (todo.length && performance.now() - t0 < budgetMs) { const [t, k, l] = todo.shift(); if (!hasPart(B, t, k, l)) garmentPart(B, t, k, l); } if (todo.length) setTimeout(step, 60); };
-  setTimeout(step, 400);
+  const idle = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f, { timeout: 1500 }) : (f) => setTimeout(f, 80);
+  const step = (dl) => { const t0 = performance.now(); const left = () => (dl && dl.timeRemaining ? dl.timeRemaining() > 4 : performance.now() - t0 < budgetMs);
+    do { const [t, k, l] = todo.shift(); if (!hasPart(B, t, k, l)) garmentPart(B, t, k, l); } while (todo.length && left()); if (todo.length) idle(step); };
+  setTimeout(() => idle(step), 400);
 }
 
 // ---------------------------------------------------------------- clothing material
