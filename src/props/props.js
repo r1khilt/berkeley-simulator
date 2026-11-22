@@ -18,7 +18,7 @@ function L() {
   if (_L) return _L;
   const std = (o) => new THREE.MeshStandardMaterial(o);
   _L = {
-    galv: std({ color: 0x9aa0a3, roughness: 0.45, metalness: 0.75, name: 'prop:galvanized' }),
+    galv: std({ color: 0xa7abad, roughness: 0.5, metalness: 0.7, name: 'prop:galvanized' }), // r4-props: less blue
     steel: std({ color: 0xc9ccce, roughness: 0.3, metalness: 0.9, name: 'prop:stainless' }),
     charcoal: std({ color: 0x2c2f31, roughness: 0.55, metalness: 0.45, name: 'prop:charcoal' }),
     rubber: std({ color: 0x161616, roughness: 0.9, metalness: 0, name: 'prop:rubber' }),
@@ -101,18 +101,30 @@ function panel(w, h, x, y, z, ry = 0, u0 = 0, v0 = 0, u1 = 1, v1 = 1) {
   return t(g, x, y, z, 0, ry, 0);
 }
 
+// r4-props: soft contact shadow for small props (most scatters don't cast real shadows, for performance, so they
+// looked pasted onto the ground): a radial-gradient decal quad just above the ground, shared by every prop that uses it.
+function contactShadow(P, w, d, x = 0, z = 0, k = 0.55) {
+  const Lm = L();
+  const tex = texCache('contact', () => canvasTex(64, 64, (g, W, H) => { const gr = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); }, { srgb: false }));
+  const m = Lm.contact || (Lm.contact = new THREE.MeshBasicMaterial({ color: 0x000000, map: tex, transparent: true, opacity: k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, name: 'prop:contactShadow' }));
+  P.add(m, t(new THREE.PlaneGeometry(w, d), x, 0.014, z, -Math.PI / 2, 0, 0), { uv: 'keep' });
+}
+
 // ------------------------------------------------------------------ props
-export function campusLamp() { // fluted cast-iron post with an acorn globe, ~4.1 m
+export function campusLamp() { // r4-props: cast-iron post on a moulded bell base, fluted shaft with collars, acorn globe on a fitter, ~4.2 m
   const M = materials(), P = new Parts();
-  P.add(M.lampGreen, lathe([[0, 0], [0.2, 0], [0.2, 0.06], [0.17, 0.1], [0.15, 0.24], [0.11, 0.36], [0.1, 0.42], [0.085, 0.5], [0.0, 0.5]], 12));
-  const shaft = new THREE.CylinderGeometry(0.058, 0.07, 2.75, 24, 4, true); const p = shaft.attributes.position;
-  for (let i = 0; i < p.count; i++) { const a = Math.atan2(p.getZ(i), p.getX(i)); const k = 1 + 0.07 * Math.cos(12 * a); p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
-  shaft.computeVertexNormals(); P.add(M.lampGreen, t(shaft, 0, 0.5 + 1.375, 0));
-  P.add(M.lampGreen, torus(0.075, 0.022, 6, 16, 0, 3.27, 0, Math.PI / 2));
-  P.add(M.lampGreen, lathe([[0, 3.25], [0.09, 3.25], [0.11, 3.32], [0.13, 3.36], [0.13, 3.4], [0, 3.4]], 12));
-  P.add(M.lampGlow, lathe([[0, 3.4], [0.11, 3.4], [0.17, 3.48], [0.205, 3.6], [0.2, 3.72], [0.16, 3.84], [0.09, 3.93], [0.0, 3.96]], 18));
-  P.add(M.lampGreen, lathe([[0, 3.92], [0.07, 3.92], [0.09, 3.96], [0.05, 4.0], [0.02, 4.05], [0.035, 4.09], [0.0, 4.13]], 10));
-  return { ...P.build(), collider: { type: 'cyl', r: 0.2, h: 4.1 } };
+  // stepped plinth + bell base with mouldings (cast iron), 0.9 m
+  P.add(M.lampGreen, lathe([[0, 0], [0.235, 0], [0.235, 0.05], [0.215, 0.07], [0.215, 0.12], [0.2, 0.15], [0.17, 0.2], [0.15, 0.3], [0.13, 0.46], [0.115, 0.6],
+    [0.13, 0.63], [0.13, 0.67], [0.105, 0.7], [0.095, 0.82], [0.11, 0.85], [0.11, 0.89], [0.085, 0.92], [0, 0.92]], 14));
+  const shaft = new THREE.CylinderGeometry(0.06, 0.075, 2.3, 24, 3, true); const p = shaft.attributes.position;
+  for (let i = 0; i < p.count; i++) { const a = Math.atan2(p.getZ(i), p.getX(i)); const k = 1 + 0.08 * Math.cos(12 * a); p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
+  shaft.computeVertexNormals(); P.add(M.lampGreen, t(shaft, 0, 0.9 + 1.15, 0));
+  P.add(M.lampGreen, lathe([[0.08, 1.55], [0.095, 1.57], [0.095, 1.62], [0.08, 1.64], [0, 1.64]], 12));       // mid collar
+  P.add(M.lampGreen, lathe([[0.0, 3.16], [0.075, 3.16], [0.1, 3.2], [0.1, 3.24], [0.085, 3.27], [0.12, 3.3], [0.15, 3.36], [0.15, 3.41], [0, 3.41]], 14)); // capital + fitter
+  for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + Math.PI / 4; P.add(M.lampGreen, torus(0.045, 0.012, 4, 8, Math.cos(a) * 0.13, 3.26, Math.sin(a) * 0.13, 0, -a, 0, Math.PI)); } // small scrolls under the fitter
+  P.add(M.lampGlow, lathe([[0, 3.41], [0.12, 3.41], [0.18, 3.48], [0.215, 3.6], [0.215, 3.73], [0.18, 3.86], [0.11, 3.96], [0.0, 3.99]], 16));
+  P.add(M.lampGreen, lathe([[0, 3.95], [0.08, 3.95], [0.1, 3.99], [0.06, 4.03], [0.025, 4.08], [0.04, 4.12], [0.0, 4.17]], 10));       // cap + finial
+  return { ...P.build(), collider: { type: 'cyl', r: 0.24, h: 4.2 } };
 }
 
 export function streetLight() { // galvanised pole with a cobra-head luminaire reaching toward +z (over the street)
@@ -144,42 +156,80 @@ export function bench() { // 1.8 m park bench: wooden slats on three cast-iron f
   }
   for (let i = 0; i < 4; i++) P.add(M.wood, box(1.8, 0.035, 0.085, 0, 0.452, 0.2 - i * 0.105));
   for (let i = 0; i < 3; i++) { const y = 0.56 + i * 0.12, z = -0.27 - i * 0.012; P.add(M.wood, box(1.8, 0.09, 0.03, 0, y, z, -0.18)); }
+  contactShadow(P, 2.3, 0.95, 0, -0.04, 0.5); // r4-props
   return { ...P.build(), collider: { type: 'box', min: [-0.92, 0, -0.36], max: [0.92, 0.92, 0.26] } };
 }
 
-export function trashCan() { // round slatted steel receptacle with a dome lid, 0.95 m
+export function trashCan() { // r4-props: slatted steel receptacle (Victor Stanley style), solid bands, open funnel lid, 0.97 m
   const Lm = L(), M = materials(), P = new Parts();
-  const n = 18, r = 0.29;
-  for (let i = 0; i < n; i++) { const a = i / n * TAU; P.add(Lm.charcoal, box(0.07, 0.8, 0.014, Math.cos(a) * r, 0.47, Math.sin(a) * r, 0, -a + Math.PI / 2)); }
-  P.add(Lm.charcoal, torus(r, 0.016, 5, 24, 0, 0.1, 0, Math.PI / 2));
-  P.add(Lm.charcoal, torus(r, 0.016, 5, 24, 0, 0.84, 0, Math.PI / 2));
-  P.add(M.blackPaint, cyl(0.26, 0.24, 0.78, 14, 0, 0.08, 0, true));                       // liner
-  P.add(Lm.charcoal, cyl(0.22, 0.24, 0.07, 14, 0, 0.0, 0));                               // foot
-  P.add(Lm.charcoal, lathe([[0.0, 0.0], [0.31, 0.0], [0.31, 0.03], [0.27, 0.07], [0.18, 0.12], [0.0, 0.14]], 18, 0, 0.87, 0));
-  P.add(M.blackPaint, cyl(0.12, 0.12, 0.012, 12, 0, 0.993, 0));                           // dark opening
-  return { ...P.build(), collider: { type: 'cyl', r: 0.31, h: 1.0 } };
+  const n = 26, r = 0.3;
+  for (let i = 0; i < n; i++) { const a = i / n * TAU; P.add(Lm.charcoal, box(0.044, 0.7, 0.012, Math.cos(a) * r, 0.47, Math.sin(a) * r, 0, -a + Math.PI / 2)); } // vertical bars
+  const band = (y0, h) => lathe([[r - 0.012, y0], [r + 0.012, y0], [r + 0.014, y0 + 0.01], [r + 0.014, y0 + h - 0.01], [r + 0.012, y0 + h], [r - 0.012, y0 + h], [r - 0.012, y0]], 20);
+  P.add(Lm.charcoal, band(0.0, 0.13));                                                    // base band (sits on the ground)
+  P.add(Lm.charcoal, band(0.43, 0.035));                                                  // waist band
+  P.add(Lm.charcoal, band(0.8, 0.075));                                                   // top band
+  P.add(M.blackPaint, cyl(0.272, 0.265, 0.8, 16, 0, 0.06, 0, true));                       // liner seen through the bars
+  // dome lid with a deep central opening (dark bag inside)
+  P.add(Lm.charcoal, lathe([[0.15, 0.885], [0.15, 0.955], [0.175, 0.975], [0.23, 0.965], [0.285, 0.93], [0.318, 0.895], [0.318, 0.875], [0.0, 0.875]].reverse(), 20));
+  P.add(M.blackPaint, cyl(0.15, 0.15, 0.01, 14, 0, 0.885, 0));                            // bag surface inside the opening
+  contactShadow(P, 0.95, 0.95);
+  return { ...P.build(), collider: { type: 'cyl', r: 0.32, h: 1.0 } };
 }
 
-export function recyclingBin() { // blue recycling bin with a curved lid and front opening
+function recycleLabelTex() { // r4-props: front label for the compactor: recycling arrows + RECYCLE
+  return texCache('recycleLabel', () => canvasTex(256, 384, (g, w, h) => {
+    g.fillStyle = '#1d5ea6'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#f2f4f5'; g.fillRect(18, 150, w - 36, 200);
+    g.strokeStyle = '#1d5ea6'; g.lineWidth = 14; g.lineCap = 'round';
+    const cx = w / 2, cy = 228, R = 52;
+    for (let k = 0; k < 3; k++) { const a0 = k * TAU / 3 - Math.PI / 2 + 0.35, a1 = a0 + TAU / 3 - 0.75; g.beginPath(); g.arc(cx, cy, R, a0, a1); g.stroke();
+      const ax = cx + Math.cos(a1) * R, ay = cy + Math.sin(a1) * R, tx = -Math.sin(a1), ty = Math.cos(a1); g.fillStyle = '#1d5ea6'; g.beginPath(); g.moveTo(ax + tx * 22, ay + ty * 22); g.lineTo(ax + Math.cos(a1) * 20, ay + Math.sin(a1) * 20); g.lineTo(ax - Math.cos(a1) * 20, ay - Math.sin(a1) * 20); g.fill(); }
+    g.fillStyle = '#1d5ea6'; g.font = 'bold 40px Arial'; g.textAlign = 'center'; g.fillText('RECYCLE', cx, 330);
+    g.fillStyle = '#e8eef4'; g.font = 'bold 22px Arial'; g.fillText('BOTTLES  CANS  PAPER', cx, 60);
+  }));
+}
+export function recyclingBin() { // r4-props: solar compactor (BigBelly-style, as on Sproul Plaza): blue body, slanted solar lid, pull-down hopper
   const Lm = L(), M = materials(), P = new Parts();
-  P.add(Lm.recycle, boxY(0.56, 0.86, 0.56, 0, 0.04, 0));
-  P.add(Lm.charcoal, boxY(0.5, 0.04, 0.5, 0, 0, 0));
-  const lid = new THREE.CylinderGeometry(0.28, 0.28, 0.6, 16, 1, false, 0, Math.PI); t(lid, 0, 0.9, 0, 0, 0, Math.PI / 2, 1, 1, 0.5 / 0.28 * 0.5);
-  P.add(Lm.recycle, lid);
-  P.add(M.blackPaint, t(new THREE.CircleGeometry(0.085, 14), 0, 0.98, 0.18, -0.95, 0, 0), { uv: 'keep' });
-  P.add(M.whitePaint, panel(0.26, 0.26, 0, 0.55, 0.282));                                    // label
-  P.add(Lm.recycle, torus(0.06, 0.012, 4, 10, 0, 0.55, 0.29));                              // embossed symbol ring
-  return { ...P.build(), collider: { type: 'box', min: [-0.3, 0, -0.3], max: [0.3, 1.05, 0.3] } };
+  const W = 0.64, D = 0.66, H = 1.12;
+  const sh = new THREE.Shape(); const rr = 0.06; // rounded-corner plan
+  sh.moveTo(-W / 2 + rr, -D / 2); sh.lineTo(W / 2 - rr, -D / 2); sh.quadraticCurveTo(W / 2, -D / 2, W / 2, -D / 2 + rr); sh.lineTo(W / 2, D / 2 - rr); sh.quadraticCurveTo(W / 2, D / 2, W / 2 - rr, D / 2);
+  sh.lineTo(-W / 2 + rr, D / 2); sh.quadraticCurveTo(-W / 2, D / 2, -W / 2, D / 2 - rr); sh.lineTo(-W / 2, -D / 2 + rr); sh.quadraticCurveTo(-W / 2, -D / 2, -W / 2 + rr, -D / 2);
+  const body = new THREE.ExtrudeGeometry(sh, { depth: H - 0.06, bevelEnabled: false, curveSegments: 3 }); body.rotateX(-Math.PI / 2); body.translate(0, 0.06, 0);
+  P.add(Lm.recycle, body);
+  P.add(Lm.charcoal, boxY(W - 0.04, 0.06, D - 0.04, 0, 0, 0));                              // plinth
+  // slanted lid (front low) with the solar panel
+  const lid = new THREE.BufferGeometry(); const yb = H, yf = H + 0.05, yr = H + 0.2;
+  const v = [[-W / 2, yb, D / 2], [W / 2, yb, D / 2], [W / 2, yb, -D / 2], [-W / 2, yb, -D / 2], [-W / 2, yf, D / 2], [W / 2, yf, D / 2], [W / 2, yr, -D / 2], [-W / 2, yr, -D / 2]];
+  const q = (a, b, c, d) => [...v[a], ...v[b], ...v[c], ...v[a], ...v[c], ...v[d]];
+  lid.setAttribute('position', new THREE.Float32BufferAttribute([...q(4, 5, 6, 7), ...q(0, 1, 5, 4), ...q(1, 2, 6, 5), ...q(2, 3, 7, 6), ...q(3, 0, 4, 7)], 3)); lid.computeVertexNormals();
+  P.add(Lm.charcoal, lid);
+  const pan = new THREE.PlaneGeometry(W - 0.1, Math.hypot(D - 0.1, yr - yf) * 0.9); pan.rotateX(-Math.PI / 2 + Math.atan2(yr - yf, D)); pan.translate(0, (yf + yr) / 2 + 0.004, 0);
+  P.add(Lm.solar || (Lm.solar = new THREE.MeshStandardMaterial({ color: 0x1a2340, roughness: 0.25, metalness: 0.5, name: 'prop:solar' })), pan, { uv: 'keep' });
+  // hopper door: recessed frame, handle bar, dark slot; label below
+  P.add(Lm.charcoal, boxY(W - 0.12, 0.3, 0.02, 0, H - 0.4, D / 2 + 0.005));
+  P.add(M.blackPaint, boxY(W - 0.2, 0.05, 0.012, 0, H - 0.17, D / 2 + 0.016));
+  P.add(Lm.steel, t(new THREE.CylinderGeometry(0.016, 0.016, W - 0.24, 8), 0, H - 0.3, D / 2 + 0.06, 0, 0, Math.PI / 2));
+  for (const x of [-(W - 0.26) / 2, (W - 0.26) / 2]) P.add(Lm.steel, box(0.02, 0.02, 0.06, x, H - 0.3, D / 2 + 0.035));
+  const lm = Lm.recLabel || (Lm.recLabel = new THREE.MeshStandardMaterial({ map: recycleLabelTex(), roughness: 0.55, name: 'prop:recycleLabel' }));
+  P.add(lm, panel(W - 0.12, 0.6, 0, 0.42, D / 2 + 0.004), { uv: 'keep' });
+  contactShadow(P, W + 0.4, D + 0.4);
+  return { ...P.build(), collider: { type: 'box', min: [-W / 2 - 0.02, 0, -D / 2 - 0.02], max: [W / 2 + 0.02, H + 0.22, D / 2 + 0.08] } };
 }
 
-export function bikeRack() { // galvanised inverted-U, 0.75 m wide, 0.9 m tall (bikes lock along z)
+export function bikeRack() { // r4-props: galvanised inverted-U, 0.75 m wide, 0.9 m tall, tight top bends, bolted base plates
   const Lm = L(), P = new Parts();
-  const pts = [[-0.375, 0, 0], [-0.375, 0.525, 0]];
-  for (let i = 1; i < 12; i++) { const a = Math.PI - i / 12 * Math.PI; pts.push([Math.cos(a) * 0.375, 0.525 + Math.sin(a) * 0.375, 0]); }
-  pts.push([0.375, 0.525, 0], [0.375, 0, 0]);
-  P.add(Lm.galv, new THREE.TubeGeometry(polyCurve(pts), 28, 0.03, 8, false));
-  for (const x of [-0.375, 0.375]) P.add(Lm.galv, cyl(0.065, 0.065, 0.012, 10, x, 0, 0));
-  return { ...P.build(), collider: { type: 'box', min: [-0.41, 0, -0.04], max: [0.41, 0.93, 0.04] } };
+  const w = 0.375, top = 0.875, br = 0.13; const pts = [[-w, 0.0, 0], [-w, top - br, 0]];
+  for (let i = 1; i < 6; i++) { const a = Math.PI - i / 6 * (Math.PI / 2); pts.push([-w + br + Math.cos(a) * br, top - br + Math.sin(a) * br, 0]); }
+  pts.push([-w + br, top, 0], [w - br, top, 0]);
+  for (let i = 1; i < 6; i++) { const a = Math.PI / 2 - i / 6 * (Math.PI / 2); pts.push([w - br + Math.cos(a) * br, top - br + Math.sin(a) * br, 0]); }
+  pts.push([w, top - br, 0], [w, 0.0, 0]);
+  P.add(Lm.galv, new THREE.TubeGeometry(polyCurve(pts), 30, 0.03, 8, false));
+  for (const x of [-w, w]) {
+    P.add(Lm.galv, boxY(0.15, 0.012, 0.15, x, 0, 0));
+    for (const [dx, dz] of [[-0.05, -0.05], [0.05, -0.05], [-0.05, 0.05], [0.05, 0.05]]) P.add(Lm.galv, cyl(0.011, 0.011, 0.012, 6, x + dx, 0.012, dz));
+  }
+  contactShadow(P, 1.05, 0.35, 0, 0, 0.4);
+  return { ...P.build(), collider: { type: 'box', min: [-0.41, 0, -0.08], max: [0.41, 0.93, 0.08] } };
 }
 
 export function parkedBike() { // city bike on its kickstand, front wheel toward +z
