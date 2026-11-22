@@ -212,14 +212,18 @@ export async function miningPool(R = 7.5) { // granite-coped round pool, dark wa
   B.flush(g, { name: 'mining-pool' });
   const water = new THREE.Mesh(new THREE.CircleGeometry(R + 0.01, 96).rotateX(-Math.PI / 2).translate(0, top - 0.12, 0), K.water);
   water.name = 'mining-pool:water'; water.receiveShadow = true; g.add(water); // plain still water; the water pass can restyle meshes named *:water
-  // Rondo II: four polished stainless rings intertwined, resting just on the surface
-  const S = new Bag(), y = top - 0.12;
-  const rings = [[0.0, 0.0, 1.9], [Math.PI / 2, 0.55, 1.9], [0.9, 1.45, 1.75], [-0.7, 2.4, 1.75]];
-  for (const [rx, ry, Rr] of rings) {
-    const t = new THREE.TorusGeometry(Rr, 0.075, 12, 96); t.rotateX(rx + Math.PI / 2 * 0.0); t.rotateY(ry); t.rotateZ(0.35);
-    t.computeBoundingBox(); t.translate(0, y - t.boundingBox.min.y - 0.12, 0); S.add(K.steel, t, { uv: false }); // dips just under the surface
+  // Rondo II: four polished stainless rings intertwined, resting just on the surface (hi/lo LOD: the rings are most of the tris)
+  const y = top - 0.12, rings = [[0.0, 0.0, 1.9], [Math.PI / 2, 0.55, 1.9], [0.9, 1.45, 1.75], [-0.7, 2.4, 1.75]];
+  const lod = new THREE.LOD(); lod.name = 'statue:rondo-ii';
+  for (const [rs, ts, dist] of [[12, 96, 0], [6, 40, 60]]) {
+    const S = new Bag(), lvl = new THREE.Group();
+    for (const [rx, ry, Rr] of rings) {
+      const t = new THREE.TorusGeometry(Rr, 0.075, rs, ts); t.rotateX(rx); t.rotateY(ry); t.rotateZ(0.35);
+      t.computeBoundingBox(); t.translate(0, y - t.boundingBox.min.y - 0.12, 0); S.add(K.steel, t, { uv: false }); // dips just under the surface
+    }
+    S.flush(lvl, { name: 'rondo-ii' }); lod.addLevel(lvl, dist);
   }
-  S.flush(g, { name: 'rondo-ii' });
+  lod.addLevel(new THREE.Object3D(), 700); g.add(lod);
   return g;
 }
 
