@@ -51,6 +51,9 @@ export const SITES = [
   // the paved plaza (they grew straight out of the concrete)
   { type: 'lawn', pts: MF(rect(17.5, 27.5, 31, 33.5)) },
   ...[[47, 16], [41, 16], [39, 42], [37, 45], [42, 48]].map(([u, v]) => ({ type: 'dirt', pts: MF(rect(u - 1.1, v - 1.1, u + 1.1, v + 1.1)) })),
+  // [r5-east] Sather Tower's terrace is red brick around the tower and out to the head of the west stair (CC0 photos
+  // "Campanile Way from base of Sather Tower"); the bake had lawn and loose path blobs right up to the tower base
+  { type: 'paved', brick: true, pts: [[-11.0, -9.5], [12.5, -11.5], [15.0, 13.5], [-5.5, 17.0], [-11.0, 11.0], [-11.0, 9.4], [-11.6, 9.4], [-11.6, 1.9], [-11.0, 1.9]] },
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
@@ -85,7 +88,9 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
     if (special && gt.snx) { // 1 m special ids (brick/granite pavers, turf) are cleared under painted surfaces
       const snx = gt.snx, snz = gt.snz;
       for (let z = Math.max(0, Math.floor(bz0 - z0)); z <= Math.min(snz - 1, Math.ceil(bz1 - z0)); z++) for (let x = Math.max(0, Math.floor(bx0 - x0)); x <= Math.min(snx - 1, Math.ceil(bx1 - x0)); x++) {
-        const k = z * snx + x; const v = special[k]; if (v >= 4 && v <= 6 && sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0) special[k] = 0;
+        const k = z * snx + x; const v = special[k]; const ins = sdPoly(P, x0 + x + 0.5, z0 + z + 0.5) > 0;
+        if (s.brick && ins) special[k] = 4; // [r5-east] brick pavers (special id 4)
+        else if (v >= 4 && v <= 6 && ins) special[k] = 0;
       }
     }
   }
