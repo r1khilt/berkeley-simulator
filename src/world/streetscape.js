@@ -65,7 +65,7 @@ function mergeRibbons(list) {
   const n = g.attributes.normal; for (let i = 0; i < n.count; i++) { if (n.getY(i) < 0) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i)); }
   g.computeBoundingSphere(); return g;
 }
-export async function buildStreetscape({ scene, vectors, pois, heightAt, physics, camPos, rect }) {
+export async function buildStreetscape({ scene, vectors, pois, heightAt, physics, camPos, rect, landmarks }) {
   const group = new THREE.Group(); group.name = 'streetscape'; scene.add(group);
   const M = materials();
   let PR = null; try { PR = await import('../props/props.js'); } catch (e) { console.warn('props unavailable', e); }
@@ -117,6 +117,15 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   }
   // scooters & news racks near Telegraph/Bancroft
   for (const p of (pois.named || [])) { if (Math.random() < 0.12 && (p.k === 'cafe' || p.k === 'restaurant' || p.k === 'fast_food')) { const n = allRoadIdx.nearest(p.p[0], p.p[1], 25); if (n) { const nx = -n.dz, nz = n.dx, l = Math.hypot(nx, nz) || 1; const s = Math.sign((p.p[0] - n.px) * nx + (p.p[1] - n.pz) * nz) || 1; const w = (n.L.w || 8) / 2 + 1.0; const x = n.px + nx / l * w * s, z = n.pz + nz / l * w * s; (Math.random() < 0.6 ? scoot : news).add(x, y(x, z), z, Math.random() * 6); } } }
+  // [r4-sweep-outer] landmark modules load after this runs, so lamps/poles/benches from OSM points and the procedural
+  // placement above could stand inside a landmark's footprint (lamp posts poking through Memorial Stadium, dorms, frats).
+  // Drop every scattered prop inside (or within 0.6 m of) a hand-built landmark footprint; open-space landmarks
+  // (fields, courts, schoolyards, parks) keep theirs.
+  if (landmarks && landmarks.length) {
+    const inLm = landmarkTester(landmarks.filter((l) => !/field|courts|schoolyard|diamond|park/.test(l.id)).flatMap((l) => l.footprints || []), 0.6);
+    for (const s of scatters) s.items = s.items.filter((it) => !inLm(it[0], it[2]));
+    for (let i = lampPts.length - 1; i >= 0; i--) if (inLm(lampPts[i][0], lampPts[i][1])) lampPts.splice(i, 1);
+  }
   for (const s of scatters) s.finalize(group);
   // ---------- road markings
   const markY = (x, z) => heightAt(x, z);
@@ -178,6 +187,19 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
     group, scatters, lampTex, lampPts,
     update(cp) { if (this._lp && cp.distanceToSquared(this._lp) < 16) return; this._lp = cp.clone(); for (const s of scatters) s.update(cp); },
   };
+}
+// [r4-sweep-outer] point-in-footprint test over landmark polygons (spatial hash, 32 m cells); true also within `pad` m of an edge
+function landmarkTester(polys, pad = 0) {
+  const C = 32, g = new Map(); const key = (i, j) => i * 100003 + j;
+  polys.forEach((fp, k) => { if (!fp || fp.length < 3) return; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of fp) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    for (let i = Math.floor((x0 - pad) / C); i <= Math.floor((x1 + pad) / C); i++) for (let j = Math.floor((z0 - pad) / C); j <= Math.floor((z1 + pad) / C); j++) { const kk = key(i, j); if (!g.has(kk)) g.set(kk, []); g.get(kk).push(k); } });
+  return (x, z) => { const list = g.get(key(Math.floor(x / C), Math.floor(z / C))); if (!list) return false;
+    for (const k of list) { const r = polys[k]; let c = false; let dmin = Infinity;
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j];
+        if (((a[1] > z) !== (b[1] > z)) && (x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])) c = !c;
+        if (pad > 0) { const ex = b[0] - a[0], ez = b[1] - a[1], L2 = ex * ex + ez * ez || 1; const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (z - a[1]) * ez) / L2)); dmin = Math.min(dmin, Math.hypot(a[0] + ex * t - x, a[1] + ez * t - z)); } }
+      if (c || dmin < pad) return true; }
+    return false; };
 }
 function physicsInside(ph, x, z) { // crude: is (x,z) within 0.6 m of a wall segment
   const r = ph.resolve(x, z, 0.6, ph.heightAt(x, z), 2); return r[2];

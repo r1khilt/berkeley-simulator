@@ -138,7 +138,7 @@ async function boot() {
       const g = cx2.createRadialGradient(x, z, 0, x, z, r); g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},0.55)`); g.addColorStop(0.7, `rgba(${col[0]},${col[1]},${col[2]},0.25)`); g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`); cx2.fillStyle = g; cx2.beginPath(); cx2.arc(x, z, r, 0, 7); cx2.fill(); }
     const lt = new THREE.CanvasTexture(cv); lt.flipY = false; lt.minFilter = THREE.LinearFilter; lt.generateMipmaps = false; lt.colorSpace = THREE.NoColorSpace; lt.needsUpdate = true; terrain.uniforms.uLeaf.value = lt; }
   let streets = null;
-  try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step } }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
+  try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step }, landmarks: manifest.landmarks /* r4-sweep-outer: keep props out of landmark footprints */ }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
   BS.streets = streets; phase('streetscape');
   // a few real point lights follow the player through the nearest lamps at night
   const lampLights = []; for (let i = 0; i < (qs.get('nolamps') ? 0 : 6); i++) { const L = new THREE.PointLight(0xffd6a0, 0, 26, 2); L.castShadow = false; scene.add(L); lampLights.push(L); }
