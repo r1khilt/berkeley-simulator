@@ -93,9 +93,15 @@ export async function build(ctx) {
           for (int i = 0; i < ${NJ}; i++) { float a = float(i) * ${(Math.PI * 2 / NJ).toFixed(6)} + 0.2; vec2 c = vec2(cos(a), sin(a)) * ${RJ.toFixed(3)}; vec2 d = vRipXZ - c; float r = length(d);
             g += (d / max(r, 1e-3)) * cos(r * 16.0 - uTime * 7.0) * exp(-r * 1.8) * 0.16; }
           g += vec2(sin(vRipXZ.x * 3.1 + uTime * 1.3), cos(vRipXZ.y * 2.7 - uTime * 1.1)) * 0.03;
-          normal = normalize(normal + (viewMatrix * vec4(g.x, 0.0, g.y, 0.0)).xyz); }`);
+          normal = normalize(normal + (viewMatrix * vec4(g.x, 0.0, g.y, 0.0)).xyz); }`)
+      // r4-sweep-central2: the env map is sky-only, so at eye level (grazing view, Fresnel ~1) the pool mirrored bright
+      // horizon sky and read as a pale floor. Below ~25 deg the real pool reflects Sproul, MLK and the plaza trees, so
+      // reflections that point low are darkened to a dim green-grey (scaled from the sky radiance, so dusk/night follow).
+      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+        { vec3 rw = normalize((vec4(reflect(-geometryViewDir, geometryNormal), 0.0) * viewMatrix).xyz);
+          radiance *= mix(vec3(0.16, 0.19, 0.18), vec3(1.0), smoothstep(0.12, 0.5, rw.y)); }`);
   };
-  waterMat.customProgramCacheKey = () => 'ludwigWater3';
+  waterMat.customProgramCacheKey = () => 'ludwigWater4';
   const water2 = new THREE.Mesh(new THREE.CircleGeometry(RIM_IN + 0.01, 72).rotateX(-Math.PI / 2), waterMat);
   water2.position.set(cx, WATER_Y, cz); water2.name = 'ludwig-water'; water2.receiveShadow = true; water2.renderOrder = 1;
   root.add(water2);

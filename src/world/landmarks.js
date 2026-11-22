@@ -4,6 +4,7 @@ import { materials, U, boxUV } from '../materials.js';
 import { loadJSON } from '../data.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyInteriorGlass } from './interiors.js'; // furnished rooms behind landmark window glass
+import { weatherLandmark } from './pbr.js'; // r4-sweep-central2: consistent base grime on mixed façades
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
@@ -40,6 +41,7 @@ export class LandmarkManager {
       if (!/[?      try { applyInteriorGlass(obj,]nointerior/.test(location.search)) try { applyInteriorGlass(obj, { id: l.id, name: (mod.info && mod.info.name) || l.name, tag: packet.footprints && packet.footprints[0] && packet.footprints[0].tags && packet.footprints[0].tags.building, M: this.M }); } catch (e) { console.warn('interiors', l.id, e); } // window interiors
       obj.traverse((o) => { if (o.isMesh) { if (o.castShadow !== false) o.castShadow = true; o.receiveShadow = true; } });
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
+      try { weatherLandmark(obj); } catch (e) { console.warn('weather', l.id, e); } // r4-sweep-central2: plain masonry gets base grime too
       this.setupMaterials && this.setupMaterials(obj);
       this.scene.add(obj);
       const tag = 'lm:' + l.id, ph = this.physics;

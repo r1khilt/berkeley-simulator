@@ -198,10 +198,28 @@ export function initPBR(quality = 'high') {
 // Installed per material by main.js setupMaterials (works for clones; idempotent).
 import { noiseTexture } from './noiseTex.js';
 export function isPBRMat(m) { if (!PBR_ENABLED || !m || !m.map) return false; for (const k in PBR.maps) if (PBR.maps[k].map === m.map) return true; return false; }
-export function pbrWeather(mat) {
+// r4-sweep-central2: landmark façades mix PBR-mapped and plain materials (Hesse: mapped walls/pilasters over a plain
+// plinth; Hertz the reverse) and only the mapped ones got base grime, so the band showed as khaki stripes on some members
+// only. world/landmarks.js now calls weatherLandmark() per landmark: plain masonry-like materials (opaque, rough,
+// non-metal, not foliage) get the same band, on vertical faces only (flat ground-level paving was tuned without it).
+// The grime tint is neutral grey for both paths (was a warm khaki multiply).
+export function weatherLandmark(root) {
+  if (!PBR_ENABLED) return;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (!m || !m.userData || m.userData.pbrWeather || isPBRMat(m)) continue; // mapped ones: setupMaterials -> pbrWeather
+      if (!(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial) || m.transparent || m.alphaTest > 0 || m.alphaMap) continue;
+      if ((m.roughness ?? 1) < 0.45 || (m.metalness ?? 0) >= 0.3) continue;
+      if (m.color && m.color.g > m.color.r * 1.15 && m.color.g > m.color.b) continue; // foliage / planting
+      pbrWeather(m, true);
+    }
+  });
+}
+export function pbrWeather(mat, plain = false) {
   if (mat && mat.userData && mat.userData.groundTurf) { turfWorld(mat); return; } // r4-ground: shared turf -> real lawn texture
-  if (!isPBRMat(mat) || mat.userData.pbrWeather) return;
-  mat.userData.pbrWeather = 1;
+  if (!(plain || isPBRMat(mat)) || mat.userData.pbrWeather) return;
+  mat.userData.pbrWeather = plain ? 2 : 1;
   const k0 = mat.customProgramCacheKey ? String(mat.customProgramCacheKey()) : '';
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = function (sh, r) {
@@ -221,8 +239,13 @@ export function pbrWeather(mat) {
    float hgW = vWPW.y - groundAt(vWPW.xz);
    float nW = texture(uNoiseW, vec2(vWPW.x + vWPW.z, vWPW.y * 0.2) * 0.35).r;
    float grW = (1.0 - smoothstep(0.05, 0.4 + 0.7 * nW, hgW)) * step(-1.5, hgW);
-   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.64, 0.6, 0.54) + vec3(0.01, 0.008, 0.006), grW * 0.6);
+   #ifdef PBR_PLAIN
+   { vec3 fnW = cross(dFdx(vWPW), dFdy(vWPW)); grW *= 1.0 - smoothstep(0.5, 0.8, abs(fnW.y) / max(length(fnW), 1e-8)); }
+   #endif
+   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.6 + vec3(0.008), grW * 0.6);
+   #ifndef PBR_PLAIN
    diffuseColor.rgb *= 0.95 + 0.1 * texture(uNoiseW, vWPW.xz * 0.011 + vWPW.y * 0.004).r;
+   #endif
    #ifdef PBR_ASHLAR
    { vec2 bu = vMapUv * vec2(1.0, 2.0); float rw = floor(bu.y); vec2 cell = vec2(floor(bu.x + mod(rw, 2.0) * 0.5), rw);
      vec3 p3 = fract(vec3(cell.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); float hb = fract((p3.x + p3.y) * p3.z);
@@ -231,7 +254,8 @@ export function pbrWeather(mat) {
  }`);
   };
   if (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map) { mat.defines = Object.assign({}, mat.defines, { PBR_ASHLAR: '' }); }
-  mat.customProgramCacheKey = () => k0 + '|pbrw' + (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map ? 'a' : '');
+  if (plain) mat.defines = Object.assign({}, mat.defines, { PBR_PLAIN: '' });
+  mat.customProgramCacheKey = () => k0 + '|pbrw' + (PBR.maps.ashlar && mat.map === PBR.maps.ashlar.map ? 'a' : '') + (plain ? 'p' : '');
   mat.needsUpdate = true;
 }
 
