@@ -75,8 +75,10 @@ void groundShadePBR(vec2 w, float dist) {
   // ---- lawn: irrigated turf with dry patches and faint mowing stripes
   if (wG > 0.001) {
     PS l = gTapT(w, gWP, 1.0, 2.0, L_LAWN, kIso, near);
-    float dryP = smoothstep(0.6, 0.85, n0.r + (n1.b - 0.5) * 0.2) * 0.35 + smoothstep(0.7, 0.98, 1.0 - lush) * 0.3;
-    if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP + (d.h - l.h) * 0.4, 0.0, 1.0)); }
+    // r4-ground: late-November irrigated lawn: only broad, soft dry areas. The old height-driven term stamped the 2 m
+    // dry-grass texture pattern as repeated brown blotches wherever lushness was low (most re-labelled lawn).
+    float dryP = smoothstep(0.62, 0.9, n0.r + (n1.b - 0.5) * 0.2) * 0.3 + smoothstep(0.75, 1.0, 1.0 - lush) * 0.12 * n0.g;
+    if (dryP > 0.02) { PS d = gTapT(w, gWP, 0.97, 2.0, L_DRYGRASS, 1.0 - kIso, near); l = pbrMix(l, d, clamp(dryP * (1.0 + (d.h - l.h) * 1.2), 0.0, 1.0)); }
     l.c *= 0.84 + 0.3 * n0.g;
     float mow = step(0.5, fract(dot(w, vec2(0.7071, 0.7071)) / 5.0)); l.c *= mix(1.0, 0.95 + 0.1 * mow, (1.0 - fade) * 0.7);
     // r4-ground: crisp edges. A thin spade-cut line where lawn meets a planted bed and a faint shadow line along paving

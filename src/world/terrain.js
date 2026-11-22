@@ -65,7 +65,7 @@ export class CoreTerrain {
       uCoreSize: { value: new THREE.Vector2(c.nx, c.nz) },
       uGround: { value: new THREE.Vector4(meta.core.x0, meta.core.z0, gt.nx * gt.step, gt.nz * gt.step) },
       uAuxRect: { value: new THREE.Vector4(meta.core.x0, meta.core.z0, ax.nx * ax.step, ax.nz * ax.step) },
-      uNight: U.uNight, uTime: U.uTime,
+      uNight: U.uNight, uTime: U.uTime
     };
     pbrUniforms(this.uniforms); // gfx-materials: texture arrays + on/off switch
     PBR.uGH.value = hTex; PBR.uGHRect.value.set(c.x0 + 0.5 * c.step, c.z0 + 0.5 * c.step, c.step, 0); PBR.uGHSize.value.set(c.nx, c.nz);
