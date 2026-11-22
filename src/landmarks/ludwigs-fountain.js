@@ -56,8 +56,8 @@ export async function build(ctx) {
   const gMin = Math.min(...Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return groundAt(cx + RIM_OUT * Math.cos(a), cz + RIM_OUT * Math.sin(a)); }));
   const gMax = Math.max(...Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return groundAt(cx + (RIM_OUT + 1.1) * Math.cos(a), cz + (RIM_OUT + 1.1) * Math.sin(a)); }));
   const main = new Bucket(boxUV);
-  // r4-sweep: cool pale-grey exposed-aggregate concrete (photo ~#B8B4AC); the warm tan read as a generic planter
-  const rimMat = M.concrete.clone(); rimMat.color.set(0xd6d3cc); rimMat.roughness = 0.88; rimMat.name = 'ludwigConcrete';
+  // r4-sweep: rim colour kept (a cool grey matched the photo but merged with the grey paving in-game)
+  const rimMat = M.concrete.clone(); rimMat.color.set(0xd8cab2); rimMat.roughness = 0.88; rimMat.name = 'ludwigConcrete';
   const stainMat = M.concrete.clone(); stainMat.color.set(0xa99d89); stainMat.name = 'ludwigStain';
   // ring with eased (rounded) arrises on both top edges; outer face runs 1 m below grade so it never floats on the slope
   const e = 0.05;
