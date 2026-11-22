@@ -23,6 +23,7 @@ for (let i = 0; i < NST; i++) { const h = TOPH - STEP_H * (i + 1); if (h <= 0) c
 const groundAt = (px, pz, maxY = Infinity) => { let y = 0;
   if (Math.abs(px) < 2) { if (pz <= Z0 && pz > topZ0) { const i = Math.min(NST - 1, Math.floor((Z0 - pz) / STEP_D)); y = STEP_H * (i + 1); } else if (pz <= topZ0 && pz > topZ1) y = TOPH; else if (pz <= topZ1 && pz > topZ1 - STEP_D * NST) { const i = Math.floor((topZ1 - pz) / STEP_D); y = TOPH - STEP_H * (i + 1); } }
   return { y: y <= maxY ? y : 0, on: null }; };
+window.BSIM = { renderer }; // the player body's Rocketbox loader needs the renderer (KTX2 textures)
 const camera = new THREE.PerspectiveCamera(+(qs.get('fov') || 60), W / H, 0.05, 300);
 // ---- a small copy of the player controller (walk / bike / fly) around the real Avatar
 const av = new Avatar({}); scene.add(av.root);

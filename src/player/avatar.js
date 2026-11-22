@@ -48,14 +48,12 @@ export class Avatar {
     this._people = { A, extra, Character, life, RB, rbCache: {} };
     await this._buildBody();
   }
-  // one Rocketbox avatar, loaded and prepared on its own (cached per id)
+  // one Rocketbox avatar, loaded and prepared on its own (cached per id; loadRocketbox doesn't cache {only} loads)
   _rbAvatar(id) {
     const P = this._people; if (P.rbCache[id]) return P.rbCache[id];
-    const e = AVATARS.find((a) => a.id === id); const RB = P.RB;
     return (P.rbCache[id] = (async () => {
-      const [{ GLTFLoader }, { MeshoptDecoder }] = await Promise.all([import('three/examples/jsm/loaders/GLTFLoader.js'), import('three/examples/jsm/libs/meshopt_decoder.module.js')]);
-      const loader = RB.getLoader ? RB.getLoader() : new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-      const g = await loader.loadAsync(RB_BASE + e.file); return RB.prepAvatar(e, g, P.A);
+      let r = null; for (let i = 0; i < 100 && !(r = window.BSIM && (window.BSIM.renderer || (window.BSIM.composer && window.BSIM.composer.renderer))); i++) await new Promise((res) => setTimeout(res, 100)); // KTX2 textures need the renderer
+      const list = await P.RB.loadRocketbox(P.A, { only: [id], renderer: r }); if (!list || !list[0]) throw new Error('rocketbox avatar ' + id + ' missing'); return list[0];
     })());
   }
   async _buildBody() {

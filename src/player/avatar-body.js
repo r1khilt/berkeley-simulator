@@ -8,6 +8,7 @@
 //     this file retargets it: pelvis + spine copied, hands and feet IK'd onto the proxy's wrists / ankles;
 //   - layers: turn bank, accel lean, head looks where the camera looks, foot IK onto steps and slopes.
 import * as THREE from 'three';
+import { Character } from '../people/character.js'; // its arms-in layer is reused for the (retargeted) sprint
 
 const BASE = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/people/';
 const UAL_LEG = 0.4003 + 0.4295; // UAL mannequin thigh + shin (clip strides scale with leg length)
@@ -89,6 +90,17 @@ export class PlayerBody {
   // gait loops: phase of the left foot's furthest-forward point (so walk / jog / sprint blend in step); seated pelvis offset
   _calibrate(inv) {
     const c = this.c, A = this.A, b = this.b; const solo = (n, t) => { for (const k in A) { const a = A[k]; a.setEffectiveWeight(k === n ? 1 : 0); a.enabled = k === n; } A[n].time = t; this.mixer.update(0); c.root.updateMatrixWorld(true); };
+    // natural ground speed of each gait loop on THIS body (Rocketbox's own mocap and the UAL retargets differ): the stance
+    // foot's backward speed relative to the body while the toe is down
+    this.gait = {};
+    for (const n of ['Walk_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop']) { if (!A[n]) continue; const d = A[n].getClip().duration, N = 72; const ys = [], zs = [];
+      for (let i = 0; i < N; i++) { solo(n, (i / N) * d); const B0 = b.ball_l.getWorldPosition(v1).applyMatrix4(inv), P0 = b.pelvis.getWorldPosition(v2).applyMatrix4(inv); ys.push(B0.y); zs.push(B0.z - P0.z); }
+      // stance = toe within 5.5 cm of its lowest and the foot travelling back: mean speed over it (mocap speed wobbles within a step)
+      const ymin = Math.min(...ys); let dz = 0, dtt = 0; for (let i = 0; i < N; i++) { const j = (i + 1) % N; const z = zs[j] - zs[i]; if (ys[i] < ymin + 0.055 && ys[j] < ymin + 0.055 && z > 0) { dz += z; dtt += d / N; } }
+      const med = dtt > 0 ? dz / dtt : 0; const fb = GAIT[n] * this.k;
+      const lim = { Walk_Loop: [0.5, 2.3], Jog_Fwd_Loop: [1.8, 7.5], Sprint_Loop: [4.5, 11] }[n];
+      this.gait[n] = med >= lim[0] && med <= lim[1] ? med : fb; }
+    if (this.gait.Sprint_Loop && this.gait.Jog_Fwd_Loop && this.gait.Sprint_Loop < this.gait.Jog_Fwd_Loop + 1) this.gait.Sprint_Loop = this.gait.Jog_Fwd_Loop + 1.5;
     this.strike = {};
     for (const n of ['Walk_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop']) { if (!A[n]) continue; const d = A[n].getClip().duration; let best = 1e9, bt = 0;
       for (let i = 0; i < 64; i++) { const t = (i / 64) * d; solo(n, t); const z = v1.copy(b.foot_l.getWorldPosition(v1)).applyMatrix4(inv).z - b.pelvis.getWorldPosition(v2).applyMatrix4(inv).z; if (z < best) { best = z; bt = t; } }
@@ -127,7 +139,7 @@ export class PlayerBody {
       if (!ground) { if (this.jumpT >= 0) this.jumpT += dt; else this.fallT += dt; }
       if (ground && !this.prevGround) { // touch-down: dip harder the faster we come down
         const impact = Math.max(0, -this.vyPrev); const big = (st.airTime || 0) > 0.25 || this.jumpT >= 0;
-        if (big) { this.landT = 0; this.landW = clamp((impact - 2.5) / 9, 0.18, 1) * (this.spd > 2 ? 0.55 : 1); }
+        if (big) { this.landT = 0; this.landW = clamp((impact - 2.5) / 9, 0.22, 1) * (this.spd > 2 ? 0.75 : 1); }
         this.jumpT = -1; this.fallT = 0; }
       const wantAir = !ground && (this.jumpT >= 0 || this.fallT > 0.16);
       this.airK += ((wantAir ? 1 : 0) - this.airK) * damp(wantAir ? (this.jumpT >= 0 ? 22 : 9) : 18, dt);
@@ -135,7 +147,7 @@ export class PlayerBody {
     this.prevGround = ground; this.vyPrev = vy;
     const groundK = 1 - this.airK;
     // ---- locomotion blend space (also the base under plugin modes / landing)
-    const k = this.k, vW = GAIT.Walk_Loop * k, vJ = GAIT.Jog_Fwd_Loop * k, vS = GAIT.Sprint_Loop * k;
+    const G = this.gait || {}, vW = G.Walk_Loop || GAIT.Walk_Loop * this.k, vJ = G.Jog_Fwd_Loop || GAIT.Jog_Fwd_Loop * this.k, vS = G.Sprint_Loop || GAIT.Sprint_Loop * this.k;
     const v = onFoot ? this.spd : 0;
     let wI = 0, wW = 0, wJ = 0, wS = 0;
     if (v < vW) { wW = sstep(0.04, 0.55, v); wI = 1 - wW; } // idle -> walk: the walk takes over by ~0.5 m/s (played slower)
@@ -204,6 +216,8 @@ export class PlayerBody {
     }    c.root.updateMatrixWorld(true);
     // ---- procedural layers
     if (footK > 0.5 && this.c._armsIn) this._armsIn(this.spd > 3 ? 'jog' : 'walk'); // people code: pull hanging arms in toward the body
+    if (footK * wS > 0.25) Character.prototype._armsIn.call(this.c, 'jog'); // the UAL sprint flares the elbows on Rocketbox bodies
+    if (this.airK > 0.2 && footK < 0.8) this._airArms(this.airK * (1 - this.flyK) * 0.55); // take-off flings the arms out stiffly: soften
     if ((footK > 0.01 || this.airK > 0.01) && !DBG.includes('nolean')) this._lean(dt, yawRate, footK + this.airK * 0.5);
     if (this.flyK > 0.5 && this.flyFast > 0.3) this._superman(this.flyFast * this.flyK);
     if (this.flyK > 0.05 && this.flyFast < 0.7) this._hover(this.flyK * (1 - this.flyFast));
@@ -215,6 +229,7 @@ export class PlayerBody {
     this.setGrip(mode === 'bike' || mode === 'scooter' || mode === 'horse' ? 1 : 0);
     if (this.c.pack) this._pack(); // Rocketbox characters carry a rigid backpack placed after the pose
   }
+  _airArms(k) { const c = this.c, b = this.b; const d = new THREE.Vector3(); for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; c.aim(b['upperarm_' + s], b['lowerarm_' + s], this.dw(sx * 0.62, -0.62, -0.3, d), k); c.aim(b['lowerarm_' + s], b['hand_' + s], this.dw(sx * 0.35, -0.2, -0.9, d), k); } }
   _armsIn(mode) { const c = this.c; if (c.phoneK == null) c.phoneK = 0; c._armsIn(mode); }
   // RBCharacter's backpack (same placement as rocketbox.js, which only runs inside the NPC update)
   _pack() {
@@ -296,7 +311,7 @@ export class PlayerBody {
     const B = (x, y, z) => d.set(0, 0, 0).addScaledVector(right, x).addScaledVector(head, y).addScaledVector(back, z).normalize();
     c.aim(b.upperarm_r, b.lowerarm_r, B(0.1, 1, -0.12), k); c.aim(b.lowerarm_r, b.hand_r, B(0.02, 1, -0.05), k);
     c.aim(b.upperarm_l, b.lowerarm_l, B(-0.25, -1, 0.15), k); c.aim(b.lowerarm_l, b.hand_l, B(-0.15, -1, 0.2), k);
-    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; c.aim(b['thigh_' + s], b['calf_' + s], B(sx * 0.05, -1, 0.04), k * 0.7); c.aim(b['calf_' + s], b['foot_' + s], B(sx * 0.03, -1, 0.15), k * 0.7); c.aim(b['foot_' + s], b['ball_' + s], B(0, -1, -0.25), k * 0.6); }
+    for (const s of ['l', 'r']) { const sx = s === 'l' ? -1 : 1; c.aim(b['thigh_' + s], b['calf_' + s], B(sx * 0.05, -1, 0.02), k * 0.95); c.aim(b['calf_' + s], b['foot_' + s], B(sx * 0.03, -1, 0.1), k * 0.95); c.aim(b['foot_' + s], b['ball_' + s], B(0, -1, -0.2), k * 0.8); }
     c.aim(b.neck_01, b.Head, B(0, 0.75, 0.66), k * 0.8); // look ahead, not at the ground
   }
   // hover: upright float, legs together and a little bent, toes down, arms loose off the sides
