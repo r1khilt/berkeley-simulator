@@ -60,7 +60,7 @@ const P = {
 const ALIAS = { fly: 'drone', flying: 'drone', cycle: 'bike', bicycle: 'bike', lime: 'scooter', 'e-scooter': 'scooter', escooter: 'scooter', scooters: 'scooter', hover: 'hoverboard', board: 'hoverboard', horseback: 'horse', ride: 'horse', grapple: 'hook', grappling: 'hook', grapplinghook: 'hook', 'grappling-hook': 'hook', skateboard: 'skate', veo: 'scooter', drive: 'car', settings: 'gear', close: 'x' };
 export function hasIcon(name) { const k = String(name || '').toLowerCase(); return !!(P[name] || P[k] || P[ALIAS[k]]); }
 export function icon(name, cls = '') {
-  if (typeof name === 'string' && name.trim().startsWith('<svg')) return name; // plugin-supplied SVG
+  if (typeof name === 'string' && name.trim().startsWith('<svg')) return /^\s*<svg[^>]*\sclass=/.test(name) ? name : name.replace(/^\s*<svg/, `<svg class="i ${cls}" aria-hidden="true"`); // plugin-supplied SVG (r5-controls: sized like the built-in icons)
   const k = String(name || '').toLowerCase();
   const body = P[name] || P[k] || P[ALIAS[k]] || P.move;
   return `<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;

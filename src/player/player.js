@@ -309,14 +309,14 @@ export class Player {
     const headH = this.mode === 'bike' ? 1.75 : 1.6;
     const bodyY = this.pos.y + this.visDy;
     // teleports / mode warps: snap the smoothing state
-    if (!C.init || C.last.distanceToSquared(this.pos) > 36) { C.init = true; C.y = bodyY; C.vy = 0; C.col = 99; C.x = this.pos.x; C.z = this.pos.z; C.hx = { vy: 0 }; C.hz = { vy: 0 }; C.st = 0.1; }
+    if (!C.init || C.last.distanceToSquared(this.pos) > 36) { C.init = true; C.y = bodyY; C.vy = 0; C.col = 99; C.prevBody = bodyY; C.st = 0.1; }
     C.last.copy(this.pos);
-    // vertical pivot: critically damped (tight on the ground, softer in the air so jumps don't yank the view);
-    // the smoothing time itself eases between the two so landings don't jolt
+    // vertical pivot: critically damped (tight on the ground, softer in the air so jumps don't yank the view); the
+    // smoothing time eases between the two so landings don't jolt. It runs in fixed 1/240 s steps against the target
+    // interpolated across the frame, so the lag is identical at any frame rate (a per-frame filter jitters when dt varies).
+    // The horizontal pivot is rigid on purpose for the same reason.
     C.st += ((fly ? 0.06 : this.onGround || this.plugins[this.mode] ? 0.1 : 0.2) - C.st) * damp(6, dt);
-    C.y = smoothDamp(C.y, bodyY, C, C.st, dt);
-    // horizontal pivot: a very light lag (50 ms; 80 ms in flight) softens collisions and sudden stops
-    C.x = smoothDamp(C.x, this.pos.x, C.hx, fly ? 0.08 : 0.05, dt); C.z = smoothDamp(C.z, this.pos.z, C.hz, fly ? 0.08 : 0.05, dt);
+    { const n = Math.min(48, Math.max(1, Math.ceil(dt * 240 - 1e-6))), hh = dt / n, y0 = C.prevBody ?? bodyY; for (let i = 1; i <= n; i++) C.y = smoothDamp(C.y, y0 + (bodyY - y0) * (i / n), C, C.st, hh); C.prevBody = bodyY; }
     if (Math.abs(bodyY - C.y) > 2.5) { C.y = bodyY - Math.sign(bodyY - C.y) * 2.5; }
     if (this.view === 'first' && !fly) {
       const sp = this.speed || 0; this.headBob += dt * (sp > 0.3 && this.onGround ? (5 + sp) : 0);
@@ -329,7 +329,7 @@ export class Player {
     }
     const plugin = this.plugins[this.mode];
     const pivotY = (plugin ? this.pos.y + (C.y - bodyY) * 0.5 : C.y) + headH + 0.25; // plugin modes: follow their own smoothing closely
-    _tgt.set(C.x, pivotY, C.z);
+    _tgt.set(this.pos.x, pivotY, this.pos.z);
     const dist = fly ? Math.max(this.camDist, 6) : this.camDist;
     _dir.set(Math.sin(this.camYaw) * Math.cos(this.camPitch), -Math.sin(this.camPitch), Math.cos(this.camYaw) * Math.cos(this.camPitch));
     // wall collision: pull in at once, ease back out

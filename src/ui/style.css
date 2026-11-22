@@ -359,8 +359,10 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 /* ---------- r5-controls: number-key badges on the mode bar, walk / fly speed stepper, mode key strip */
 .seg-icons button { position: relative; }
-.seg-icons .mk { position: absolute; right: 3px; top: 2px; font: 600 9px/1 var(--font); color: var(--ink2); opacity: .75; pointer-events: none; }
-.seg-icons button.on .mk { color: var(--accent); opacity: .9; }
+.seg-icons .mk { position: absolute; right: 4px; top: 3px; font: 700 9.5px/1 var(--font); color: var(--ink); opacity: .55; pointer-events: none; }
+.seg-icons button.on .mk { color: var(--accent); opacity: 1; }
+.hint .ks { margin: 0 1px; opacity: .55; }
+.hint .hint-m { margin-right: 4px; }
 .spd { display: flex; align-items: center; gap: 3px; margin-left: -6px; }
 .spd.hidden { display: none; }
 .spd button { appearance: none; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: var(--fill); color: var(--ink); cursor: pointer; transition: background .15s; }
@@ -368,8 +370,9 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .spd button .i { width: 14px; height: 14px; stroke-width: 2.2; }
 .spd output { min-width: 58px; text-align: center; font: 600 12.5px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--ink); transition: color .2s; }
 .spd.bump output { color: var(--accent); }
+/* the key strip sits just above the mode bar (left-aligned with it) so it never covers the bar, the prompt or the minimap */
+.hint { left: calc(16px + var(--sl)); bottom: calc(76px + var(--sb)); transform: none; }
 .hint .hint-m { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .hint .hint-m .i, .hint > .i { width: 15px; height: 15px; opacity: .9; }
-.range.wide output { min-width: 112px; }
 .touch-ui .seg-icons .mk { display: none; }
 @media (max-width: 760px) { .seg-icons .mk { display: none; } }

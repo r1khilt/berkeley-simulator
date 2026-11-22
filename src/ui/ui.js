@@ -99,7 +99,7 @@ export class UI {
   showTitle(on) {
     this.title.classList.toggle('off', !on); this.hud.classList.toggle('off', on); this.state = on ? 'title' : 'play';
     let seen = false; try { seen = localStorage.getItem('bsim.hinted') === '1'; localStorage.setItem('bsim.hinted', '1'); } catch (e) {}
-    if (!on && !this._hinted && !seen) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('Space')} Jump <i></i> ${kbd('1')}–${kbd(String(Math.max(3, this._modeList().length)))} Bike, fly, scooter… <i></i> ${kbd('H')} Controls`, 9000), 900); } // r5-controls: mention the mode keys
+    if (!on && !this._hinted && !seen) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('Space')} Jump <i></i> ${kbd('1')}–${kbd(String(Math.max(3, this._modeList().length)))} Ride or fly <i></i> ${kbd('H')} Controls`, 9000), 900); } // r5-controls: mention the mode keys
   }
   fade(cb, hold = 300) { this.fadeEl.classList.add('on'); setTimeout(() => { cb && cb(); setTimeout(() => this.fadeEl.classList.remove('on'), hold); }, 380); }
   // ---------- HUD
@@ -233,8 +233,9 @@ export class UI {
     if (this.isTouch || !m || !m.hint) return;
     let n = {}; try { n = JSON.parse(localStorage.getItem('bsim.modeHints') || '{}'); } catch (e) {}
     if (!force && (n[m.id] || 0) >= 3) return; n[m.id] = (n[m.id] || 0) + 1; try { localStorage.setItem('bsim.modeHints', JSON.stringify(n)); } catch (e) {}
-    const segs = String(m.hint).split(/\s*·\s*/).map((x) => { const q = x.match(/^(\S+)\s+(.+)$/); if (!q || !q[1].split('/').every((k) => /^([A-Z0-9]|Shift|Space|Scroll|Esc|Ctrl|\+|-)$/.test(k))) return esc(x); const keys = q[1] === '+/-' ? ['+', '-'] : q[1].split('/').filter(Boolean); return `${kbd(...keys)} ${esc(q[2])}`; });
-    this.hint(`<span class="hint-m">${icon(m.icon)}${esc(m.label)}</span><i></i>${segs.join(' <i></i> ')}`, 6500);
+    const cap1 = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    const segs = String(m.hint).split(/\s*·\s*/).map((x) => { const q = x.match(/^(\S+)\s+(.+)$/); if (!q || !q[1].split('/').every((k) => /^([A-Z0-9]|Shift|Space|Scroll|Esc|Ctrl|\+|-)$/.test(k))) return esc(cap1(x)); const keys = q[1] === '+/-' ? ['+', '-'] : q[1].split('/').filter(Boolean); return `${keys.map((k) => kbd(k === '-' ? '−' : k)).join('<span class="ks">/</span>')} ${esc(cap1(q[2]))}`; });
+    this.hint(`<span class="hint-m" title="${esc(m.label)}">${icon(m.icon)}</span>${segs.join(' <i></i> ')}`, 6500);
   }
   // r5-controls: once per session, point out notable interactions (e.g. the Campanile elevator) when you get close
   _nearby(p) {
@@ -453,7 +454,7 @@ export class UI {
           ${row(kbd('+', '-'), 'Faster or slower', 'Walk and fly speed, also in Settings')}
         </section>
         <section><h3>Get around</h3>
-          ${modes.map((m, i) => row((i < 9 ? kbd(String(i + 1)) : '') + (m.key ? kbd(keyName(m.key)) : ''), `<span class="sc-mi">${icon(m.icon)}</span>${esc(m.label)}`, esc(m.id === 'walk' ? 'Press a mode key again to walk' : m.id === 'scooter' ? 'Summons a Lime to you. E parks it' : m.hint || ''))).join('')}
+          ${modes.map((m, i) => row((i < 9 ? kbd(String(i + 1)) : '') + (m.key ? kbd(keyName(m.key)) : ''), `<span class="sc-mi">${icon(m.icon)}</span>${esc(m.label)}`, esc(m.id === 'walk' ? 'Press a mode key again to walk' : m.id === 'scooter' ? 'Summons a Lime to you. E parks it' : String(m.hint || '').replace(/(^|· )(\S+) /g, '$1$2\u00a0')))).join('')}
           ${tools.map((t) => row(t.key ? kbd(keyName(t.key)) : '<span class="sc-none">Always on</span>', `<span class="sc-mi">${icon(t.icon)}</span>${esc(t.label)}`, esc(t.hint || ''))).join('')}
         </section>
         <section><h3>Explore</h3>
@@ -469,8 +470,8 @@ export class UI {
     const seg = (k, val, opts) => `<div class="seg" data-k="${k}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(val) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     // r5-controls: walk speed (multiplier) and fly speed (m/s, log slider 3-150) live here too
     const FLY0 = 3, FLY1 = 150, toLog = (v) => Math.round(Math.log(v / FLY0) / Math.log(FLY1 / FLY0) * 1000), fromLog = (u) => FLY0 * Math.pow(FLY1 / FLY0, u / 1000);
-    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%`, walkSpeed: (v) => `${this.fmtSpeed(4.2 * v)} · run ${this.fmtSpeed(8 * v)}`, flySpeed: (u) => this.fmtSpeed(fromLog(u)) };
-    const range = (k, min, max, step, val) => `<div class="range${k === 'walkSpeed' ? ' wide' : ''}"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${k}"><output>${fmts[k](val)}</output></div>`;
+    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%`, walkSpeed: (v) => this.fmtSpeed(4.2 * v), flySpeed: (u) => this.fmtSpeed(fromLog(u)) };
+    const range = (k, min, max, step, val) => `<div class="range"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${k}"><output>${fmts[k](val)}</output></div>`;
     const sw = (k, on) => `<label class="switch"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}><i></i></label>`;
     this.panel(`${this._head('Settings')}
       <section><h3>Graphics</h3>
@@ -481,7 +482,7 @@ export class UI {
         <div class="row"><span>Walk speed</span>${range('walkSpeed', 0.5, 2, 0.05, s.walkSpeed ?? 1)}</div>
         <div class="row"><span>Fly speed</span>${range('flySpeed', 0, 1000, 1, toLog(s.flySpeed ?? 25))}</div>
         <div class="row"><span>Camera follows movement</span>${sw('camFollow', s.camFollow !== false)}</div>
-        <p class="row-note">In the game, + and - change the speed of the mode you're in. In fly mode the scroll wheel does too.</p></section>
+        <p class="row-note">Shift runs at about twice your walk speed. In the game, + and − change the speed of the mode you're in, and in fly mode so does the scroll wheel.</p></section>
       <section><h3>Controls</h3>
         <div class="row"><span>Look sensitivity</span>${range('sens', 0.3, 2.5, 0.05, s.sens)}</div>
         <div class="row"><span>Invert vertical look</span>${sw('invertY', s.invertY)}</div>
