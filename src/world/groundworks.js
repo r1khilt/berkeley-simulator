@@ -14,8 +14,8 @@ import { materials, TEX_M } from '../materials.js';
 const KERB = 0.13;        // road surface drop below the sidewalk (m)
 const KERB_W = 0.17;      // kerb top width
 const EDGE_W = 0.12;      // path/plaza edging width
-const TILE = 96;          // kerb/edging tile size (m)
-const KERB_R = 240;       // kerbs/edging drawn within this radius
+const TILE = 128;         // kerb/edging tile size (m)
+const KERB_R = 170;       // kerbs/edging drawn within this radius
 const CAMPUS = (x, z) => x > -760 && x < 520 && z > -560 && z < 420;
 
 // ---------- samplers over the decoded arrays
@@ -272,16 +272,17 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   const group = new THREE.Group(); group.name = 'groundworks'; scene.add(group);
   // own lightly tinted copies so the ground pieces separate from the slabs they sit on
   const stepMat = { concrete: M.concrete, granite: M.graniteDark, brick: M.brick || M.concrete };
-  const capMat = M.graniteDark, wallMat = M.concreteDark || M.concrete, kerbMat = M.concrete;
+  const capMat = M.graniteDark, kerbMat = M.concrete;
   // ---- chunked static meshes (stairs + walls), 128 m buckets, hidden beyond ~420 m
   const buckets = new Map();
-  const bucket = (x, z, key) => { const k = key + Math.floor(x / 128) + ',' + Math.floor(z / 128); let b = buckets.get(k); if (!b) buckets.set(k, (b = { geo: new Geo(), key, cx: (Math.floor(x / 128) + 0.5) * 128, cz: (Math.floor(z / 128) + 0.5) * 128 })); return b.geo; };
+  const BK = 256; // one mesh per material per 256 m cell keeps draw calls low
+  const bucket = (x, z, key) => { const k = key + Math.floor(x / BK) + ',' + Math.floor(z / BK); let b = buckets.get(k); if (!b) buckets.set(k, (b = { geo: new Geo(), key, cx: (Math.floor(x / BK) + 0.5) * BK, cz: (Math.floor(z / BK) + 0.5) * BK })); return b.geo; };
   // ---- stairs
   let nTreads = 0;
   for (const st of plan.stairs) {
     const { P, C, L, w, n, lo, hi, up } = st; const r = (hi - lo) / n, t = L / n, hw = w / 2;
-    const mid = along(P, C, L / 2); const key = 'st:' + st.mat + ':';
-    const geo = bucket(mid[0], mid[1], key), cheekGeo = bucket(mid[0], mid[1], 'cheek:'), railGeo = bucket(mid[0], mid[1], 'rail:');
+    const mid = along(P, C, L / 2); const key = st.mat === 'granite' ? 'gran' : st.mat === 'brick' ? 'brick' : 'conc';
+    const geo = bucket(mid[0], mid[1], key), cheekGeo = bucket(mid[0], mid[1], 'conc'), railGeo = bucket(mid[0], mid[1], 'rail');
     const yBase = (x, z) => Math.min(heightAt(x, z), lo) - 0.35;
     for (let i = 0; i < n; i++) {
       // tread i spans [s0, s1] measured from the LOW end; top at lo + (i+1) r; 2.5 cm nosing over the riser below
@@ -324,7 +325,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   let nWallSeg = 0;
   for (const wl of plan.walls) {
     const { P, C, L, ret, sgn, H, Lo, hFree } = wl;
-    const mid = along(P, C, L / 2); const geo = bucket(mid[0], mid[1], 'wall:'), cap = bucket(mid[0], mid[1], 'cap:');
+    const mid = along(P, C, L / 2); const geo = bucket(mid[0], mid[1], 'conc'), cap = bucket(mid[0], mid[1], 'gran');
     for (let k = 0; k < P.length - 1; k++) {
       const a = P[k], b = P[k + 1]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); if (l < 0.05) continue;
       const nx = -dz / l * sgn, nz = dx / l * sgn; // unit normal toward the HIGH side
@@ -350,13 +351,13 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       nWallSeg++;
     }
   }
-  const matFor = (key) => key.startsWith('st:') ? stepMat[key.split(':')[1]] : key === 'cheek:' ? wallMat : key === 'rail:' ? M.iron : key === 'wall:' ? wallMat : capMat;
+  const matFor = (key) => key === 'conc' ? stepMat.concrete : key === 'gran' ? capMat : key === 'brick' ? stepMat.brick : M.iron;
   const statics = [];
   for (const b of buckets.values()) {
     if (!b.geo.count) continue; const y = heightAt(b.cx, b.cz);
     const mesh = new THREE.Mesh(b.geo.geometry([b.cx, y, b.cz]), matFor(b.key)); mesh.position.set(b.cx, y, b.cz);
-    mesh.castShadow = b.key !== 'rail:'; mesh.receiveShadow = true; mesh.name = 'gw:' + b.key; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
-    if (b.key === 'rail:') mesh.userData.detail = true;
+    mesh.castShadow = b.key !== 'rail'; mesh.receiveShadow = true; mesh.name = 'gw:' + b.key; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+    if (b.key === 'rail') mesh.userData.detail = true;
     group.add(mesh); statics.push(mesh);
   }
   // ---- tree grates where trunks stand in paving (Sproul Plaza, Dwinelle Plaza, streets)
@@ -412,62 +413,95 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       if (!jump && lastCP && (cp.x - lastCP.x) ** 2 + (cp.z - lastCP.z) ** 2 < 4 && !this._pending) return;
       updateTiles(cp, jump ? 999 : 2); lastCP = { x: cp.x, z: cp.z };
       this._pending = false;
-      for (const m of statics) { const d = Math.hypot(m.position.x - cp.x, m.position.z - cp.z) - 90; m.visible = d < (m.userData.detail ? 160 : 420); }
+      if (grates) grates.userData.update(cp);
+      for (const m of statics) { const d = Math.hypot(m.position.x - cp.x, m.position.z - cp.z) - 181; m.visible = d < (m.userData.detail ? 120 : 380); }
     },
   };
 }
 
-// marching squares on the asphalt (kerbs) and paved (edging) SDF channels inside one tile
+// marching squares on the asphalt (kerbs) and paved (edging) SDF channels inside one tile; kept segments are chained
+// into polylines, simplified (5 cm) and re-split at <= 3 m, then swept with a kerb or edging profile. Shared vertices
+// along a run mean no cracks between pieces and ~3x fewer triangles than one box per contour cell.
 function traceTile(S, G, bmask, x0, z0, nearCrossing, geo, stats) {
   const st = S.s; const j0 = Math.max(0, Math.floor((x0 - S.x0) / st)), j1 = Math.min(S.nx - 2, Math.ceil((x0 + TILE - S.x0) / st) - 1);
   const i0 = Math.max(0, Math.floor((z0 - S.z0) / st)), i1 = Math.min(S.nz - 2, Math.ceil((z0 + TILE - S.z0) / st) - 1);
   for (const ch of [0, 1]) {
-    const segs = [];
+    const segs = []; const key = (p) => Math.round(p.x * 1000) + ',' + Math.round(p.z * 1000);
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
       const v = [S.raw(i, j, ch), S.raw(i, j + 1, ch), S.raw(i + 1, j + 1, ch), S.raw(i + 1, j, ch)];
       const code = (v[0] > 0 ? 1 : 0) | (v[1] > 0 ? 2 : 0) | (v[2] > 0 ? 4 : 0) | (v[3] > 0 ? 8 : 0);
       if (code === 0 || code === 15) continue;
       const px = [S.x0 + j * st, S.x0 + (j + 1) * st, S.x0 + (j + 1) * st, S.x0 + j * st], pz = [S.z0 + i * st, S.z0 + i * st, S.z0 + (i + 1) * st, S.z0 + (i + 1) * st];
-      const E = []; // crossing points on the 4 edges, keyed for chaining
-      for (let e = 0; e < 4; e++) { const a = e, b = (e + 1) % 4; if ((v[a] > 0) !== (v[b] > 0)) { const t = v[a] / (v[a] - v[b]); E.push({ x: px[a] + (px[b] - px[a]) * t, z: pz[a] + (pz[b] - pz[a]) * t }); } }
-      if (E.length === 2) segs.push([E[0], E[1]]); else if (E.length === 4) { segs.push([E[0], E[1]]); segs.push([E[2], E[3]]); }
+      const E = [];
+      for (let e = 0; e < 4; e++) { let a = e, b = (e + 1) % 4; if ((v[a] > 0) === (v[b] > 0)) continue; if (a > b || (e === 3)) { const t = a; a = b; b = t; } // canonical edge direction -> identical floats in both cells
+        const t = v[a] / (v[a] - v[b]); E.push({ x: px[a] + (px[b] - px[a]) * t, z: pz[a] + (pz[b] - pz[a]) * t }); }
+      const pairs = E.length === 2 ? [[E[0], E[1]]] : E.length === 4 ? [[E[0], E[1]], [E[2], E[3]]] : [];
+      for (const [p, q] of pairs) { const type = classify(ch, p, q, S, G, bmask, nearCrossing); if (type) segs.push({ p, q, kp: key(p), kq: key(q), type, used: false }); }
     }
-    for (const [p, q] of segs) emitSeg(ch, p, q, S, G, bmask, nearCrossing, geo, stats);
+    // chain segments of the same type that share endpoints
+    const adj = new Map(); const add = (k, i) => { let l = adj.get(k); if (!l) adj.set(k, (l = [])); l.push(i); };
+    segs.forEach((sg, i) => { add(sg.kp, i); add(sg.kq, i); });
+    const next = (k, type) => { const l = adj.get(k); if (!l) return -1; for (const i of l) if (!segs[i].used && segs[i].type === type) return i; return -1; };
+    const order = segs.map((sg, i) => i).sort((a, b) => (adj.get(segs[a].kp).length + adj.get(segs[a].kq).length) - (adj.get(segs[b].kp).length + adj.get(segs[b].kq).length));
+    for (const i of order) {
+      if (segs[i].used) continue; const sg = segs[i]; sg.used = true; const type = sg.type;
+      const pts = [sg.p, sg.q]; let kEnd = sg.kq, kStart = sg.kp;
+      for (let n; (n = next(kEnd, type)) >= 0;) { const s2 = segs[n]; s2.used = true; if (s2.kp === kEnd) { pts.push(s2.q); kEnd = s2.kq; } else { pts.push(s2.p); kEnd = s2.kp; } }
+      for (let n; (n = next(kStart, type)) >= 0;) { const s2 = segs[n]; s2.used = true; if (s2.kp === kStart) { pts.unshift(s2.q); kStart = s2.kq; } else { pts.unshift(s2.p); kStart = s2.kp; } }
+      const run = splitLong(simplify(pts, 0.05), 3.0);
+      if (run.length >= 2) sweep(type, run, ch, S, G, geo, stats);
+    }
   }
 }
-// one contour segment -> kerb (asphalt boundary) or edging (paved boundary next to soft ground)
-function emitSeg(ch, p, q, S, G, bmask, nearCrossing, geo, stats) {
-  const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2; const L = Math.hypot(q.x - p.x, q.z - p.z); if (L < 0.05) return;
-  if (!G.inside(mx, mz, 3)) return;
-  // inward normal (into the channel) from the SDF gradient
-  let gx = S.at(mx + 0.4, mz, ch) - S.at(mx - 0.4, mz, ch), gz = S.at(mx, mz + 0.4, ch) - S.at(mx, mz - 0.4, ch); const gl = Math.hypot(gx, gz); if (gl < 1e-4) return; gx /= gl; gz /= gl;
-  const ox = mx - gx * 0.6, oz = mz - gz * 0.6; // outside probe
-  if (bmask.at(ox, oz) || bmask.at(mx, mz)) return;
-  const tx = (q.x - p.x) / L, tz = (q.z - p.z) / L;
-  const ext = 0.03; const P0 = [p.x - tx * ext, p.z - tz * ext], P1 = [q.x + tx * ext, q.z + tz * ext];
-  const nx = gx, nz = gz; // into the channel
+// kerb (asphalt boundary next to sidewalk/verge) | edge (paving next to soft ground) | null
+function classify(ch, p, q, S, G, bmask, nearCrossing) {
+  const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2; if (Math.hypot(q.x - p.x, q.z - p.z) < 0.02 || !G.inside(mx, mz, 3)) return null;
+  const n = inward(S, ch, mx, mz); if (!n) return null;
+  const ox = mx - n[0] * 0.6, oz = mz - n[1] * 0.6; // outside probe
+  if (bmask.at(ox, oz) || bmask.at(mx, mz)) return null;
   if (ch === 0) {
-    if (nearCrossing(mx, mz, 2.2)) return;
-    if (S.at(ox, oz, 0) > -0.2) return; // asphalt both sides (lanes, lots)
-    const hs = (x, z) => G.at(x - nx * 0.6, z - nz * 0.6), hr = (x, z) => G.at(x + nx * 0.7, z + nz * 0.7);
-    const yT0 = hs(P0[0], P0[1]) + 0.015, yT1 = hs(P1[0], P1[1]) + 0.015, yR0 = hr(P0[0], P0[1]) - 0.06, yR1 = hr(P1[0], P1[1]) - 0.06;
-    const B0 = [P0[0] - nx * KERB_W, P0[1] - nz * KERB_W], B1 = [P1[0] - nx * KERB_W, P1[1] - nz * KERB_W];
-    const F0 = [P0[0] - nx * 0.02, P0[1] - nz * 0.02], F1 = [P1[0] - nx * 0.02, P1[1] - nz * 0.02];
-    orientQuad(geo, [B0[0], yT0, B0[1]], [B1[0], yT1, B1[1]], [F1[0], yT1, F1[1]], [F0[0], yT0, F0[1]], [0, 1, 0]); // top
-    orientQuad(geo, [F0[0], yT0, F0[1]], [F1[0], yT1, F1[1]], [P1[0], yT1 - 0.02, P1[1]], [P0[0], yT0 - 0.02, P0[1]], [nx * 0.7, 0.7, nz * 0.7]); // arris
-    orientQuad(geo, [P0[0], yT0 - 0.02, P0[1]], [P1[0], yT1 - 0.02, P1[1]], [P1[0], yR1, P1[1]], [P0[0], yR0, P0[1]], [nx, 0, nz]); // road face
-    orientQuad(geo, [B0[0], yT0 - 0.1, B0[1]], [B1[0], yT1 - 0.1, B1[1]], [B1[0], yT1, B1[1]], [B0[0], yT0, B0[1]], [-nx, 0, -nz]); // back
-    stats.segs++;
-  } else {
-    if (S.at(ox, oz, 0) > -0.3) return; // asphalt outside: the kerb handles it
-    if (S.at(ox, oz, 1) > -0.3) return; // still paving outside (noisy contour)
-    if (!CAMPUS(mx, mz) && S.at(ox, oz, 2) < -0.25) return; // off campus only along lawns; on campus wherever paving meets soft ground
-    const hp = (x, z) => G.at(x + nx * 0.5, z + nz * 0.5), hg = (x, z) => G.at(x - nx * 0.5, z - nz * 0.5);
-    const yT0 = hp(P0[0], P0[1]) + 0.035, yT1 = hp(P1[0], P1[1]) + 0.035, yG0 = Math.min(hg(P0[0], P0[1]), yT0 - 0.04) - 0.05, yG1 = Math.min(hg(P1[0], P1[1]), yT1 - 0.04) - 0.05;
-    const I0 = [P0[0] + nx * EDGE_W, P0[1] + nz * EDGE_W], I1 = [P1[0] + nx * EDGE_W, P1[1] + nz * EDGE_W];
-    orientQuad(geo, [P0[0], yT0, P0[1]], [P1[0], yT1, P1[1]], [I1[0], yT1, I1[1]], [I0[0], yT0, I0[1]], [0, 1, 0]); // top
-    orientQuad(geo, [P0[0], yG0, P0[1]], [P1[0], yG1, P1[1]], [P1[0], yT1, P1[1]], [P0[0], yT0, P0[1]], [-nx, 0, -nz]); // lawn face
-    orientQuad(geo, [I0[0], yT0 - 0.07, I0[1]], [I1[0], yT1 - 0.07, I1[1]], [I1[0], yT1, I1[1]], [I0[0], yT0, I0[1]], [nx, 0, nz]); // paving side
+    if (nearCrossing(mx, mz, 2.2)) return null; // kerb ramps at crossings
+    if (S.at(ox, oz, 0) > -0.2) return null; // asphalt both sides (lanes, lots)
+    return 'kerb';
+  }
+  if (S.at(ox, oz, 0) > -0.3) return null; // asphalt outside: the kerb handles it
+  if (S.at(ox, oz, 1) > -0.3) return null; // still paving outside (noisy contour)
+  if (!CAMPUS(mx, mz) && S.at(ox, oz, 2) < -0.25) return null; // off campus only along lawns; on campus wherever paving meets soft ground
+  return 'edge';
+}
+function inward(S, ch, x, z) { let gx = S.at(x + 0.4, z, ch) - S.at(x - 0.4, z, ch), gz = S.at(x, z + 0.4, ch) - S.at(x, z - 0.4, ch); const gl = Math.hypot(gx, gz); return gl < 1e-4 ? null : [gx / gl, gz / gl]; }
+function simplify(P, tol) { // Douglas-Peucker on {x,z}
+  if (P.length < 3) return P; const keep = new Uint8Array(P.length); keep[0] = keep[P.length - 1] = 1; const stack = [[0, P.length - 1]];
+  while (stack.length) { const [a, b] = stack.pop(); const A = P[a], B = P[b]; const dx = B.x - A.x, dz = B.z - A.z, L = Math.hypot(dx, dz) || 1e-9; let md = -1, mi = -1;
+    for (let i = a + 1; i < b; i++) { const d = Math.abs((P[i].x - A.x) * dz - (P[i].z - A.z) * dx) / L; if (d > md) { md = d; mi = i; } }
+    if (md > tol) { keep[mi] = 1; stack.push([a, mi], [mi, b]); } }
+  return P.filter((_, i) => keep[i]);
+}
+function splitLong(P, maxL) { const out = [P[0]]; for (let i = 1; i < P.length; i++) { const A = P[i - 1], B = P[i]; const n = Math.ceil(Math.hypot(B.x - A.x, B.z - A.z) / maxL); for (let k = 1; k <= n; k++) out.push({ x: A.x + (B.x - A.x) * k / n, z: A.z + (B.z - A.z) * k / n }); } return out; }
+// sweep a kerb / edging profile along a run; per-vertex inward normals from the SDF gradient keep offsets consistent
+function sweep(type, run, ch, S, G, geo, stats) {
+  const V = run.map((p, i) => {
+    let n = inward(S, ch, p.x, p.z);
+    if (!n) { const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i + 1)]; const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1; n = [-dz / l, dx / l]; }
+    const [nx, nz] = n;
+    if (type === 'kerb') {
+      const yT = G.at(p.x - nx * 0.6, p.z - nz * 0.6) + 0.015, yR = G.at(p.x + nx * 0.7, p.z + nz * 0.7) - 0.06;
+      return { F: [p.x, p.z], B: [p.x - nx * KERB_W, p.z - nz * KERB_W], yT, yR, nx, nz };
+    }
+    const yT = G.at(p.x + nx * 0.5, p.z + nz * 0.5) + 0.035; const yG = Math.min(G.at(p.x - nx * 0.5, p.z - nz * 0.5), yT - 0.04) - 0.05;
+    return { F: [p.x, p.z], B: [p.x + nx * EDGE_W, p.z + nz * EDGE_W], yT, yR: yG, nx, nz };
+  });
+  for (let i = 0; i < V.length - 1; i++) {
+    const a = V[i], b = V[i + 1]; const nx = (a.nx + b.nx) / 2, nz = (a.nz + b.nz) / 2;
+    if (type === 'kerb') {
+      orientQuad(geo, [a.B[0], a.yT, a.B[1]], [b.B[0], b.yT, b.B[1]], [b.F[0], b.yT, b.F[1]], [a.F[0], a.yT, a.F[1]], [0, 1, 0]); // top
+      orientQuad(geo, [a.F[0], a.yT, a.F[1]], [b.F[0], b.yT, b.F[1]], [b.F[0], b.yR, b.F[1]], [a.F[0], a.yR, a.F[1]], [nx, 0.15, nz]); // road face
+      orientQuad(geo, [a.B[0], a.yT - 0.09, a.B[1]], [b.B[0], b.yT - 0.09, b.B[1]], [b.B[0], b.yT, b.B[1]], [a.B[0], a.yT, a.B[1]], [-nx, 0, -nz]); // back
+    } else {
+      orientQuad(geo, [a.F[0], a.yT, a.F[1]], [b.F[0], b.yT, b.F[1]], [b.B[0], b.yT, b.B[1]], [a.B[0], a.yT, a.B[1]], [0, 1, 0]); // top
+      orientQuad(geo, [a.F[0], a.yR, a.F[1]], [b.F[0], b.yR, b.F[1]], [b.F[0], b.yT, b.F[1]], [a.F[0], a.yT, a.F[1]], [-nx, 0.1, -nz]); // lawn face
+      orientQuad(geo, [a.B[0], a.yT - 0.07, a.B[1]], [b.B[0], b.yT - 0.07, b.B[1]], [b.B[0], b.yT, b.B[1]], [a.B[0], a.yT, a.B[1]], [nx, 0, nz]); // paving side
+    }
     stats.segs++;
   }
 }
@@ -491,19 +525,21 @@ function makeGrates(items, M) {
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const grateMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.2 });
   const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); g.translate(0, 0.012, 0);
-  // frame: 4 bars around the grate, 0.1 m wide, 3 cm proud
-  const parts = []; const bar = (cx, cz, sx, sz) => { const b = new THREE.BoxGeometry(sx, 0.08, sz); b.translate(cx, -0.01, cz); parts.push(b); };
-  bar(0, 0.55, 1.2, 0.1); bar(0, -0.55, 1.2, 0.1); bar(0.55, 0, 0.1, 1.0); bar(-0.55, 0, 0.1, 1.0);
-  const fg = mergeBoxes(parts);
+  // frame: a 0.1 m granite band 3 cm proud of the paving (top ring + outer faces, 16 triangles)
+  const fg = new Geo(); const o = 0.6, i = 0.5, yt = 0.03, yb = -0.05; const C = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  for (let k = 0; k < 4; k++) { const a = C[k], b = C[(k + 1) % 4]; const nrm = [(a[0] + b[0]) / 2, 0, (a[1] + b[1]) / 2];
+    fg.quad([a[0] * i, yt, a[1] * i], [b[0] * i, yt, b[1] * i], [b[0] * o, yt, b[1] * o], [a[0] * o, yt, a[1] * o], [0, 1, 0], [[a[0] * i, a[1] * i], [b[0] * i, b[1] * i], [b[0] * o, b[1] * o], [a[0] * o, a[1] * o]]);
+    fg.quad([a[0] * o, yb, a[1] * o], [b[0] * o, yb, b[1] * o], [b[0] * o, yt, b[1] * o], [a[0] * o, yt, a[1] * o], nrm, [[0, 0], [0.6, 0], [0.6, 0.04], [0, 0.04]]); }
   const inst = new THREE.Group(); inst.name = 'gw:grates';
-  const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, items.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    items.forEach(([px, py, pz, r, s], i) => { m4.compose(new THREE.Vector3(px, py, pz), q.setFromAxisAngle(up, r), new THREE.Vector3(s, 1, s)); m.setMatrixAt(i, m4); });
-    m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; return m; };
-  inst.add(mk(g, grateMat)); inst.add(mk(fg, M.graniteDark)); inst.count = items.length;
+  const cap = Math.min(items.length, 900);
+  const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); return m; };
+  const meshes = [mk(g, grateMat), mk(fg.geometry(), M.graniteDark)]; inst.add(...meshes);
+  const mats = new Float32Array(items.length * 16); { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    items.forEach(([px, py, pz, r, s], k) => { m4.compose(new THREE.Vector3(px, py, pz), q.setFromAxisAngle(up, r), new THREE.Vector3(s, 1, s)); m4.toArray(mats, k * 16); }); }
+  inst.count = items.length;
+  // only grates within ~160 m are drawn (refilled as the camera moves)
+  inst.userData.update = (cp) => { let k = 0; const R2 = 160 * 160;
+    for (let n = 0; n < items.length && k < cap; n++) { const dx = items[n][0] - cp.x, dz = items[n][2] - cp.z; if (dx * dx + dz * dz > R2) continue; for (const m of meshes) m.instanceMatrix.array.set(mats.subarray(n * 16, n * 16 + 16), k * 16); k++; }
+    for (const m of meshes) { m.count = k; m.instanceMatrix.needsUpdate = true; } };
   return inst;
-}
-function mergeBoxes(list) {
-  const pos = [], nor = [], uv = [];
-  for (let g of list) { g = g.toNonIndexed(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); const p = g.attributes.position.array; for (let i = 0; i < p.length; i += 3) uv.push((p[i] + p[i + 2]) / TEX_M, p[i + 1] / TEX_M); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
