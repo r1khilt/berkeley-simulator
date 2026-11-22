@@ -454,7 +454,7 @@ export async function build(ctx) {
   const fg = new THREE.Group(); fg.name = 'campanile-interior-anim'; fg.matrixAutoUpdate = false; fg.matrix.copy(F); innerG.add(fg);
   let FL = doorY0 + 0.05; for (let u = -3.6; u <= 3.61; u += 0.9) for (let v = -3.6; v <= 3.61; v += 0.9) FL = Math.max(FL, gAt(u, v) + 0.03);
   const TL = DECK_Y - 38 * 0.18, CEIL = FL + 4.25;           // the elevator stops 38 steps (6.84 m) below the deck
-  const inner = new Bucket(bUV), innerFine = new Bucket(bUV);   // interior-only geometry, drawn only near the tower
+  const inner = new Bucket((g) => boxUV(g)), innerFine = new Bucket((g) => boxUV(g));   // interior-only geometry, drawn only near the tower
   const ix = buildInterior(M, { inner, innerFine, outer: main }, fg, { HW0, DECK_Y, FL, TL, CEIL, doorY1 });
   // bronze entrance leaves hinged at the jambs; they swing into the lobby when someone comes near (see update)
   const leaves = [-1, 1].map((side) => {
