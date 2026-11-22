@@ -145,12 +145,12 @@ export async function build(ctx) {
     const gmin = Math.min(K.g(...R.at(s0, 1)), K.g(...R.at(s1, 1)));
     const floorYs = o.floorYs || [FL, FL + 4.4, FL + 8.8, ct];
     const ops = []; for (let i = 0; i < nb; i++) { const c = (i + 0.5) * p; for (let f = 0; f < floorYs.length - 1; f++) { if (f === 0 && (o.door || []).includes(i)) continue; ops.push({ s0: c - 0.75, s1: c + 0.75, y0: floorYs[f] + 0.75, y1: floorYs[f + 1] - 0.7 }); } }
-    const dops = (o.door || []).map((i) => ({ s0: (i + 0.5) * p - 1.05, s1: (i + 0.5) * p + 1.05, y0: FL, y1: FL + 3.2, doorTop: FL + 2.45 })); // [r5a] pavilion side entrance
+    const dops = (o.door || []).map((i) => ({ s0: (i + 0.5) * p - 0.85, s1: (i + 0.5) * p + 0.85, y0: FL, y1: FL + 3.3, doorTop: FL + 2.5 })); // [r5a] pavilion side entrance (on the window axis)
     const bops = []; for (let i = 0; i < nb; i++) { const c = (i + 0.5) * p; if ((o.door || []).includes(i)) continue; const y0 = bwY(RP, c, 0.5, 2.75, 3.75); if (y0 != null) bops.push({ s0: c - 0.5, s1: c + 0.5, y0, y1: 3.75 });
       const yl = lowY(RP, c, 0.5); if (yl != null) bops.push({ s0: c - 0.5, s1: c + 0.5, y0: yl, y1: 2.4 }); } // [r5a] grade-following
     K.wall(RP, STD, 0, L, gmin - 1.5, 4.05, bops, 0.6); for (const w of bops) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR });
     K.wall(RP, ST, 0, L, 4.05, ct, [...ops, ...dops], 0.6);
-    for (const w of dops) { K.fill(RP, w, { kind: 'door', door: DOOR, rev: 0.45, frame: FR }); K.rbox(RP, FR, w.s0 - 0.35, w.y1 + 0.12, -0.05, w.s1 + 0.35, w.y1 + 0.5, 1.15); } // door + flat dark canopy
+    for (const w of dops) { K.fill(RP, w, { kind: 'door', door: DOOR, glass: M.glass, rev: 0.45, frame: FR }); for (const [a0, a1] of [[w.s0 - 0.3, w.s0], [w.s1, w.s1 + 0.3]]) K.rbox(RP, STD, a0, w.y0, 0, a1, w.y1 + 0.3, 0.12); K.rbox(RP, STD, w.s0 - 0.3, w.y1, 0, w.s1 + 0.3, w.y1 + 0.3, 0.12); K.rbox(RP, ST, w.s0 - 0.5, w.y1 + 0.3, 0, w.s1 + 0.5, w.y1 + 0.55, 0.5); } // door in a cast-stone surround under a hood
     for (const w of ops) { K.fill(RP, w, { mull: 1, tran: [w.y1 - 0.8], rev: 0.4, frame: FR }); K.rbox(RP, ST, w.s0 - 0.18, w.y1, 0, w.s1 + 0.18, w.y1 + 0.3, 0.12, { detail: true }); }
     K.rbox(RP, STD, 0, 4.0, -0.6, L, 4.18, 0.12);
     for (const [a, b] of [[0, 0.32], [L - 0.32, L]]) K.rbox(RP, ST, a, gmin - 1.5, -0.6, b, ct, 0.1); // corner strips
@@ -282,13 +282,19 @@ export async function build(ctx) {
     const vU = vL - n2 * T; walkables.push(stairV(uc - hw, uc + hw, vU, vL, yMid, FL, n2));
     const vM = vU - LM; if (n1 > 0) { K.box(STD, uc - hw, gW - 1, vM, uc + hw, yMid, vU); walkables.push(K.walkPoly(rect(uc - hw, vM, uc + hw, vU), yMid)); }
     const vB = n1 > 0 ? vM - n1 * T : vU; if (n1 > 0) walkables.push(stairV(uc - hw, uc + hw, vB, vM, gW, yMid, n1));
-    for (const [x0, x1] of [[uc - hw - 0.55, uc - hw], [uc + hw, uc + hw + 0.55]]) { // blocky cheek walls stepping down with the flights
-      K.box(ST, x0, gl - 1, vL, x1, FL + 0.95, vF);
-      K.box(ST, x0, gW - 1, vU, x1, yMid + (FL - yMid) * 0.5 + 0.95, vL);
-      if (n1 > 0) { K.box(ST, x0, gW - 1, vM, x1, yMid + 0.95, vU); K.box(ST, x0, gW - 1, vB, x1, gW + (yMid - gW) * 0.5 + 0.95, vM); }
-      colliders.push(K.colPoly(rect(x0, vB, x1, vF), gW - 1, FL + 1.0));
+    // sloped cheek walls with a continuous coping 0.9 m above the nosings, down both flights and across the half landing
+    const prof = [[vF, FL + 0.9], [vL, FL + 0.9], [vU, yMid + 0.9 + (n1 > 0 ? 0 : 0)]]; if (n1 > 0) prof.push([vM, yMid + 0.9], [vB, gW + 0.9]); const vEnd = n1 > 0 ? vB : vU;
+    for (const [x0, x1] of [[uc - hw - 0.45, uc - hw], [uc + hw, uc + hw + 0.45]]) {
+      const sh = new THREE.Shape(); sh.moveTo(prof[0][0], gW - 1.2); for (const [v, y] of prof) sh.lineTo(v, y); sh.lineTo(vEnd - 0.35, prof[prof.length - 1][1]); sh.lineTo(vEnd - 0.35, gW - 1.2); sh.closePath();
+      const g = new THREE.ExtrudeGeometry(sh, { depth: x1 - x0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(x1, 0, 0); K.add(ST, g);
+      const cp = new THREE.Shape(); cp.moveTo(prof[0][0], prof[0][1]); for (const [v, y] of prof) cp.lineTo(v, y); cp.lineTo(vEnd - 0.35, prof[prof.length - 1][1]); for (let k = prof.length - 1; k >= 0; k--) cp.lineTo(k === prof.length - 1 ? vEnd - 0.35 : prof[k][0], prof[k][1] + 0.07); cp.closePath();
+      const cg = new THREE.ExtrudeGeometry(cp, { depth: x1 - x0 + 0.08, bevelEnabled: false }); cg.rotateY(-Math.PI / 2); cg.translate(x1 + 0.04, 0, 0); K.add(STD, cg);
+      colliders.push(K.colPoly(rect(x0, vEnd - 0.35, x1, vF), gW - 1, FL + 1.0));
     }
-    for (const u of [uc - hw + 0.18, uc + hw - 0.18]) { railV(u, vU + 0.1, yMid + rise * 0.5, vL - 0.05, FL); if (n1 > 0) railV(u, vB + 0.1, gW + rise * 0.5, vM - 0.05, yMid); }
+    // continuous galvanised rails inside the cheeks (posts on the treads), and a concrete apron where the flight meets the walk
+    for (const u of [uc - hw + 0.18, uc + hw - 0.18]) { const H = 0.92; const pts = [[vL + 0.3, FL], [vL, FL], [vU, yMid], ...(n1 > 0 ? [[vM, yMid], [vB, gW]] : []), [vEnd - 0.3, gW]];
+      for (let k = 0; k < pts.length - 1; k++) { pipe([u, pts[k][1] + H, pts[k][0]], [u, pts[k + 1][1] + H, pts[k + 1][0]]); const nn = Math.max(1, Math.round(Math.abs(pts[k + 1][0] - pts[k][0]) / 1.5)); for (let j = 0; j < nn; j++) { const t = j / nn, v = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * t, y = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * t; pipe([u, y - 0.02, v], [u, y + H, v], 0.02); } } }
+    K.box(STEP, uc - hw - 0.9, gW - 0.5, vEnd - 1.6, uc + hw + 0.9, gW + 0.03, vEnd); walkables.push(K.walkPoly(rect(uc - hw - 0.9, vEnd - 1.6, uc + hw + 0.9, vEnd), gW + 0.03));
   }
   // inscription on the north centre canopy
   {
