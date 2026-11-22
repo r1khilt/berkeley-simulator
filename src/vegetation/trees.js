@@ -657,10 +657,10 @@ const SPECIES_DEF = {
   redwood: {
     lod2K: 0.5, name: 'Coast redwood', arche: 'conifer', leaf: 'spray', bark: 'redwood', seed: 404, typical: { height: 35, crownR: 5 },
     trunk: { h: 34.6, r0: 0.85, r1: 0.06, flare: 0.6, wiggle: 0.004, segs: 10, seg: 8, taperPow: 0.8 },
-    crown: { base: 10, top: 35, R: 5, shape: ['cone', 0.8, 5], irr: 0.24 }, // r4-trees: clear red bole below a ragged, narrow crown (not a generic cone)
+    crown: { base: 7.5, top: 35, R: 5, shape: ['cone', 0.8, 5], irr: 0.24 }, // r4-trees: clear red bole below a ragged, narrow crown (not a generic cone)
     whorls: { spacing: 1.15, n: 4, elev: [-0.35, 0.3], droop: 0.12, r: 0.07, lenK: [0.85, 1.0], clumpK: 0.35, clumpR: [0.6, 1.4] },
     cards: { n: 1500, size: 1.5, vbias: 0.05, out: 1.0, face: 0.35, flat: 0.45, jit: 0.35 },
-    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 12, rK0: 0.62, n1: 56, n2: 26, rK: 0.8, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, // flat, ragged branch-spray tiers
+    normal: 'cone', lod1Core: true, lod1Limbs: 0, puff: { n0: 24, rK0: 0.85, n1: 56, n2: 26, rK: 0.85, aspect: 1.65, core: 0, core0: 0, rMax: 0.5 }, // dense, flat, ragged branch-spray tiers (the near cards alone read as a scrawny bottlebrush)
     look: { cols: ['#3a5230', '#466036', '#33482c'], ramp: [0.35, 0.8, 0.15, 0.2], twig: '#6b3d2a', rough: 0.8, transBack: 0.3, transWrap: 0.2, blobK: 0.41, sway: 0.006, flutter: 0.0006, tintK: 1.0 },
   },
   eucalyptus: {
@@ -781,7 +781,7 @@ const SEASONAL = {
     spring: { cols: ['#74a03c', '#82ad45', '#669036'], ramp: [0.35, 0.8, 0.2, 0.2], density: 0.75 },
     summer: { cols: ['#55762f', '#628237', '#4b6a2a'], ramp: [0.35, 0.8, 0.2, 0.2], density: 1 },
     'early-autumn': { cols: ['#6c7d33', '#8b8a38', '#a07f3a'], ramp: [0.4, 0.75, 0.35, 0.2], density: 0.8 },
-    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.22 }, // the esplanade pollards are mostly bare by late November (r4-trees: a few brown leaves still cling to the whips)
+    'late-autumn': { cols: ['#86704a', '#8e6c42', '#6a5036'], ramp: [0.3, 0.6, 0.4, 0.25], density: 0.38 }, // the esplanade pollards are mostly bare by late November (r4-trees: a few brown leaves still cling to the whips)
     winter: { cols: ['#7d6a45', '#8a6f45', '#6b5538'], ramp: [0.4, 0.7, 0.3, 0.2], density: 0.0 },
   },
   deciduous: {
@@ -858,7 +858,7 @@ function buildSpecies(id, d, season, opts) {
       // fit the puff crowns to where the near LOD's leaves actually are (95th-percentile radius, 3rd-percentile base)
       const lp = L0.leaves.p, rads = [], ys = []; for (let i = 0; i < lp.length; i += 3) { rads.push(Math.hypot(lp[i], lp[i + 2])); ys.push(lp[i + 1]); }
       const fit = rads.length > 60 ? { R: percentile(rads, 0.95), base: percentile(ys, 0.03) } : null;
-      L0.puffs = buildPuffs(sk, d, rnd, density, Math.round((PF.n0 ?? 12) * (opts.puffK ?? 1)), { rK: PF.rK0 ?? 0.78, shell: 0.88, aoK: 0.86, core: PF.core0 ?? 1, coreY: 0.6, coreR: 0.36, fit, fistK: 0.5 });
+      L0.puffs = buildPuffs(sk, d, rnd, density, Math.round((PF.n0 ?? 12) * (opts.puffK ?? 1)), { rK: PF.rK0 ?? 0.78, shell: 0.88, aoK: 0.86, core: PF.core0 ?? 1, coreY: 0.6, coreR: 0.36, fit, fistK: 0.68 });
       L1.leaves = buildPuffs(sk, d, rnd, density, Math.round((PF.n1 ?? 30) * (opts.puffK ?? 1)), { fit, aoK: 0.92, skipK: 0.2 });
       L2.trunk = trunkOnly(sk, d);
       L2.puffs = buildPuffs(sk, d, rnd, density, PF.n2 ?? 13, { core: 1, rK: 0.95, fit, aoK: 0.9, skipK: 0 });

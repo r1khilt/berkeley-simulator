@@ -66,7 +66,7 @@ const BARK = {
     const ridge = Math.pow(1 - Math.abs(s * 2 - 1), 1.4);
     const f = pnoise(u * 96, v * 6, 96, 6, 35);
     const k = 0.5 + 0.5 * ridge + (f - 0.5) * 0.22;
-    return [cl(150 * k + 12), cl(80 * k + 8), cl(56 * k + 6), ridge * 0.8 + f * 0.2];
+    return [cl(136 * k + 12), cl(80 * k + 8), cl(60 * k + 6), ridge * 0.8 + f * 0.2]; // r4-trees: a step less orange (read as a painted pole in sun)
   },
   euc: (u, v) => { // blue gum: smooth cream-grey with long tan strips peeling away
     const n = pfbm(u * 4, v * 8, 4, 8, 4, 41);
