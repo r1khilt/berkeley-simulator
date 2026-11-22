@@ -139,6 +139,27 @@ export async function build(ctx) {
   stone.push(BX(bw0, bw1, -PL1, PL1, -1.0, WALL.y - 0.1));
   for (const s of [-1, 1]) stone.push(BX(bw1, PA0, s > 0 ? PL0 : -PL0 - RW, s > 0 ? PL0 + RW : -PL0, -1.0, WALL.y - 0.1));
   stone.push(BX(bw0 - 1.2, bw0, -6, 6, -1.0, WALL.y)); // rear stair/door block
+  // [r4-sweep-outer] the outside of the skene (what you see from Gayley Road / the east gate) was one blank 50 m slab:
+  // give it the same order as the stage side in plain relief: pilasters on the column grid, recessed stepped-frame panels,
+  // a base course, an architrave band and a projecting cornice with a cap, wrapped round the side returns.
+  { const oA = bw0; // outer face (outward = -along)
+    trim.push(BX(oA - 0.6, oA + 0.1, -PL1 - 0.6, PL1 + 0.6, WALL.y - 0.75, WALL.y - 0.12)); // cornice
+    trim.push(BX(oA - 0.75, oA + 0.1, -PL1 - 0.75, PL1 + 0.75, WALL.y - 0.12, WALL.y + 0.16)); // cornice cap
+    trim.push(BX(oA - 0.16, oA, -PL1, PL1, WALL.y - 1.95, WALL.y - 1.3)); // architrave band
+    stone.push(BX(oA - 0.28, oA, -PL1, PL1, -1.0, 1.15)); trim.push(BX(oA - 0.36, oA, -PL1, PL1, 1.15, 1.32)); // base course + lip
+    const pl = []; for (let l = 3.1; l < PL1 - 0.4; l += 3.0) { pl.push(l, -l); } pl.push(PL1 - 0.6, -(PL1 - 0.6)); pl.sort((a, b) => a - b);
+    for (const l of pl) if (Math.abs(l) > 6.4) stone.push(BX(oA - 0.42, oA, l - 0.45, l + 0.45, -1.0, WALL.y - 1.95));
+    const bays = pl.filter((l) => Math.abs(l) > 6.4);
+    for (let k = 0; k + 1 < bays.length; k++) { const l0 = bays[k] + 0.45, l1 = bays[k + 1] - 0.45; if (l1 - l0 < 1.2 || (l0 < 0 && l1 > 0)) continue;
+      const y0 = 1.9, y1 = WALL.y - 2.45;
+      for (const [d, o, w] of [[0.16, 0, 0.26], [0.08, 0.26, 0.12]]) { trim.push(BX(oA - d, oA, l0 + o, l1 - o, y0 + o, y0 + o + w)); trim.push(BX(oA - d, oA, l0 + o, l1 - o, y1 - o - w, y1 - o)); trim.push(BX(oA - d, oA, l0 + o, l0 + o + w, y0 + o + w, y1 - o - w)); trim.push(BX(oA - d, oA, l1 - o - w, l1 - o, y0 + o + w, y1 - o - w)); }
+      panel.push(BX(oA - 0.03, oA, l0 + 0.4, l1 - 0.4, y0 + 0.4, y1 - 0.4)); }
+    // side returns: outer faces at |l| = PL0 + RW, running from the back wall to the pylons
+    for (const sg of [-1, 1]) { const lo = sg * (PL0 + RW);
+      trim.push(BX(bw0 - 0.6, PA0, sg > 0 ? lo : lo - 0.6, sg > 0 ? lo + 0.6 : lo, WALL.y - 0.75, WALL.y - 0.12));
+      trim.push(BX(bw0 - 0.75, PA0, sg > 0 ? lo : lo - 0.75, sg > 0 ? lo + 0.75 : lo, WALL.y - 0.12, WALL.y + 0.16));
+      stone.push(BX(bw0, PA0, sg > 0 ? lo : lo - 0.28, sg > 0 ? lo + 0.28 : lo, -1.0, 1.15));
+      for (const a of [bw0 + 3.2, (bw0 + PA0) / 2, PA0 - 2.6]) stone.push(BX(a - 0.45, a + 0.45, sg > 0 ? lo : lo - 0.42, sg > 0 ? lo + 0.42 : lo, -1.0, WALL.y - 1.95)); } }
   // column positions on the back wall: centre bay 5.8 m, then 3.0 m bays
   const lats = []; for (let k = 0; k < 6; k++) { lats.push(2.9 + k * 3.0); lats.push(-(2.9 + k * 3.0)); }
   lats.sort((a, b) => a - b);
