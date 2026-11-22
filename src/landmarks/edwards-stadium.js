@@ -45,7 +45,7 @@ export async function build(ctx) {
       K.box(wallBuff, a + o, y0 + o + w, f0, a + o + w, y1 - o - w, f1); K.box(wallBuff, b - o - w, y0 + o + w, f0, b - o, y1 - o - w, f1); }
     const [q0, q1] = offs(vF, out, 0, 0.03); K.box(wallPanel, a + 0.48, y0 + 0.48, q0, b - 0.48, y1 - 0.48, q1);
   };
-  const baseCourse = (ua, ub, gg, vF, out) => { const [b0, b1] = offs(vF, out, 0, 0.26); K.box(wallBase, ua, gg - 0.6, b0, ub, gg + 1.25, b1); const [t0, t1] = offs(vF, out, 0, 0.32); K.box(wallBase, ua, gg + 1.25, t0, ub, gg + 1.42, t1); // base course + water-table lip };
+  const baseCourse = (ua, ub, gg, vF, out) => { const [b0, b1] = offs(vF, out, 0, 0.26); K.box(wallBase, ua, gg - 0.6, b0, ub, gg + 1.25, b1); const [t0, t1] = offs(vF, out, 0, 0.32); K.box(wallBase, ua, gg + 1.25, t0, ub, gg + 1.42, t1); }; // base course + water-table lip
 
   // ---------- grandstands ----------
   const stands = [
