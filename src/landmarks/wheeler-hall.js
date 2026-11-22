@@ -237,7 +237,7 @@ export async function build(ctx) {
     K.box(GD, u0, -2.0, vS, u1, FL + 0.5, tV1); // lower parapet along the terrace end
     for (const y of [FL - 0.55, FL - 1.55]) K.box(GD, u0 - 0.02, y - 0.02, tV1, u1 + 0.02, y + 0.02, v1 + 0.02, { detail: true }); // ashlar courses
     // raised board-formed concrete planters on the plaza: agapanthus + shrubs west of the block, dry grasses to the east
-    for (const [pu0, pv0, pu1, pv1, kind] of [[-32.8, 35.2, -26.6, 40.4, 'aga'], [15.5, 43.2, 21.5, 46.0, 'grass']]) { // (beside/outside the block, not in front of the flight)
+    for (const [pu0, pv0, pu1, pv1, kind] of [[15.5, 43.2, 21.5, 46.0, 'grass']]) { // (an agapanthus box by the west block hid the flight from the usual Sather Road viewpoint: left out)
       const gp = Math.min(K.g(pu0, pv0), K.g(pu1, pv0), K.g(pu0, pv1), K.g(pu1, pv1)), yP = Math.max(K.g(pu0, pv0), K.g(pu1, pv0), K.g(pu0, pv1), K.g(pu1, pv1)) + 0.62;
       K.box(PLANTER, pu0, gp - 0.4, pv0, pu1, yP, pv1); K.box(M.soil, pu0 + 0.18, yP - 0.08, pv0 + 0.18, pu1 - 0.18, yP - 0.06, pv1 - 0.18);
       r5cols.push(K.colPoly([[pu0, pv0], [pu1, pv0], [pu1, pv1], [pu0, pv1]], gp - 0.4, yP));
