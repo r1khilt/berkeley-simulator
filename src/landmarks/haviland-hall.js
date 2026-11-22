@@ -67,7 +67,8 @@ export async function build(ctx) {
     // (the frontispiece now stands 0.25 m proud of the façade: the recessed door used to sit behind the solid bay-7 wall face and never showed)
     const R = K.run([uF - 0.25, v0], [uF - 0.25, v1]); const o = { s0: 1.95, s1: 4.45, y0: yL, y1: yL + 5.9, doorTop: yL + 3.2 }; // rectangular opening (photo): arched wood doors under a tall gridded transom
     const WD = tint(M.woodDark, 0x8a5634);
-    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); K.fill(R, o, { kind: 'door', door: WD, glass: M.glass, rev: 0.15 }); // dark glass: no lit interior behind the fanlight
+    K.wall(R, ST, 0.3, 6.1, yL, yT, [o], 0.25); const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass';
+    K.fill(R, o, { kind: 'door', door: WD, glass: DKG, rev: 0.15 }); // dark glass: no lit interior behind the transom
     { const w = o.s1 - o.s0, rr = w / 2, cx = (o.s0 + o.s1) / 2, spring = o.y1 + 99; // gridded transom (photo: ~5 x 6 lights)
       { const ag = new THREE.TorusGeometry(rr - 0.08, 0.07, 5, 20, Math.PI); ag.translate(cx, o.doorTop - rr + 0.02, -0.12); K.addRun(R, WD, ag, { detail: true }); const tg = new THREE.Shape(); tg.moveTo(o.s0, o.doorTop); tg.lineTo(o.s0, o.doorTop - rr); tg.absarc(cx, o.doorTop - rr, rr, Math.PI, 0, true); tg.lineTo(o.s1, o.doorTop); tg.lineTo(o.s0, o.doorTop); const sg = new THREE.ShapeGeometry(tg, 8); sg.translate(0, 0, -0.135); K.addRun(R, tint(M.woodDark, 0x6e4228), sg, { detail: true }); } // arched head of the door leaves
       for (let k = 1; k < 5; k++) { const x = o.s0 + w * k / 5, dx = x - cx, top = Math.min(o.y1 - 0.02, spring + Math.sqrt(Math.max(0, rr * rr - dx * dx)) - 0.02); K.rbox(R, WD, x - 0.025, o.doorTop, -0.15, x + 0.025, top, -0.11, { detail: true }); }

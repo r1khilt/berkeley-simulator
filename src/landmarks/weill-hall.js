@@ -36,6 +36,7 @@ export async function build(ctx) {
   const CD = M.stuccoWhite.clone(); CD.color = new THREE.Color(0xa8a69e);       // plinth / shadowed concrete [r5a] greyer
   const TILE = M.redTile;                                                       // [r5a] red Mission clay tile (photo: #b85a3e sunlit), was a grey-mauve slate tint
   const FR = P.trimWhite, GL = M.windowNight;
+  const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x1e2a2a); // [r5a] atrium curtain wall: no furnished rooms behind it
   const colliders = [], walkables = [];
   let poly = ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z));
   const simp = []; for (let i = 0; i < poly.length; i++) { const a = poly[(i - 1 + poly.length) % poly.length], b = poly[i], c = poly[(i + 1) % poly.length];
@@ -72,7 +73,7 @@ export async function build(ctx) {
       const D = 4.2; const e = 0.7; // recess depth, solid end strips
       K.wall(R, BAND, 0, L, Y0, EAVE, [{ s0: e, s1: L - e, y0: FL - 0.3, y1: TOP }], 0.45);
       K.rbox(R, CD, e, Y0, -D - 0.3, L - e, TOP, -D);                                                     // atrium back
-      K.rbox(R, M.glass, e + 0.05, FL - 0.3, -D + 0.01, L - e - 0.05, TOP - 0.1, -D + 0.04, { uvMode: 'keep' }); // curtain wall [r5a] dark green-black glazing deep behind the frame (photo #1e2a2a)
+      K.rbox(R, DKG, e + 0.05, FL - 0.3, -D + 0.01, L - e - 0.05, TOP - 0.1, -D + 0.04, { uvMode: 'keep' }); // curtain wall [r5a] dark green-black glazing deep behind the frame (photo #1e2a2a)
       const nm = Math.round((L - 2 * e) / 1.5); for (let k = 1; k < nm; k++) { const s = e + (L - 2 * e) * k / nm; K.rbox(R, FR, s - 0.04, FL - 0.3, -D + 0.04, s + 0.04, TOP - 0.1, -D + 0.12, { detail: true }); }
       for (const s of [e, L - e]) K.rbox(R, BAND, s - (s === e ? 0.0 : 0.45) , Y0, -D - 0.3, s + (s === e ? 0.45 : 0), TOP, 0);
       const px = [e + 0.3, e + (L - 2 * e) / 3, e + 2 * (L - 2 * e) / 3, L - e - 0.3];

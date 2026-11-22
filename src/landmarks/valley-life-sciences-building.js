@@ -24,6 +24,9 @@ export async function build(ctx) {
   const STEP = tint(M.concrete, 0xd9d3c5), NOSE = solid(0x7d776c, 0.9, 0.0), RISER = tint(M.concrete, 0xaaa396); // [r5a] steps: concrete treads with a dark shadow line under each nosing so flights read as steps, not ramps
   const SP = solid(0x1d1e20, 0.6, 0.3), FR = solid(0x1b1c1e, 0.45, 0.5), LV = solid(0x8c8a84, 0.8, 0.2), DOOR = solid(0x2b2a27, 0.4, 0.6);
   const GL = M.windowNight;
+  // [r5a] dark, non-interior glass for the giant window strips, doors and basement lights: the photos show dark bronze glazing,
+  // and lit furnished rooms behind 9 m strips made the front read as an office block (attic/pavilion windows keep GL)
+  const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x1d2326);
   const RAIL = solid(0xc3c6c8, 0.42, 0.35); // galvanised, not mirror-blue
   const pipe = (a, b, r = 0.03) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
   // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
@@ -70,7 +73,7 @@ export async function build(ctx) {
     const bw = []; for (let i = 0; i < nb; i++) { const c = (i + 0.5) * p; if ((o.entrance || []).includes(i)) continue; const y0 = bwY(R, s0 + c, 0.65, 2.75, 3.85); if (y0 != null) bw.push({ s0: c - 0.65, s1: c + 0.65, y0, y1: 3.85 });
       const yl = lowY(R, s0 + c, 0.65); if (yl != null) bw.push({ s0: c - 0.65, s1: c + 0.65, y0: yl, y1: 2.4 }); } // + a lower row where the slope exposes the sub-basement
     K.wall(RP, STD, 0, s1 - s0, gmin - 1.5, 4.05, bw, 0.8);
-    for (const w of bw) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR });
+    for (const w of bw) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR, glass: DKG });
     // [r5a] o.doorY < FL (south front: LiDAR landing ~4.5 m): the water table and frieze band stop at the entrance bays so the doors drop to the landing
     const dY = o.doorY ?? FL, ents = o.entrance || [], lowDoor = dY < FL - 0.01 && ents.length;
     const spans = lowDoor ? [[s0, s0 + Math.min(...ents) * p + PW / 2], [s0 + (Math.max(...ents) + 1) * p - PW / 2, s1]] : [[s0, s1]];
@@ -79,6 +82,7 @@ export async function build(ctx) {
     for (let i = 0; i < nb; i++) { const c = s0 + (i + 0.5) * p; if (lowDoor && ents.includes(i)) continue; // roundel + paired stems
       const g = new THREE.CylinderGeometry(0.5, 0.5, 0.14, 18); g.rotateX(Math.PI / 2); g.translate(c, 4.74, 0.19); K.addRun(R, ST, g, { detail: true });
       const g2 = new THREE.CylinderGeometry(0.36, 0.36, 0.07, 14); g2.rotateX(Math.PI / 2); g2.translate(c, 4.74, 0.28); K.addRun(R, STD, g2, { detail: true });
+      { const rg = new THREE.TorusGeometry(0.53, 0.045, 4, 18); rg.translate(c, 4.74, 0.13); K.addRun(R, NOSE, rg, { detail: true }); } // [r5a] shadow ring so the roundels read
       for (const dx of [-1.15, -0.95, 0.95, 1.15]) K.rbox(R, ST, c + dx - 0.05, 4.28, 0.12, c + dx + 0.05, 5.2, 0.2, { detail: true });
     }
     // pilasters
@@ -97,14 +101,14 @@ export async function build(ctx) {
       const a = s0 + i * p + PW / 2, b = s0 + (i + 1) * p - PW / 2; const ent = (o.entrance || []).includes(i);
       if (!(lowDoor && ent)) K.rbox(R, ST, a, FL, -0.62, b, FL + 0.32, -0.28); // sill ledge
       K.rbox(R, FR, a, ct - 0.18, -0.62, b, ct, -0.5); // head
-      K.rbox(R, GL, a, FL + 0.32, -0.66, b, ct - 0.18, -0.6);
+      K.rbox(R, DKG, a, FL + 0.32, -0.66, b, ct - 0.18, -0.6);
       if (ent) {
         // [r5a] glazed bronze double doors (were flat black slabs): frame, two glass leaves, centre stile, push bars, gridded transom
         K.rbox(R, DOOR, a + 0.25, dY, -0.66, b - 0.25, FL + 2.8, -0.6); if (lowDoor) K.rbox(R, STD, a, dY - 0.1, -0.8, b, FL + 0.4, -0.66); // backing below the strip glass
-        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, M.glass, x0, dY + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, dY + 1.0, -0.585, x1 - 0.08, dY + 1.06, -0.55, { detail: true }); }
-          K.rbox(R, M.glass, a + 0.42, FL + 2.18, -0.6, b - 0.42, FL + 2.68, -0.585, { uvMode: 'keep' }); for (let k = 1; k < 4; k++) { const x = a + 0.42 + (b - a - 0.84) * k / 4; K.rbox(R, FR, x - 0.03, FL + 2.18, -0.585, x + 0.03, FL + 2.68, -0.56, { detail: true }); } }
+        { const m = (a + b) / 2; for (const [x0, x1] of [[a + 0.42, m - 0.1], [m + 0.1, b - 0.42]]) { K.rbox(R, DKG, x0, dY + 0.25, -0.6, x1, FL + 2.05, -0.585, { uvMode: 'keep' }); K.rbox(R, FR, x0 + 0.08, dY + 1.0, -0.585, x1 - 0.08, dY + 1.06, -0.55, { detail: true }); }
+          K.rbox(R, DKG, a + 0.42, FL + 2.18, -0.6, b - 0.42, FL + 2.68, -0.585, { uvMode: 'keep' }); for (let k = 1; k < 4; k++) { const x = a + 0.42 + (b - a - 0.84) * k / 4; K.rbox(R, FR, x - 0.03, FL + 2.18, -0.585, x + 0.03, FL + 2.68, -0.56, { detail: true }); } }
         K.rbox(R, FR, (a + b) / 2 - 0.05, dY, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
-        K.rbox(R, FR, a - 0.05, FL + 2.85, -0.6, b + 0.05, FL + 3.45, 0.95); // marquee canopy
+        K.rbox(R, FR, a - 0.05, FL + 2.8, -0.6, b + 0.05, FL + 3.6, 1.3); // marquee canopy [r5a] deeper, boxier (photo)
         // diamond lattice grille over the rest of the strip
         const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.45; // [r5a] denser lattice (photos: ~6-8 diamonds across a bay), was 0.9 m with 0.11 bars
         for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.065, 0.08); }
@@ -148,9 +152,9 @@ export async function build(ctx) {
     const dops = (o.door || []).map((i) => ({ s0: (i + 0.5) * p - 0.85, s1: (i + 0.5) * p + 0.85, y0: FL, y1: FL + 3.3, doorTop: FL + 2.5 })); // [r5a] pavilion side entrance (on the window axis)
     const bops = []; for (let i = 0; i < nb; i++) { const c = (i + 0.5) * p; if ((o.door || []).includes(i)) continue; const y0 = bwY(RP, c, 0.5, 2.75, 3.75); if (y0 != null) bops.push({ s0: c - 0.5, s1: c + 0.5, y0, y1: 3.75 });
       const yl = lowY(RP, c, 0.5); if (yl != null) bops.push({ s0: c - 0.5, s1: c + 0.5, y0: yl, y1: 2.4 }); } // [r5a] grade-following
-    K.wall(RP, STD, 0, L, gmin - 1.5, 4.05, bops, 0.6); for (const w of bops) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR });
+    K.wall(RP, STD, 0, L, gmin - 1.5, 4.05, bops, 0.6); for (const w of bops) K.fill(RP, w, { mull: 1, rev: 0.3, frame: FR, glass: DKG });
     K.wall(RP, ST, 0, L, 4.05, ct, [...ops, ...dops], 0.6);
-    for (const w of dops) { K.fill(RP, w, { kind: 'door', door: DOOR, glass: M.glass, rev: 0.45, frame: FR }); for (const [a0, a1] of [[w.s0 - 0.3, w.s0], [w.s1, w.s1 + 0.3]]) K.rbox(RP, STD, a0, w.y0, 0, a1, w.y1 + 0.3, 0.12); K.rbox(RP, STD, w.s0 - 0.3, w.y1, 0, w.s1 + 0.3, w.y1 + 0.3, 0.12); K.rbox(RP, ST, w.s0 - 0.5, w.y1 + 0.3, 0, w.s1 + 0.5, w.y1 + 0.55, 0.5); } // door in a cast-stone surround under a hood
+    for (const w of dops) { K.fill(RP, w, { kind: 'door', door: DOOR, glass: DKG, rev: 0.45, frame: FR }); for (const [a0, a1] of [[w.s0 - 0.3, w.s0], [w.s1, w.s1 + 0.3]]) K.rbox(RP, STD, a0, w.y0, 0, a1, w.y1 + 0.3, 0.12); K.rbox(RP, STD, w.s0 - 0.3, w.y1, 0, w.s1 + 0.3, w.y1 + 0.3, 0.12); K.rbox(RP, ST, w.s0 - 0.5, w.y1 + 0.3, 0, w.s1 + 0.5, w.y1 + 0.55, 0.5); } // door in a cast-stone surround under a hood
     for (const w of ops) { K.fill(RP, w, { mull: 1, tran: [w.y1 - 0.8], rev: 0.4, frame: FR }); K.rbox(RP, ST, w.s0 - 0.18, w.y1, 0, w.s1 + 0.18, w.y1 + 0.3, 0.12, { detail: true }); }
     K.rbox(RP, STD, 0, 4.0, -0.6, L, 4.18, 0.12);
     for (const [a, b] of [[0, 0.32], [L - 0.32, L]]) K.rbox(RP, ST, a, gmin - 1.5, -0.6, b, ct, 0.1); // corner strips
@@ -223,7 +227,7 @@ export async function build(ctx) {
     // block's own floor (~ grade here), a flat dark canopy under its cornice, and a shallow landing with a step down to the walk
     { const R = K.run([77.1, 8.2], [77.1, -8.0]), sc = 8.1, gE = Math.min(K.g(80.0, -1.5), K.g(80.0, 1.5), K.g(80.0, 0)), yD = Math.max(4.62, gE + 0.16), uL = 78.9;
       K.rbox(R, FR, sc - 2.1, yD - 0.02, -0.06, sc + 2.1, yD + 2.55, 0.05);
-      for (const [x0, x1] of [[sc - 1.95, sc - 1.25], [sc - 1.15, sc - 0.06], [sc + 0.06, sc + 1.15], [sc + 1.25, sc + 1.95]]) K.rbox(R, M.glass, x0, yD + 0.1, 0.05, x1, yD + 2.4, 0.065, { uvMode: 'keep' });
+      for (const [x0, x1] of [[sc - 1.95, sc - 1.25], [sc - 1.15, sc - 0.06], [sc + 0.06, sc + 1.15], [sc + 1.25, sc + 1.95]]) K.rbox(R, DKG, x0, yD + 0.1, 0.05, x1, yD + 2.4, 0.065, { uvMode: 'keep' });
       K.rbox(R, FR, sc - 1.1, yD + 0.95, 0.065, sc + 1.1, yD + 1.01, 0.1, { detail: true });
       K.rbox(R, FR, sc - 2.5, yD + 2.6, -0.05, sc + 2.5, yD + 2.85, 1.6); // canopy, below the block's cornice (7.6)
       K.box(STEP, 77.1, gE - 1, -2.6, uL, yD, 2.8); walkables.push(K.walkPoly(rect(77.1, -2.6, uL, 2.8), yD)); (K._stairs || (K._stairs = [])).push([77.1, -2.6, uL + 0.6, 2.8]);
@@ -253,10 +257,9 @@ export async function build(ctx) {
     for (const u of [uA - 1.2, uB]) {
       K.box(ST, u, g0 - 1, Math.min(land0, land1), u + 1.2, FLs + 0.55, Math.max(land0, land1));
       K.box(ST, u - 0.06, FLs + 0.55, Math.min(land0, land1) - 0.06, u + 1.26, FLs + 0.65, Math.max(land0, land1) + 0.06);
-      // stepped planter cubes descending outward from the cheek (photo 04), shrub-topped
+      // stepped cubes descending outward from the cheek (photo 04)
       { const out = u < UC ? -1 : 1; for (let k = 1; k <= 2; k++) { const x0 = out < 0 ? u - 1.15 * k : u + 1.2 + 1.15 * (k - 1), x1 = x0 + 1.15, yt = Math.max(g0 + 0.45, FLs + 0.55 - 0.8 * k);
-        K.box(ST, x0, g0 - 1, Math.min(land0, land1), x1, yt, Math.max(land0, land1)); K.box(ST, x0 - 0.04, yt, Math.min(land0, land1) - 0.04, x1 + 0.04, yt + 0.08, Math.max(land0, land1) + 0.04);
-        const sg = new THREE.IcosahedronGeometry(0.5, 1); sg.scale(1.0, 0.75, 1.6); sg.translate((x0 + x1) / 2, yt + 0.32, (land0 + land1) / 2); K.add(rnMats(M).leafA, sg, { detail: true }); } }
+        K.box(ST, x0, g0 - 1, Math.min(land0, land1), x1, yt, Math.max(land0, land1)); K.box(ST, x0 - 0.04, yt, Math.min(land0, land1) - 0.04, x1 + 0.04, yt + 0.08, Math.max(land0, land1) + 0.04); } }
       for (let k = 0; k < 3; k++) { const f0 = k / 3, f1 = (k + 1) / 3; const pa = vTopF + (vStop - vTopF) * f0, pb = vTopF + (vStop - vTopF) * f1;
         const yb = FLs - (FLs - g0) * (f1 * (len - 2 * T) / len) + 0.75; K.box(ST, u, g0 - 1, Math.min(pa, pb), u + 1.2, yb, Math.max(pa, pb)); }
       colliders.push(K.colPoly(rect(u, Math.min(vStop, land1), u + 1.2, Math.max(vStop, land1)), g0 - 1, FLs + 0.9));
