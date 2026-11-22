@@ -49,7 +49,8 @@ const SIGN = { x: -693.7, z: 142.6, yaw: Math.PI / 2 };   // Oxford & Center cam
 // Class of 1953 gift (Berkeleyan, 17 Nov 1999): with the cast granite + bronze sign came "landscaping along a wooded path
 // on the opposite corner ... above the banks of the south fork ... boulders for use as seats": granite seat boulders
 const SEATS = [[-683.6, 174.4, 0.3], [-676.3, 177.0, 1.4], [-669.0, 176.4, 2.2], [-661.4, 174.0, 0.9]];
-let PLANS = null;   // bridge deck profiles, computed once from the graded heightfield
+let PLANS = null;
+let GM = null;       // ground SDF + grid, kept for the riparian shrub pass   // bridge deck profiles, computed once from the graded heightfield
 
 // ------------------------------------------------------------------ heightfield helpers
 function hgrid(heights, c) {
@@ -82,6 +83,7 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 // ------------------------------------------------------------------ 1) grading (runs right after gradeTerrain)
 export function gradeR5West({ heights, c, gt, sdf }) {
   if (R5W_OFF) return null;
+  GM = { sdf, gt, c };
   const G = hgrid(heights, c);
   // a) re-cut channels the LiDAR missed: under the Octagon / car bridges (decks returned as ground), the North Fork's
   //    lower reach below its culvert (vegetation-smoothed; "a deep pool ... then a series of noisy cataracts"), and the
@@ -517,4 +519,46 @@ function buildAsucWall(A, MAT, heightAt, water, physics, group, quality) {
       physics.addWalkable({ type: 'fn', tag: 'r5-stones', bounds: [x0, z0, x1, z1], heightAt: (x, z) => { for (const [sx2, sy, sz2] of stones) if ((x - sx2) ** 2 + (z - sz2) ** 2 < 0.13) return sy; return null; } }); }
   }
   return pts.length;
+}
+
+// ------------------------------------------------------------------ riparian understory (Grinnell Natural Area / grove reach)
+// The photos and the Creeks of UC Berkeley tour describe a dense riparian edge (creek dogwood thickets at the confluence,
+// California rose, thimbleberry, ivy banks); the LiDAR only found the canopy trees, so the banks read as open lawn.
+// Adds shrub-class instances (species 'shrub') up both banks, off paths/decks, clear of existing trunks. Call after
+// reseatTrees() and before the TreeSystem is built; ?nor5w=1 skips it.
+const SHRUB_REACHES = [
+  [[-367, 187], [-381, 184], [-398, 191], [-414, 192], [-428, 185], [-440, 181], [-454, 178], [-460, 169], [-462, 151]],
+  [[-466, 125], [-471, 124], [-495, 122], [-506, 112], [-507, 97], [-514, 93], [-526, 95], [-535, 103], [-553, 96], [-571, 98], [-581, 105], [-582, 120], [-589, 130], [-604, 132], [-615, 145], [-622, 156], [-642, 179], [-658, 190], [-671, 192]],
+  [[-569, 56], [-579, 66], [-585, 79], [-585, 93], [-581, 105]],
+];
+export function augmentR5Trees(trees, heightAt) {
+  if (R5W_OFF || !trees || !GM) return 0;
+  const { sdf, gt, c } = GM; const sx0 = c.x0 + 0.5 * gt.step, sz0 = c.z0 + 0.5 * gt.step;
+  const paved = (x, z) => { const j = Math.round((x - sx0) / gt.step), i = Math.round((z - sz0) / gt.step); if (i < 0 || j < 0 || i >= gt.nz || j >= gt.nx) return true; const o = (i * gt.nx + j) * 4; return sdf[o] > 104 || sdf[o + 1] > 104; };
+  // existing trunks on a 4 m hash
+  const cell = new Map(); const key = (x, z) => Math.floor(x / 4) * 100003 + Math.floor(z / 4);
+  for (let i = 0; i < trees.n; i++) { const x = trees.x[i] / 10, z = trees.z[i] / 10; if (x < -700 || x > -340 || z < 30 || z > 220) continue; const k = key(x, z); let l = cell.get(k); if (!l) cell.set(k, (l = [])); l.push([x, z]); }
+  const nearTree = (x, z, r) => { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = cell.get(Math.floor(x / 4 + a) * 100003 + Math.floor(z / 4 + b)); if (l) for (const [tx, tz] of l) if ((tx - x) ** 2 + (tz - z) ** 2 < r * r) return true; } return false; };
+  const add = []; let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (const R of SHRUB_REACHES) {
+    const S = resample(R, 2.2, 0);
+    for (const q of S) for (const sg of [-1, 1]) {
+      if (rnd() < 0.18) continue;
+      let low = Infinity; for (let o = -2.5; o <= 2.5; o += 0.5) low = Math.min(low, heightAt(q.x - q.tz * o, q.z + q.tx * o));
+      const off = 2.6 + rnd() * 3.2; const x = q.x - q.tz * off * sg + (rnd() - 0.5) * 1.2, z = q.z + q.tx * off * sg + (rnd() - 0.5) * 1.2;
+      const y = heightAt(x, z); if (y < low + 0.45) continue;                       // up the bank, never in the channel
+      if (paved(x, z) || nearTree(x, z, 1.6)) continue;
+      if ((PLANS || []).some((p) => p && p.deckAt(x, z, 2.5) != null)) continue;
+      add.push([x, z, y, 1.3 + rnd() * 1.7, 0.9 + rnd() * 1.1, rnd()]);
+      const k = key(x, z); let l = cell.get(k); if (!l) cell.set(k, (l = [])); l.push([x, z]);
+    }
+  }
+  if (!add.length) return 0;
+  const n0 = trees.n, n = n0 + add.length;
+  const grow = (A, T) => { const B = new T(n); B.set(A); return B; };
+  const X = grow(trees.x, Int16Array), Z = grow(trees.z, Int16Array), Y = grow(trees.y, Uint16Array), Hh = grow(trees.h, Uint16Array), Rr = grow(trees.r, Uint8Array), SP = grow(trees.sp, Uint8Array), CR = grow(trees.cr, Uint8Array), CG = grow(trees.cg, Uint8Array), CB = grow(trees.cb, Uint8Array);
+  add.forEach(([x, z, y, h, r, v], k) => { const i = n0 + k; X[i] = Math.round(x * 10); Z[i] = Math.round(z * 10); Y[i] = Math.max(0, Math.round(y * 100)); Hh[i] = Math.round(h * 100); Rr[i] = Math.round(r * 10); SP[i] = 13; CR[i] = 62 + v * 18; CG[i] = 84 + v * 20; CB[i] = 46 + v * 10; });
+  Object.assign(trees, { n, x: X, z: Z, y: Y, h: Hh, r: Rr, sp: SP, cr: CR, cg: CG, cb: CB });
+  return add.length;
 }

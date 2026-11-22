@@ -19,7 +19,7 @@ import { UI, buildMapCanvas } from './ui/ui.js';
 import { Audio } from './audio.js';
 import { PLACES } from './places.js';
 import { installBigGame, BIG_GAME_PLACES } from './props/bigGame.js'; // Big Game easter egg (permanent)
-import { gradeR5West, installR5West } from './world/r5-west.js'; // [r5b] west creek bridges, culverts, Oxford gateway (?nor5w=1 disables)
+import { gradeR5West, installR5West, augmentR5Trees } from './world/r5-west.js'; // [r5b] west creek bridges, culverts, Oxford gateway (?nor5w=1 disables)
 import { installWater } from './world/water.js'; // r4-campanile: Strawberry Creek water, Mining Circle pool, water sounds (?nowater=1 disables)
 import { installCampanile } from './props/campanile.js'; // r4-campanile: elevator ride, carillon recitals + hourly toll (?nobells=1 disables)
 import { buildStreetscape } from './world/streetscape.js';
@@ -127,6 +127,7 @@ async function boot() {
   // ---- trees
   const trees = decodeTrees(treeBin);
   if (gwPlan) reseatTrees(gwPlan, trees); // [r4-ground] trees follow the graded terrain
+  try { BS.r5shrubs = augmentR5Trees(trees, heightAt); } catch (e) { console.warn('r5-west shrubs failed', e); } // [r5b] riparian understory along the west creek
   let treeSys = null;
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
