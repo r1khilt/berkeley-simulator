@@ -70,7 +70,7 @@ function mats() {
   _m = {
     pillar: tint(M.concrete, 0xe3d2ae, { name: 'statue:pillar', roughness: 0.92 }),
     joint: tint(M.stucco, 0xb9a887, { name: 'statue:pillarJoint', roughness: 0.95 }),
-    gold: new THREE.MeshStandardMaterial({ color: 0xdcaa4a, metalness: 1, roughness: 0.34, vertexColors: true, name: 'statue:goldLeaf' }),
+    gold: new THREE.MeshStandardMaterial({ color: 0xcfa556, metalness: 1, roughness: 0.38, vertexColors: true, name: 'statue:goldLeaf' }),
     granite: ao(tint(M.granite, 0xb3b2ac, { name: 'statue:greyGranite', roughness: 0.92 })),
     plinth: tint(M.granite, 0xa9a8a3, { name: 'statue:plinth', roughness: 0.9 }),
     rock: ao(tint(M.granite, 0x9d9584, { name: 'statue:rock', roughness: 0.97 })),
@@ -106,11 +106,11 @@ export async function goldenBear() { // Lower Sproul: chamfered concrete pillar 
   B.add(K.pillar, box(1.2, 0.34, 1.2, 0, -0.2, 0)); B.add(K.pillar, new THREE.CylinderGeometry(0.44 * Math.SQRT2, 0.6 * Math.SQRT2, 0.16, 4, 1).rotateY(Math.PI / 4).translate(0, 0.22, 0)); // chamfered base block
   B.add(K.pillar, box(2 * a + 0.1, 0.14, 2 * a + 0.1, 0, H - 0.98, 0)); B.add(K.joint, box(2 * a + 0.06, 0.03, 2 * a + 0.06, 0, H - 1.0, 0)); // capital band under the soffit
   // cap: 2.6 m square slab, 0.2 m at the edge, inverted-pyramid soffit down onto the shaft
-  B.add(K.pillar, box(2.6, 0.22, 2.6, 0, H - 0.07, 0));
-  B.add(K.pillar, new THREE.ConeGeometry(1.3 * Math.SQRT2, 0.55, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.07 - 0.275, 0));
+  B.add(K.pillar, box(2.6, 0.16, 2.6, 0, H - 0.01, 0));
+  B.add(K.pillar, new THREE.ConeGeometry(1.3 * Math.SQRT2, 0.45, 4, 1).rotateY(Math.PI / 4).rotateX(Math.PI).translate(0, H - 0.01 - 0.225, 0));
   for (const yy of [1.4, 2.8, 4.2]) B.add(K.joint, box(2 * a - 2 * c + 0.012, 0.014, 2 * a + 0.006, 0, yy, 0)), B.add(K.joint, box(2 * a + 0.006, 0.014, 2 * a - 2 * c + 0.012, 0, yy, 0)); // faint formwork lift joints
   B.flush(g, { name: 'golden-bear' });
-  const bear = await sculpt('bear-hardy', K.gold, { s: 1.4, ao: 0.5 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
+  const bear = await sculpt('bear-hardy', K.gold, { s: 1.4, ao: 0.75 }); bear.position.set(0, H + 0.15, 0.0); g.add(bear);
   return g;
 }
 
