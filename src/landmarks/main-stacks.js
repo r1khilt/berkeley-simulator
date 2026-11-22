@@ -18,9 +18,9 @@ export const info = {
 };
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
-  const STONE = tint(M.concrete, 0xd6d0c4), STONE_D = tint(M.concrete, 0xb7b1a6), BRICK = tint(M.brick, 0xb06a5e), BANDM = tint(M.concrete, 0xd2cbbf);
+  const STONE = tint(M.stuccoWhite, 0xe4dfd4), STONE_D = tint(M.concrete, 0xc4beb3), BRICK = tint(M.brick, 0xb06a5e), BANDM = tint(M.concrete, 0xd2cbbf);
   const WALK = tint(M.concrete, 0xc2bdb3), GLASS = M.glassLight, FRAME = solid(0xb9bcbe, 0.4, 0.6), LAMP = solid(0x2f4a3c, 0.5, 0.3);
-  const JUNIPER = solid(0x3f5a2e, 0.95, 0), SOIL = tint(M.soil, 0x5a4634);
+  const JUNIPER = solid(0x3f5a2e, 0.95, 0), JUNIPER2 = solid(0x56702f, 0.95, 0), SOIL = tint(M.soil, 0x5a4634);
   const fp = ctx.footprints[0].outer.map(([x, z]) => K.uv(x, z));
   const poly = orient(fp); const Y = 4.9; const n = poly.length;
   const g0 = Math.min(...poly.map(([u, v]) => K.g(u, v))) - 1.5;
@@ -37,7 +37,7 @@ export async function build(ctx) {
     const gOut = Math.min(...[0.15, 0.5, 0.85].map((t) => { const p = R.at(R.L * t, 2.0); return K.g(p[0], p[1]); }));
     // opening in the east parapet where the north-east stair's landing joins the terrace (v -19.8..-16.8)
     let gap = null; if (R.n[0] > 0.5 && Math.min(a[1], b[1]) < -19 && Math.max(a[1], b[1]) > -16) { const sAt = (v) => ((19 - R.a[0]) * R.t[0] + (v - R.a[1]) * R.t[1]); const g1 = sAt(-19.8), g2 = sAt(-16.8); gap = [Math.min(g1, g2), Math.max(g1, g2)]; }
-    edges.push({ R, L, doe, glade: !doe && (R.n[1] < -0.5 || R.n[0] < -0.5), gOut, gap });
+    edges.push({ R, L, doe, glade: !doe, gOut, gap }); // every outward (non-Doe) edge carries the balustrade
   }
   for (const e of edges) {
     const { R, L } = e; if (e.doe) continue;
@@ -47,13 +47,16 @@ export async function build(ctx) {
     if (Y - e.gOut > 1.6 && L > 2) K.rbox(R, STONE_D, 0, Y - 1.05, 0.04, L, Y - 0.95, 0.07, { detail: true });
     // parapet: balustrade panels between solid dies on the Glade sides, solid coped parapet elsewhere
     if (e.glade && L > 3) {
-      const nP = Math.max(1, Math.round(L / 4.2)), pw = L / nP;
-      for (let k = 0; k < nP; k++) {
-        const s0 = k * pw, s1 = (k + 1) * pw;
-        K.rbox(R, STONE, s0, Y - 0.2, -0.55, s0 + 0.6, Y + 1.12, 0.02); K.rbox(R, STONE, s0 - 0.04, Y + 1.12, -0.59, s0 + 0.64, Y + 1.2, 0.06);
-        balustrade(K, R, STONE, s0 + 0.6, s1, Y - 0.05, 1.05, { d: -0.26, pitch: 0.3 });
+      for (const [r0, r1] of e.gap ? [[0, e.gap[0]], [e.gap[1], L]] : [[0, L]]) {
+        const RL = r1 - r0; if (RL < 1.3) { if (RL > 0.2) K.rbox(R, STONE, r0, Y - 0.2, -0.55, r1, Y + 1.12, 0.02); continue; }
+        const nP = Math.max(1, Math.round(RL / 4.2)), pw = RL / nP;
+        for (let k = 0; k < nP; k++) {
+          const s0 = r0 + k * pw, s1 = r0 + (k + 1) * pw;
+          K.rbox(R, STONE, s0, Y - 0.2, -0.55, s0 + 0.6, Y + 1.12, 0.02); K.rbox(R, STONE, s0 - 0.04, Y + 1.12, -0.59, s0 + 0.64, Y + 1.2, 0.06);
+          balustrade(K, R, STONE, s0 + 0.6, s1, Y - 0.05, 1.05, { d: -0.26, pitch: 0.3 });
+        }
+        K.rbox(R, STONE, r1 - 0.6, Y - 0.2, -0.55, r1, Y + 1.12, 0.02); K.rbox(R, STONE, r1 - 0.64, Y + 1.12, -0.59, r1 + 0.04, Y + 1.2, 0.06);
       }
-      K.rbox(R, STONE, L - 0.6, Y - 0.2, -0.55, L, Y + 1.12, 0.02);
     } else {
       for (const [s0, s1] of e.gap ? [[0, e.gap[0]], [e.gap[1], L]] : [[0, L]]) { if (s1 - s0 < 0.2) continue;
         K.rbox(R, STONE, s0, Y - 0.2, -0.45, s1, Y + 0.85, 0.02); K.rbox(R, STONE, s0 - 0.03, Y + 0.85, -0.5, s1 + 0.03, Y + 0.95, 0.07); }
@@ -61,13 +64,13 @@ export async function build(ctx) {
     for (const [s0, s1] of e.gap ? [[0, e.gap[0]], [e.gap[1], L]] : [[0, L]]) if (s1 - s0 > 0.2) colliders.push(K.colPoly([R.at(s0, 0.05), R.at(s1, 0.05), R.at(s1, -0.5), R.at(s0, -0.5)], Y - 0.3, Y + 1.15));
     // juniper bank at the foot of the tall Glade-side walls: a 3.5 m wedge of low spreading juniper rising ~1.1 m
     if (e.glade && Y - e.gOut > 2.0 && L > 2.5) {
-      const A0 = R.at(0, 0.02), A1 = R.at(L, 0.02), B0 = R.at(0, 3.5), B1 = R.at(L, 3.5);
-      const gA0 = K.g(A0[0], A0[1]) + 1.1, gA1 = K.g(A1[0], A1[1]) + 1.1, gB0 = K.g(B0[0], B0[1]) - 0.05, gB1 = K.g(B1[0], B1[1]) - 0.05;
+      const A0 = R.at(0, 0.02), A1 = R.at(L, 0.02), B0 = R.at(0, 4.2), B1 = R.at(L, 4.2);
+      const gA0 = K.g(A0[0], A0[1]) + 0.75, gA1 = K.g(A1[0], A1[1]) + 0.75, gB0 = K.g(B0[0], B0[1]) - 0.05, gB1 = K.g(B1[0], B1[1]) - 0.05;
       const geo = new THREE.BufferGeometry(); const P = [A0[0], gA0, A0[1], B0[0], gB0, B0[1], B1[0], gB1, B1[1], A0[0], gA0, A0[1], B1[0], gB1, B1[1], A1[0], gA1, A1[1]];
       geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.computeVertexNormals();
       if (geo.attributes.normal.getY(0) < 0) { const q = geo.attributes.position.array; for (let t = 0; t < q.length; t += 9) for (let c = 0; c < 3; c++) { const tmp = q[t + 3 + c]; q[t + 3 + c] = q[t + 6 + c]; q[t + 6 + c] = tmp; } geo.computeVertexNormals(); }
       K.add(JUNIPER, geo);
-      for (let s = 1.0; s < L - 0.8; s += 1.6) for (const d of [0.9, 2.3]) { const p = R.at(s + (d > 1 ? 0.8 : 0), d); const gy = K.g(p[0], p[1]) + 1.1 * (1 - d / 3.5); K.add(JUNIPER, new THREE.SphereGeometry(0.75, 7, 5).scale(1.35, 0.42, 1.1).translate(p[0], gy + 0.12, p[1]), { detail: true }); }
+      let q = 0; for (let s = 0.8; s < L - 0.6; s += 1.3) for (const d of [0.8, 2.0, 3.3]) { q++; const jit = ((q * 7919) % 13) / 13; const dd = d + (jit - 0.5) * 0.9 + (d > 3 ? jit * 0.8 : 0); const p = R.at(s + jit * 0.9, dd); const gy = K.g(p[0], p[1]) + 0.75 * Math.max(0, 1 - dd / 4.2); const r = 0.7 + jit * 0.5; K.add(q % 3 ? JUNIPER : JUNIPER2, new THREE.SphereGeometry(r, 7, 5).scale(1.4, 0.38 + jit * 0.12, 1.15).translate(p[0], gy + 0.1, p[1]), { detail: true }); }
     }
   }
   // ---- paving: concrete bands on a ~6 m grid over the brick field (clipped to the terrace), walk strip along Doe

@@ -238,7 +238,7 @@ export async function build(ctx) {
   colliders.push(K.colPoly([[tU0 - 1.6, vS], [tU0, vS], [tU0, tV1 + 6.6], [tU0 - 1.6, tV1 + 6.6]], -2.0, FL + 0.51)); // [r5-audit-central] west cheek block
 
   // refine-central: foundation planting, lamp posts and bike racks where the paths arrive
-  siteDress(K, ctx, outline, { d: 1.2, lamps: 3 });
+  siteDress(K, ctx, outline, { d: 1.2, lamps: 3, clear: [29, 32, 35, 38, 41].map((v) => [-25.3, v, 1.9]) }); // [r5-audit-central] no shrubs poking through the west cheek block
   const object3d = K.finish();
   object3d.name = 'wheeler-hall';
   return { object3d, colliders, walkables };

@@ -23,6 +23,7 @@ function band(line, hw) {
 
 // ---- Moffitt Library site (anchor -265.33, -52.4; frame -16 deg), from the 2023 aerial + OSM footways + site photos
 const MF = frame(-265.33, -52.4, -16);
+const WF = frame(-116.9, 85.7, -16.122); // [r5-audit-central] Wheeler Hall frame
 const rect = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
 export const SITES = [
   // irrigated lawns where the bake left forest-floor dirt and dry ground: east of the plaza deck (toward Memorial
@@ -51,6 +52,10 @@ export const SITES = [
   // the paved plaza (they grew straight out of the concrete)
   { type: 'lawn', pts: MF(rect(17.5, 27.5, 31, 33.5)) },
   ...[[47, 16], [41, 16], [39, 42], [37, 45], [42, 48]].map(([u, v]) => ({ type: 'dirt', pts: MF(rect(u - 1.1, v - 1.1, u + 1.1, v + 1.1)) })),
+  // [r5-audit-central] Wheeler Plaza (Wheeler frame: anchor -116.9, 85.7; -16.122 deg): photos show one grey paved plaza
+  // rising eastward along the whole foot of the grand south stair (the bake left lawn there, wrapping the bottom steps),
+  // with the big south-east tree in a planting bed.
+  { type: 'paved', pts: WF([[-27.5, 38.0], [28, 38.0], [28, 50.5], [14, 50.5], [14, 43], [6, 43], [6, 50.5], [-27.5, 50.5]]) },
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
