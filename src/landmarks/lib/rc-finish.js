@@ -30,7 +30,10 @@ export function gAt(K, R, s, d = 1.2) { const p = R.at(s, d); return K.g(p[0], p
 
 // Plain face-mounted sign panel (canvas lettering) on run R, centred at s, bottom at y.
 export function sign(K, R, s, y, w, h, text, opts = {}) {
-  const m = signMat(text, { w: 1024, h: Math.max(96, Math.round(1024 * h / w)), ...opts });
+  // r4-sweep-central2: opts.w/opts.h are panel metres (entry() passes signOpts through); spreading them after the pixel
+  // size gave a 1024x0 canvas (blank dark sign + WebGL texStorage warnings on Dwinelle, Mulford, Li Ka Shing)
+  const { w: _w, h: _h, ...mo } = opts; void _w; void _h;
+  const m = signMat(text, { w: 1024, h: Math.max(96, Math.round(1024 * h / w)), ...mo });
   const d = (opts.d ?? 0.0) + 0.06;
   const g = new THREE.PlaneGeometry(w, h); g.translate(s, y + h / 2, d + 0.004);
   K.addRun(R, m, g, { uvMode: 'keep' });

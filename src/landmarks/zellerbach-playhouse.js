@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Kit, polysGeo } from './lib/classic-kit.js';
 import { glassBand, pipeRail, tinted, tone } from './lib/b01-kit.js';
+import { signText } from './lib/b03-kit.js';
 
 export const info = {
   id: 'zellerbach-playhouse',
@@ -13,10 +14,6 @@ export const info = {
   blurb: 'The Playhouse is the smaller theatre of the Zellerbach complex, used for Theater, Dance & Performance Studies productions and Cal Performances events.',
   replaces: ['w/24025431'],
 };
-const FONT = { T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'], h: ['10000', '10000', '11110', '10001', '10001', '10001', '10001'], e: ['00000', '00000', '01110', '10001', '11111', '10000', '01111'],
-  P: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'], l: ['110', '010', '010', '010', '010', '010', '111'], a: ['00000', '00000', '01110', '00001', '01111', '10001', '01111'],
-  y: ['00000', '00000', '10001', '10001', '01111', '00001', '01110'], o: ['00000', '00000', '01110', '10001', '10001', '10001', '01110'], u: ['00000', '00000', '10001', '10001', '10001', '10011', '01101'], s: ['00000', '00000', '01111', '10000', '01110', '00001', '11110'] };
-
 export async function build(ctx) {
   const ANG = THREE.MathUtils.degToRad(-9);
   const K = new Kit(ctx, ANG); const M = ctx.M; const g = (u, v) => K.g(u, v);
@@ -24,7 +21,7 @@ export async function build(ctx) {
   const conc = tone(M.concrete, 0x9a968f), concL = tone(M.concrete, 0xa6a39c), soffit = tone(M.concrete, 0x6e6b66);
   const metal = tinted(M.whitePaint, 0x7d8388, { metalness: 0.5, roughness: 0.4 });
   const frame = tinted(M.darkBronze, 0x2b2a28);
-  const drape = tinted(M.stucco, 0xd9d2c2);
+  const drape = tinted(M.stucco, 0x5a5148); // r4-sweep-central2: dim lobby behind the glass (a pale drape made the glazing read as a grey wall)
   const lglass = tinted(M.glassLight, 0x4f5a55, { opacity: 0.5 }), seam = tinted(M.iron, 0x8a9095), rail = tinted(M.iron, 0xb8bcbf, { metalness: 0.7 });
   const U0 = -12.9, U1 = 13.1, V0 = -28.8, V1 = 28.7, FT = 7.0, RT = 12.0;
   const GP = Math.max(g(U1 + 2, 0), g(0, V0 - 2)); const GT = GP + 3.8; // lobby glazing top
@@ -39,13 +36,19 @@ export async function build(ctx) {
     K.rbox(Rg, drape, 0.2, GP - 0.5, -0.5, Rg.L - 0.2, GT, -0.45);
     K.rbox(R, conc, -0.2, GT, -3.6, L + 0.2, FT, 0.0);        // fascia
     K.rbox(R, soffit, -0.2, GT - 0.02, -3.6, L + 0.2, GT, 0.0);
+    // r4-sweep-central2: paved entry apron under the cantilever (lawn ran into the glass) and a row of soffit downlights
+    let gA = -1e9; for (let k = 0; k <= 8; k++) for (const dd of [-2.5, 0.5]) gA = Math.max(gA, g(...R.at(L * k / 8, dd)));
+    const AT = Math.min(GP - 0.1, Math.max(GP - 0.47, gA + 0.04)); // apron top: just above the local grade so it shows
+    K.rbox(R, concL, -0.2, GP - 1.6, -3.5, L + 0.2, AT, 1.4);
+    walkables.push(K.walkPoly(rk ? [[U1 - 3.5, V0], [U1 + 1.4, V0], [U1 + 1.4, V1], [U1 - 3.5, V1]] : [[U0, V0 - 1.4], [U1, V0 - 1.4], [U1, V0 + 3.5], [U0, V0 + 3.5]], AT));
+    for (let s = 1.8; s < L - 1; s += 3.6) K.rbox(R, M.lampGlow, s - 0.14, GT - 0.06, -1.9, s + 0.14, GT - 0.02, -1.62, { detail: true });
     for (let s = 3; s < L - 1; s += 7.2) { K.rbox(R, concL, s - 0.6, GP - 0.5, -3.5, s + 0.6, GT, -2.3); colliders.push(K.colCyl(...R.at(s, -2.9), 0.8, GP - 1, GT)); }
     for (let y = GT + 0.3; y < FT - 0.2; y += 0.3) K.rbox(R, M.concreteDark, 0, y - 0.01, 0.0, L, y + 0.01, 0.01, { detail: true });
     if (rk) for (let k = 0; k < 6; k++) { const y0 = GT + 0.3 + k * 0.42, len = L * 0.7; const gg = new THREE.BoxGeometry(len, 0.05, 0.04); gg.rotateZ(Math.atan2(1.2, len)); gg.translate(L * 0.15 + len / 2, y0 + 0.6, 0.01); K.addRun(R, M.concreteDark, gg, { detail: true }); } // raked reveals
   }
-  // "ThePlayhouse" on the corner pier face (north-east)
-  { const R = K.run([U1 - 3.5, V0 + 3.5], [U1 - 3.5 - 0.01, V0 + 3.5]); const R2 = K.run([U1, V0], [U0, V0]); const text = 'ThePlayhouse', px = 0.04; let s = 2.0; const yT = GP + 3.0;
-    for (const ch of text) { const gl = FONT[ch]; const cw = gl ? gl[0].length : 3; if (gl) for (let r = 0; r < 7; r++) for (let c = 0; c < cw; c++) if (gl[r][c] === '1') K.rbox(R2, M.blackPaint, s + c * px, yT - (r + 1) * px, -3.5 + 1.25, s + (c + 1) * px, yT - r * px, -3.5 + 1.29, { detail: true }); s += (cw + 1) * px; } void R; }
+  // r4-sweep-central2: building name in thin dark-bronze capitals on the north fascia near the east corner (was a pixel-font
+  // "ThePlayhouse" floating on a pier face)
+  { const R2 = K.run([U1, V0], [U0, V0]); signText(K, R2, 'ZELLERBACH PLAYHOUSE', 7.6, GT + 0.75, 0.62, { font: 'Futura, "Century Gothic", "Trebuchet MS", Arial, sans-serif', weight: '500', spacing: 0.12, color: '#2f2a25', metal: 0.4, rough: 0.5, d: 0.03 }); }
   // west and south walls (board-formed concrete)
   for (const [a, b] of [[[U0, V0], [U0, V1]], [[U0, V1], [U1, V1]]]) { const R = K.run(a, b); K.rbox(R, conc, 0, Math.min(g(...a), g(...b)) - 0.6, -0.3, R.L, FT, 0.0); for (let y = 1; y < FT; y += 0.3) K.rbox(R, M.concreteDark, 0, y - 0.01, 0.0, R.L, y + 0.01, 0.01, { detail: true }); }
   K.box(conc, U0 - 0.1, FT - 0.05, V0 - 0.1, U1 + 0.1, FT + 0.5, V1 + 0.1);
