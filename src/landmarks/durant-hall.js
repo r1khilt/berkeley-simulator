@@ -86,7 +86,7 @@ export async function build(ctx) {
     for (const o of uf) glaze(R, o);
     // giant pilaster strips between the central bays (water table to architrave)
     for (const s of [pier + endW, pier + endW + midW, pier + endW + midW * 2, pier + endW + midW * 3]) {
-      K.rbox(R, A, s - 0.46, FL + 0.25, 0, s + 0.46, TOP, 0.22); // r4-sweep: deeper strip (was 0.14 m) so it reads in raking light
+      K.rbox(R, G, s - 0.46, FL + 0.25, 0, s + 0.46, TOP, 0.22); // r4-sweep: deeper strip (was 0.14 m), smooth granite so it reads against the jointed ashlar
       K.rbox(R, G, s - 0.54, TOP - 0.35, 0, s + 0.54, TOP, 0.3); // capital block
       K.rbox(R, G, s - 0.54, FL + 0.25, 0, s + 0.54, FL + 0.65, 0.3); // base block
     }
@@ -98,7 +98,7 @@ export async function build(ctx) {
     const uf = []; cs.forEach((c) => uf.push(win(c - 0.95, F2 + 0.95, F2 + 3.75, 1.3), win(c + 0.95, F2 + 0.95, F2 + 3.75, 1.3)));
     // r4-sweep: inner pilaster strips run the full height (water table to architrave) like the long sides; the old
     // outer upper-storey piers are replaced by the wide corner pilasters added below for all four corners
-    for (let i = 1; i <= 2; i++) { const s = pier + bw * i; K.rbox(R, A, s - 0.42, FL + 0.25, 0, s + 0.42, TOP, 0.22); }
+    for (let i = 1; i <= 2; i++) { const s = pier + bw * i; K.rbox(R, G, s - 0.42, FL + 0.25, 0, s + 0.42, TOP, 0.22); }
     const gf = [];
     const door = { s0: L / 2 - (f === 'S' ? 1.2 : 1.0), s1: L / 2 + (f === 'S' ? 1.2 : 1.0), y0: FL, y1: FL + (f === 'S' ? 4.5 : 3.4), doorTop: FL + (f === 'S' ? 3.1 : 2.5), sill: false };
     if (f === 'N') { gf.push(win(cs[0], FL + 0.95, FL + 3.75, 1.35), win(cs[2], FL + 0.95, FL + 3.75, 1.35)); }
@@ -114,7 +114,7 @@ export async function build(ctx) {
       // cornice hood on two scrolled consoles
       K.rbox(R, G, door.s0 - 1.0, door.y1 + 0.45, 0, door.s1 + 1.0, door.y1 + 0.85, 0.75); // r4-sweep: hood 1.05 -> 0.75 m deep
       K.rbox(R, G, door.s0 - 1.15, door.y1 + 0.85, 0, door.s1 + 1.15, door.y1 + 1.15, 0.9);  //  so the doorway isn't buried in shadow
-      for (const s of [door.s0 - 0.35, door.s1 + 0.35]) { const g = new THREE_.CylinderGeometry(0.13, 0.13, 0.06, 14); g.rotateX(Math.PI / 2); g.translate(s, door.y1 + 0.65, 0.78); K.addRun(R, G, g, { detail: true }); } // frieze rosettes
+
       for (const s of [door.s0 - 0.75, door.s1 + 0.75]) {
         K.rbox(R, G, s - 0.2, door.y1 - 1.2, pp, s + 0.2, door.y1 + 0.45, pp + 0.35);
         const g = new THREE_.CylinderGeometry(0.26, 0.26, 0.4, 12); g.rotateZ(Math.PI / 2); g.translate(s, door.y1 + 0.1, pp + 0.5); K.addRun(R, G, g);
@@ -124,7 +124,7 @@ export async function build(ctx) {
   }
   // r4-sweep: wide flat corner pilasters at every corner (photos: ~1.3 m strips, no capitals), full height. Each run's
   // start strip reaches 0.22 m past the corner so the outside corner closes.
-  for (const R of Object.values(runs)) { K.rbox(R, A, -0.22, FL + 0.25, 0, 1.4, TOP, 0.22); K.rbox(R, A, R.L - 1.4, FL + 0.25, 0, R.L, TOP, 0.22); }
+  for (const R of Object.values(runs)) { K.rbox(R, G, -0.22, FL + 0.25, 0, 1.4, TOP, 0.22); K.rbox(R, G, R.L - 1.4, FL + 0.25, 0, R.L, TOP, 0.22); } // smooth granite strips (jointed ashlar strips lost contrast in-game)
   // r4-sweep: glazed entrance doors (photos): a pair of dark-wood leaves with big glass panels over kick panels, a heavy
   // transom bar and a tall four-light transom, plain stone reveal, and a small pendant lamp in the recess soffit.
   function glazedDoor(R, o, rev, lamp) {
