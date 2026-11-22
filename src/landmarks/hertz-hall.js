@@ -18,7 +18,7 @@ export async function build(ctx) {
   const K = new Kit(ctx, deg(-9)); const M = ctx.M; const X = mats(M);
   const W = new THREE.MeshStandardMaterial({ color: 0xfcf5e6, roughness: 0.92, map: M.stuccoWhite.map, normalMap: M.stuccoWhite.normalMap }); // refine-central: smooth painted concrete (was tan textured stucco)
   const BAT = new THREE.MeshStandardMaterial({ color: 0xf2e9d8, roughness: 0.9, map: M.stuccoWhite.map });
-  const ROOF = new THREE.MeshStandardMaterial({ color: 0x5e4b3c, roughness: 0.6, metalness: 0.3 });
+  const ROOF = new THREE.MeshStandardMaterial({ color: 0x5e4b3c, roughness: 0.78, metalness: 0.12 }); // r4-sweep: less glare (was 0.6 / 0.3: blown-out sheen on the low gable)
   const SOFF = new THREE.MeshStandardMaterial({ color: 0x8a7560, roughness: 0.85 });
   const MUL = new THREE.MeshStandardMaterial({ color: 0xe3dccd, roughness: 0.5 });
   const GL = new THREE.MeshStandardMaterial({ color: 0x2c3540, roughness: 0.08, metalness: 0.35 });
@@ -34,7 +34,7 @@ export async function build(ctx) {
     battens(R, 0, R.L, Math.max(gm, 4.6), EAVE, 0.6, ops.map((o) => [o.s0 - 0.05, o.s1 + 0.05]));
   }
   // north gable wall (plain, battened)
-  { const R = K.run([u1, v0], [u0, v0]); K.wall(R, W, 0, R.L, base, EAVE, [], 0.4); const t = polysGeo([[[u1, EAVE, v0], [um, EAVE + RISE, v0], [u0, EAVE, v0]]]); K.add(W, t); battens(R, 0, R.L, gm, EAVE, 0.8); }
+  { const R = K.run([u1, v0], [u0, v0]); K.wall(R, W, 0, R.L, base, EAVE, [], 0.4); const t = polysGeo([[[u0, EAVE, v0], [um, EAVE + RISE, v0], [u1, EAVE, v0]]]); K.add(W, t); /* r4-sweep: wound to face north (outward); it faced inward, so the north gable was see-through and the roof looked like it floated */ battens(R, 0, R.L, gm, EAVE, 0.8); }
   // ---------- south gable façade ----------
   {
     const R = K.run([u0, v1], [u1, v1]); const c = R.L / 2;
