@@ -8,10 +8,19 @@ The owner is Rikhil, a Berkeley student. His direction:
 - Recognisable and realistic beats exact 1:1. `src/landmarks/sproul-hall.js` is the minimum quality bar. Don't rebuild Sproul.
 - Never default to night ("we can't see anything").
 
+## Round 4 direction (Nov 21): raise the floor, not the ceiling
+Rikhil's words: "i dont necessarily want higher quality. i think rn its good. but not everything is up to that quality". The outside of Doe Library and Sproul Hall are the bar. Find what falls below it (terrain, pathways, props, buildings) and bring it up to that level, in priority order of how bad it is times how often a player sees it. He named: bad terrain and pathways, the guardian lions at Durant Hall (next to Dwinelle), and Moffitt ("horribly done"). Don't regress anything that's already good, and don't spend time polishing things that already meet the bar.
+
+## QA pitfalls (learned the hard way)
+- `snap.mjs` pauses before streaming, so only always-on landmarks near spawn load. Use `FORCE=1 node snap.mjs ...` or call `BSIM.lm.loadNow([ids])`, or you will be judging procedural stand-ins.
+- Never call `BSIM.play()` headless: memory balloons past 6 GB and wedges the sandbox. Set `BSIM.player.enabled = true; BSIM.flyover = false` instead. Run UI tests with `?q=low`.
+- Restart the no-HMR Vite on :5174 after adding new landmark files (its glob list goes stale).
+- Manifest: regenerate with `node /work/qa/manifest.mjs`. Hand-patched manifest fields must also go into `public/data/landmarks/manifest.overrides.json` or they will be lost.
+- One browser at a time per sandbox; close it when done.
+
 ## Setup (your own sandbox)
 ```
 cd / && curl -fsS -H "x-agent-capability: $AGENT_API_TOKEN" "$AGENT_API_URL/v1/files/<KIT_ID>/content" -o /tmp/kit.tgz && tar xzf /tmp/kit.tgz -C / && bash /work/setup.sh
-cd /work/ucb/app && (nohup npx vite --config vite.nohmr.config.js > /tmp/vite2.log 2>&1 &)
 git checkout -b <your-branch>
 ```
 - Vite runs on :5173 (HMR; the building harness is at /dev/landmark.html). The no-HMR copy runs on :5174 and is what the QA scripts load.
