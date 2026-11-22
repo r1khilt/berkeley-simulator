@@ -332,7 +332,7 @@ export function patchPuff(mat, uni, puffP) {
   float q = lt.g + ( vInst - 0.5 ) * uRamp.z + ( vRnd - 0.5 ) * uRamp.w;
   vec3 lc = mix( leafRamp( q ) * vTint, uTwigCol, lt.b );
   float ball = 0.66 + 0.26 * sqrt( max( 0.0, 1.0 - pr2 ) ); // rim of the ball a little darker (leaves seen edge-on, gaps); x0.92 overall to match the card crowns' value
-  diffuseColor.rgb *= lc * lt.r * vAO * ball;
+  diffuseColor.rgb *= lc * lt.r * vAO * ball * ( 0.86 + 0.28 * vRnd ); // per-puff value variation: crowns are lumpy masses, not uniform blobs
   diffuseColor.a *= lt.a;
   if ( lt.g >= vNearFade * 1.02 ) discard; // near core puffs dissolve leaf by leaf as the camera closes in (no ghosting)
 #endif
@@ -341,7 +341,7 @@ export function patchPuff(mat, uni, puffP) {
       .replace('#include <normal_fragment_begin>', NORMAL_NOFLIP + `
   {
     // ball normal: in-plane part from the (rotated) corner direction, out-of-plane part toward the viewer
-    vec3 sn = normalize( vSphN + vec3( 0.0, 0.0, sqrt( max( 0.0, 1.0 - dot( vCorner, vCorner ) ) ) + 0.2 ) );
+    vec3 sn = normalize( vSphN * vec3( 1.0, 0.6, 1.0 ) + vec3( 0.0, 0.0, sqrt( max( 0.0, 1.0 - dot( vCorner, vCorner ) ) ) + 0.2 ) ); // y damped: ball tops don't catch blue sky light
     normal = normalize( mix( normal, sn, uPuffP.y ) );
   }
 `)
@@ -351,7 +351,7 @@ export function patchPuff(mat, uni, puffP) {
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
   };
-  mat.customProgramCacheKey = () => 'tree-puff-3';
+  mat.customProgramCacheKey = () => 'tree-puff-4';
   return mat;
 }
 // shadow-pass materials for puffs: the billboard faces the shadow camera (i.e. the sun), so each puff casts a round,
