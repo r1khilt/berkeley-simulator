@@ -26,7 +26,8 @@ export async function build(ctx) {
   const GL = M.windowNight;
   // [r5a] dark, non-interior glass for the giant window strips, doors and basement lights: the photos show dark bronze glazing,
   // and lit furnished rooms behind 9 m strips made the front read as an office block (attic/pavilion windows keep GL)
-  const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x1d2326);
+  const DKG = M.glass.clone(); DKG.userData = { ...DKG.userData, interior: false }; DKG.name = 'r5a-dark-glass'; DKG.color = new THREE.Color(0x1f262b); DKG.envMapIntensity = 1.6;
+  const LAT = solid(0x5e5040, 0.5, 0.45); // [r5a] dark bronze lattice, a step lighter than the glass behind it
   const RAIL = solid(0xb9bcbd, 0.62, 0.15); // galvanised, matte (glossy metal mirrored the sky blue)
   const pipe = (a, b, r = 0.03) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = d.length(); const g = new THREE.CylinderGeometry(r, r, L, 6); g.translate(0, L / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate(a[0], a[1], a[2]); K.add(RAIL, g, { detail: true }); };
   // handrail along a flight: foot (vA, yA) -> top (vB, yB) at u, 0.9 m above the nosing line, posts every ~1.6 m, 0.3 m runouts
@@ -110,8 +111,8 @@ export async function build(ctx) {
         K.rbox(R, FR, (a + b) / 2 - 0.05, dY, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
         K.rbox(R, FR, a - 0.05, FL + 2.8, -0.6, b + 0.05, FL + 3.6, 1.3); // marquee canopy [r5a] deeper, boxier (photo)
         // diamond lattice grille over the rest of the strip
-        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.45; // [r5a] denser lattice (photos: ~6-8 diamonds across a bay), was 0.9 m with 0.11 bars
-        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.065, 0.08); }
+        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.6; // [r5a] ~0.6 m diamond modules in a lighter bronze so the grille reads against the dark glass (was 0.9 m, black on lit rooms)
+        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, LAT, ...seg, -0.4, 0.085, 0.09); }
         for (const x of [a + 0.05, b - 0.05]) K.rbox(R, FR, x - 0.06, y0, -0.6, x + 0.06, y1, -0.38);
         K.rbox(R, SP, a, y0 - 0.05, -0.6, b, y0 + 0.05, -0.52, { detail: true });
       } else {
