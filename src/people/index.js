@@ -108,8 +108,10 @@ class People {
     for (const c of this.pool) if (c.hideNext) { c.hideNext = false; if (!c.agent) c.root.visible = false; }
     // r4-people3: dress everyone in an avatar; people already on screen switch only once they're far away or out of view
     this._rbMade = false;
-    if (this.rb) for (const a of agents) { if (a._rb || !a.look || this.byAgent.has(a)) continue;
-      if (a.id >= this.rb.id0 || (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 > 1600 || !this._inView(a)) this._adopt(a); }
+    if (this.rb) for (const a of agents) { if (a._rb || !a.look) continue; const held = this.byAgent.get(a);
+      if (a.id >= this.rb.id0 || (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 > 400 || !this._inView(a)) { // (beyond 20 m a colour change is barely visible)
+        if (held) { if ((a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 < 400 && this._inView(a)) continue; held.agent = null; held.hideNext = true; this.byAgent.delete(a); a.hidden = false; } // a near Quaternius person swaps once off screen
+        this._adopt(a); } }
     // pick the K nearest people in view (riders included: campus life keeps drawing their bike when the person is hidden)
     const maxD2 = this.maxD * this.maxD, cand = this._cand || (this._cand = []); cand.length = 0;
     for (const a of agents) { const d2 = (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 + (a.y - cam.y) ** 2 * 0.3; const keep = this.byAgent.has(a); if (a.kind === 'rider' && d2 > 22 * 22 * (keep ? 1.25 : 1)) continue; // r4-people2: riders get skinned people too (on campus life's bikes)
