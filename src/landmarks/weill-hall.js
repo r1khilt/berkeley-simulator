@@ -102,6 +102,16 @@ export async function build(ctx) {
       const g0 = Math.max(gAt(R, L / 2, 2), gAt(R, e + 1, 1), gAt(R, L - e - 1, 1)) + 0.08;
       K.rbox(R, P.concreteBuff, e, Y0, -D, L - e, g0, 2.0);
       walkables.push({ type: 'poly', pts: [R.at(e, -D), R.at(L - e, -D), R.at(L - e, 2.0), R.at(e, 2.0)].map(([u, v]) => K.xz(u, v)), y: g0 });
+      // [r5a] where the grade falls away in front of the pavilion (the SW corner drops ~2 m toward the grove), a full-width
+      // flight runs down from the forecourt edge to the path instead of leaving a bare slab edge standing above the lawn
+      { const gF = Math.min(gAt(R, e + 1, 5.0), gAt(R, L / 2, 5.0), gAt(R, L - e - 1, 5.0)); const rise = g0 - gF;
+        if (rise > 0.3) { const n = Math.max(2, Math.round(rise / 0.155)), r = rise / n, T = 0.36, d0 = 2.0;
+          for (let k = 0; k < n - 1; k++) { K.rbox(R, P.concreteBuff, e, gF - 0.8, d0 + k * T, L - e, g0 - r * (k + 1), d0 + (k + 1) * T); K.rbox(R, CD, e, g0 - r * (k + 1) - 0.06, d0 + k * T - 0.01, L - e, g0 - r * (k + 1) - 0.03, d0 + k * T + 0.002, { detail: true }); }
+          for (const sx of [e - 0.45, L - e]) K.rbox(R, C, sx, gF - 0.8, -0.2, sx + 0.45, g0 + 0.9, d0 + (n - 1) * T); // cheek walls
+          const cs = [R.at(e, d0), R.at(L - e, d0), R.at(L - e, d0 + (n - 1) * T), R.at(e, d0 + (n - 1) * T)].map(([u, v]) => K.xz(u, v));
+          walkables.push({ type: 'fn', bounds: [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1])), Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))],
+            heightAt: (x, z) => { const [u, v] = K.uv(x, z); const du = u - R.a[0], dv = v - R.a[1]; const ss = du * R.t[0] + dv * R.t[1], dd = du * R.n[0] + dv * R.n[1];
+              if (ss < e || ss > L - e || dd < d0 || dd > d0 + (n - 1) * T) return null; return g0 - r * (Math.floor((dd - d0) / T) + 1); } }); } }
       continue;
     }
     // ---------- regular banded façade ----------

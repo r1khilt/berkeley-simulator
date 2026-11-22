@@ -159,7 +159,7 @@ async function boot() {
     near.sort((a, b) => a[0] - b[0]);
     lampLights.forEach((L, i) => { const q = near[i]; if (!q) { L.userData.k = 0; L.intensity = 0; return; } const [x, z, k] = q[1]; const hh = k > 1 ? 7.5 : 3.8; L.position.set(x, heightAt(x, z) + hh, z); L.userData.k = k > 1 ? 60 : 32; L.intensity = L.userData.k * night; L.userData.ok = true; });
   };
-  scene.add(buildSigns(signsData).group);
+  scene.add(buildSigns((signsData || []).filter((s) => s.n !== 'Social Research Library')).group); // [r5a] no storefront board on Haviland Hall's Beaux-Arts west front (the library is inside)
   if (midData.length) scene.add(buildMidCity(midData, heightAt));
   scene.add(buildSkyline(skylineData, heightAt));
   const bridges = buildBridges(); scene.add(bridges.group); phase('far');

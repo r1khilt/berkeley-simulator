@@ -17,7 +17,7 @@ export const info = {
 
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-17.2)); const M = ctx.M;
-  const ST = ashlarMat('havilandStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xe2dac8, joint: 0xc2b9a5, vary: 0.02, grain: 0.012 }), ORN = tint(M.stucco, 0xd8d0be), BASE = tint(M.granite, 0xb3a893), CU = tint(M.copper, 0x5f8f7e), FR = solid(0xede8dc, 0.5, 0.05);
+  const ST = ashlarMat('havilandStone', { bw: 1.2, ch: 0.6, span: 2.4, base: 0xdad4c5, joint: 0xbcb5a4, /* [r5a] a touch cooler/lower (photo #d8d1c0..#e2ddd0; render blew out) */ vary: 0.02, grain: 0.012 }), ORN = tint(M.stucco, 0xd8d0be), BASE = tint(M.granite, 0xb3a893), CU = tint(M.copper, 0x5f8f7e), FR = solid(0xede8dc, 0.5, 0.05);
   const BRICK = tint(M.brick, 0xb0604c);
   const colliders = [], walkables = [];
   const FL = 2.0, BWY = 0.52; // BWY: basement window sill (local y)
