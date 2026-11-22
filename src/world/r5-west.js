@@ -400,7 +400,7 @@ function headwall(A, MAT, heightAt, nc, at, up, width, grate, outlet = false) {
   A.box(MAT.rubble, cx, bed + OH + (top - bed - OH) / 2, cz, 0.7, top - bed - OH, OW + 0.02, yaw);
   A.box(MAT.castStone, cx, top + 0.08, cz, 0.85, 0.16, width + 0.2, yaw);                                              // coping
   A.box(MAT.concDark, cx - t[0] * (outlet ? -0.38 : 0.38), bed + OH + 0.1, cz - t[1] * (outlet ? -0.38 : 0.38), 0.12, 0.22, OW + 0.3, yaw); // lintel on the open face
-  A.box(MAT.dark, cx + t[0] * 0.2, bed + OH / 2 - 0.1, cz + t[1] * 0.2, 0.45, OH + 0.2, OW, yaw);                       // the dark barrel
+  A.box(MAT.dark, cx + t[0] * 0.2 * (outlet ? -1 : 1), bed + OH / 2 - 0.1, cz + t[1] * 0.2 * (outlet ? -1 : 1), 0.45, OH + 0.2, OW, yaw);                       // the dark barrel
   // wingwalls flaring back along the open side
   const fwd = outlet ? 1 : -1;   // inlet: open face upstream (-t); outlet: open face downstream (+t)
   for (const sg of [-1, 1]) {
