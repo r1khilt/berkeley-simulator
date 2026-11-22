@@ -1,6 +1,7 @@
 // Clark Kerr Campus faculty apartments (north building), part of the former California School for the Deaf and Blind:
 // a narrow two-storey Spanish Colonial Revival range of white stucco under low red clay-tile hipped roofs, stepping up the
 // slope toward the hills, with a one-storey wing on its west side. LiDAR: eaves ≈5–6 m, ridges ≈6.6–7.8 m.
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit } from './lib/b08a-kit.js';
 import { ckWing } from './lib/b08a-mission.js';

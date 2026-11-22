@@ -215,9 +215,13 @@ export class Kit {
   }
   // Flat horizontal polygon (with optional holes) at height y, facing up (or down if down=true)
   flat(mat, poly, y, holes = [], down = false, opts) {
-    const s = new THREE.Shape(); s.setFromPoints(poly.map(([u, v]) => new THREE.Vector2(u, -v)));
-    for (const h of holes) { const p = new THREE.Path(); p.setFromPoints(h.map(([u, v]) => new THREE.Vector2(u, -v))); s.holes.push(p); }
-    const g = new THREE.ShapeGeometry(s); g.rotateX(-Math.PI / 2); if (down) g.rotateX(Math.PI); g.translate(0, y, 0);
+    // [r4-sweep-outer] down=true used to add rotateX(PI) after the up-facing mapping, which mirrored the polygon across
+    // v=0 (hip-roof soffits of b05b/b08a/b02 kits landed beside their buildings, e.g. faculty-club). Build the shape in
+    // (u, v) and rotate +90deg instead: same footprint, normal facing down (same as coop-kit flatDown).
+    const sv = down ? 1 : -1;
+    const s = new THREE.Shape(); s.setFromPoints(poly.map(([u, v]) => new THREE.Vector2(u, sv * v)));
+    for (const h of holes) { const p = new THREE.Path(); p.setFromPoints(h.map(([u, v]) => new THREE.Vector2(u, sv * v))); s.holes.push(p); }
+    const g = new THREE.ShapeGeometry(s); g.rotateX(down ? Math.PI / 2 : -Math.PI / 2); g.translate(0, y, 0);
     return this.add(mat, g, opts);
   }
   // Generic story-banded façade along run R from s0..s1 with nb equal bays.

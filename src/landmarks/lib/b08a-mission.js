@@ -7,7 +7,11 @@ import { pal, wing, roof, facade, ridge, chimney, rail } from './b08a-kit.js';
 
 // LiDAR statistics inside a building-frame rectangle: robust eave/ridge estimates (trees overhang some slices)
 export function lidarRect(ctx, K, u0, v0, u1, v1, axis) {
-  const lt = ctx.packet.lidarTop; const S = (x, z) => { const j = Math.round((x - lt.x0) / lt.step), i = Math.round((z - lt.z0) / lt.step); return (i >= 0 && i < lt.nz && j >= 0 && j < lt.nx) ? lt.h[i][j] : null; };
+  // [r4-sweep-outer] the slim production packets only carry lidarTop when the module source mentions it, so these
+  // modules failed to build in-game (stand-ins showed instead). Without a grid, fall back to terrain + 1-storey defaults.
+  const lt = ctx.packet && ctx.packet.lidarTop;
+  if (!lt) { const gs = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => { const [x, z] = K.xz(u, v); return ctx.groundAt(x, z); }); const gmin = Math.min(...gs), gmax = Math.max(...gs); return { ridge: gmax + 5.2, eave: gmax + 3.6, gmin, gmax, axis: axis || (u1 - u0 >= v1 - v0 ? 'u' : 'v') }; }
+  const S = (x, z) => { const j = Math.round((x - lt.x0) / lt.step), i = Math.round((z - lt.z0) / lt.step); return (i >= 0 && i < lt.nz && j >= 0 && j < lt.nx) ? lt.h[i][j] : null; };
   axis = axis || (u1 - u0 >= v1 - v0 ? 'u' : 'v');
   const along = axis === 'u' ? [u0 + 0.8, u1 - 0.8] : [v0 + 0.8, v1 - 0.8], across = axis === 'u' ? [v0 + 0.4, v1 - 0.4] : [u0 + 0.4, u1 - 0.4];
   const maxs = [], edL = [], edR = [], gs = [];

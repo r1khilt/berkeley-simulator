@@ -2,6 +2,7 @@
 // A three-storey north–south range with a red-tile gable roof, a lower two-storey east–west wing across its north end,
 // and a one-storey shed-roofed wing tucked into the angle. White stucco, dark steel casements, tile ridge caps.
 // Massing from the 2021 LiDAR (main eaves ≈10 m, ridge ≈12.5 m; north wing ridge ≈9.5 m).
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit } from './lib/b08a-kit.js';
 import { ckWing } from './lib/b08a-mission.js';

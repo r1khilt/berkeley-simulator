@@ -3,6 +3,7 @@
 // angled off its north end toward the playing fields, a colonnaded one-storey veranda along the lower west side and a
 // small one-storey annex at the south-west corner. Massing from the 2021 LiDAR (eaves ≈12 m, ridge ≈14.5 m above the
 // low south-west corner; the site rises ≈6 m to the north-east).
+// [r4-sweep-outer] ckWing reads packet.lidarTop: this comment makes manifest.mjs keep the LiDAR grid in the slim packet.
 import * as THREE from 'three';
 import { Kit, mergeKits } from './lib/b08a-kit.js';
 import { ckWing, veranda } from './lib/b08a-mission.js';
