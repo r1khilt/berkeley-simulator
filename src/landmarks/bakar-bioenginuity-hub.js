@@ -42,19 +42,24 @@ function clip(P, C) {
 export async function build(ctx) {
   const K = new Kit(ctx, 0); const M = ctx.M;
   const fp = ctx.footprints[0].outer.map(([x, z]) => [x, z]);
-  const conc = new THREE.MeshStandardMaterial({ map: boardTex(), color: 0xcfc6b8, roughness: 0.9 }); // refine-south-west: weathered board-formed concrete, not near-white conc.name = 'bakarConcrete';
+  const conc = new THREE.MeshStandardMaterial({ map: boardTex(), color: 0xd9d9d5, roughness: 0.9 }); // [r4-sweep-outer] cool raw-concrete grey (#a8a7a1 in photos); the warm tint read as beige stucco in-game // refine-south-west: weathered board-formed concrete, not near-white conc.name = 'bakarConcrete';
   const dark = std(0x1e1f22, 'bakarFrame', { rough: 0.45, metal: 0.4 });
   const pglass = new THREE.MeshStandardMaterial({ color: 0x9fb3b8, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }); pglass.name = 'bakarPavilionGlass';
   const warm = nightGlow(std(0xe8b878, 'bakarInterior', { rough: 0.9, emissive: 0xe8b878, emissiveIntensity: 0.8 }), 1.0);
   const glass = nightGlow(std(0x2c3238, 'bakarGlass', { rough: 0.06, metal: 0.5, envMapIntensity: 1.4, emissive: 0xffd9a0, emissiveIntensity: 1.1 }), 1.0);
   const soffitD = std(0x3a3a3a, 'bakarSoffit', { rough: 0.8 });
+  const rail = std(0x6f7174, 'bakarRail', { rough: 0.5, metal: 0.6 }); // [r4-sweep-outer] terrace guardrails
   const colliders = [];
   const BIG = 200;
   // volumes: [clip region (convex, x/z), top height (local y)]
   const VOL = [
     { C: [[-BIG, -BIG], [-28.5, -BIG], [-28.5, BIG], [-BIG, BIG]], top: 7.2, base: 0 },                 // low west wing
-    { C: [[-28.5, -BIG], [0.5, -BIG], [0.5, -14.5], [-28.5, -14.5]], top: 13.6, base: 4.2 },            // north galleries
-    { C: [[0.5, -BIG], [26.5, -BIG], [26.5, -16.8], [0.5, -16.8]], top: 10.6, base: 4.2 },              // north-east low gallery
+    // [r4-sweep-outer] Bancroft front: a ~6-9 m board-formed plinth wall with the galleries stepping back behind it (photo),
+    // instead of one sheer 13 m box over a glass band
+    { C: [[-28.5, -BIG], [0.5, -BIG], [0.5, -25.4], [-28.5, -25.4]], top: 8.6, base: 0, terrace: true },  // north plinth wall
+    { C: [[-28.5, -25.4], [0.5, -25.4], [0.5, -14.5], [-28.5, -14.5]], top: 13.6, base: 4.2 },          // north galleries
+    { C: [[0.5, -BIG], [26.5, -BIG], [26.5, -25.0], [0.5, -25.0]], top: 6.8, base: 0, terrace: true },    // north-east plinth wall
+    { C: [[0.5, -25.0], [26.5, -25.0], [26.5, -16.8], [0.5, -16.8]], top: 10.6, base: 4.2 },            // north-east low gallery
     { C: [[-28.5, -14.5], [7.5, -14.5], [7.5, 24.5], [-28.5, 24.5]], top: 17.4, base: 5.8 },            // central block
     { C: [[7.5, -16.8], [BIG, -16.8], [BIG, 24.5], [7.5, 24.5]], top: 21.2, base: 5.5 },                // tall east block
     { C: [[-BIG, 24.5], [BIG, 24.5], [BIG, BIG], [-BIG, BIG]], top: 0, base: 0, pavilion: true },       // 2023 glass pavilion
@@ -82,6 +87,9 @@ export async function build(ctx) {
     // windowless board-formed concrete box with crisp edges
     K.prism(conc, P, V.base > 0 ? yB : g0 - 1, V.top);
     colliders.push({ type: 'poly', pts: P, y0: V.base > 0 ? yB : g0 - 1, y1: V.top });
+    // [r4-sweep-outer] crisp projecting parapet cap (strong horizontal shadow line) + thin terrace guardrails
+    K.prism(conc, inset(P, -0.14), V.top - 0.05, V.top + 0.32);
+    if (V.top > 6) for (const { R } of polyRuns(K, inset(P, 0.35))) { if (R.L < 1.2) continue; K.rbox(R, rail, 0, V.top + 1.28, -0.03, R.L, V.top + 1.34, 0.03); K.rbox(R, rail, 0, V.top + 0.7, -0.015, R.L, V.top + 0.73, 0.015, { detail: true }); for (let s = 0; s <= R.L + 0.01; s += Math.max(0.8, R.L / Math.max(1, Math.round(R.L / 1.8)))) K.rbox(R, rail, s - 0.025, V.top + 0.32, -0.025, s + 0.025, V.top + 1.32, 0.025, { detail: true }); }
     // deep skylight slots / roof baffles on the gallery roofs
     if (V.top > 12) { const c = P.reduce((a, p) => [a[0] + p[0] / P.length, a[1] + p[1] / P.length], [0, 0]); for (let k = -1; k <= 1; k++) K.box(glass, c[0] - 6, V.top, c[1] + k * 4 - 0.6, c[0] + 6, V.top + 0.5, c[1] + k * 4 + 0.6); }
   }
