@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Character } from './character.js';
@@ -65,6 +66,10 @@ export function makeRetarget(srcScene, tgtScene) { // (exported for the player a
     const dS = wp(sb[c]).sub(wp(sb[ue])).normalize(), dT = wp(tb[c]).sub(wp(tb[ue])).normalize();
     const W = new THREE.Quaternion().setFromUnitVectors(dS, dT).multiply(wq(sb[ue]));
     sb[ue].quaternion.copy(wq(sb[ue].parent).invert().multiply(W)); sb[ue].updateMatrixWorld(true);
+    // hands: also match the twist (palm orientation) using the knuckle line index -> pinky, or the palms come out rotated
+    const m = /^hand_([lr])$/.exec(ue); if (m) { const i = 'index_01_' + m[1], k = 'pinky_01_' + m[1];
+      if (sb[i] && sb[k] && tb[i] && tb[k]) { const aS = wp(sb[i]).sub(wp(sb[k])), aT = wp(tb[i]).sub(wp(tb[k])); aS.addScaledVector(dT, -aS.dot(dT)).normalize(); aT.addScaledVector(dT, -aT.dot(dT)).normalize();
+        const W2 = new THREE.Quaternion().setFromUnitVectors(aS, aT).multiply(wq(sb[ue])); sb[ue].quaternion.copy(wq(sb[ue].parent).invert().multiply(W2)); sb[ue].updateMatrixWorld(true); } }
   }
   const off = {}; for (const ue of order) off[ue] = wq(sb[ue]).invert().multiply(wq(tb[ue]));
   for (const [o, q] of srcRest) o.quaternion.copy(q); srcScene.updateMatrixWorld(true);
@@ -100,13 +105,60 @@ export function retargetClip(clip, R, yFix = 0) {
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
 
+// ---------------------------------------------------------------- Rocketbox's own mocap (tools/people_rb_anims.mjs)
+// Walk, formal walk, jog, idle and talking come from Rocketbox's motion-captured takes on the same Biped rig (natural
+// arm swing, weight shift, relaxed hands); sitting and the bump reaction stay retargeted UAL clips.
+let _anims = null;
+export function loadRBAnims() {
+  return _anims || (_anims = fetch(BASE + 'anims.bin').then((r) => { if (!r.ok) throw new Error('rb anims ' + r.status); return r.arrayBuffer(); }).then((buf) => {
+    const dv = new DataView(buf); const jl = dv.getUint32(0, true); const J = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, jl)));
+    let off = 4 + jl; const T = new Float32Array(buf, off, J.nt); off += J.nt * 4; const V = new Float32Array(buf, off, J.nv); off += J.nv * 4; const Q = new Int16Array(buf, off, J.nq);
+    const out = {};
+    for (const c of J.clips) {
+      const tracks = c.tracks.map((t) => { const times = T.slice(t.t, t.t + t.n);
+        if (t.p === 'q') { const v = new Float32Array(t.n * 4); for (let i = 0; i < t.n * 4; i += 4) { const x = Q[t.o + i] / 32767, y = Q[t.o + i + 1] / 32767, z = Q[t.o + i + 2] / 32767, w = Q[t.o + i + 3] / 32767; const l = Math.hypot(x, y, z, w) || 1; v[i] = x / l; v[i + 1] = y / l; v[i + 2] = z / l; v[i + 3] = w / l; } return new THREE.QuaternionKeyframeTrack(t.b + '.quaternion', times, v); }
+        return new THREE.VectorKeyframeTrack(t.b + '.position', times, V.slice(t.o, t.o + t.n * 3)); });
+      const clip = new THREE.AnimationClip(c.name, c.duration, tracks); clip.userData = { leg: c.leg }; out[c.name] = clip;
+    }
+    return out;
+  }).catch((e) => { console.warn('rocketbox mocap unavailable', e); return null; }));
+}
+// a Biped take -> this avatar: clavicles / thighs were re-parented (see prepAvatar), so their local rotations get the
+// old parent's rotation folded in (L_new = L_neck * L_clavicle, L_new = L_spine * L_thigh); hips scaled by leg length
+function nativeClip(clip, name, scene, by, k) {
+  const tr = {}; for (const t of clip.tracks) tr[t.name] = t;
+  const fold = { Bip01_L_Clavicle: 'Bip01_Neck', Bip01_R_Clavicle: 'Bip01_Neck', Bip01_L_Thigh: 'Bip01_Spine', Bip01_R_Thigh: 'Bip01_Spine' };
+  const tracks = []; const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+  for (const t of clip.tracks) {
+    const bn = t.name.split('.')[0]; if (!by[bn]) continue;
+    if (t.name.endsWith('.position')) { if (bn !== 'Bip01') continue; const v = t.values.slice(); for (let i = 0; i < v.length; i++) v[i] *= k; tracks.push(new THREE.VectorKeyframeTrack(t.name, t.times, v)); continue; }
+    const par = fold[bn]; if (!par) { tracks.push(t.clone()); continue; }
+    // resample at 30 fps: L_new(t) = L_parentOld(t) * L_old(t)
+    const pt = tr[par + '.quaternion']; const pi = pt && pt.createInterpolant(), ci = t.createInterpolant(); const rest = by[par].quaternion;
+    const n = Math.max(2, Math.round(clip.duration * 30) + 1); const times = new Float32Array(n), vals = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) { const tt = Math.min(clip.duration, i / 30); times[i] = tt; if (pi) qa.fromArray(pi.evaluate(tt)); else qa.copy(rest); qb.fromArray(ci.evaluate(tt)); qa.multiply(qb).normalize();
+      if (i && qa.x * vals[i * 4 - 4] + qa.y * vals[i * 4 - 3] + qa.z * vals[i * 4 - 2] + qa.w * vals[i * 4 - 1] < 0) { qa.x = -qa.x; qa.y = -qa.y; qa.z = -qa.z; qa.w = -qa.w; } qa.toArray(vals, i * 4); }
+    tracks.push(new THREE.QuaternionKeyframeTrack(t.name, times, vals));
+  }
+  return new THREE.AnimationClip(name, clip.duration, tracks);
+}
+
 // ---------------------------------------------------------------- loading
 let _promise = null;
-export function loadRocketbox(peopleAssets, opts = {}) { return _promise || (_promise = _load(peopleAssets, opts)); }
+// the NPC pool's full load is cached; filtered loads ({only:[ids]}, e.g. the player or the dev harness) are not
+export function loadRocketbox(peopleAssets, opts = {}) { if (opts.only) return _load(peopleAssets, opts); return _promise || (_promise = _load(peopleAssets, opts)); }
+// a GLTFLoader set up for these files (meshopt geometry, KTX2 / ETC1S colour textures; one KTX2 transcoder per renderer)
+let _ktx2 = null, _ktxR = null;
+export function getLoader(renderer) {
+  const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+  if (renderer) { if (!_ktx2 || _ktxR !== renderer) { _ktx2 = new KTX2Loader().setTranscoderPath((import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/basis/').detectSupport(renderer); _ktxR = renderer; } loader.setKTX2Loader(_ktx2); }
+  return loader;
+}
 async function _load(A, opts) {
   const man = await fetch(BASE + 'manifest.json').then((r) => { if (!r.ok) throw new Error('rb manifest ' + r.status); return r.json(); });
   let list = man.avatars; if (opts.only) list = list.filter((a) => opts.only.includes(a.id));
-  const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+  const loader = getLoader(opts.renderer); // colour textures are KTX2 / ETC1S (GPU-compressed); transcoder in public/assets/basis/
+  if (opts.mocap !== false) prepAvatar.natives = await loadRBAnims();
   const out = []; let i = 0;
   const worker = async () => { while (i < list.length) { const e = list[i++]; try { const g = await loader.loadAsync(BASE + e.file); await idle(); const av = prepAvatar(e, g, A); out.push(av); if (opts.onAvatar) opts.onAvatar(av); } catch (err) { console.warn('rocketbox avatar failed', e.id, err); } await idle(); } };
   await Promise.all([worker(), worker()]);
@@ -115,7 +167,7 @@ async function _load(A, opts) {
 }
 const idle = () => new Promise((r) => (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(() => r(), { timeout: 400 }) : setTimeout(r, 16)));
 
-export function prepAvatar(e, gltf, A) { // (exported for the player avatar, r5-avatar)
+export function prepAvatar(e, gltf, A) { // (exported: the player avatar loads its own one avatar with getLoader())
   const scene = gltf.scene; scene.updateMatrixWorld(true);
   const by = bonesOf(scene);
   // UE-like hierarchy: clavicles under the upper spine (Biped hangs them off the neck, so head turns would swing the
@@ -124,7 +176,7 @@ export function prepAvatar(e, gltf, A) { // (exported for the player avatar, r5-
   scene.updateMatrixWorld(true);
   const meshes = []; scene.traverse((o) => { if (o.isSkinnedMesh) meshes.push(o); });
   for (const me of meshes) for (const m of [].concat(me.material)) {
-    m.metalness = 0; m.envMapIntensity = 0.8;
+    m.metalness = 0; m.envMapIntensity = 1.0; if (m.name !== 'rb:hair') m.color.setScalar(1.1); // Rocketbox albedo carries baked shading: lift it a touch so people don't read a stop darker than the sunlit plaza
     if (m.name === 'rb:head') { m.roughness = 0.6; }
     else if (m.name === 'rb:hair') { m.roughness = 0.7; m.alphaTest = 0.5; m.transparent = false; m.side = THREE.DoubleSide; m.alphaToCoverage = false; }
     else { m.roughness = 0.82; if (m.normalMap) m.normalScale.set(0.9, 0.9); }
@@ -141,6 +193,13 @@ export function prepAvatar(e, gltf, A) { // (exported for the player avatar, r5-
   for (const o of R.tOrder) o.bone.quaternion.copy(o.restL); R.hip.position.copy(R.hipP0); scene.updateMatrixWorld(true);
   const yFix = restAnkle - idleAnkle;
   const clips = {}; for (const n of NPC_CLIPS) if (src.clips[n]) clips[n] = retargetClip(src.clips[n], R, yFix); // only what character.js plays (extra UAL clips stay player-side)
+  // Rocketbox mocap for walking / jogging / standing / talking (when loaded), re-grounded on the idle
+  let native = false; const natives = prepAvatar.natives;
+  if (natives) { const by2 = bonesOf(scene); const legA = legLen(R.tb);
+    for (const role of ['Walk_Loop', 'Walk_Formal_Loop', 'Jog_Fwd_Loop', 'Idle_Loop', 'Idle_Talking_Loop']) { const c = natives[e.sex + ':' + role]; if (c) { clips[role] = nativeClip(c, role, scene, by2, legA / (c.userData.leg || legA)); native = true; } }
+    if (native && clips.Idle_Loop) { const mx3 = new THREE.AnimationMixer(scene); const a3 = mx3.clipAction(clips.Idle_Loop); a3.play(); a3.time = 0; mx3.update(0); scene.updateMatrixWorld(true);
+      const y3 = Math.min(wp(R.tb.foot_l).y, wp(R.tb.foot_r).y); mx3.stopAllAction(); mx3.uncacheRoot(scene); for (const o of R.tOrder) o.bone.quaternion.copy(o.restL); R.hip.position.copy(R.hipP0); scene.updateMatrixWorld(true);
+      const dy = restAnkle - y3; if (Math.abs(dy) > 0.004 && Math.abs(dy) < 0.2) for (const role of ['Walk_Loop', 'Walk_Formal_Loop', 'Jog_Fwd_Loop', 'Idle_Loop', 'Idle_Talking_Loop']) { const c = clips[role]; const t = c && c.tracks.find((x) => x.name === 'Bip01.position'); if (t) for (let i = 1; i < t.values.length; i += 3) t.values[i] += dy; } } }
   // finger rest / fist in avatar space (for character.js setHands: relaxed hands and riders' grip)
   const restQ = {}, fistQ = {};
   for (const ue of R.order) { const pu = UE_PARENT(ue); if (!pu || !R.off[pu] || !src.restQ || !src.restQ[ue]) continue;
@@ -152,9 +211,9 @@ export function prepAvatar(e, gltf, A) { // (exported for the player avatar, r5-
         const bn = bones[bi] && bones[bi].name; if (bn !== 'Bip01_Spine2' && bn !== 'Bip01_Spine1') continue; v.fromBufferAttribute(P, i).applyMatrix4(me.matrixWorld);
         if (Math.abs(v.x - sp.x) < 0.08 && Math.abs(v.y - sp.y) < 0.12) mx2 = Math.max(mx2, sp.z - v.z); } }
     if (mx2 > 0.05 && mx2 < 0.3) backDepth = mx2; }
-  const B = { sex: e.sex, clips, restQ, fistQ, id: e.id, e, yaw: scene.rotation.y };
-  const av = { id: e.id, sex: e.sex, e, scene, meshes, B, backDepth, R, yFix }; // R / yFix: the player retargets its extra clips (r5-avatar)
-  try { av.look = measureLook(av); } catch (err) { console.warn('rocketbox look', e.id, err); av.look = null; }
+  const B = { sex: e.sex, clips, restQ, fistQ, id: e.id, e, yaw: scene.rotation.y, native };
+  const av = { id: e.id, sex: e.sex, e, scene, meshes, B, backDepth, R, yFix };
+  try { av.look = e.look ? { ...e.look } : measureLook(av); } catch (err) { console.warn('rocketbox look', e.id, err); av.look = null; } // measured offline by the build (KTX2 can't be read back)
   return av;
 }
 
@@ -212,11 +271,30 @@ export class RBCharacter {
 }
 // the motion code is shared with the Quaternius characters (it only talks to UE-named bones in world space)
 for (const k of ['update', 'fade', 'aim', 'dirW', 'ik2', 'cw', '_lean', '_cyclePose', '_scootPose', '_phonePose', '_armsIn', '_widen', '_standFix', '_groundPose', '_liePose', '_gaze', '_props', 'setHands', 'setShadow']) RBCharacter.prototype[k] = Character.prototype[k];
+// Realistic proportions: the Quaternius 'arms in' fix (superhero lats) would push these hands into the hips, so only
+// trim wide arms a little; and stand the UAL walk up a bit (its torso leans ~12 deg forward, the head ~20 deg: hunched)
+const _dW = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _ax = new THREE.Vector3();
+RBCharacter.prototype._armsIn = function (mode) {
+  if (this.B.native) { // mocap arms: only give the hands a little clearance from the hips (realistic hips + bulky clothes)
+    if (mode === 'walk' || mode === 'stand') for (const s of ['l', 'r']) { if (s === 'r' && this.phoneK > 0.05) continue; const b = this.bones; const sx = s === 'l' ? -1 : 1;
+      const d = wp(b['lowerarm_' + s]).sub(wp(b['upperarm_' + s])).normalize(); const rq = this.root.getWorldQuaternion(new THREE.Quaternion()); const dl = d.clone().applyQuaternion(rq.clone().invert());
+      if (dl.x * sx < 0.12) { dl.x = sx * (0.12 * 0.6 + Math.max(0, dl.x * sx) * 0.4); dl.normalize().applyQuaternion(rq); this.aim(b['upperarm_' + s], b['lowerarm_' + s], dl, 1); } }
+    return; }
+  const b = this.bones; const rq = this.root.getWorldQuaternion(new THREE.Quaternion()); const inv = rq.clone().invert();
+  for (const s of ['l', 'r']) { if (s === 'r' && this.phoneK > 0.05) continue;
+    const d = wp(b['lowerarm_' + s]).sub(wp(b['upperarm_' + s])).normalize().applyQuaternion(inv); const sx = s === 'l' ? -1 : 1;
+    const lim = mode === 'jog' ? 0.2 : 0.13; if (d.x * sx > lim) { d.x = sx * (lim + (d.x * sx - lim) * 0.5); d.normalize().applyQuaternion(rq); this.aim(b['upperarm_' + s], b['lowerarm_' + s], d, 1); } }
+};
+RBCharacter.prototype._upright = function (k) { // rotate spine_02 and neck back about the character's right axis
+  const b = this.bones; this.root.getWorldQuaternion(_qa); _ax.set(1, 0, 0).applyQuaternion(_qa);
+  for (const [bn, ang] of [['spine_02', 0.09 * k], ['neck_01', 0.12 * k]]) { const bone = b[bn]; _qb.setFromAxisAngle(_ax, ang); bone.getWorldQuaternion(_qa); _qb.multiply(_qa); bone.parent.getWorldQuaternion(_qa); _qa.invert().multiply(_qb); bone.quaternion.copy(_qa); bone.updateMatrixWorld(true); }
+};
 // after the shared update has posed the skeleton: hang the backpack on the upper back
 const _upd = Character.prototype.update;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _inv = new THREE.Matrix4();
 RBCharacter.prototype.update = function (dt, a, cam) {
   _upd.call(this, dt, a, cam);
+  if (!this.B.native) { if (this.mode === 'walk' && this.phoneK < 0.5) this._upright(1); else if (this.mode === 'jog') this._upright(0.5); }
   const on = this.packOn && this.mode !== 'lie' && this.mode !== 'ground' && this.mode !== 'sit';
   this.pack.visible = on; for (const s of this.straps) s.visible = on; if (!on) return;
   const sp = this.bones.spine_03, ne = this.bones.neck_01;
@@ -271,3 +349,8 @@ function measureLook(av) {
   const H = top - bot;
   return { fem: av.sex === 'f' ? 1 : 0, top: tc, bot: bc, skin: nearest(SKIN_P, skin), hairC: nearest(HAIR_P, hc), hair: av.e.hair ?? (av.sex === 'f' ? 2 : 1), flags, shoe: nearest(SHOE_P, avg('foot') || SHOE_P[1]), h: H > 1.3 && H < 2.1 ? H / 1.75 : 1, w: 1 };
 }
+
+// with mocap the UAL-specific fixes (straightened idle legs, widened walking thighs) would fight the captured motion
+const _sf = Character.prototype._standFix, _wd = Character.prototype._widen;
+RBCharacter.prototype._standFix = function () { if (!this.B.native) _sf.call(this); };
+RBCharacter.prototype._widen = function () { if (!this.B.native) _wd.call(this); };
