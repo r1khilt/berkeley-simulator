@@ -16,9 +16,9 @@ const KEYS = { Space: 'Space', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlL
 export const keyName = (code) => (!code ? '' : KEYS[code] || String(code).replace(/^(Key|Digit|Numpad|Arrow)/, ''));
 const kbd = (...k) => k.map((x) => `<kbd>${esc(x)}</kbd>`).join('');
 const BUILTIN_MODES = [
-  { id: 'walk', label: 'Walk', icon: 'walk', hint: 'Shift to run, Space to jump' },
-  { id: 'bike', label: 'Bike', key: 'KeyB', icon: 'bike' },
-  { id: 'fly', label: 'Fly', key: 'KeyF', icon: 'drone', hint: 'Space to climb, C to descend, Shift for speed' },
+  { id: 'walk', label: 'Walk', icon: 'walk', hint: 'Shift run · Space jump · +/- speed' },
+  { id: 'bike', label: 'Bike', key: 'KeyB', icon: 'bike', hint: 'W pedal · Shift faster · A/D steer · B off' }, // r5-controls: hints double as the on-screen key strip
+  { id: 'fly', label: 'Fly', key: 'KeyF', icon: 'drone', hint: 'Space up · C down · Shift boost · Scroll/+/- speed · F land' },
 ];
 const WEATHER = [['live', 'Current', 'live', 'Current Berkeley weather'], ['clear', 'Clear', 'sun', 'Clear'], ['cloudy', 'Cloudy', 'cloudSun', 'Partly cloudy'], ['overcast', 'Overcast', 'overcast', 'Overcast'], ['fog', 'Fog', 'fog', 'Karl the Fog']];
 const fillRange = (el) => el.style.setProperty('--p', `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
@@ -99,7 +99,7 @@ export class UI {
   showTitle(on) {
     this.title.classList.toggle('off', !on); this.hud.classList.toggle('off', on); this.state = on ? 'title' : 'play';
     let seen = false; try { seen = localStorage.getItem('bsim.hinted') === '1'; localStorage.setItem('bsim.hinted', '1'); } catch (e) {}
-    if (!on && !this._hinted && !seen) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('M')} Map <i></i> ${kbd('T')} Time <i></i> ${kbd('H')} Controls`, 8000), 900); }
+    if (!on && !this._hinted && !seen) { this._hinted = true; setTimeout(() => this.hint(this.isTouch ? 'Drag to look around · use the stick to move' : `${kbd('W', 'A', 'S', 'D')} Move <i></i> ${kbd('Shift')} Run <i></i> ${kbd('Space')} Jump <i></i> ${kbd('1')}–${kbd(String(Math.max(3, this._modeList().length)))} Bike, fly, scooter… <i></i> ${kbd('H')} Controls`, 9000), 900); } // r5-controls: mention the mode keys
   }
   fade(cb, hold = 300) { this.fadeEl.classList.add('on'); setTimeout(() => { cb && cb(); setTimeout(() => this.fadeEl.classList.remove('on'), hold); }, 380); }
   // ---------- HUD
@@ -130,6 +130,7 @@ export class UI {
     this.hud.addEventListener('click', (e) => {
       const btn = e.target.closest('button'); if (btn) btn.blur(); // keep Space/Enter for the game, not the focused button
       const h = e.target.closest('[data-h]'); if (h) { if (h.dataset.h === 'help') this.help(); else this.cb[h.dataset.h]?.(); return; }
+      const sb = e.target.closest('[data-spd]'); if (sb) { this.player?.stepSpeed?.(+sb.dataset.spd); return; } // r5-controls
       const md = e.target.closest('[data-mode]');
       if (md) { // touch: the bar is collapsed to the current mode; first tap expands it
         if (this.isTouch && !this.modesEl.classList.contains('open')) { this.modesEl.classList.add('open'); clearTimeout(this._mo); this._mo = setTimeout(() => this.modesEl.classList.remove('open'), 5000); return; }
@@ -180,7 +181,11 @@ export class UI {
   reticleOn(on) { this.reticle.classList.toggle('hidden', !on); }
   hudOn(on) { this.hud.classList.toggle('off', !on); }
   // ---------- movement modes (generic: built-ins + player.plugins with key / label / icon)
-  bindPlayer(player) { this.player = player; this._modeSig = null; this.modes(); }
+  bindPlayer(player) {
+    this.player = player; this._modeSig = null;
+    player.modeOrder = () => this._modeList().map((m) => m.id); player.pickMode = (id) => this._pickMode(id); // r5-controls: digit keys 1-9 pick from the mode bar
+    this.modes();
+  }
   _modeList() {
     const pl = (this.player && this.player.plugins) || {}, list = [];
     for (const b of BUILTIN_MODES) { const o = pl[b.id]; list.push(o ? { ...b, label: o.label || b.label, key: o.key || b.key, icon: o.icon || b.icon, hint: o.hint || b.hint } : b); }
@@ -193,8 +198,11 @@ export class UI {
   _tools() { return Object.entries((this.player && this.player.plugins) || {}).filter(([, o]) => o && o.tool && !o.hidden).map(([id, o]) => ({ id, label: o.label || cap(id), key: o.key, icon: o.icon || id, hint: o.hint })); }
   _renderModes() {
     const list = this._modeList();
-    this.modesEl.innerHTML = `<div class="seg-icons">${list.map((m) => `<button data-mode="${esc(m.id)}" role="radio" title="${esc(m.label)}${m.key ? ` (${esc(keyName(m.key))})` : ''}" aria-label="${esc(m.label)}">${icon(m.icon)}</button>`).join('')}</div><span class="mode-label"><b></b><small></small></span>`;
+    // r5-controls: each segment shows its number key (1-9 also switch modes); the stepper sets walk / fly speed
+    this.modesEl.innerHTML = `<div class="seg-icons">${list.map((m, i) => `<button data-mode="${esc(m.id)}" role="radio" title="${esc(m.label)} (${i < 9 ? i + 1 : ''}${m.key ? `${i < 9 ? ' or ' : ''}${esc(keyName(m.key))}` : ''})${m.id === 'scooter' ? ' · summons a Lime' : ''}" aria-label="${esc(m.label)}">${icon(m.icon)}${i < 9 ? `<span class="mk">${i + 1}</span>` : ''}</button>`).join('')}</div><span class="mode-label"><b></b><small></small></span>
+      <div class="spd hidden" role="group" aria-label="Speed"><button data-spd="-1" title="Slower (-)" aria-label="Slower">${icon('minus')}</button><output title="Speed · + / - keys${''}"></output><button data-spd="1" title="Faster (+)" aria-label="Faster">${icon('plus')}</button></div>`;
     this.modeLabel = this.modesEl.querySelector('.mode-label b'); this.modeSpeed = this.modesEl.querySelector('.mode-label small'); this._modeCur = null; this._spd = null;
+    this.spdEl = this.modesEl.querySelector('.spd'); this.spdOut = this.spdEl.querySelector('output'); this._spdTxt = null;
   }
   modes() {
     const p = this.player; if (!p) return;
@@ -204,9 +212,38 @@ export class UI {
       this._modeCur = p.mode; let hit = false;
       this.modesEl.querySelectorAll('[data-mode]').forEach((b) => { const on = b.dataset.mode === p.mode; hit ||= on; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
       const m = this._modeList().find((x) => x.id === p.mode); this.modeLabel.textContent = m ? m.label : cap(p.mode);
+      if (this.state === 'play' && m && !m.hidden) this.modeHint(m); // r5-controls: show that mode's keys for a few seconds
     }
-    const sp = p.speed || 0, show = p.mode !== 'walk' ? sp > 0.6 : sp > 6.5, txt = show ? this.fmtSpeed(sp) : '';
+    // r5-controls: walk and fly show their adjustable speed in the stepper; vehicles keep the live speed readout
+    const kind = p.speedKind ? p.speedKind() : null;
+    const spdTxt = kind === 'fly' ? this.fmtSpeed(p.flySpeed) : kind === 'walk' ? this.fmtSpeed(p.sprinting ? p.runSpeed : p.walkSpeed) : null;
+    if (spdTxt !== this._spdTxt) { this._spdTxt = spdTxt; this.spdEl.classList.toggle('hidden', !spdTxt); if (spdTxt) { this.spdOut.textContent = spdTxt; this.spdEl.title = kind === 'fly' ? 'Fly speed · scroll or + / -' : 'Walk speed · + / - (Shift runs)'; } }
+    const sp = p.speed || 0, show = !kind && sp > 0.6, txt = show ? this.fmtSpeed(sp) : '';
     if (txt !== this._spd) { this._spd = txt; this.modeSpeed.textContent = txt; }
+    this._nearby(p);
+  }
+  // r5-controls: a speed change from the keyboard / wheel flashes the stepper and names the new speed
+  speedChanged(kind, v) {
+    this.modes(); if (!this.spdEl) return;
+    this.spdEl.classList.remove('bump'); void this.spdEl.offsetWidth; this.spdEl.classList.add('bump'); clearTimeout(this._sb); this._sb = setTimeout(() => this.spdEl.classList.remove('bump'), 700);
+    const p = this.player; this.notify(kind === 'fly' ? `Fly speed ${this.fmtSpeed(v)} · Shift for ${this.fmtSpeed(v * 3)}` : `Walk ${this.fmtSpeed(p.walkSpeed)} · run ${this.fmtSpeed(p.runSpeed)}`, { icon: kind === 'fly' ? 'drone' : 'walk', ms: 1600 });
+  }
+  // r5-controls: the keys for a mode, as a short strip of key caps (from the mode's one-line hint, e.g. 'W throttle · S brake')
+  modeHint(m, force = false) {
+    if (this.isTouch || !m || !m.hint) return;
+    let n = {}; try { n = JSON.parse(localStorage.getItem('bsim.modeHints') || '{}'); } catch (e) {}
+    if (!force && (n[m.id] || 0) >= 3) return; n[m.id] = (n[m.id] || 0) + 1; try { localStorage.setItem('bsim.modeHints', JSON.stringify(n)); } catch (e) {}
+    const segs = String(m.hint).split(/\s*·\s*/).map((x) => { const q = x.match(/^(\S+)\s+(.+)$/); if (!q || !q[1].split('/').every((k) => /^([A-Z0-9]|Shift|Space|Scroll|Esc|Ctrl|\+|-)$/.test(k))) return esc(x); const keys = q[1] === '+/-' ? ['+', '-'] : q[1].split('/').filter(Boolean); return `${kbd(...keys)} ${esc(q[2])}`; });
+    this.hint(`<span class="hint-m">${icon(m.icon)}${esc(m.label)}</span><i></i>${segs.join(' <i></i> ')}`, 6500);
+  }
+  // r5-controls: once per session, point out notable interactions (e.g. the Campanile elevator) when you get close
+  _nearby(p) {
+    let best = null, bd = 26;
+    for (const it of p.interactions || []) { if (!it.action || !it.label || !(it.radius > 0)) continue; const d = Math.hypot(it.pos[0] - p.pos.x, it.pos[2] - p.pos.z); if (d < bd && Math.abs(it.pos[1] - p.pos.y) < 6) { bd = d; best = it; } }
+    if (!best || p.activeInteraction || p.mode !== 'walk') return;
+    const id = best.id || best.action; this._nearSeen = this._nearSeen || new Set(); if (this._nearSeen.has(id)) return; this._nearSeen.add(id);
+    const what = /elevator/i.test(best.label) ? 'Campanile elevator: walk in through the door, then press' : `${best.label}: walk up and press`;
+    this.hint(`${icon('info')}<span>${esc(what)}</span> ${kbd('E')}`, 6000);
   }
   _pickMode(id) {
     const p = this.player; if (!p) return;
@@ -412,10 +449,11 @@ export class UI {
           ${row(kbd('Shift'), 'Run')}${row(kbd('Space'), 'Jump')}
           ${row(kbd('Mouse'), 'Look around', 'Click the view to capture the mouse, or drag')}
           ${row(kbd('V'), 'First or third person')}
-          ${row(kbd('Scroll'), 'Camera distance')}
+          ${row(kbd('Scroll'), 'Camera distance', 'In fly mode, scroll sets the fly speed')}
+          ${row(kbd('+', '-'), 'Faster or slower', 'Walk and fly speed, also in Settings')}
         </section>
         <section><h3>Get around</h3>
-          ${modes.map((m) => row(m.key ? kbd(keyName(m.key)) : '', `<span class="sc-mi">${icon(m.icon)}</span>${esc(m.label)}`, esc(m.id === 'walk' ? 'Press a mode key again to walk' : m.hint || ''))).join('')}
+          ${modes.map((m, i) => row((i < 9 ? kbd(String(i + 1)) : '') + (m.key ? kbd(keyName(m.key)) : ''), `<span class="sc-mi">${icon(m.icon)}</span>${esc(m.label)}`, esc(m.id === 'walk' ? 'Press a mode key again to walk' : m.id === 'scooter' ? 'Summons a Lime to you. E parks it' : m.hint || ''))).join('')}
           ${tools.map((t) => row(t.key ? kbd(keyName(t.key)) : '<span class="sc-none">Always on</span>', `<span class="sc-mi">${icon(t.icon)}</span>${esc(t.label)}`, esc(t.hint || ''))).join('')}
         </section>
         <section><h3>Explore</h3>
@@ -429,14 +467,21 @@ export class UI {
   }
   settings(s, onChange) {
     const seg = (k, val, opts) => `<div class="seg" data-k="${k}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(val) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%` };
-    const range = (k, min, max, step, val) => `<div class="range"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${k}"><output>${fmts[k](val)}</output></div>`;
+    // r5-controls: walk speed (multiplier) and fly speed (m/s, log slider 3-150) live here too
+    const FLY0 = 3, FLY1 = 150, toLog = (v) => Math.round(Math.log(v / FLY0) / Math.log(FLY1 / FLY0) * 1000), fromLog = (u) => FLY0 * Math.pow(FLY1 / FLY0, u / 1000);
+    const fmts = { sens: (v) => `${(+v).toFixed(2)}×`, fov: (v) => `${Math.round(v)}°`, volume: (v) => `${Math.round(v * 100)}%`, walkSpeed: (v) => `${this.fmtSpeed(4.2 * v)} · run ${this.fmtSpeed(8 * v)}`, flySpeed: (u) => this.fmtSpeed(fromLog(u)) };
+    const range = (k, min, max, step, val) => `<div class="range${k === 'walkSpeed' ? ' wide' : ''}"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${k}"><output>${fmts[k](val)}</output></div>`;
     const sw = (k, on) => `<label class="switch"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}><i></i></label>`;
     this.panel(`${this._head('Settings')}
       <section><h3>Graphics</h3>
         <div class="row"><span>Quality</span>${seg('quality', s.quality, [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}</div>
         <div class="row"><span>People</span>${sw('life', s.life !== false)}</div>
         <p class="row-note">Changing quality reloads the page.</p></section>
+      <section><h3>Movement</h3>
+        <div class="row"><span>Walk speed</span>${range('walkSpeed', 0.5, 2, 0.05, s.walkSpeed ?? 1)}</div>
+        <div class="row"><span>Fly speed</span>${range('flySpeed', 0, 1000, 1, toLog(s.flySpeed ?? 25))}</div>
+        <div class="row"><span>Camera follows movement</span>${sw('camFollow', s.camFollow !== false)}</div>
+        <p class="row-note">In the game, + and - change the speed of the mode you're in. In fly mode the scroll wheel does too.</p></section>
       <section><h3>Controls</h3>
         <div class="row"><span>Look sensitivity</span>${range('sens', 0.3, 2.5, 0.05, s.sens)}</div>
         <div class="row"><span>Invert vertical look</span>${sw('invertY', s.invertY)}</div>
@@ -450,7 +495,7 @@ export class UI {
       const parse = (v) => (v === 'true' ? true : v === 'false' ? false : v);
       const set = (k, v) => { if (k === 'theme') this.setTheme(v); if (k === 'units') this.units = v; onChange(k, v); };
       p.querySelectorAll('.seg[data-k]').forEach((g) => g.addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (!b || b.classList.contains('on')) return; g.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); set(g.dataset.k, parse(b.dataset.v)); }));
-      p.querySelectorAll('input[type=range][data-k]').forEach((el) => { const out = el.nextElementSibling; fillRange(el); el.addEventListener('input', () => { out.textContent = fmts[el.dataset.k](el.value); fillRange(el); set(el.dataset.k, parseFloat(el.value)); }); });
+      p.querySelectorAll('input[type=range][data-k]').forEach((el) => { const out = el.nextElementSibling; fillRange(el); el.addEventListener('input', () => { out.textContent = fmts[el.dataset.k](el.value); fillRange(el); const v = parseFloat(el.value); set(el.dataset.k, el.dataset.k === 'flySpeed' ? Math.round(fromLog(v) * 10) / 10 : v); }); });
       p.querySelectorAll('input[type=checkbox][data-k]').forEach((el) => el.addEventListener('change', () => set(el.dataset.k, el.checked)));
       p.querySelector('[data-x=help]').onclick = () => this.help();
     });

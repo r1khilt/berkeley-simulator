@@ -52,6 +52,7 @@ class Grapple {
     const self = this;
     this.plugin = {
       label: 'Grappling hook', icon: ICON, hint: 'Hold Q or right mouse to swing · Space reel in · C let out',
+      tool: true, // r5-controls: an always-on ability, so the HUD lists it under Controls instead of as a mode (keeps number keys 1-6 for modes)
       // player.js toggles a plugin's mode when its key is pressed. The hook fires from onKey instead: the toggle into
       // 'grapple' is refused by canEnter, and while swinging the key reads as undefined for the length of that one key
       // event, so Q re-fires mid-air instead of dropping you into walk mode. Everyone else always sees 'KeyQ'.

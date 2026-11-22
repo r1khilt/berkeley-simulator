@@ -191,6 +191,9 @@ async function boot() {
   const physicsPlayer = new Player({ scene, camera, physics, dom: canvas, look: store.get('look', {}) });
   const player = physicsPlayer; BS.player = player;
   player.sens = settings.sens; player.invertY = settings.invertY;
+  // r5-controls: adjustable walk / fly speed (Settings, + / - keys, wheel in fly mode) and camera follow, saved with the settings
+  player.speedScale = settings.walkSpeed ?? 1; if (settings.flySpeed) player.flySpeed = settings.flySpeed; player.camFollow = settings.camFollow !== false;
+  player.onSpeedChange = (k, v, fromGame) => { settings[k === 'fly' ? 'flySpeed' : 'walkSpeed'] = v; store.set('settings', settings); if (fromGame) ui.speedChanged(k, v); };
   setupMaterials(scene);
   const lm = new LandmarkManager({ scene, physics, heightAt, manifest, standins: bres.standinMgr, setupMaterials,
     onLoaded: (l) => { player.interactions.push(...(l.inter || [])); },
@@ -263,6 +266,7 @@ async function boot() {
   const onSetting = (k, v) => {
     settings[k] = v; store.set('settings', settings);
     if (k === 'sens') player.sens = v; if (k === 'invertY') player.invertY = v; if (k === 'volume') audio.setVolume(v);
+    if (k === 'walkSpeed') player.speedScale = v; if (k === 'flySpeed') player.flySpeed = v; if (k === 'camFollow') player.camFollow = v; // r5-controls
     if (k === 'life' && life) life.setEnabled(v); // r4-campus-life
     if (k === 'fov') { camera.fov = v; camera.updateProjectionMatrix(); csm.updateFrustums(); }
     if (k === 'quality') { ui.notify(`Switching to ${v} quality…`, { icon: 'gear', ms: 1500 }); setTimeout(() => location.reload(), 600); }

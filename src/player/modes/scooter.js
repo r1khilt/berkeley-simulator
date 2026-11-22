@@ -130,17 +130,44 @@ export function install(player, ctx) {
   const prevInteract = player.onInteract;
   player.onInteract = (it) => { if (it && it.fleet) { if (it.it && player.mode !== 'scooter') { plugin.pending = it.it; player.setMode('scooter'); } return; } return prevInteract && prevInteract(it); };
   const ride = { it: null }; let lastPos = new THREE.Vector3(), justMounted = false, frame = 0, toastT = 0;
+  // r5-controls: bring a parked scooter to the player. Prefers a Lime that is out of view (so none visibly vanishes from a
+  // rack you are looking at), then the nearest. Returns the item, false while a fade-to-ground is running, or null.
+  let summonBusy = false;
+  function summon(p) {
+    if (summonBusy) return false;
+    const gy = ph.groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5).y;
+    if (p.pos.y - gy > 2.5) { // flying or falling: drop to the ground first, then summon
+      summonBusy = true; const go = () => { summonBusy = false; p.teleport(p.pos.x, gy, p.pos.z); p.setMode('walk'); p.setMode('scooter'); };
+      if (ui && ui.fade) ui.fade(go, 200); else go(); return false;
+    }
+    const cam = p.camera, cf = _v2.set(0, 0, -1); if (cam) cf.applyQuaternion(cam.quaternion);
+    let best = null, bs = Infinity;
+    for (const it of fleet.items) {
+      if (!it.group) continue;
+      const dx = it.x - p.pos.x, dz = it.z - p.pos.z, d2 = dx * dx + dz * dz, d = Math.sqrt(d2) || 1;
+      const seen = cam && d < 120 && (dx * cf.x + dz * cf.z) / d > 0.45;
+      const score = d2 + (it.type === 'lime' ? 0 : 4e6) + (seen ? 1e8 : 0) + (it.down ? 1e4 : 0);
+      if (score < bs) { bs = score; best = it; }
+    }
+    if (!best) return null;
+    fleet.unpark(best);
+    let x = p.pos.x, z = p.pos.z; const r0 = ph.resolve(x, z, 0.36, gy, 1.6); if (r0[2]) { x = r0[0]; z = r0[1]; }
+    Object.assign(best, { x, z, y: ph.groundAt(x, z, p.pos.y + 0.5).y, yaw: p.camYaw, down: false, moved: true, summoned: true });
+    return best;
+  }
 
   const plugin = {
     key: KEY, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M5 18h9l3-12h3M15 6h-2"/></svg>', // ui: SVG icon (no emoji in UI)
     iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M5 18h9l3-12h3M15 6h-2"/></svg>',
     get label() { return ride.it ? NAMES[ride.it.type] : 'E-scooter'; },
-    hint: 'W throttle · S brake · A/D steer · E park',
+    hint: 'W throttle · S brake · A/D steer · E park', // r5-controls: U / its number key / the HUD button summons one
     fleet, pending: null,
     canEnter(p) {
       if (p.keys.has('ShiftLeft') || p.keys.has('ShiftRight')) return false; // Shift+U is reserved
       const it = this.pending || fleet.nearest(p.pos.x, p.pos.z, REACH + 0.3, p.pos.y);
       if (it) { this.pending = it; return true; }
+      // r5-controls: nothing in reach -> summon the nearest parked Lime to you (U, the number key or the HUD button)
+      const sm = summon(p); if (sm) { this.pending = sm; return true; } if (sm === false) return false;
       const far = fleet.nearest(p.pos.x, p.pos.z, 5000);
       if (far && ui && ui.toast && performance.now() > toastT) { toastT = performance.now() + 2500; const d = Math.hypot(far.x - p.pos.x, far.z - p.pos.z); const b = ((Math.atan2(far.x - p.pos.x, -(far.z - p.pos.z)) * 180 / Math.PI) + 360) % 360; const dir = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][Math.round(b / 45) % 8];
         const cl = CLUSTERS[far.home]; ui.toast({ kind: 'Scooters', name: `Nearest ${NAMES[far.type]}: ${d < 1000 ? Math.round(d / 10) * 10 + ' m' : (d / 1000).toFixed(1) + ' km'} ${dir}`, sub: cl && Math.hypot(cl.x - far.x, cl.z - far.z) < 40 ? cl.name : 'Walk up and press E to ride' }, 2600); }
@@ -148,10 +175,10 @@ export function install(player, ctx) {
     },
     enter(p) {
       const it = this.pending || fleet.nearest(p.pos.x, p.pos.z, REACH + 0.3, p.pos.y); this.pending = null; if (!it) return;
-      fleet.unpark(it); const rig = getRig(it.type); const S = SPECS[it.type];
+      fleet.unpark(it); const rig = getRig(it.type); const S = SPECS[it.type]; const popIn = !!it.summoned; it.summoned = false;
       // face the scooter's own heading; flip if the player approaches from behind and it's more natural to turn it
       Object.assign(ride, { it, rig, S, x: it.x, z: it.z, y: it.y, yaw: it.yaw, speed: 0, steer: 0, lean: 0, tilt: it.down ? 1.36 : TILT, tiltV: 0, pitch: 0, vy: 0, air: false, dist: 0, bumpY: 0, bumpV: 0, pOff: 0, pOffV: 0, kerb: [null, null], kerbCool: [0, 0], kerbAt: [[0, 0], [0, 0]], wasDown: it.down, t: 0, odo: 0, stand: 1, brake: 0, throttle: 0, accel: 0, camIdle: 0, lastCam: p.camYaw, load: 0 });
-      it.down = false; rig.root.visible = true; p.yaw = it.yaw; p.vel.set(0, 0, 0); p.onGround = true;
+      it.down = false; rig.root.visible = true; p.yaw = it.yaw; p.vel.set(0, 0, 0); p.onGround = true; ride.pop = popIn ? 0.3 : 0; // r5-controls: a summoned scooter pops in
       this._place(p); lastPos.copy(p.pos); justMounted = true;
       entry.pos[0] = 1e9; sound.unlock(); sound.start('motor');
     },
@@ -172,6 +199,7 @@ export function install(player, ctx) {
     _place(p) { // sync player position + rig transform from ride state
       const r = ride, S = r.S; const y = r.y + r.bumpY;
       r.rig.root.position.set(r.x, y, r.z); r.rig.root.rotation.set(r.pitch + r.pOff, r.yaw, r.lean + r.tilt, 'YXZ');
+      r.rig.root.scale.setScalar(r.pop > 0 ? 1 - 0.3 * (r.pop / 0.3) ** 2 : 1); // r5-controls: summon pop-in
       r.rig.steer.quaternion.setFromAxisAngle(r.rig.axis, r.steer);
       const sp = r.dist / S.R; r.rig.wheelF.rotation.x = -sp; r.rig.wheelR.rotation.x = -sp;
       r.rig.stand.quaternion.slerpQuaternions(_qi, r.rig.standStow, 1 - r.stand);
@@ -183,7 +211,7 @@ export function install(player, ctx) {
     update(p, dt, inp) {
       const r = ride; if (!r.it) { p.setMode('walk'); return 0; }
       if (p.pos.distanceToSquared(lastPos) > 9) { p.setMode('walk'); return 0; } // teleported (map travel, respawn): leave the scooter parked
-      justMounted = false; p.jumpReq = false; r.t += dt; const S = r.S;
+      justMounted = false; p.jumpReq = false; r.t += dt; const S = r.S; if (r.pop > 0) r.pop = Math.max(0, r.pop - dt);
       // ---- inputs
       const throttle = Math.max(0, inp.f), brake = clamp(Math.max(0, -inp.f) + (inp.up ? 1 : 0), 0, 1), steerIn = -inp.s;
       r.throttle += (throttle - r.throttle) * damp(10, dt); r.brake = brake;
