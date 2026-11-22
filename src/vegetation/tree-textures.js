@@ -454,3 +454,62 @@ export function leafTexture(kind, S = 2048) {
   t.userData.coverage = cov / (d.length / 4); t.userData.meanShade = mr / 255; t.userData.cellM = M;
   return (_leaf[key] = t);
 }
+
+// ---------- r4-trees: leaf-cluster "puff" atlas ----------
+// Volumetric crowns are built from camera-facing leaf puffs (tree-shaders.js patchPuff). Each puff cell is a round
+// ball of the species' own shoots (copies of the leaf atlas cells, at real size for a ball `ballM` metres across,
+// pointing outward from the centre; back layers darker = self-shadowed core), so a puff carries exactly the same
+// channel encoding as the leaf cards (R shade, G per-leaf random, B twig mask, A coverage) and colours identically.
+// 2:1 atlas, two variants (u 0-0.5, 0.5-1); the ball fills a disc of radius ~0.49 cell around the cell centre.
+const _puff = {};
+export function puffTexture(kind, S = 1024, ballM = 3) {
+  const key = kind + ':' + S + ':' + ballM;
+  if (_puff[key]) return _puff[key];
+  const src = leafTexture(kind, S); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1;
+  const sc = document.createElement('canvas'); sc.width = W; sc.height = H;
+  sc.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(src.image.data.buffer.slice(0)), W, H), 0, 0);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  const rnd = mulberry32(hashStr('puff:' + kind));
+  const w = cs * Math.min(0.62, M / ballM); // drawn shoot cell size (px): real-size leaves for a ball ballM wide
+  const reach = w * 0.88;                     // shoot length (px)
+  const n = Math.round(Math.min(70, Math.max(12, 3.0 * Math.pow(cs * 0.49 / (reach * 0.7), 2))));
+  for (let cell = 0; cell < 2; cell++) {
+    g.save(); g.beginPath(); g.rect(cell * cs + 1, 1, cs - 2, cs - 2); g.clip();
+    const cx = cell * cs + cs / 2, cy = cs / 2, R = cs * 0.49;
+    const ph = [rnd() * TAU, rnd() * TAU], lobe = (a) => 0.8 + 0.12 * Math.sin(3 * a + ph[0]) + 0.08 * Math.sin(5 * a + ph[1]); // lumpy, not circular
+    for (const [frac, dark] of [[0.45, 0.6], [0.35, 0.8], [0.45, 1]]) { // back, middle, front layers
+      const cnt = Math.round(n * frac);
+      for (let k = 0; k < cnt; k++) {
+        // the leafy middle of each shoot lands uniformly inside the ball; shoots point outward (inner ones any way),
+        // so the centre is solid and the rim thins out into individual leaves instead of a hard circle
+        const a = rnd() * TAU, u = Math.sqrt(rnd()), rr = u * R * 0.78 * lobe(a);
+        const out = Math.atan2(Math.sin(a), Math.cos(a)), th = (u < 0.35 ? rnd() * TAU : out + (rnd() - 0.5) * 1.2) - Math.PI / 2;
+        const bx = cx + Math.cos(a) * rr - Math.cos(th + Math.PI / 2) * reach * 0.5, by = cy + Math.sin(a) * rr - Math.sin(th + Math.PI / 2) * reach * 0.5;
+        g.save(); g.translate(bx, by); g.rotate(th);
+        g.filter = dark < 1 ? `brightness(${dark})` : 'none';
+        const ww = w * (0.85 + 0.3 * rnd());
+        g.drawImage(sc, (k + cell) % 2 * cs, 0, cs, cs, -ww / 2, -ww * 0.04, ww, ww);
+        g.restore();
+      }
+    }
+    g.restore();
+  }
+  g.filter = 'none';
+  const img = g.getImageData(0, 0, W, H); const d = img.data;
+  let sr = 0, sgr = 0, nn = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 220 && d[i + 2] < 128) { sr += d[i]; sgr += d[i + 1]; nn++; }
+  const mr = nn ? sr / nn : 170, mg = nn ? sgr / nn : 128;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (a < 255) { const t = a / 255; d[i] = d[i] * t + mr * (1 - t); d[i + 1] = d[i + 1] * t + mg * (1 - t); d[i + 2] = d[i + 2] * t; }
+  }
+  const level0 = new Uint8Array(d.buffer.slice(0));
+  const t = new THREE.DataTexture(level0, W, H, THREE.RGBAFormat);
+  t.colorSpace = THREE.NoColorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.mipmaps = buildCoverageMips(level0, W, H, 0.42); t.generateMipmaps = false;
+  t.anisotropy = 4; t.needsUpdate = true;
+  t.userData.ballM = ballM;
+  return (_puff[key] = t);
+}

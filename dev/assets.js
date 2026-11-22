@@ -74,7 +74,7 @@ const unionBox = (parts) => { const b = new THREE.Box3(); for (const p of parts)
 let lib = null; const treeMeshes = [];
 const sampleTints = [new THREE.Color(0.24, 0.30, 0.18), new THREE.Color(0.30, 0.33, 0.22), new THREE.Color(0.36, 0.38, 0.27)];
 if (only !== 'props') {
-  lib = createTreeLibrary({ season, lod0Budget: +(qs.get('lod0') ?? 3000), only: qs.get('species') ? qs.get('species').split(',') : null });
+  lib = createTreeLibrary({ season, lod0Budget: +(qs.get('lod0') ?? 3000), only: qs.get('species') ? qs.get('species').split(',') : null, puffs: qs.get('puffs') !== '0', leafTexSize: +(qs.get('tex') ?? 2048) });
   let z = 0;
   for (const [id, sp] of Object.entries(lib.species)) {
     const H = sp.typical.height, R = sp.typical.crownR;
