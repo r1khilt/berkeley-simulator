@@ -57,7 +57,7 @@ export async function build(ctx) {
   const gMax = Math.max(...Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return groundAt(cx + (RIM_OUT + 1.1) * Math.cos(a), cz + (RIM_OUT + 1.1) * Math.sin(a)); }));
   const main = new Bucket(boxUV);
   // r4-sweep: cool pale-grey exposed-aggregate concrete (photo ~#B8B4AC); the warm tan read as a generic planter
-  const rimMat = M.concrete.clone(); rimMat.color.set(0xcac7c0); rimMat.roughness = 0.88; rimMat.name = 'ludwigConcrete';
+  const rimMat = M.concrete.clone(); rimMat.color.set(0xd6d3cc); rimMat.roughness = 0.88; rimMat.name = 'ludwigConcrete';
   const stainMat = M.concrete.clone(); stainMat.color.set(0xa99d89); stainMat.name = 'ludwigStain';
   // ring with eased (rounded) arrises on both top edges; outer face runs 1 m below grade so it never floats on the slope
   const e = 0.05;
@@ -82,7 +82,8 @@ export async function build(ctx) {
   const waterMat = M.water.clone();
   // r4-sweep: deeper, more reflective water (photo: dark, mirrors sky and trees); the pale 0.62-opacity surface read as a
   // solid white floor from eye level. The basin floor still shows faintly near the rim.
-  waterMat.name = 'ludwigWater'; waterMat.color.set(0x5b767c); waterMat.transparent = true; waterMat.opacity = 0.8; waterMat.depthWrite = false;
+  waterMat.name = 'ludwigWater'; waterMat.color.set(0x3e555b); waterMat.transparent = true; waterMat.opacity = 0.86; waterMat.depthWrite = false;
+  waterMat.envMapIntensity = 0.7; // the sky-only env map at grazing angles still mirrored the bright sky as a white sheet
   waterMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRipXZ;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRipXZ = position.xz;');
