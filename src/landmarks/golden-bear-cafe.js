@@ -44,12 +44,13 @@ export async function build(ctx) {
   const frieze = tone(M.concrete, 0xb8b0a2);                   // cast relief frieze
   const dark = tinted(M.blackPaint, 0x23211f);                // slot backing, bronze-black frames
   const frame = tinted(M.darkBronze, 0x4e3e2c);
-  const podium = tone(M.concrete, 0xb8b2a6);
+  const podium = tone(M.concrete, 0xcfc8ba); // [r5-sproul] cream podium wall (photo #D9D2C3); read dark
   const navy = tinted(M.calBlue, 0x34465c);
   const sglass = tinted(M.glassLight, 0x7f9196, { opacity: 0.3 }); // transparent storefront glass (lighter: the furnished interior shows through — interiors-cafe)
   const interior = tinted(M.stucco, 0xe6c896);                  // warm-lit café interior seen through the glass
   const greenGlass = tinted(M.windowNight, 0x6f8a80);           // light-green clerestory glass
-  const YT = 11.8, DEP = 0.92, TH = 0.3, FL = 7.0; // shell rim 11.8 + 0.2 m upturned rim = 12.0 (LiDAR) // umbrella rim, depth, slab; café / upper floor level
+  const YT = 11.9, DEP = 1.02, TH = 0.2, FL = 7.0; // shell rim 11.9 + 0.1 m upturned rim = 12.0 (LiDAR), centre 10.88 // umbrella rim, depth, slab; café / upper floor level
+  // [r5-sproul] thinner shells (0.3 m fascia instead of 0.5) so the 0.8 m V-dips of the east/west edges read as a zigzag
   const g = (u, v) => K.g(u, v);
 
   // ---- umbrella field (strips measured from the LiDAR) ----
@@ -61,7 +62,7 @@ export async function build(ctx) {
     { u0: 17.7, u1: 24.8, vN: -7.4, vS: 15.1, n: 3 }, { u0: 24.8, u1: 32.05, vN: -10.9, vS: 11.3, n: 3 },
     { u0: 32.05, u1: 39.7, vN: -7.43, vS: 8.0, n: 2 }, { u0: 39.7, u1: 47.3, vN: -10.75, vS: 12.4, n: 3 },
   ];
-  const F = umbrellaField(strips, { yTop: YT, depth: DEP, dip: 0.8, gap: 0.22 });
+  const F = umbrellaField(strips, { yTop: YT, depth: DEP, dip: 0.95, gap: 0.22 }); // [r5-sproul] dip 0.8 -> 0.95: a slightly exaggerated V so the zigzag fascia reads from across the plaza
 
   // ---- building bodies (wall lines inset from the roof edges) ----
   const outlineW = [[-40.9, -22.25], [-33.3, -22.25], [-33.3, -18.6], [-26.1, -18.6], [-26.1, -14.75], [-18.9, -14.75], [-18.9, -18.25], [-11.6, -18.25],
@@ -248,8 +249,8 @@ export async function build(ctx) {
     return g(u, v);
   };
   // r4-sweep: soffits in light board-marked concrete (the untextured white paint read as raw blockout from spawn)
-  const sofC = tone(M.concrete, 0xe8e4dc), sofC2 = tone(M.concrete, 0xd8d3c9);
-  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.2, rimW: 0.15, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv) });
+  const sofC = tone(M.concrete, 0xdcd7cd), sofC2 = tone(M.concrete, 0xcdc7bb); // [r5-sproul] a touch darker than the sunlit white fascia (photo)
+  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.2 /* r4-sweep-central2: ~0.4 m columns as built (0.6 m read squat) */, rimUp: 0.1, rimW: 0.12, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv), aoSoffit: 0.5 /* r5-sproul */ });
 
   // rooftop mechanical equipment and a small penthouse (LiDAR 12.9–15.0 m)
   const mech = tinted(M.concrete, 0xd0d0cc);

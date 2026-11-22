@@ -5,7 +5,7 @@
 // face Lower Sproul above a two-storey west wing; a solar canopy overhangs the roof. Massing from the 2021 LiDAR:
 // main roof ~21.3 m, penthouse 27.6 m, west wing 13.5 / 9.5 m, Bancroft pavilion 8.5 m (y=0 at Lower Sproul).
 import * as THREE from 'three';
-import { Kit } from './lib/classic-kit.js';
+import { Kit, polysGeo } from './lib/classic-kit.js';
 import { glassBand, slotBand, pipeRail, tinted, tone, TEXAVG } from './lib/b01-kit.js';
 import { mlkInterior, fitFloor, MLK_IN } from './lib/int-mlk.js'; // interiors-cafe: enterable Lower Sproul dining room + Cal Student Store frontage
 
@@ -143,9 +143,27 @@ export async function build(ctx) {
       const Rp = K.run(a, b); const gp = Math.min(g(...a), g(...b)) - 0.5;
       glassBand(K, Rp, 0, Rp.L, gp, ph - 0.9, { glass: sGlass, frame: alu, pitch: 1.45, transoms: [g(...a) + 2.4], doors: Rp.L > 20 ? [{ s0: Rp.L / 2 - 1.0, s1: Rp.L / 2 + 1.0, h: 2.2 }] : [] });
       K.rbox(Rp, warm, 0.3, gp, -0.45, Rp.L - 0.3, ph - 1.0, -0.42);
-      K.rbox(Rp, M.whitePaint, -0.15, ph - 0.9, -0.3, Rp.L + 0.15, ph, 0.25);
+      K.rbox(Rp, M.whitePaint, -0.15, ph - 0.9, -0.3, Rp.L + 0.15, ph - 0.8, 0.25); // [r5-sproul] wall head tucked under the folded roof
+      if (Rp.L > 20) { // [r5-sproul] street face (MRY 385-UCB_0009): grey fins over the upper glazing, white eyebrow, gold Cal "C" on the glass
+        const gpp = g(...a), finMat = tinted(M.iron, 0x8e9294, { metalness: 0.5, roughness: 0.45 });
+        for (let s = 0.36; s < Rp.L - 0.2; s += 0.725) K.rbox(Rp, finMat, s - 0.03, ph - 3.1, 0.0, s + 0.03, ph - 0.95, 0.22, { detail: true });
+        K.rbox(Rp, M.whitePaint, -0.1, gpp + 3.3, 0.0, Rp.L + 0.1, gpp + 3.45, 0.45);
+        const cg = new THREE.TorusGeometry(0.6, 0.14, 6, 24, Math.PI * 1.55); cg.rotateZ(Math.PI * 0.225); cg.translate(Rp.L * 0.56, ph - 2.3, 0.3); K.addRun(Rp, M.calGold || M.gold, cg, { detail: true });
+      }
     }
-    K.box(conc, p0, ph - 0.25, V1, p1, ph - 0.05, q1);
+    // [r5-sproul] thin folded-plate roof instead of a flat slab: a shallow asymmetric gable whose ridge rises to a pointed
+    // prow over the west end, knife-edge white fascia, white soffit, dark grey top, deep cantilevered eaves (photo 0009)
+    { const W = [p0 - 3.6, ph + 1.05, 33.0], E = [p1 + 0.4, ph + 0.3, 33.6], SW = [p0 - 1.8, ph - 0.2, q1 + 3.0], SE = [p1 + 0.4, ph - 0.95, q1 + 2.4], NW = [p0 - 1.4, ph + 0.1, V1 + 0.15], NE = [p1 + 0.4, ph - 0.2, V1 + 0.15]; // prow rises, street eave falls toward MLK
+      const roofTop = tinted(M.concrete, 0x5f6366, { roughness: 0.6 }), FT = 0.2, ctr = [(p0 + p1) / 2, 0, 34];
+      const face = (P, up) => { const [A, B, C] = P; const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2]; const ny = uz * vx - ux * vz; return (ny > 0) === up ? P : [A, C, B]; };
+      const tops = [[W, E, SE], [W, SE, SW], [W, NW, NE], [W, NE, E]];
+      K.add(roofTop, polysGeo(tops.map((t) => face(t, true))), { uvMode: 'roof' });
+      K.add(M.whitePaint, polysGeo(tops.map((t) => face(t.map((p) => [p[0], p[1] - FT, p[2]]), false))));
+      const loop = [SW, SE, E, NE, NW, W], fq = [];
+      for (let i = 0; i < loop.length; i++) { const P = loop[i], Q = loop[(i + 1) % loop.length]; const a1 = [P[0], P[1] + 0.02, P[2]], b1 = [Q[0], Q[1] + 0.02, Q[2]], b0 = [Q[0], Q[1] - FT - 0.02, Q[2]], a0 = [P[0], P[1] - FT - 0.02, P[2]];
+        const mx = (P[0] + Q[0]) / 2 - ctr[0], mz = (P[2] + Q[2]) / 2 - ctr[2]; const nx = (b1[1] - a1[1]) * 0 + ((b1[2] - a1[2]) * (a0[1] - a1[1]) - 0), ex = Q[0] - P[0], ez = Q[2] - P[2];
+        const outward = (-ez) * mx + ex * mz < 0; fq.push(outward ? [a1, b1, b0, a0] : [a1, a0, b0, b1]); }
+      K.add(M.whitePaint, polysGeo(fq)); }
     colliders.push(K.colPoly([[p0, V1], [p1, V1], [p1, q1], [p0, q1]], -2, ph));
   }
   // ---- NORTH (toward the Golden Bear terrace) giant order over a brick base ----
@@ -210,9 +228,41 @@ export async function build(ctx) {
     walkables.push(K.walkPoly([[w0, wM], [U0, wM], [U0, wS], [w0, wS]], 9.5));
     // board-formed concrete terrace at the wing's north end (LiDAR ~5 m), stair down to Lower Sproul
     const tv0 = -33.4; K.box(board, w0, -1.5, tv0, U0, 4.8, wN); K.box(conc, w0 - 0.1, 4.8, tv0 - 0.1, U0, 5.0, wN);
-    pipeRail(K, alu, [[w0 + 0.1, wN], [w0 + 0.1, tv0 + 0.1], [U0, tv0 + 0.1]], 5.0);
+    pipeRail(K, alu, [[w0 + 0.1, wN - 3.2], [w0 + 0.1, tv0 + 0.1], [U0, tv0 + 0.1]], 5.0); // [r5-sproul] opening onto the new stair landing
     walkables.push(K.walkPoly([[w0, tv0], [U0, tv0], [U0, wN], [w0, wN]], 5.0));
-    { const gs = g(w0 - 4, (tv0 + wN) / 2), n = Math.max(3, Math.round((5.0 - gs) / 0.17)); walkables.push(K.stairs(conc, w0 - n * 0.3, tv0 + 1.0, w0, tv0 + 4.0, gs, 5.0, '+u', n)); }
+    // [r5-sproul] the external stair runs along the west façade (MRY 385-UCB_0001/0002a/0058): two open flights rising north
+    // to the terrace with a mid-landing on a round concrete column, grey steel stringers, orange-red soffits, galvanised
+    // picket guards and stainless rails, instead of one solid 29-riser block perpendicular to the façade
+    { const sU0 = w0 - 3.0, sU1 = w0 - 0.6, gs = g(w0 - 1.8, -16.0), yT = 5.0, n1 = 14, n2 = 15, r = (yT - gs) / (n1 + n2), t = 0.3;
+      const vTop = wN, v2b = vTop + n2 * t, vL = v2b + 1.8, v1b = vL + n1 * t, yL = gs + n1 * r; // flight 2 [vTop, v2b], landing [v2b, vL], flight 1 [vL, v1b]
+      const orange = tinted(M.whitePaint, 0xd25a35, { roughness: 0.6 }), stringer = tinted(M.iron, 0x7a7f83, { metalness: 0.5, roughness: 0.45 });
+      const flight = (vLo, vHi, yLo, n) => { // low end at vLo (south), rising toward -v (north)
+        for (let i = 0; i < n; i++) { const vb = vLo - i * t, va = vb - t, y = yLo + r * (i + 1);
+          K.box(conc, sU0 + 0.08, y - 0.17, va, sU1 - 0.08, y, vb + 0.02);
+          K.box(M.blackPaint, sU0 + 0.12, y - 0.003, vb - 0.06, sU1 - 0.12, y + 0.004, vb + 0.025, { detail: true }); }
+        const L = vLo - vHi, yA = yLo, yB = yLo + r * n, ang = Math.atan2(yB - yA, L), hyp = Math.hypot(L, yB - yA);
+        for (const [u0, u1, mat, dy, h] of [[sU0, sU0 + 0.1, stringer, 0.08, 0.42], [sU1 - 0.1, sU1, stringer, 0.08, 0.42], [sU0 - 0.02, sU1 + 0.02, orange, -0.42, 0.1]]) { // stringers below the nosing line, orange soffit plate clear of the step blocks
+          const gg = new THREE.BoxGeometry(u1 - u0, h, hyp); gg.rotateX(ang); gg.translate((u0 + u1) / 2, (yA + yB) / 2 + dy - h / 2 + 0.17, (vLo + vHi) / 2); K.add(mat, gg); }
+        for (const uu of [sU0 + 0.04, sU1 - 0.04]) { // picket guards + handrail
+          for (let v = vHi + 0.06; v < vLo; v += 0.12) { const yy = yLo + (vLo - v) / L * (yB - yA) + 0.1; K.box(alu, uu - 0.012, yy, v - 0.012, uu + 0.012, yy + 1.0, v + 0.012, { detail: true }); }
+          pipeRail(K, alu, [[uu, vLo + 0.25], [uu, vHi - 0.25]], (u, v) => yLo + Math.max(0, Math.min(L, vLo - v)) / L * (yB - yA) + 0.15, { h: 0.92, mid: false, pitch: 99 });
+        }
+      };
+      flight(v1b, vL, gs, n1); flight(v2b, vTop, yL, n2);
+      // mid-landing on a round column, top landing joining the terrace
+      K.box(conc, sU0, yL - 0.3, v2b, sU1, yL, vL); K.box(orange, sU0 + 0.05, yL - 0.33, v2b + 0.05, sU1 - 0.05, yL - 0.3, vL - 0.05);
+      K.cyl(conc, (sU0 + sU1) / 2, gs - 0.5, (v2b + vL) / 2, 0.3, 0.3, yL - 0.33 - gs + 0.5, 16);
+      K.box(conc, sU0, yT - 0.3, vTop - 3.0, w0, yT, vTop); K.box(orange, sU0 + 0.05, yT - 0.33, vTop - 2.95, w0 - 0.05, yT - 0.3, vTop - 0.05);
+      K.cyl(conc, sU0 + 0.5, gs - 0.5, vTop - 2.5, 0.3, 0.3, yT - 0.33 - gs + 0.5, 16);
+      for (const [p0, p1] of [[[sU0 + 0.04, vTop + 0.1], [sU0 + 0.04, vTop - 2.96]], [[sU0 + 0.04, vTop - 2.96], [w0, vTop - 2.96]], [[sU1 - 0.04, v2b + 0.02], [sU1 - 0.04, vL]], [[sU0 + 0.04, v2b], [sU0 + 0.04, vL]]]) {
+        const yy = p0[1] > vTop + 0.5 ? yL : yT; pipeRail(K, alu, [p0, p1], yy, { h: 1.07, mid: false, pitch: 99 });
+        const dl = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); for (let k = 0; k <= dl / 0.12; k++) { const q = k / Math.max(1, Math.floor(dl / 0.12)); const pu = p0[0] + (p1[0] - p0[0]) * q, pv = p0[1] + (p1[1] - p0[1]) * q; K.box(alu, pu - 0.012, yy, pv - 0.012, pu + 0.012, yy + 1.05, pv + 0.012, { detail: true }); } }
+      colliders.push(K.colCyl((sU0 + sU1) / 2, (v2b + vL) / 2, 0.35, gs - 1, yL - 0.35), K.colCyl(sU0 + 0.5, vTop - 2.5, 0.35, gs - 1, yT - 0.35));
+      colliders.push(K.colPoly([[sU0, v1b], [sU0, vTop - 3.0], [w0, vTop - 3.0]], yL - 0.2, yT + 1.1)); // outer guard line
+      walkables.push(K.walkFn(sU0, vTop - 3.0, sU1, v1b, (uu, vv) => {
+        if (vv <= vTop) return yT; if (vv <= v2b) return yL + r * Math.min(n2, Math.floor((v2b - vv) / t) + 1); if (vv <= vL) return yL;
+        return gs + r * Math.min(n1, Math.max(1, Math.floor((v1b - vv) / t) + 1)); }));
+      walkables.push(K.walkPoly([[sU0, vTop - 3.0], [w0, vTop - 3.0], [w0, vTop], [sU0, vTop]], yT)); }
     colliders.push(K.colPoly([[w0, tv0], [U0, tv0], [U0, wN], [w0, wN]], -2, 5.0));
   }
   // ---- roof: penthouse, lantern, solar canopy ----

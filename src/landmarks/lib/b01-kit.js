@@ -52,7 +52,7 @@ export function umbrellaField(strips, { yTop, depth, dip = 0, gap = 0.1 }) {
   };
   return { units, find, hAt, gap, top: (u, v) => { const q = find(u, v); return q ? hAt(q, u, v) : null; } };
 }
-export function buildUmbrellas(K, F, { top, soffit, soffit2 = null, fascia, col, thick = 0.2, thickC = 0.35, colR = 0.25, colBase = null, skipCol = () => false, rimUp = 0, rimW = 0.15, lamp = null }) {
+export function buildUmbrellas(K, F, { top, soffit, soffit2 = null, fascia, col, thick = 0.2, thickC = 0.35, colR = 0.25, colBase = null, skipCol = () => false, rimUp = 0, rimW = 0.15, lamp = null, aoSoffit = 0 }) {
   const tp = [], bp = [], bp2 = [], fp = [];
   const area = (P) => { let a = 0; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; a += p[0] * q[2] - q[0] * p[2]; } return a; };
   for (const q of F.units) {
@@ -82,7 +82,25 @@ export function buildUmbrellas(K, F, { top, soffit, soffit2 = null, fascia, col,
       }
     }
   }
-  K.add(top, polysGeo(tp), { uvMode: 'roof' }); K.add(soffit, polysGeo(bp), { uvMode: 'box' }); if (bp2.length) K.add(soffit2, polysGeo(bp2), { uvMode: 'box' }); K.add(fascia, polysGeo(fp));
+  K.add(top, polysGeo(tp), { uvMode: 'roof' }); K.add(fascia, polysGeo(fp));
+  if (!aoSoffit) { K.add(soffit, polysGeo(bp), { uvMode: 'box' }); if (bp2.length) K.add(soffit2, polysGeo(bp2), { uvMode: 'box' }); return; }
+  // [r5-sproul] the soffits are the umbrellas' readable face from the plaza, but under one ambient term every facet came out
+  // the same flat grey ("reads as flat slabs"). Bake the photo look into vertex colours: bright where bounce light reaches
+  // the rim, darkening toward the column head by `aoSoffit`, and the folded east/west facets a shade darker so the creases
+  // from the column to the edge mid-points read.
+  for (const [list, mat, k] of [[bp, soffit, 1.0], [bp2, soffit2 || soffit, 0.95]]) {
+    if (!list.length) continue;
+    const g = polysGeo(list); const p = g.attributes.position; const c = new Float32Array(p.count * 3);
+    let yMin = Infinity, yMax = -Infinity; for (let i = 0; i < p.count; i++) { yMin = Math.min(yMin, p.getY(i)); yMax = Math.max(yMax, p.getY(i)); }
+    for (let i = 0; i < p.count; i += 3) { // per triangle: the lowest vertex is the column head
+      let lo = i; for (let j = 1; j < 3; j++) if (p.getY(i + j) < p.getY(lo)) lo = i + j;
+      for (let j = 0; j < 3; j++) { const v = (i + j === lo ? 1 - aoSoffit : 1) * k; c[(i + j) * 3] = c[(i + j) * 3 + 1] = c[(i + j) * 3 + 2] = v; }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    const mesh = new THREE.Mesh(K.boxUV(g.index ? g.toNonIndexed() : g), Object.assign(mat.clone(), { vertexColors: true }));
+    if (mat.onBeforeCompile) { mesh.material.onBeforeCompile = mat.onBeforeCompile; mesh.material.customProgramCacheKey = mat.customProgramCacheKey; }
+    mesh.castShadow = mesh.receiveShadow = true; mesh.name = 'umbrella-soffit'; K.extra.push(mesh);
+  }
 }
 // clerestory glass band from yBot up to the umbrella soffit along a wall polyline (closed ring, outward oriented)
 export function clerestory(K, F, ring, yBot, glass, frame, { thick = 0.2, step = 0.5, mullion = 1.5, inset = 0.12, cap = Infinity, skip = () => false } = {}) {

@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { materials, TEX_M } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
+import { gradeSproulSteps, buildSproulSteps, sproulStepsCovers } from './r5sproul.js'; // [r5-sproul] terraced Upper->Lower Sproul steps
 
 const KERB = 0.13;        // road surface drop below the sidewalk (m)
 const KERB_W = 0.17;      // kerb top width
@@ -153,6 +154,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const stairs = [];
   for (const p of vectors.paths) {
     if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2) continue;
+    if (sproulStepsCovers(p.pts)) continue; // [r5-sproul] rebuilt by r5sproul.js
     const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
     const w = Math.max(1.2, Math.min(14, p.w || 2.6));
@@ -200,6 +202,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
       if (heights[k] > ramp) heights[k] = ramp;
     });
   }
+  gradeSproulSteps(G, heights); // [r5-sproul] terraced Upper->Lower Sproul steps (r5sproul.js)
   // 3) walls: classify retaining vs freestanding from the terrain on both sides, then terrace the retaining ones
   const walls = [];
   for (const b of vectors.barriers) {
@@ -341,6 +344,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
   const buckets = new Map();
   const BK = 256; // one mesh per material per 256 m cell keeps draw calls low
   const bucket = (x, z, key) => { const k = key + Math.floor(x / BK) + ',' + Math.floor(z / BK); let b = buckets.get(k); if (!b) buckets.set(k, (b = { geo: new Geo(), key, cx: (Math.floor(x / BK) + 0.5) * BK, cz: (Math.floor(z / BK) + 0.5) * BK })); return b.geo; };
+  try { const o = buildSproulSteps({ heightAt, physics, M }); if (o) group.add(o); } catch (e) { console.warn('r5 sproul steps failed', e); } // [r5-sproul]
   // ---- stairs
   let nTreads = 0;
   for (const st of plan.stairs) {
