@@ -105,8 +105,8 @@ export async function build(ctx) {
         K.rbox(R, FR, (a + b) / 2 - 0.05, dY, -0.585, (a + b) / 2 + 0.05, FL + 2.75, -0.53, { detail: true });
         K.rbox(R, FR, a - 0.05, FL + 2.85, -0.6, b + 0.05, FL + 3.45, 0.95); // marquee canopy
         // diamond lattice grille over the rest of the strip
-        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.58; // [r5a] finer, denser lattice (photo), was 0.9 m with 0.11 bars
-        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.075, 0.08); }
+        const y0 = FL + 3.5, y1 = ct - 0.18, step = 0.37; // [r5a] fine dense lattice (photo: ~8-9 diamonds across a bay), was 0.9 m with 0.11 bars
+        for (let k = -Math.ceil((y1 - y0) / step) - 1; k <= Math.ceil((b - a + y1 - y0) / step) + 1; k++) for (const sg of [1, -1]) { const seg = clip(a + k * step, y0, 1, sg, a, b, y0, y1); if (seg) bar(R, FR, ...seg, -0.4, 0.05, 0.07); }
         for (const x of [a + 0.05, b - 0.05]) K.rbox(R, FR, x - 0.06, y0, -0.6, x + 0.06, y1, -0.38);
         K.rbox(R, SP, a, y0 - 0.05, -0.6, b, y0 + 0.05, -0.52, { detail: true });
       } else {
