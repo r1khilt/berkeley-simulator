@@ -163,7 +163,7 @@ function planBridge(b, H) {
     const q = D[bi]; const rx = x - q.cx, rz = z - q.cz; const lat = -rx * q.tz + rz * q.tx, al = rx * q.tx + rz * q.tz;
     if (Math.abs(lat) > b.w / 2 + pad) return null;
     if ((bi === 0 && al < -0.05) || (bi === D.length - 1 && al > 0.05)) return null;
-    if (b.tree && Math.hypot(x - b.tree[0], z - b.tree[1]) < 0.8) return null;
+    if (b.tree && Math.hypot(x - b.tree[0], z - b.tree[1]) < 1.05) return null;
     return q.y;
   };
   return { b, D, s0, s1, span, dip, bounds: [x0, z0, x1, z1], deckAt };
@@ -271,6 +271,7 @@ function buildBridge(A, MAT, p, physics, heightAt) {
     if (physics) for (let i = 0; i < n - 1; i += 2) { const a = D[i], c = D[Math.min(n - 1, i + 2)]; const pa = L(a, o), pc = L(c, o); physics.addSeg(pa[0], pa[1], pc[0], pc[1], Math.min(a.y, c.y) - 0.2, Math.max(a.y, c.y) + 1.0, 'r5-bridge'); }
   }
   if (physics) physics.addWalkable({ type: 'fn', tag: 'r5-bridge', bounds: p.bounds, heightAt: (x, z) => p.deckAt(x, z) });
+  if (physics && b.tree) physics.addCircle(b.tree[0], b.tree[1], 1.9, D[0].y - 0.1, D[0].y + 0.42, 'r5-bridge');   // the octagonal bench
 }
 function postIdx(D, gap) { const n = D.length; const out = [0]; let last = D[0].s; for (let i = 1; i < n - 1; i++) if (D[i].s - last >= gap) { out.push(i); last = D[i].s; } if (D[n - 1].s - D[out[out.length - 1]].s < gap * 0.4 && out.length > 1) out.pop(); out.push(n - 1); return out; }
 function timberRail(A, MAT, D, L, o, xbrace) {
