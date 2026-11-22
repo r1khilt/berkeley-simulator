@@ -32,23 +32,27 @@ export const info = {
   clear: [rectXZ(1.5, 32.5, 10.5, 41.5), /* r4: the tree in front of the doors */ rectXZ(30.5, -17.5, 50.6, 12.5), rectXZ(30.5, 12.5, 38.5, 20.5), rectXZ(50.6, -7.5, 56.5, 7.5), rectXZ(-22, -31, 26, -23.9)],
 };
 
-// r4: matte black perforated metal (Press kiosk): canvas dot pattern, holes glow warm at night
-let _perf = null;
-function perfMetal() {
-  if (_perf) return _perf;
-  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
-  const e = document.createElement('canvas'); e.width = e.height = S; const ge = e.getContext('2d');
-  g.fillStyle = '#1b1b1c'; g.fillRect(0, 0, S, S); ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S);
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const r = 1.2 + 4.2 * Math.abs(Math.sin(x * 0.7 + y * 0.45) * Math.cos(y * 0.33 - x * 0.21)); // varying "pixel" holes
-    g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(x * 16 + 8, y * 16 + 8, r, 0, 7); g.fill();
-    ge.fillStyle = '#fff'; ge.beginPath(); ge.arc(x * 16 + 8, y * 16 + 8, r, 0, 7); ge.fill();
+// r4: black perforated metal (Press kiosk): per-face "pixel gradient" of round holes, densest low in the middle and
+// fading to the corners (photos). The white-lit interior shows through the holes, so they read as light dots by day
+// and glow warm at night; the sheet itself has a satin metallic sheen.
+let _perf = null, _perfTile = null;
+function perfCanvas(tile) {
+  const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const e = document.createElement('canvas'); e.width = W; e.height = H; const ge = e.getContext('2d');
+  g.fillStyle = '#26272a'; g.fillRect(0, 0, W, H); ge.fillStyle = '#000'; ge.fillRect(0, 0, W, H);
+  g.fillStyle = '#34363a'; g.fillRect(0, H * 0.5 - 1, W, 2);                                   // mid-height panel seam
+  for (let y = 4; y < H; y += 8) for (let x = 4 + ((y / 8) % 2) * 4; x < W; x += 8) {
+    const dx = (x / W - 0.5) * 1.6, dy = (y / H - 0.68) * 1.9, k = tile ? 0.55 + 0.25 * Math.sin(x * 0.07) * Math.cos(y * 0.09) : Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy));
+    const r = 0.4 + 3.1 * k; if (r < 0.7) continue;
+    g.fillStyle = `rgb(${150 + 60 * k | 0},${148 + 58 * k | 0},${140 + 55 * k | 0})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    ge.fillStyle = '#fff'; ge.beginPath(); ge.arc(x, y, r, 0, 7); ge.fill();
   }
   const t = new THREE.CanvasTexture(c), te = new THREE.CanvasTexture(e);
   for (const x of [t, te]) { x.colorSpace = THREE.SRGBColorSpace; x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; }
-  _perf = nightGlow(new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, emissive: 0xffc68a, emissiveMap: te, emissiveIntensity: 1.1, roughness: 0.55, metalness: 0.55 }), 1.0);
-  _perf.name = 'mfPerf'; return _perf;
+  const m = nightGlow(new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, emissive: 0xffc68a, emissiveMap: te, emissiveIntensity: 1.1, roughness: 0.38, metalness: 0.6, envMapIntensity: 1.4 }), 1.0);
+  m.name = tile ? 'mfPerfTile' : 'mfPerf'; return m;
 }
+function perfMetal(tile = false) { if (tile) return _perfTile || (_perfTile = perfCanvas(true)); return _perf || (_perf = perfCanvas(false)); }
 
 // r4: ivy cover (leafy canvas, darker undersides) for the vent wall beside Press
 let _ivy = null;
@@ -88,22 +92,23 @@ export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
-  const C = tint(M.concrete, 0xd5d9df, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
-  const CT = tint(M.concrete, 0xd2d3d4, 'mfTower');        // the stair towers read a touch warmer / board-marked
-  { const bc = boardConc(); CT.map = bc.map; if (bc.normalMap) CT.normalMap = bc.normalMap; if (bc.roughnessMap) CT.roughnessMap = bc.roughnessMap; }
-  const CD = tint(M.concrete, 0x9da1a8, 'mfConcDark');     // soffits, recesses, weathered parapets
-  const GL = nightGlow(std(0x3a4550, 'mfGlass', { rough: 0.12, metal: 0.4, extra: { envMapIntensity: 2.0, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
+  const C = tint(M.concrete, 0xa8abaf, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
+  const CT = tint(M.concrete, 0xaaabac, 'mfTower');        // the stair towers read a touch warmer / board-marked
+  for (const m of [C, CT]) { const bc = boardConc(); m.map = bc.map; if (bc.normalMap) m.normalMap = bc.normalMap; if (bc.roughnessMap) m.roughnessMap = bc.roughnessMap; } // board-formed, no panel grid
+  const CD = tint(M.concrete, 0x7f8388, 'mfConcDark');     // soffits, recesses, weathered parapets
+  const GL = nightGlow(std(0x33373b, 'mfGlass', { rough: 0.16, metal: 0.3, extra: { envMapIntensity: 1.25, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
   const FR = std(0x2a2623, 'mfBronze', { rough: 0.45, metal: 0.6 });   // dark bronze anodised frames (near black in the photos)
   GL.userData.interior = false; // r4: the glass deep behind the balconies stays dark (no lit-room shader); east/podium glass keeps it
   const GLP = nightGlow(std(0x3d464f, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.4, emissive: 0xffd09a, emissiveIntensity: 0.45 } }), 1.0); // r4: a little less mirror-bright // shaded podium glazing still catches the sky
   const PG = std(0x3a3633, 'mfPergola', { rough: 0.55, metal: 0.5 });  // dark steel pergola frame
   const GRN = std(0x3d4f2c, 'mfPlant', { rough: 0.95 });
+  const CS = tint(M.concrete, 0x5f6266, 'mfSoffit');      // r4: soffits under the cantilevers read as deep shadow in the photos
   const LOBBY = nightGlow(std(0xe8e2d6, 'mfLobbyLight', { rough: 0.6, extra: { emissive: 0xfff2dc, emissiveIntensity: 1.3 } }), 0.6); // lit lobby / café interiors
   const WOOD = M.wood;
   const colliders = [], walkables = [];
   const F3 = 4.4, F4 = 8.8, F5 = 13.2, SOF = 16.35, RT = 17.55, TP = 19.6, DECK_E = 8.7, DECK_N = 4.6;
   const GW = -17.2, GN = -17.3, GS = 17.3, GE = 31.5; // glass lines of the main block (deep in shadow behind the balconies)
-  const BP4 = 2.1, BP5 = 2.6, BP = 2.35, RP = 3.85;                           // balcony / roof projection beyond the glass
+  const BP4 = 2.6, BP5 = 3.1, BP = 2.85, RP = 3.85; // r4: deeper (was 2.1 / 2.6)                           // balcony / roof projection beyond the glass
   const TW = [[-17, -5], [16, 28]];                    // tower spans along u
   const TNv = -23.6, TSv = 22.8;                       // tower outer faces (north / south)
   const PU = -30.5, PS = 25.5, PN = -24.5;             // west podium edges; south walkway edge
@@ -124,18 +129,19 @@ export async function build(ctx) {
   const balcony = (R, s0, s1, yF, { e0 = 0, e1 = 0, slabExt = false } = {}) => {
     const a = s0 - e0, b = s1 + e1; const BP = yF > F4 + 1 ? BP5 : BP4;
     K.rbox(R, C, slabExt ? a : s0, yF - 0.32, -0.3, slabExt ? b : s1, yF, BP - 0.27);
+    K.rbox(R, CS, slabExt ? a : s0, yF - 0.335, -0.3, slabExt ? b : s1, yF - 0.32, BP - 0.36); // dark soffit
     const sn = Math.max(1, Math.round((b - a) / 6.5));
     for (let i = 0; i < sn; i++) { const p = a + (b - a) * i / sn, q = a + (b - a) * (i + 1) / sn; K.rbox(R, C, p + (i ? 0.02 : 0), yF - 0.62, BP - 0.34, q - (i < sn - 1 ? 0.02 : 0), yF + 0.55, BP); }
     K.rbox(R, CD, a, yF - 0.6, BP - 0.38, b, yF + 0.53, BP - 0.33); // back of the panel joints
-    const bn = Math.max(1, Math.round((b - a) / 5.5));
+    const bn = sn; // r4: rail segments break at the spandrel panel joints
     for (let i = 0; i < bn; i++) { // separate top blocks on short square posts, open gaps between
       const p = a + (b - a) * i / bn + (i ? 0.13 : 0), q = a + (b - a) * (i + 1) / bn - (i < bn - 1 ? 0.13 : 0);
-      const up = yF > F4 + 1, yT = up ? yF + 0.98 : yF + 0.8;          // the top tier's balustrade is lighter and more open
-      for (const f of (up ? [0.1, 0.3, 0.5, 0.7, 0.9] : [0.18, 0.5, 0.82])) { const s = p + (q - p) * f; K.rbox(R, C, s - 0.13, yF + 0.55, BP - 0.3, s + 0.13, yT, BP - 0.05, { detail: true }); }
-      K.rbox(R, C, p, yT, BP - 0.38, q, up ? yT + 0.36 : yF + 1.3, BP + 0.03);
+      const yT = yF + 0.85;                                             // r4: ~0.3 m open slot under a 0.38 m rail on chunky blocks (photos)
+      for (const f of [0.2, 0.8]) { const s = p + (q - p) * f; K.rbox(R, C, s - 0.16, yF + 0.55, BP - 0.33, s + 0.16, yT, BP - 0.02, { detail: true }); }
+      K.rbox(R, C, p, yT, BP - 0.38, q, yT + 0.38, BP + 0.03);
     }
     const ent = R === RS && yF < F4 + 1 && s0 > 5;                  // plain square beam ends over the entrance
-    beams(R, s0, s1, yF - 0.32, BP - 0.36, ent ? 0.5 : 0.62, ent ? 0.5 : 0.45, 6, 0.4);
+    beams(R, s0, s1, yF - 0.335, BP - 0.36, ent ? 0.55 : 0.75, ent ? 0.55 : 0.5, 4.5, 0.45);
     if (R === RW) globes(R, s0, s1, yF - 0.32, 6, BP);
   };
   const globeGeo = new THREE.SphereGeometry(0.17, 10, 6);
@@ -147,7 +153,7 @@ export async function build(ctx) {
     const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const [d, y] of pts.slice(1)) sh.lineTo(d, y); sh.lineTo(pts[0][0], pts[0][1]);
     const g = new THREE.ExtrudeGeometry(sh, { depth: s1 - s0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s1, 0, 0); K.addRun(R, mat, g);
   };
-  const GLo = std(0x3a4550, 'mfGlassUnlit', { rough: 0.12, metal: 0.4, extra: { envMapIntensity: 2.0 } }); // same by day; dark at night
+  const GLo = std(0x33373b, 'mfGlassUnlit', { rough: 0.16, metal: 0.3, extra: { envMapIntensity: 1.25 } }); // same by day; dark at night
   GLo.userData.interior = false; const GLD = GLo; // entrance doors read dark in shade (photos)
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const glassStorey = (R, s0, s1, y0, y1, o = {}) => {
@@ -207,13 +213,13 @@ export async function build(ctx) {
   // ---------- roof slab (deep fascia, overhangs most on W/N/S), beams beneath, membrane, penthouse ----------
   const RE_ = 1.2; // r4: east roof overhang
   const roofPoly = [[GW - RP, GN - RP], [GE + RE_, GN - RP], [GE + RE_, GS + RP], [GW - RP, GS + RP]];
-  K.prism(C, roofPoly, SOF, RT - 0.45);
+  K.prism(C, roofPoly, SOF, RT - 0.45); K.prism(CS, roofPoly, SOF - 0.015, SOF); // r4: dark soffit under the overhang
   K.prism(M.concreteDark, [[GW - RP + 0.35, GN - RP + 0.35], [GE + RE_ - 0.35, GN - RP + 0.35], [GE + RE_ - 0.35, GS + RP - 0.35], [GW - RP + 0.35, GS + RP - 0.35]], RT - 0.45, RT - 0.05);
   {
     const ring = [[GW - RP, GN - RP], [GW - RP, GS + RP], [GE + RE_, GS + RP], [GE + RE_, GN - RP]];
     for (let i = 0; i < 4; i++) { const R = K.run(ring[i], ring[(i + 1) % 4]); profileRun(R, C, 0, R.L, [[-0.9, RT - 0.47], [0, RT - 0.47], [-0.26, RT + 0.05], [-0.9, RT + 0.05]]); K.rbox(R, CD, 0, SOF + 0.2, 0.0, R.L, SOF + 0.25, 0.012, { detail: true }); }
-    beams(RW, 0, RW.L, SOF, RP - 0.12, 0.95, 0.6, 6, 0.45); globes(RW, 0, RW.L, SOF, 6, RP);
-    for (const [R, sf] of [[RS, sS], [RN, sN]]) for (const [s0, s1] of balBays(R, sf)) beams(R, s0, s1, SOF, RP - 0.12, 0.95, 0.6, 6, 0.45);
+    beams(RW, 0, RW.L, SOF - 0.015, RP - 0.12, 0.95, 0.6, 4.5, 0.5); globes(RW, 0, RW.L, SOF, 6, RP);
+    for (const [R, sf] of [[RS, sS], [RN, sN]]) for (const [s0, s1] of balBays(R, sf)) beams(R, s0, s1, SOF - 0.015, RP - 0.12, 0.95, 0.6, 4.5, 0.5);
   }
   penthouse(K, [[4, -8], [16, -8], [16, 6], [4, 6]], RT - 0.05, 3.45, { mat: C, louvreMat: CD });
   K.box(C, 3.8, RT + 3.4, -8.2, 16.2, RT + 3.6, 6.2);
@@ -269,7 +275,7 @@ export async function build(ctx) {
     }
     K.rbox(R, GLD, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
     K.rbox(R, C, dA - 0.3, 7.3, -0.25, dB + 0.3, F4 - 0.32, 0.08);     // recessed fascia (~1.2 m) over the doors
-    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#3a3129', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
+    signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.85, 0.52, { color: '#3a3129', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
     // continuous concrete sidewalk in front of the doors (flush threshold)
     const SW = tint(M.concrete, 0xfaf7f1, 'mfWalk');
     const ga = Math.max(F3, K.gMax(2.5, GS, 16, GS + 9, 8)) + 0.02;
@@ -412,8 +418,8 @@ export async function build(ctx) {
     // glow at night, a full-length top-hinged flap propped open as an awning over the white service counter, PRESS in
     // white letters on the dark back wall, a warm LED line at the base. No tables (the photos show benches only).
     { const a = 40.3, b = -15.4, c = 48.6, d = -11.7, h = yF + 3.3;
-      const PERF = perfMetal();
-      K.box(PERF, a, yF, b, c, h, d); K.box(FR, a - 0.04, h, b - 0.04, c + 0.04, h + 0.12, d + 0.04); K.box(M.concreteDark, a + 0.15, h + 0.12, b + 0.15, c - 0.15, h + 0.14, d - 0.15); // thin dark edge, grey roof membrane (it read as a void from above)
+      const PERF = perfMetal(), PERFT = perfMetal(true);
+      K.box(PERF, a, yF, b, c, h, d, { uvMode: 'keep' }); K.box(FR, a - 0.04, h, b - 0.04, c + 0.04, h + 0.12, d + 0.04); K.box(M.concreteDark, a + 0.15, h + 0.12, b + 0.15, c - 0.15, h + 0.14, d - 0.15); // thin dark edge, grey roof membrane (it read as a void from above)
       const R = K.run([a, d], [c, d]); const L = R.L;                              // service side faces the terrace (south)
       const WHT = std(0xf4f2ee, 'mfPressWhite', { rough: 0.5, extra: { emissive: 0xfff6e8, emissiveIntensity: 1.0 } }); // lit by day too (the bright interior is what reads from the plaza)
       K.rbox(R, WHT, 0.5, yF + 0.95, -1.1, L - 0.5, yF + 2.55, -0.02);          // lit white interior seen through the opening
@@ -421,12 +427,13 @@ export async function build(ctx) {
       for (let k = 0; k < 3; k++) K.rbox(R, M.blackPaint || FR, 0.9 + k * 0.75, yF + 1.55, -1.04, 1.5 + k * 0.75, yF + 2.35, -1.0, { detail: true }); // menu boards
       signText(K, R, 'PRESS', L / 2, yF + 2.13, 0.5, { color: '#ffffff', metal: 0.0, rough: 0.5, d: -0.99, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 });
       K.rbox(R, M.concreteDark, 0.5, yF + 0.95, -0.4, L - 0.5, yF + 1.05, 0.12);  // counter top
-      K.rbox(R, PERF, 0.5, yF, 0.0, L - 0.5, yF + 0.95, 0.03);                    // counter front (perforated)
+      K.rbox(R, PERFT, 0.5, yF, 0.0, L - 0.5, yF + 0.95, 0.03);                   // counter front (perforated)
       { const fd = 1.35, tilt = THREE.MathUtils.degToRad(16), g = new THREE.BoxGeometry(L - 0.6, 0.06, fd);   // the propped flap
-        g.translate(0, 0, fd / 2); g.rotateX(-tilt); g.translate(L / 2, yF + 2.62, 0.02); K.addRun(R, PERF, g);
+        g.translate(0, 0, fd / 2); g.rotateX(-tilt); g.translate(L / 2, yF + 2.62, 0.02); K.addRun(R, PERFT, g);
         for (const sx of [0.7, L - 0.7]) K.rbox(R, M.iron, sx - 0.02, yF + 2.2, 0.9, sx + 0.02, yF + 2.62 + fd * Math.sin(tilt) - 0.05, 0.94, { detail: true }); }
       const LED = M.lampGlow;
       K.box(LED, a + 0.05, yF, b - 0.06, c - 0.05, yF + 0.05, b - 0.02, { detail: true }); K.box(LED, a - 0.06, yF, b, a - 0.02, yF + 0.05, d, { detail: true }); K.box(LED, c + 0.02, yF, b, c + 0.06, yF + 0.05, d, { detail: true });
+      for (const [p0, p1] of [[[c, d], [c, b]], [[a, b], [a, d]]]) { const Re = K.run(p0, p1); K.rbox(Re, M.blackPaint || FR, 0.45, yF + 2.05, 0, Re.L - 0.45, yF + 2.75, 0.04); signText(K, Re, 'PRESS', Re.L / 2, yF + 2.4, 0.46, { color: '#ffffff', metal: 0.0, rough: 0.5, d: 0.06, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 }); }
       colliders.push(rectCol(a, b, c, d, yF - 1, h + 0.3));
       for (const u of [41.0, 47.9]) { K.cyl(FR, u, yF, d + 1.9, 0.09, 0.09, 0.95, 10, { detail: true }); K.cyl(LED, u, yF + 0.82, d + 1.9, 0.095, 0.095, 0.1, 10, { detail: true }); } // bollard lights
     }
