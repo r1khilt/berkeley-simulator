@@ -177,7 +177,7 @@ export class UI {
     const n = this.noticeEl; n.querySelector('.ni').innerHTML = icon(ic); n.querySelector('.nt').textContent = text;
     n.classList.remove('off'); clearTimeout(this._nt); this._nt = setTimeout(() => n.classList.add('off'), ms);
   }
-  hint(html, ms = 6000) { const h = this.hintEl; if (!html) { h.classList.add('off'); return; } h.innerHTML = html; h.classList.remove('off'); clearTimeout(this._ht); this._ht = setTimeout(() => h.classList.add('off'), ms); }
+  hint(html, ms = 6000) { const h = this.hintEl; this._modeHintOn = false; if (!html) { h.classList.add('off'); return; } h.innerHTML = html; h.classList.remove('off'); clearTimeout(this._ht); this._ht = setTimeout(() => h.classList.add('off'), ms); }
   reticleOn(on) { this.reticle.classList.toggle('hidden', !on); }
   hudOn(on) { this.hud.classList.toggle('off', !on); }
   // ---------- movement modes (generic: built-ins + player.plugins with key / label / icon)
@@ -230,12 +230,13 @@ export class UI {
   }
   // r5-controls: the keys for a mode, as a short strip of key caps (from the mode's one-line hint, e.g. 'W throttle · S brake')
   modeHint(m, force = false) {
-    if (this.isTouch || !m || !m.hint) return;
+    const clear = () => { if (this._modeHintOn && !this.hintEl.classList.contains('off')) this.hint(null); this._modeHintOn = false; }; // don't leave the previous mode's keys up
+    if (this.isTouch || !m || !m.hint) return clear();
     let n = {}; try { n = JSON.parse(localStorage.getItem('bsim.modeHints') || '{}'); } catch (e) {}
-    if (!force && (n[m.id] || 0) >= 3) return; n[m.id] = (n[m.id] || 0) + 1; try { localStorage.setItem('bsim.modeHints', JSON.stringify(n)); } catch (e) {}
+    if (!force && (n[m.id] || 0) >= 3) return clear(); n[m.id] = (n[m.id] || 0) + 1; try { localStorage.setItem('bsim.modeHints', JSON.stringify(n)); } catch (e) {}
     const cap1 = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const segs = String(m.hint).split(/\s*·\s*/).map((x) => { const q = x.match(/^(\S+)\s+(.+)$/); if (!q || !q[1].split('/').every((k) => /^([A-Z0-9]|Shift|Space|Scroll|Esc|Ctrl|\+|-)$/.test(k))) return esc(cap1(x)); const keys = q[1] === '+/-' ? ['+', '-'] : q[1].split('/').filter(Boolean); return `${keys.map((k) => kbd(k === '-' ? '−' : k)).join('<span class="ks">/</span>')} ${esc(cap1(q[2]))}`; });
-    this.hint(`<span class="hint-m" title="${esc(m.label)}">${icon(m.icon)}</span>${segs.join(' <i></i> ')}`, 6500);
+    this.hint(`<span class="hint-m" title="${esc(m.label)}">${icon(m.icon)}</span>${segs.join(' <i></i> ')}`, 6500); this._modeHintOn = true;
   }
   // r5-controls: once per session, point out notable interactions (e.g. the Campanile elevator) when you get close
   _nearby(p) {
