@@ -173,10 +173,21 @@ export function planter(K, u0, v0, u1, v1, { h = 0.55, mat = null, shrubs = true
 }
 // One low clipped shrub (flat-shaded icosahedron) at (u,v), base height y (default ground).
 export function shrubAt(K, u, v, y = null, { size = 0.55, h = 0.8, i = 0 } = {}) {
-  const yy = y ?? K.g(u, v); const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
-  const g = new THREE.IcosahedronGeometry(r, 1); g.scale(1.25, h / (2 * r), 1.1); g.rotateY(i * 1.7); g.translate(u, yy + h * 0.42, v);
+  // [r4-ground] was a sphere sunk 8% into the ground ("blobs sunk into it"): now a lumpy clipped dome with a flat,
+  // slightly flared base that sits ON the soil, over a dark mulch disc that grounds it visually.
+  const yy = y ?? Math.min(K.g(u, v), K.g(u + size * 0.8, v), K.g(u - size * 0.8, v), K.g(u, v + size * 0.8), K.g(u, v - size * 0.8));
+  const r = size * (0.85 + 0.3 * ((i * 7919) % 13) / 13);
+  const g = new THREE.IcosahedronGeometry(r, 2); const P = g.attributes.position;
+  for (let k = 0; k < P.count; k++) { // deterministic lumps + flattened, flared base
+    const x = P.getX(k), yv = P.getY(k), z = P.getZ(k); const n = 1 + 0.1 * Math.sin(x * 9.1 + i * 1.3) * Math.cos(z * 8.3 - i) + 0.07 * Math.sin(yv * 11.7 + i * 2.1);
+    const flare = yv < 0 ? 1.08 : 1; P.setXYZ(k, x * n * flare, yv < 0 ? yv * 0.32 : yv * n, z * n * flare);
+  }
+  g.computeVertexNormals(); g.scale(1.25, h / (1.32 * r), 1.1); g.rotateY(i * 1.7); g.translate(u, yy - 0.04 + h * 0.32 / 1.32, v);
   K.add(i % 3 ? shrubMat() : shrubMat2(), g, { detail: true, uvMode: 'keep' });
+  const m = new THREE.CircleGeometry(r * 1.45, 10); m.rotateX(-Math.PI / 2); m.scale(1.2, 1, 1.1); m.rotateY(i * 1.7); m.translate(u, yy + 0.025, v);
+  K.add(mulchMat(), m, { detail: true, uvMode: 'keep' });
 }
+export function mulchMat() { return local('mulch', () => { const m = new THREE.MeshStandardMaterial({ color: 0x4a3828, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); m.name = 'rc-mulch'; return m; }); }
 // Low clipped shrubs filling a rectangle, at base height y (default ground).
 export function shrubRow(K, u0, v0, u1, v1, y = null, { size = 0.55, h = 0.8 } = {}) {
   const L = Math.max(u1 - u0, v1 - v0); const along = (u1 - u0) >= (v1 - v0); const n = Math.max(1, Math.round(L / (size * 1.5)));

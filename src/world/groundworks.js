@@ -118,6 +118,13 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     for (let j = 0; j < G.nx; j++) { const x = G.x0 + j * G.s; const sj = Math.max(0, Math.min(snx - 1, Math.round((x - S.x0) / S.s)));
       if (sd[(si * snx + sj) * 4] < 76) continue; // nearest texel > 1.2 m outside the asphalt (texel half-diagonal 1.13 m): skip the bilinear sample
       const dA = S.at(x, z, 0); if (dA > 0.12) { heights[i * G.nx + j] -= KERB * smooth(0.12, 0.3, dA); nLow++; } } }
+  // 1b) campus lawns and beds sit a few cm below the walks that cross them, so path edging reads as a real edge
+  let nSoft = 0;
+  G.each(-760, -560, 520, 420, (x, z, k) => {
+    const dP = S.at(x, z, 1); if (dP > -0.05 || dP < -1.4) return;
+    if (S.at(x, z, 0) > -0.5 || (S.at(x, z, 2) < -0.3 && S.at(x, z, 3) < -0.3) || bmask.at(x, z)) return;
+    heights[k] -= 0.045 * (1 - smooth(0.8, 1.4, -dP)); nSoft++;
+  });
   // 2) stairs: plan from the (road-graded) terrain, then bed them in
   const stairs = [];
   for (const p of vectors.paths) {
@@ -203,7 +210,7 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
     });
   }
   const ms = Math.round(performance.now() - t0);
-  console.log('groundworks grade', JSON.stringify({ ms, lowered: nLow, aprons: nApron, stairs: stairs.length, walls: walls.length, retaining: walls.filter((w) => w.ret).length }));
+  console.log('groundworks grade', JSON.stringify({ ms, lowered: nLow, soft: nSoft, aprons: nApron, stairs: stairs.length, walls: walls.length, retaining: walls.filter((w) => w.ret).length }));
   return { G, S, bmask, stairs, walls, c, gt, orig, aprons: nApron };
 }
 // trees were baked against the ungraded terrain: move each by the local grading delta (cm units, as decoded)
@@ -369,9 +376,11 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       const x = trees.x[i] / 10, z = trees.z[i] / 10; if (!G.inside(x, z, 4)) continue;
       const dP = S.at(x, z, 1), dA = S.at(x, z, 0); if (!(dP > 0.75 || dA > 1.0)) continue;
       if (S.at(x, z, 2) > 0.2 || S.at(x, z, 3) > 0.3 || bmask.at(x, z)) continue;
-      const ch = dP > dA ? 1 : 0; const gx = S.at(x + 0.8, z, ch) - S.at(x - 0.8, z, ch), gz = S.at(x, z + 0.8, ch) - S.at(x, z - 0.8, ch);
-      const rot = Math.atan2(gx, gz); const sz = Math.max(1.2, Math.min(1.6, 1.1 + (trees.h[i] / 100) * 0.02));
-      items.push([x, heightAt(x, z), z, rot, sz]);
+      // street trees square up to the kerb; plaza trees to the world-aligned paving grid
+      let rot = 0; if (dA > -2.5) { const gx = S.at(x + 0.8, z, 0) - S.at(x - 0.8, z, 0), gz = S.at(x, z + 0.8, 0) - S.at(x, z - 0.8, 0); if (Math.hypot(gx, gz) > 0.3) rot = Math.atan2(gx, gz); }
+      const sz = Math.max(1.2, Math.min(1.6, 1.1 + (trees.h[i] / 100) * 0.02));
+      const nrm = new THREE.Vector3(heightAt(x - 0.7, z) - heightAt(x + 0.7, z), 1.4, heightAt(x, z - 0.7) - heightAt(x, z + 0.7)).normalize(); // sit flush on sloping paving
+      items.push([x, heightAt(x, z), z, rot, sz, nrm]);
     }
     if (items.length) grates = makeGrates(items, M); if (grates) group.add(grates);
   }
@@ -488,7 +497,7 @@ function sweep(type, run, ch, S, G, geo, stats) {
       const yT = G.at(p.x - nx * 0.6, p.z - nz * 0.6) + 0.015, yR = G.at(p.x + nx * 0.7, p.z + nz * 0.7) - 0.06;
       return { F: [p.x, p.z], B: [p.x - nx * KERB_W, p.z - nz * KERB_W], yT, yR, nx, nz };
     }
-    const yT = G.at(p.x + nx * 0.5, p.z + nz * 0.5) + 0.035; const yG = Math.min(G.at(p.x - nx * 0.5, p.z - nz * 0.5), yT - 0.04) - 0.05;
+    const yT = G.at(p.x + nx * 0.5, p.z + nz * 0.5) + 0.02; const yG = Math.min(G.at(p.x - nx * 0.5, p.z - nz * 0.5), yT - 0.04) - 0.05;
     return { F: [p.x, p.z], B: [p.x + nx * EDGE_W, p.z + nz * EDGE_W], yT, yR: yG, nx, nz };
   });
   for (let i = 0; i < V.length - 1; i++) {
@@ -517,16 +526,16 @@ function orientQuad(geo, a, b, c, d, want) {
 function makeGrates(items, M) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
   // weathered cast iron (sunlit mid grey-brown), dark slots showing soil, mulch ring around the trunk
-  x.fillStyle = '#6b6660'; x.fillRect(0, 0, 128, 128);
-  x.fillStyle = '#5a4634'; x.beginPath(); x.arc(64, 64, 22, 0, 7); x.fill();
-  x.strokeStyle = '#2a2622'; x.lineWidth = 2.0; for (let r = 30; r < 62; r += 6) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
-  x.lineWidth = 2.4; for (let a = 0; a < 16; a++) { const t = a / 16 * Math.PI * 2; x.beginPath(); x.moveTo(64 + Math.cos(t) * 24, 64 + Math.sin(t) * 24); x.lineTo(64 + Math.cos(t) * 90, 64 + Math.sin(t) * 90); x.stroke(); }
-  x.strokeStyle = '#7a756d'; x.lineWidth = 6; x.strokeRect(3, 3, 122, 122);
+  x.fillStyle = '#857e74'; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = '#5e4a37'; x.beginPath(); x.arc(64, 64, 21, 0, 7); x.fill();
+  x.strokeStyle = '#3b352f'; x.lineWidth = 1.6; for (let r = 30; r < 62; r += 7) { x.beginPath(); x.arc(64, 64, r, 0, 7); x.stroke(); }
+  x.lineWidth = 2.0; for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; x.beginPath(); x.moveTo(64 + Math.cos(t) * 23, 64 + Math.sin(t) * 23); x.lineTo(64 + Math.cos(t) * 90, 64 + Math.sin(t) * 90); x.stroke(); }
+  x.strokeStyle = '#948c80'; x.lineWidth = 5; x.strokeRect(2.5, 2.5, 123, 123);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const grateMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.2 });
-  const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); g.translate(0, 0.012, 0);
-  // frame: a 0.1 m granite band 3 cm proud of the paving (top ring + outer faces, 16 triangles)
-  const fg = new Geo(); const o = 0.6, i = 0.5, yt = 0.03, yb = -0.05; const C = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const grateMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.2, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); g.translate(0, 0.008, 0);
+  // frame: a 0.1 m granite band ~1 cm proud of the paving (top ring + outer faces, 16 triangles)
+  const fg = new Geo(); const o = 0.6, i = 0.5, yt = 0.012, yb = -0.05; const C = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
   for (let k = 0; k < 4; k++) { const a = C[k], b = C[(k + 1) % 4]; const nrm = [(a[0] + b[0]) / 2, 0, (a[1] + b[1]) / 2];
     fg.quad([a[0] * i, yt, a[1] * i], [b[0] * i, yt, b[1] * i], [b[0] * o, yt, b[1] * o], [a[0] * o, yt, a[1] * o], [0, 1, 0], [[a[0] * i, a[1] * i], [b[0] * i, b[1] * i], [b[0] * o, b[1] * o], [a[0] * o, a[1] * o]]);
     fg.quad([a[0] * o, yb, a[1] * o], [b[0] * o, yb, b[1] * o], [b[0] * o, yt, b[1] * o], [a[0] * o, yt, a[1] * o], nrm, [[0, 0], [0.6, 0], [0.6, 0.04], [0, 0.04]]); }
@@ -535,7 +544,8 @@ function makeGrates(items, M) {
   const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); return m; };
   const meshes = [mk(g, grateMat), mk(fg.geometry(), M.graniteDark)]; inst.add(...meshes);
   const mats = new Float32Array(items.length * 16); { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    items.forEach(([px, py, pz, r, s], k) => { m4.compose(new THREE.Vector3(px, py, pz), q.setFromAxisAngle(up, r), new THREE.Vector3(s, 1, s)); m4.toArray(mats, k * 16); }); }
+    const qy = new THREE.Quaternion();
+    items.forEach(([px, py, pz, r, s, nrm], k) => { q.setFromUnitVectors(up, nrm).multiply(qy.setFromAxisAngle(up, r)); m4.compose(new THREE.Vector3(px, py, pz), q, new THREE.Vector3(s, 1, s)); m4.toArray(mats, k * 16); }); }
   inst.count = items.length;
   // only grates within ~160 m are drawn (refilled as the camera moves)
   inst.userData.update = (cp) => { let k = 0; const R2 = 160 * 160;
