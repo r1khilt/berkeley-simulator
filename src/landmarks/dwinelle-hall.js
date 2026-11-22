@@ -94,8 +94,8 @@ function dwinellePlaza(K, ctx, { BASE, ST, colliders, walkables }) {
   }
   // brick bands: on the landing (axis + diagonals toward the stair) and radiating across the plaza in front
   const vc = (vB0 + vB1) / 2;
-  for (const dv of [-13, -6.5, 0, 6.5, 13]) bandOnGround(K, BR, [uB + 0.3, vc + dv * 0.35], [uB + 17, vc + dv], 0.24);
-  bandOnGround(K, BR, [uB + 6, vB0 - 3], [uB + 6, vB1 + 3], 0.24);
+  for (const dv of [-13, -6.5, 0, 6.5, 13]) bandOnGround(K, BR, [uB + 0.3, vc + dv * 0.35], [uB + 17, vc + dv], 0.19);
+  bandOnGround(K, BR, [uB + 6, vB0 - 3], [uB + 6, vB1 + 3], 0.19);
   // black lanterns at the heads of both flights; steel tube handrails splitting the upper flight
   for (const v of [vU0 - 0.75, vU1 + 0.75]) lantern(K, uU - 0.9, yT + 0.45, v, { h: 3.9 });
   for (const v of [vB0 - 0.9, vB1 + 0.9]) lantern(K, uB - 0.8, yL, v, { h: 4.3 });

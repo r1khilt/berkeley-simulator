@@ -9,7 +9,7 @@ const local = (k, f) => { if (!_m.has(k)) _m.set(k, f()); return _m.get(k); };
 export const castIron = () => local('iron', () => { const m = solid(0x1d1e1f, 0.55, 0.35); m.name = 'r5-castIron'; return m; });
 export const steelTube = () => local('tube', () => { const m = solid(0xc9cdd0, 0.35, 0.8); m.name = 'r5-steelTube'; return m; });
 export const timber = (M) => local('timber', () => tint(M.wood, 0x9c968c)); // weathered silver-grey slats
-export const brickBand = (M) => local('brickBand', () => { const m = solid(0xb8735c, 0.85, 0); m.name = 'r5-brickBand'; return m; }); // flat salmon brick inlay (no bumpy brick normal map)
+export const brickBand = (M) => local('brickBand', () => { const m = solid(0xb08070, 0.85, 0); m.name = 'r5-brickBand'; return m; }); // flat salmon brick inlay (no bumpy brick normal map)
 export const creamWall = (M) => local('creamWall', () => tint(M.stuccoWhite, 0xece6d8));
 export const boardConcrete = (M) => local('boardConc', () => tint(M.concrete, 0xb4afa6));
 
