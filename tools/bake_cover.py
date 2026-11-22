@@ -96,17 +96,16 @@ mA = dA > 0; mP = (dP > 0) & ~mA; hard = mA | mP
 mD = (dD > 0) & ~hard; mG = (dG > 0) & ~mD & ~hard; mN = ~(hard | mD | mG)
 open_ = ~hard & ~bm
 
-# lawn seed: mapped/NDVI lawn plus unmapped ground with some green in it
-seed = (mG | (mN & (lush > 0.22))) & open_
+# lawn seed: mapped/NDVI lawn plus any unmapped open ground (central campus open ground is lawn; the NAIP NDVI is from
+# a dry summer, so irrigated-but-browned lawns show up as 'natural')
+seed = (mG | mN) & open_
 def frac(mask, sig):
     num = ndi.gaussian_filter(mask.astype(np.float32), sig); den = ndi.gaussian_filter(open_.astype(np.float32), sig)
     return num / np.maximum(den, 1e-3)
-f6 = frac(seed, 6.0 / R)              # lawn share of the open ground within ~6 m
-lawn = seed.copy()
-# trees standing in lawn: canopy ground becomes lawn where the open ground around it is mostly lawn
-lawn |= mD & (f6 > 0.32)
-# unmapped open ground (dry 'natural'): lawn unless it is a narrow leftover strip in a mostly-bed area
-lawn |= mN & open_ & (f6 > 0.15)
+# Campus lawns run right under the trees (the aerial photo shows canopy over turf almost everywhere), so canopy ground
+# defaults to lawn; only the deep interior of big canopy-only areas (> ~7 m from any lawn) becomes a groundcover bed.
+dseed = ndi.distance_transform_edt(~seed) * R
+lawn = seed | ((mD | mN) & open_ & (dseed <= 7.0))
 bed = open_ & ~lawn & maint
 # smooth the lawn/bed boundary into clean landscaped curves and drop specks (beds < ~25 m^2, lawn holes < ~20 m^2)
 disk = lambda r: (np.hypot(*np.mgrid[-r:r + 1, -r:r + 1]) <= r)

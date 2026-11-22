@@ -91,36 +91,20 @@ void groundShadePBR(vec2 w, float dist) {
   if (wD > 0.001) {
     PS a;
     if (bedK > 0.5) {
-      // r4-ground: maintained planting bed = dark shredded-bark mulch with planted clumps (low shrubs / groundcover) on a
-      // jittered ~1.1 m grid, plus patches of dense ivy, so it reads as a designed bed rather than bare or worn dirt
+      // r4-ground: maintained planting bed = dense low evergreen groundcover (ivy / star jasmine) with dark bark mulch
+      // showing in the gaps and along a clean cut edge, instead of bare brown dirt
       PS mu = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
       float lmu = dot(mu.c, vec3(0.2126, 0.7152, 0.0722));
       mu.c = mix(vec3(lmu), mu.c, 0.45) * vec3(0.95, 0.72, 0.55) * 0.62;          // darker, redder, flatter bark mulch
       mu.c = mix(vec3(0.05, 0.032, 0.022), mu.c, 0.55);
       PS gc = gTapT(w, gWP, 0.33, 2.0, L_LAWN, 1.0 - kIso, near);                  // leafy set at 3x scale -> broad leaves
       vec3 gm = vec3(0.0743, 0.1139, 0.0376);
-      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(1.5)) * vec3(0.62, 0.78, 0.7); // more contrast, deeper blue-green
-      gc.r = 0.62;
-      float plantK = 1.0 - smoothstep(35.0, 80.0, dist);
-      vec2 pc = w / 1.1; vec2 pci = floor(pc); float best = 1e3; float hsel = 0.0; vec2 bdir = vec2(0.0);
-      if (plantK > 0.0) {
-        for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
-          vec2 cc = pci + vec2(float(dx), float(dy)); vec2 o = vec2(hq12(cc), hq12(cc + 7.7));
-          vec2 dv = (pc - cc - o) * 1.1; float d = length(dv) - (0.3 + 0.24 * hq12(cc + 3.3));
-          if (d < best) { best = d; hsel = hq12(cc + 1.9); bdir = dv; }
-        }
-      }
-      float ivy = smoothstep(0.56, 0.64, n0.g * 0.65 + n1.r * 0.35);                 // some beds are solid ivy
-      float clump = (1.0 - smoothstep(-0.03, 0.03, best)) * plantK;
-      float dome = smoothstep(0.0, -0.3, best);
-      vec3 pv = hsel < 0.6 ? vec3(1.0) : hsel < 0.85 ? vec3(1.25, 1.2, 0.8) : vec3(0.85, 0.9, 1.15);  // a few plant varieties
-      PS pl = gc; pl.c *= pv * (0.55 + 0.6 * dome);
-      pl.g += normalize(bdir + 1e-4) * (1.0 - dome) * 0.6 * clump;
-      mu.c *= 0.7 + 0.3 * smoothstep(0.0, 0.22, best);                                 // contact shade round each plant
-      float kc = max(clump, ivy) * smoothstep(0.0, 0.3, dD);                         // a clean mulch strip along the bed edge
-      kc = mix(kc, 0.5 * smoothstep(0.0, 0.3, dD) + 0.4 * ivy, 1.0 - plantK);        // far: average cover
-      PS iv = gc; iv.c *= 0.75 + 0.35 * n2.g;
-      a = pbrMix(mu, pbrMix(pl, iv, smoothstep(0.3, 0.8, ivy)), kc);
+      gc.c = gm * pow(clamp(gc.c / gm, 0.0, 3.0), vec3(1.5)) * vec3(0.6, 0.76, 0.68) * (0.8 + 0.35 * n1.r); // deeper blue-green
+      gc.r = mix(gc.r, 0.7, 0.5);
+      float cov = n1.g * 0.45 + n2.r * 0.35 + n0.g * 0.2 + (gc.h - mu.h) * 0.25;
+      float kc = smoothstep(0.3, 0.4, cov) * smoothstep(0.05, 0.4, dD);           // ~85 % cover; clean mulch strip at the edge
+      mu.c *= 0.75 + 0.25 * (1.0 - smoothstep(0.3, 0.45, cov));                    // gaps sit in the plants' shade
+      a = pbrMix(mu, gc, kc);
       a.c *= 0.92 + 0.16 * n0.b;
     } else {
       a = gTapT(w, gWP, 1.0, 3.0, L_LITTER, kIso, near);
