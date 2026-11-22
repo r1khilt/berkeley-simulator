@@ -151,8 +151,12 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   });
   // 2) stairs: plan from the (road-graded) terrain, then bed them in
   const stairs = [];
+  // [r5-audit-north] OSM flights that a landmark module already builds outside its footprint (they were drawn twice)
+  const OWNED_STEPS = new Set([
+    262173805, // Grimes Engineering Center: brick landscape stair at the SW corner (grimes-engineering-center.js, with ramp)
+  ]);
   for (const p of vectors.paths) {
-    if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2) continue;
+    if (!p.steps || p.tunnel || p.bridge || p.pts.length < 2 || OWNED_STEPS.has(p.id)) continue;
     const P = p.pts.map((q) => [q[0], q[1]]); const L = polyLen(P); if (L < 0.7 || L > 80) continue;
     if (!P.every(([x, z]) => G.inside(x, z, 6))) continue;
     const w = Math.max(1.2, Math.min(14, p.w || 2.6));
@@ -255,6 +259,8 @@ export function gradeTerrain({ heights, c, gt, sdf, vectors, manifest, bjson }) 
   const hedges = [];
   for (const b of vectors.barriers) { if (b.type !== 'hedge' || b.pts.length < 2 || !b.pts.every(([x, z]) => G.inside(x, z, 4))) continue; const P = resample(b.pts.map((q) => [q[0], q[1]]), 0.8); if (polyLen(P) < 0.8) continue; hedges.push({ P, h: Math.max(0.6, Math.min(1.6, b.h || 1.1)) }); }
   const ms = Math.round(performance.now() - t0);
+  // [r5-audit-north] ?gwdebug=1 exposes the accepted stair/wall plans for QA maps (no effect otherwise)
+  if (typeof location !== 'undefined' && /[?&]gwdebug/.test(location.search)) globalThis.__gw = { stairs: stairs.map((s) => ({ P: s.P, lo: s.lo, hi: s.hi, w: s.w, n: s.n, mat: s.mat })), walls: walls.map((w) => ({ P: w.P, ret: w.ret })) };
   console.log('groundworks grade', JSON.stringify({ ms, denoiseMs: Math.round(tB - tA), lowered: nLow, soft: nSoft, aprons: nApron, stairs: stairs.length, walls: walls.length, retaining: walls.filter((w) => w.ret).length }));
   return { G, S, bmask, stairs, walls, hedges, c, gt, orig, aprons: nApron };
 }
