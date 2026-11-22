@@ -136,7 +136,7 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
     if (kind === 'unmarked' || kind === 'no') continue;
     const n = allRoadIdx.nearest(x, z, 6); if (!n || n.L.hw === 'service' && Math.random() < 0.6) continue;
     const l = Math.hypot(n.dx, n.dz) || 1; const ux = n.dx / l, uz = n.dz / l; // road direction
-    const w = (n.L.w || 8) + 0.5; const len = 3.0;
+    const w = (n.L.w || 8) + (skipWalls ? -0.5 : 0.5); const len = 3.0; // [r4-ground] stop stripes short of the (now real) kerb
     for (let s = -w / 2; s < w / 2; s += 1.2) {
       const cx = n.px - uz * s, cz = n.pz + ux * s; // stripe centre across the road
       const a = [cx - ux * 0.3, cz - uz * 0.3], b = [cx + ux * 0.3, cz + uz * 0.3];
@@ -164,7 +164,7 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   for (const b of vectors.barriers) {
     const pts = b.pts; if (pts.length < 2) continue;
     if (b.type === 'wall' || b.type === 'retaining_wall' || b.type === 'city_wall') { if (!skipWalls) wallBuf.push(extrudeLine(pts, 0.32, Math.min(2.5, b.h || 1.2), heightAt, b.type === 'retaining_wall' ? -1.5 : -0.3)); } // [r4-ground] groundworks.js builds walls with coping + terrain terraces
-    else if (b.type === 'hedge') hedgeBuf.push(extrudeLine(pts, 0.9, Math.min(2.2, b.h || 1.3), heightAt, -0.2));
+    else if (b.type === 'hedge') { if (!skipWalls) hedgeBuf.push(extrudeLine(pts, 0.9, Math.min(2.2, b.h || 1.3), heightAt, -0.2)); } // [r4-ground] groundworks sweeps hedges with a clipped profile
     else if (b.type === 'fence' || b.type === 'railing' || b.type === 'guard_rail') fenceBuf.push(...fenceLine(pts, Math.min(2.2, b.h || 1.2), heightAt));
   }
   const addMerged = (arr, mat, name, cast = true) => { if (!arr.length) return; const g = mergeGeoms(arr); if (!g) return; const m = new THREE.Mesh(g, mat); m.castShadow = cast; m.receiveShadow = true; m.name = name; group.add(m); };

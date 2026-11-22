@@ -144,7 +144,7 @@ async function boot() {
   let streets = null;
   try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, skipWalls: !!gwPlan /* [r4-ground] */, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step } }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
   BS.streets = streets; phase('streetscape');
-  let ground = null; if (gwPlan) try { ground = buildGroundworks(gwPlan, { scene, heightAt, trees, treeSys, physics, pois }); BS.ground = ground; } catch (e) { console.warn('groundworks failed', e); } phase('groundworks'); // [r4-ground]
+  let ground = null; if (gwPlan) try { ground = buildGroundworks(gwPlan, { scene, heightAt, trees, treeSys, physics, pois, vectors }); BS.ground = ground; } catch (e) { console.warn('groundworks failed', e); } phase('groundworks'); // [r4-ground]
   // a few real point lights follow the player through the nearest lamps at night
   const lampLights = []; for (let i = 0; i < (qs.get('nolamps') ? 0 : 6); i++) { const L = new THREE.PointLight(0xffd6a0, 0, 26, 2); L.castShadow = false; scene.add(L); lampLights.push(L); }
   const lampPts = streets ? streets.lampPts : [];
