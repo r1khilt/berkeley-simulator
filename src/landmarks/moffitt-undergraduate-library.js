@@ -15,7 +15,8 @@ import * as THREE from 'three';
 import { Kit } from './lib/classic-kit.js';
 import { curtain, penthouse } from './lib/b06-modern.js';
 import { signText } from './lib/b03-kit.js';
-import { nightGlow } from '../materials.js';
+import { nightGlow, textures, TEX_M } from '../materials.js';
+import { adoptPBR } from '../world/pbr.js'; // r4: board-formed concrete set for the towers
 
 // building frame (u along the long axis, v across) -> landmark-local x/z, for the static site polygons below
 const A16 = THREE.MathUtils.degToRad(-16), CA = Math.cos(A16), SA = Math.sin(A16);
@@ -49,15 +50,52 @@ function perfMetal() {
   _perf.name = 'mfPerf'; return _perf;
 }
 
+// r4: ivy cover (leafy canvas, darker undersides) for the vent wall beside Press
+let _ivy = null;
+function ivyMat() {
+  if (_ivy) return _ivy;
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  g.fillStyle = '#22331a'; g.fillRect(0, 0, S, S); let sd = 5; const r = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 1400; k++) { const x = r() * S, y = r() * S, w = 5 + r() * 9; const l = r(); g.fillStyle = l < 0.35 ? '#2f4a22' : l < 0.75 ? '#3d5c2a' : '#56743a'; g.beginPath(); g.ellipse(x, y, w, w * 0.7, r() * 3, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  _ivy = new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, roughness: 0.9 }); _ivy.name = 'mfIvy'; return _ivy;
+}
+
+// r4: the shared concrete map shows a small regular panel grid that read as CMU on the big blank towers; the towers,
+// pylon and vent get the CC0 board-formed concrete set instead (falls back to the procedural concrete with ?pbr=0)
+let _bc = null;
+function boardConc() {
+  if (_bc) return _bc;
+  const T = textures().concrete;
+  _bc = { map: T.map.clone(), normalMap: T.normalMap && T.normalMap.clone(), roughnessMap: T.roughnessMap && T.roughnessMap.clone() };
+  adoptPBR('mfBoardConc', _bc, [190, 187, 180], TEX_M, 'boardconc');
+  return _bc;
+}
+
+// r4: newspaper front pages for the display cases (masthead, headline, photo block, columns)
+let _news = null;
+function newsMat() {
+  if (_news) return _news;
+  const W = 128, H = 96, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = '#ece8df'; g.fillRect(0, 0, W, H); g.fillStyle = '#1d1d1d'; g.fillRect(8, 6, 112, 9);
+  g.fillStyle = '#333'; g.fillRect(8, 20, 70, 5); g.fillStyle = '#7d8a96'; g.fillRect(84, 20, 36, 26);
+  g.fillStyle = '#8a8a8a'; for (let col = 0; col < 3; col++) for (let y = 30; y < 90; y += 3) if (!(col === 2 && y < 48)) g.fillRect(8 + col * 38, y, 34, 1);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  _news = new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); _news.name = 'mfNews'; return _news;
+}
+
 export async function build(ctx) {
   const K = new Kit(ctx, THREE.MathUtils.degToRad(-16)); const M = ctx.M;
   const tint = (base, hex, name) => { const m = base.clone(); m.color.set(hex); m.name = name; return m; };
   const std = (hex, name, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, ...(o.extra || {}) }); m.name = name; return m; };
   const C = tint(M.concrete, 0xd5d9df, 'mfConc');          // cast-in-place concrete: neutral light grey (the shared map is warm, so the tint leans cool)
   const CT = tint(M.concrete, 0xd2d3d4, 'mfTower');        // the stair towers read a touch warmer / board-marked
+  { const bc = boardConc(); CT.map = bc.map; if (bc.normalMap) CT.normalMap = bc.normalMap; if (bc.roughnessMap) CT.roughnessMap = bc.roughnessMap; }
   const CD = tint(M.concrete, 0x9da1a8, 'mfConcDark');     // soffits, recesses, weathered parapets
   const GL = nightGlow(std(0x1f2325, 'mfGlass', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1, emissive: 0xffd09a, emissiveIntensity: 0.38 } }), 1.0);
-  const FR = std(0x3a322b, 'mfBronze', { rough: 0.45, metal: 0.7 });   // dark bronze anodised frames
+  const FR = std(0x2a2623, 'mfBronze', { rough: 0.45, metal: 0.6 });   // dark bronze anodised frames (near black in the photos)
+  GL.userData.interior = false; // r4: the glass deep behind the balconies stays dark (no lit-room shader); east/podium glass keeps it
+  const GLD = std(0x2b3035, 'mfDoorGlass', { rough: 0.12, metal: 0.35, extra: { envMapIntensity: 1.2 } }); GLD.userData.interior = false; // shaded entrance doors
   const GLP = nightGlow(std(0x46505a, 'mfGlassPodium', { rough: 0.1, metal: 0.25, extra: { envMapIntensity: 1.8, emissive: 0xffd09a, emissiveIntensity: 0.45 } }), 1.0); // shaded podium glazing still catches the sky
   const PG = std(0x3a3633, 'mfPergola', { rough: 0.55, metal: 0.5 });  // dark steel pergola frame
   const GRN = std(0x3d4f2c, 'mfPlant', { rough: 0.95 });
@@ -110,6 +148,7 @@ export async function build(ctx) {
     const g = new THREE.ExtrudeGeometry(sh, { depth: s1 - s0, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(s1, 0, 0); K.addRun(R, mat, g);
   };
   const GLo = std(0x1f2325, 'mfGlassUnlit', { rough: 0.22, metal: 0.3, extra: { envMapIntensity: 1.1 } }); // same by day; dark at night
+  GLo.userData.interior = false;
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const glassStorey = (R, s0, s1, y0, y1, o = {}) => {
     if (o.glass) curtain(K, R, s0, s1, y0, y1, [], { glass: o.glass, mull: o.mull ?? 1.5, mullMat: FR, mullD: 0.07, band: 0, recess: 0.06 });
@@ -218,7 +257,7 @@ export async function build(ctx) {
       K.rbox(R, FR, s, F3, -0.32, s + PW, 7.3, -0.18); s += PW;         // solid black panel
       if (i < 3) { // a pair of glazed leaves in black frames
         const a = s, b = s + DW, m = (a + b) / 2;
-        K.rbox(R, M.glassLight, a, F3 + 0.02, -0.3, b, 7.0, -0.26, { detail: true });
+        K.rbox(R, GLD, a, F3 + 0.02, -0.3, b, 7.0, -0.26, { detail: true });
         for (const q of [a, m, b]) K.rbox(R, FR, q - 0.05, F3, -0.33, q + 0.05, 7.0, -0.19);
         for (const q of [a + 0.04, b - 0.04]) K.rbox(R, FR, q - 0.03, F3, -0.33, q + 0.03, 7.0, -0.19); 
         K.rbox(R, FR, a, F3, -0.33, b, F3 + 0.12, -0.19);
@@ -227,7 +266,7 @@ export async function build(ctx) {
         s = b;
       }
     }
-    K.rbox(R, M.glassLight, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
+    K.rbox(R, GLD, s, F3 + 0.02, -0.3, dB, 7.0, -0.26, { detail: true }); K.rbox(R, FR, s, 7.0, -0.33, dB, 7.3, -0.18); K.rbox(R, FR, dB - 0.08, F3, -0.33, dB, 7.3, -0.19); // sidelight
     K.rbox(R, C, dA - 0.3, 7.3, -0.25, dB + 0.3, F4 - 0.32, 0.08);     // recessed fascia (~1.2 m) over the doors
     signText(K, R, 'JAMES K. MOFFITT UNDERGRADUATE LIBRARY', (dA + dB) / 2, 7.68, 0.44, { color: '#57432c', metal: 0.35, rough: 0.4, d: 0.095, font: 'Georgia, "Times New Roman", serif', weight: '700', spacing: 0.15 });
     // continuous concrete sidewalk in front of the doors (flush threshold)
@@ -239,21 +278,21 @@ export async function build(ctx) {
     // r4: entrance forecourt furniture from the photos. The Free Speech Movement Café pylon: stacked, slightly
     // offset board-marked concrete blocks, raised letters on the south face and flyer-covered cork boards on both
     // faces; a row of redwood post-and-beam newspaper display cases; a low concrete planter ledge students sit on.
-    { const pu = -2.6, pv = 31.4, g = K.g(pu, pv) - 0.3;
+    { const pu = 39.6, pv = 20.6, g = K.g(pu, pv) - 0.3; // pylon stands in the café plaza at the south-east corner
       for (let k = 0; k < 3; k++) { const o = [0, 0.07, -0.05][k]; K.box(CT, pu - 0.72 + o, g + k * 0.95, pv - 0.27, pu + 0.72 + o, g + (k + 1) * 0.95 - 0.02, pv + 0.27); K.box(CD, pu - 0.7 + o, g + (k + 1) * 0.95 - 0.02, pv - 0.25, pu + 0.7 + o, g + (k + 1) * 0.95, pv + 0.25, { detail: true }); }
       const RSp = K.run([pu - 0.7, pv + 0.27], [pu + 0.7, pv + 0.27]), RNp = K.run([pu + 0.7, pv - 0.27], [pu - 0.7, pv - 0.27]);
-      const ink = { color: '#d9d6cf', metal: 0.0, rough: 0.85, d: 0.03, font: '"Courier New", Courier, monospace', weight: '700', spacing: 0.02 };
-      signText(K, RSp, 'FREE SPEECH', RSp.L / 2, g + 2.55, 0.16, ink); signText(K, RSp, 'MOVEMENT', RSp.L / 2, g + 2.34, 0.16, ink); signText(K, RSp, 'CAFE', RSp.L / 2, g + 2.13, 0.16, ink);
+      const ink = { color: '#45443f', metal: 0.0, rough: 0.85, d: 0.03, font: '"Courier New", Courier, monospace', weight: '700', spacing: 0.0 };
+      signText(K, RSp, 'FREE SPEECH', RSp.L / 2, g + 2.6, 0.2, ink); signText(K, RSp, 'MOVEMENT', RSp.L / 2, g + 2.36, 0.2, ink); signText(K, RSp, 'CAFE', RSp.L / 2, g + 2.12, 0.2, ink);
       const CORK = std(0x9a7448, 'mfCork', { rough: 0.95 });
       for (const R of [RSp, RNp]) { K.rbox(R, CORK, 0.22, g + 0.75, 0, R.L - 0.22, g + 1.85, 0.03, { detail: true });
         for (let k = 0; k < 9; k++) { const fx = 0.3 + ((k * 37) % 7) / 7 * (R.L - 0.75), fy = g + 0.85 + ((k * 23) % 5) / 5 * 0.8; K.rbox(R, [M.whitePaint, M.calGold, M.seatBlue, M.whitePaint][k % 4] || M.whitePaint, fx, fy, 0.03, fx + 0.2, fy + 0.27, 0.035, { detail: true }); } }
       colliders.push(rectCol(pu - 0.8, pv - 0.35, pu + 0.8, pv + 0.35, g, g + 2.9));
       // newspaper display cases on redwood posts, east side of the forecourt
-      const RW8 = std(0x7a4a2c, 'mfRedwood', { rough: 0.8 });
+      const RW8 = std(0x5a3c2b, 'mfRedwood', { rough: 0.85 }); const NEWS = newsMat();
       for (let k = 0; k < 4; k++) { const u = 10.8 + k * 1.9, v = 30.2, gg = K.g(u, v) - 0.2;
         for (const du of [-0.8, 0.8]) K.box(RW8, u + du - 0.07, gg, v - 0.07, u + du + 0.07, gg + 2.35, v + 0.07, { detail: true });
         K.box(RW8, u - 0.95, gg + 2.2, v - 0.09, u + 0.95, gg + 2.34, v + 0.09, { detail: true });
-        K.box(FR, u - 0.68, gg + 1.05, v - 0.08, u + 0.68, gg + 1.95, v + 0.08, { detail: true }); K.box(M.whitePaint, u - 0.6, gg + 1.12, v - 0.085, u + 0.6, gg + 1.88, v + 0.085, { detail: true });
+        K.box(FR, u - 0.68, gg + 1.05, v - 0.08, u + 0.68, gg + 1.95, v + 0.08, { detail: true }); K.box(NEWS, u - 0.6, gg + 1.12, v - 0.085, u + 0.6, gg + 1.88, v + 0.085, { detail: true, uvMode: 'keep' });
         K.box(M.glassLight, u - 0.64, gg + 1.08, v - 0.1, u + 0.64, gg + 1.92, v + 0.1, { detail: true });
         colliders.push(rectCol(u - 0.95, v - 0.12, u + 0.95, v + 0.12, gg, gg + 2.3)); }
       // low planter ledge with shrubs along the west side of the forecourt (sitting height)
@@ -311,7 +350,17 @@ export async function build(ctx) {
   {
     const u0 = GE, u1 = 50.5, v0 = -17, v1 = 12, L0 = GE, L1 = 45.5, W0 = -4.2, W1 = 4.2, yF = DECK_E;
     const slabs = [[u0, v0, u1, W0], [u0, W1, u1, v1], [L1, W0, u1, W1]];
-    for (const [a, b, c, d] of slabs) { K.box(C, a, 2.5, b, c, yF - 0.04, d); K.box(M.paving, a, yF - 0.04, b, c, yF, d); walkables.push(K.walkPoly([[a, b], [c, b], [c, d], [a, d]], yF)); colliders.push(rectCol(a, b, c, d, -2, yF - 0.05)); }
+    // r4: the Free Speech Movement Café sits on the ground floor under the deck's south edge (u 38.5..49.5), its glazed
+    // front set back ~2.4 m behind a row of square columns, so that strip of the deck is only a slab (CU..v1)
+    const CU0 = 38.5, CU1 = 49.5, CV = 9.6;
+    for (const [a, b, c, d] of slabs) {
+      K.box(M.paving, a, yF - 0.04, b, c, yF, d); walkables.push(K.walkPoly([[a, b], [c, b], [c, d], [a, d]], yF));
+      if (d !== v1) { K.box(C, a, 2.5, b, c, yF - 0.04, d); colliders.push(rectCol(a, b, c, d, -2, yF - 0.05)); continue; }
+      K.box(C, a, yF - 0.65, b, c, yF - 0.04, d);                                  // slab over the whole strip
+      for (const [p0, p1] of [[a, CU0], [CU1, c]]) { K.box(C, p0, 2.5, b, p1, yF - 0.65, d); colliders.push(rectCol(p0, b, p1, d, -2, yF - 0.05)); }
+      K.box(C, CU0, 2.5, b, CU1, yF - 0.65, 4.5);                                  // behind the café (lightwell wall)
+      colliders.push(rectCol(CU0, b, CU1, CV, -2, yF - 0.05), rectCol(CU0, CV, CU1, d, yF - 0.65, yF - 0.05));
+    }
     // lightwell against the façade: walls, floor at floor 3, stair along its south side, railings
     const LW = Math.max(F3, K.gMax(L0, W0, L1, W1, 8)) + 0.04;          // well floor sits just above the bare-earth terrain
     K.box(M.paving, L0, LW - 0.35, W0, L1, LW, W1); walkables.push(K.walkPoly([[L0, W0], [L1, W0], [L1, W1 - 1.9], [L0, W1 - 1.9]], LW));
@@ -319,10 +368,39 @@ export async function build(ctx) {
     walkables.push(K.stairs(C, L0 + 0.6, W1 - 1.9, L1, W1 - 0.25, LW, yF, '+u', Math.round((yF - LW) / 0.165)));
     for (const [a, b] of [[[L0, W0], [L1, W0]], [[L1, W0], [L1, W1 - 2.0]], [[L1 - 0.1, W1], [L0, W1]]]) { const R = K.run(a, b); K.rbox(R, C, 0, yF - 0.02, -0.25, R.L, yF + 0.18, 0.05); rail(R, 0.1, R.L - 0.1, yF + 0.18, -0.12, 0.9); }
     // deck edges: concrete fascia + railing where the ground falls away
-    const RSd = K.run([u0 + 7, v1], [u1, v1]); K.rbox(RSd, C, 0, 2.5, -0.3, RSd.L, yF + 0.15, 0.02); rail(RSd, 0, RSd.L, yF + 0.15, -0.15);
+    const RSd = K.run([u0 + 7, v1], [u1, v1]); K.rbox(RSd, C, 0, yF - 0.85, -0.3, RSd.L, yF + 0.15, 0.02); K.rbox(RSd, C, CU1 - (u0 + 7), 2.5, -0.3, RSd.L, yF - 0.85, 0.02); rail(RSd, 0, RSd.L, yF + 0.15, -0.15);
+    { // the café front: dark bronze storefront on a low concrete upstand (the plaza rises ~1.7 m eastward), door pair,
+      // warm interior; square columns carry the deck edge
+      const segs = [[CU0 + 0.3, 42.2], [42.2, 46.0], [46.0, CU1 - 0.3]];
+      const CAFE = nightGlow(std(0xe9dccb, 'mfCafeInside', { rough: 0.7, extra: { emissive: 0xffe2b8, emissiveIntensity: 1.0 } }), 0.8);
+      for (const [p0, p1] of segs) {
+        const yb = Math.max(K.g(p0, v1), K.g(p1, v1)) + 0.12, Rc = K.run([p0, CV], [p1, CV]);
+        K.rbox(Rc, C, 0, 2.5, -0.3, Rc.L, yb, 0.05);
+        curtain(K, Rc, 0, Rc.L, yb, yF - 0.7, [], { glass: GLP, mull: 1.6, mullMat: FR, mullD: 0.07, band: 0, recess: 0.04 });
+        K.rbox(Rc, FR, 0, yb + 2.35, -0.05, Rc.L, yb + 2.45, 0.06); // transom bar
+        K.rbox(Rc, CAFE, 0, yb - 0.1, -5.1, Rc.L, yF - 0.7, -4.95); K.rbox(Rc, CD, 0, yF - 0.75, -5.1, Rc.L, yF - 0.65, -0.1); K.rbox(Rc, M.paving, 0, yb - 0.2, -5.1, Rc.L, yb, -0.1); // lit interior, ceiling, floor
+        K.rbox(Rc, M.wood, 0.4, yb, -2.2, Rc.L - 0.4, yb + 0.75, -1.6, { detail: true }); // café counter / tables seen inside
+      }
+      { const R = K.run([42.2, CV], [46.0, CV]), yb = Math.max(K.g(42.2, v1), K.g(46, v1)) + 0.12, m = R.L / 2; // door pair
+        for (const q of [m - 0.95, m, m + 0.95]) K.rbox(R, FR, q - 0.05, yb, -0.02, q + 0.05, yb + 2.3, 0.1);
+        for (const q of [m - 0.25, m + 0.25]) K.rbox(R, M.iron, q - 0.02, yb + 0.9, 0.06, q + 0.02, yb + 1.9, 0.12, { detail: true }); }
+      for (const u of [CU0 + 0.25, 44.0, CU1 - 0.25]) { const g = K.g(u, 11.6) - 0.5; K.box(C, u - 0.28, g, 11.3, u + 0.28, yF - 0.6, 11.86); colliders.push(rectCol(u - 0.3, 11.28, u + 0.3, 11.88, g, yF - 0.6)); }
+    }
     const RNd2 = K.run([u1, v0], [u0, v0]); K.rbox(RNd2, C, 0, 2.5, -0.3, RNd2.L, yF + 0.15, 0.02); rail(RNd2, 0.5, RNd2.L - 0.5, yF + 0.15, -0.15);
     // stair down to the south plaza (beside the building's SE corner)
-    { const g = K.g(35.5, v1 + 7); const n = Math.max(3, Math.round((yF - g) / 0.16)); walkables.push(K.stairs(C, u0 + 1.2, v1, u0 + 6.2, v1 + n * 0.3, g, yF, '-v', n)); }
+    { const g = K.g(35.5, v1 + 7); const n = Math.max(3, Math.round((yF - g) / 0.16)); const sa = u0 + 1.2, sb = u0 + 6.2, ve = v1 + n * 0.3;
+      walkables.push(K.stairs(C, sa, v1, sb, ve, g, yF, '-v', n));
+      // r4: board-formed cheek walls following the flight, brushed-steel handrails on short posts
+      for (const [ua, ub] of [[sa - 0.3, sa], [sb, sb + 0.3]]) {
+        const pv = [[v1 - 0.01, g - 0.6], [ve + 0.4, g - 0.6], [ve + 0.4, g + 0.95], [ve, g + 0.95], [v1 - 0.01, yF + 0.95]];  // (v, y) outline
+        const sh = new THREE.Shape(pv.map(([v, y]) => new THREE.Vector2(-v, y)));                        // x = -v so rotateY(90°) lands on +v
+        const gm = new THREE.ExtrudeGeometry(sh, { depth: ub - ua, bevelEnabled: false }); gm.rotateY(Math.PI / 2); // (x, z) -> (u = z, v = -x)
+        gm.translate(ua, 0, 0); K.add(CT, gm); colliders.push(rectCol(ua, v1, ub, ve + 0.4, g - 0.6, g + 0.95 + (yF - g) * 0.5));
+      }
+      const STL = std(0xb9bcbf, 'mfSteel', { rough: 0.3, metal: 0.9 }), seg = (p0, p1, t) => { const d = new THREE.Vector3().subVectors(p1, p0), L = d.length(); const gm = new THREE.BoxGeometry(t, t, L); gm.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.normalize())); gm.translate((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2); K.add(STL, gm, { detail: true }); };
+      for (const u of [sa + 0.25, (sa + sb) / 2, sb - 0.25]) { seg(new THREE.Vector3(u, yF + 0.9, v1 + 0.15), new THREE.Vector3(u, g + 0.9, ve), 0.05);
+        for (let k = 0; k <= 3; k++) { const v = v1 + 0.15 + (ve - v1 - 0.15) * k / 3, y = yF - (yF - g) * (v - v1) / (ve - v1); seg(new THREE.Vector3(u, y, v), new THREE.Vector3(u, y + 0.9, v), 0.04); } }
+    }
     // broad steps east to Memorial Glade
     { const g = Math.min(K.g(u1 + 4, -6), K.g(u1 + 4, 6)); const n = Math.max(2, Math.round((yF - g) / 0.16)); if (yF - g > 0.25) walkables.push(K.stairs(C, u1, -7, u1 + n * 0.33, 7, g, yF, '-u', n)); }
     // planters and timber benches on the deck
@@ -335,9 +413,10 @@ export async function build(ctx) {
       const PERF = perfMetal();
       K.box(PERF, a, yF, b, c, h, d); K.box(FR, a - 0.04, h, b - 0.04, c + 0.04, h + 0.08, d + 0.04);
       const R = K.run([a, d], [c, d]); const L = R.L;                              // service side faces the terrace (south)
-      const WHT = std(0xf4f2ee, 'mfPressWhite', { rough: 0.5, extra: { emissive: 0xfff6e8, emissiveIntensity: 0.25 } });
+      const WHT = std(0xf4f2ee, 'mfPressWhite', { rough: 0.5, extra: { emissive: 0xfff6e8, emissiveIntensity: 0.55 } }); // lit by day too (the bright interior is what reads from the plaza)
       K.rbox(R, WHT, 0.5, yF + 0.95, -1.1, L - 0.5, yF + 2.55, -0.02);          // lit white interior seen through the opening
-      K.rbox(R, M.blackPaint || FR, 0.9, yF + 1.75, -1.05, L - 0.9, yF + 2.5, -1.0); // dark back wall
+      K.rbox(R, M.blackPaint || FR, 1.6, yF + 1.7, -1.05, L - 1.6, yF + 2.5, -1.0); // dark back wall band
+      for (let k = 0; k < 3; k++) K.rbox(R, M.blackPaint || FR, 0.9 + k * 0.75, yF + 1.55, -1.04, 1.5 + k * 0.75, yF + 2.35, -1.0, { detail: true }); // menu boards
       signText(K, R, 'PRESS', L / 2, yF + 2.13, 0.5, { color: '#ffffff', metal: 0.0, rough: 0.5, d: -0.99, font: 'Helvetica, Arial, sans-serif', weight: '800', spacing: 0.08 });
       K.rbox(R, WHT, 0.5, yF + 0.95, -0.02, L - 0.5, yF + 1.08, 0.32);          // counter top
       K.rbox(R, PERF, 0.5, yF, 0.0, L - 0.5, yF + 0.95, 0.03);                    // counter front (perforated)
@@ -356,7 +435,7 @@ export async function build(ctx) {
       for (let k = 0; k < 5; k++) { const vv = v - w / 2 + (k + 0.5) * w / 5; K.box(WOOD, u0, yF + 0.34, vv - w / 12, u1, yF + 0.45, vv + w / 12, { detail: true }); }
       colliders.push(rectCol(u0, v - w / 2, u1, v + w / 2, yF - 0.5, yF + 0.45));
     }
-    for (const [u, v] of [[33.5, -12.5], [49.6, 10.8]]) {
+    for (const [u, v] of [[47.2, -7.6], [49.6, 10.8]]) {
       K.cyl(FR, u, yF, v, 0.07, 0.06, 5.6, 8, { detail: true }); K.box(FR, u - 0.05, yF + 5.5, v - 0.05, u + 1.25, yF + 5.62, v + 0.05, { detail: true });
       K.box(M.lampGlow, u + 0.2, yF + 5.46, v - 0.04, u + 1.2, yF + 5.5, v + 0.04, { detail: true }); colliders.push(K.colCyl(u, v, 0.15, yF, yF + 5.6));
     }
@@ -365,10 +444,11 @@ export async function build(ctx) {
   // r4: Main Stacks ventilation shaft east of the deck (OSM r/21101303; LiDAR top 11.2 m): board-formed concrete
   // enclosure with a band of dark louvres under a thin cap (replaces the stand-in granite box with painted windows)
   { const u0 = 52.6, u1 = 55.8, v0 = -15.6, v1 = -8.2, yT = 11.2, g0 = K.gMin(u0, v0, u1, v1, 4) - 0.6;
-    K.box(CT, u0, g0, v0, u1, yT - 1.7, v1); K.box(CD, u0 + 0.25, yT - 1.7, v0 + 0.25, u1 - 0.25, yT - 0.25, v1 - 0.25);
-    const ring = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
-    for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); for (let y = yT - 1.6; y < yT - 0.3; y += 0.16) K.rbox(R, FR, 0.15, y, -0.22, R.L - 0.15, y + 0.06, -0.08, { detail: true }); for (let s2 = 0.15; s2 <= R.L - 0.1; s2 += (R.L - 0.3) / Math.max(1, Math.round((R.L - 0.3) / 1.5))) K.rbox(R, CT, s2 - 0.1, yT - 1.7, -0.25, s2 + 0.1, yT - 0.25, 0, { detail: true }); }
-    K.box(C, u0 - 0.1, yT - 0.25, v0 - 0.1, u1 + 0.1, yT, v1 + 0.1);
+    K.box(CT, u0, g0, v0, u1, yT - 0.6, v1);
+    const IVY = ivyMat(); const ring = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); K.rbox(R, IVY, -0.02, g0 + 0.4, 0, R.L + 0.02, yT - 0.75 - 0.25 * (i % 2), 0.12); }
+    for (let i = 0; i < 4; i++) { const R = K.run(ring[(i + 1) % 4], ring[i]); for (let y = yT - 0.55; y < yT - 0.2; y += 0.14) K.rbox(R, FR, 0.15, y, -0.12, R.L - 0.15, y + 0.06, 0.0, { detail: true }); }
+    K.box(CD, u0 + 0.1, yT - 0.6, v0 + 0.1, u1 - 0.1, yT - 0.2, v1 - 0.1); K.box(C, u0 - 0.1, yT - 0.2, v0 - 0.1, u1 + 0.1, yT, v1 + 0.1);
     colliders.push(rectCol(u0, v0, u1, v1, g0, yT));
   }
 

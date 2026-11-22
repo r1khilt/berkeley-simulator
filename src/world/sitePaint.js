@@ -2,6 +2,7 @@
 // paths, jagged paving). Before the terrain, grass and minimap are built, main.js calls paintSites() to stamp crisp,
 // straight-edged surfaces into the decoded ground SDF (and clear brick/granite specials under them).
 // Entry: { type: 'paved'|'lawn'|'dirt'|'natural', pts: [[x, z], ...] } in world metres; later entries win.
+// 'lawn' only replaces dirt/natural ground (the existing paths and roads stay); the others overwrite everything.
 // SDF channels: 0 asphalt, 1 paved, 2 grass, 3 dirt; byte = (d/6 + 0.5)*255, d = signed metres (+ inside).
 const CH = { paved: 1, lawn: 2, dirt: 3 };
 
@@ -28,19 +29,28 @@ export const SITES = [
   // Glade / Doe) and the lawn south of the main east-west walk
   { type: 'lawn', pts: MF([[51, -36], [84, -36], [84, 31], [51, 31]]) },
   { type: 'lawn', pts: MF([[-50, 43], [7, 45], [8, 84], [-50, 84]]) },
+  // the planted west slope under the big trees and the west lawn (dirt bands along its walks), the strip along Doe's
+  // west front and the strip east of California Hall: lawn instead of bare forest floor (paths stay)
+  { type: 'lawn', pts: MF([[-84, -44], [-31.5, -44], [-31.5, 44], [-84, 44]]) },
+  { type: 'lawn', pts: MF([[53, 31], [74, 31], [74, 96], [50, 96], [50, 62]]) },
+  { type: 'lawn', pts: MF([[33.5, 46], [44, 46], [44, 112], [33.5, 112]]) },
+  { type: 'lawn', pts: MF(rect(-31.5, 25.6, -6, 41)) }, // under the big tree south-west of the entrance
   // north-south promenade east of the deck (8 m), bending south-west into the plaza at the south-east corner
   { type: 'paved', pts: MF(band([[56, -40], [55.5, -8], [54.5, 20], [49, 34], [46, 48], [44, 62]], 4.0)) },
+  { type: 'paved', pts: MF([[50.2, -18], [55, -18], [55, 12.5], [50.2, 12.5]]) }, // no lawn sliver against the deck edge / east steps
   // walk from the deck's broad east steps out to the Glade paths
   { type: 'paved', pts: MF(band([[50, 0], [62, 0], [72, -3]], 3.2)) },
   // the main east-west walk south of the building (OSM w/22016926), straightened
   { type: 'paved', pts: MF(band([[60, 34.5], [38.5, 36.4], [30, 39.6], [6.5, 42.2], [-18.4, 41.6], [-37.4, 39.6], [-50, 40]], 3.0)) },
   // entrance forecourt: one continuous plaza from the doors to the walk, and the plaza at the south-east corner
-  { type: 'paved', pts: MF([[-6, 24.5], [17, 24.5], [17, 27], [36, 27], [44, 30], [52, 31], [52, 44], [30, 42.5], [-6, 41]]) },
+  { type: 'paved', pts: MF([[-6, 24.5], [17, 24.5], [17, 23.4], [30.2, 23.4], [30.2, 12], [53, 12], [53, 44], [30, 42.5], [-6, 41]]) }, // + café plaza under the deck edge
   // south-west and south footways (OSM w/24026038, w/38939533)
   { type: 'paved', pts: MF(band([[-6, 38], [-18.4, 42.1], [-23.7, 50], [-32.1, 60.8], [-37, 67]], 1.6)) },
   { type: 'paved', pts: MF(band([[6.5, 41], [7.1, 75], [8.1, 84]], 1.6)) },
-  // planting bed with the two big trees at the south-east corner (crisp edge; mulch)
-  { type: 'dirt', pts: MF(rect(17.5, 27.5, 31, 33.5)) },
+  // lawn bed with the two big trees at the south-east corner, and mulched tree pits for the LiDAR trees that stand in
+  // the paved plaza (they grew straight out of the concrete)
+  { type: 'lawn', pts: MF(rect(17.5, 27.5, 31, 33.5)) },
+  ...[[47, 16], [41, 16], [39, 42], [37, 45], [42, 48]].map(([u, v]) => ({ type: 'dirt', pts: MF(rect(u - 1.1, v - 1.1, u + 1.1, v + 1.1)) })),
 ];
 
 // signed distance from (x, z) to polygon P (positive inside)
@@ -67,7 +77,10 @@ export function paintSites(sdf, gt, x0, z0, special = null, sites = SITES) {
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
       const d = sdPoly(P, x0 + (j + 0.5) * st, z0 + (i + 0.5) * st); if (d < -3) continue;
       const k = (i * nx + j) * 4, ein = enc(d), eout = enc(-d);
-      for (let c = 0; c < 4; c++) sdf[k + c] = c === ch ? Math.max(sdf[k + c], ein) : Math.min(sdf[k + c], eout);
+      for (let c = 0; c < 4; c++) {
+        if (c === ch) sdf[k + c] = Math.max(sdf[k + c], ein);
+        else if (s.type !== 'lawn' || c === 3) sdf[k + c] = Math.min(sdf[k + c], eout); // lawn only replaces dirt: existing paths stay on top
+      }
     }
     if (special && gt.snx) { // 1 m special ids (brick/granite pavers, turf) are cleared under painted surfaces
       const snx = gt.snx, snz = gt.snz;
