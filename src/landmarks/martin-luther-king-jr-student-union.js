@@ -17,6 +17,15 @@ export const info = {
   replaces: ['w/24025428'],
 };
 
+// r4-sweep: expanded-metal mesh (diamond strands, see-through gaps); mipmaps average it to a light, ~60 % opaque grey
+function meshPanelMat() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(178,183,187,0.55)'; g.fillRect(0, 0, 64, 64); // low strand/gap contrast: no checkerboard aliasing at distance
+  g.strokeStyle = 'rgba(204,208,211,1)'; g.lineWidth = 6; g.lineCap = 'square';
+  for (const [x0, y0, x1, y1] of [[0, 32, 32, 0], [32, 0, 64, 32], [64, 32, 32, 64], [32, 64, 0, 32]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return new THREE.MeshStandardMaterial({ map: t, color: 0xb9bdc0, metalness: 0.35, roughness: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide, name: 'mlkMesh' });
+}
 const FONT = { A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'], B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'], D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
   E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'], G: ['01110', '10000', '10000', '10111', '10001', '10001', '01110'], H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
   I: ['111', '010', '010', '010', '010', '010', '111'], J: ['00111', '00010', '00010', '00010', '00010', '10010', '01100'], K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
@@ -42,7 +51,8 @@ export async function build(ctx) {
   const alu = tinted(M.iron, 0xb8bbbc, { metalness: 0.7, roughness: 0.35 });
   const mesh = tinted(M.iron, 0x9c9fa0, { metalness: 0.75, roughness: 0.4, transparent: true, opacity: 0.55 });
   const champ = tinted(M.iron, 0xc9b98f, { metalness: 0.7, roughness: 0.4 });
-  const blueGlass = tinted(M.windowNight, 0x2c4672);
+  const blueGlass = tinted(M.windowNight, 0x46566a); // r4-sweep: was saturated navy 0x2c4672 (read as flat blue paint next to the terracotta)
+  const wingGlass = tinted(M.windowNight, 0x5d6a72); // r4-sweep: west wing upper glazing (photo: mid-grey, rooms visible)
   const pv = tinted(M.glass, 0x1d2a3d, { metalness: 0.5, roughness: 0.25 });
   const sGlass = tinted(M.glassLight, 0x55666e, { opacity: 0.5 });
   const warm = tinted(M.stucco, 0xe9d2a8);
@@ -151,7 +161,18 @@ export async function build(ctx) {
     const fins = Math.round(R.L / 1.5);
     K.rbox(R, buff, 0, 9.3, -0.3, R.L, TOP - 0.1, -0.15);
     for (let i = 0; i <= fins; i++) { const s = i * R.L / fins; K.rbox(R, alu, s - 0.04, 9.6, -0.15, s + 0.04, TOP - 0.2, 0.35, { detail: i % 4 !== 0 }); }
-    K.rbox(R, mesh, 0.2, 10.2, 0.18, R.L - 0.2, TOP - 0.6, 0.2);
+    // r4-sweep: framed expanded-metal panels between the fins (photo: light galvanised mesh in thin frames, 40-60 % see-
+    // through, lighter than the glazing) instead of one dark see-through slab that read as a blank billboard
+    { const meshM = meshPanelMat(); const tiers = [[10.2, 15.35], [15.55, TOP - 0.6]];
+      for (let i = 0; i < fins; i++) {
+        const a = i * R.L / fins + 0.07, b = (i + 1) * R.L / fins - 0.07;
+        for (const [y0, y1] of tiers) {
+          const pg = new THREE.PlaneGeometry(b - a, y1 - y0); const uv = pg.attributes.uv;
+          for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * (b - a) / 0.36, uv.getY(k) * (y1 - y0) / 0.36);
+          pg.translate((a + b) / 2, (y0 + y1) / 2, 0.24); K.addRun(R, meshM, pg, { uvMode: 'keep' });
+          for (const [s0, q0, s1, q1] of [[a, y0, b, y0 + 0.06], [a, y1 - 0.06, b, y1], [a, y0, a + 0.05, y1], [b - 0.05, y0, b, y1]]) K.rbox(R, alu, s0, q0, 0.2, s1, q1, 0.28, { detail: true });
+        }
+      } }
     for (let k = 0; k < 6; k++) { const s0 = 3 + k * 9.4; glassBand(K, R, s0, s0 + 3.0, 13.6, 17.0, { glass: blueGlass, frame, pitch: 1.5, rec: -0.12 }); }
     // west wing: north part 13.5 m, south part 9.5 m with roof terrace
     const w0 = -25.4, wN = -26.0, wM = -4.0, wS = 22.0;
@@ -175,7 +196,10 @@ export async function build(ctx) {
             glassBand(K, Rw, s0, Rw.L, gw, 4.6, { glass: glassIn, frame: alu, pitch: 1.5, transoms: [2.6] }); }
           K.rbox(Rw, M.whitePaint, -0.1, 4.6, -0.3, Rw.L + 0.1, 5.8, 0.05);
         }
-        if (!internal || h > 10) glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: blueGlass, frame, pitch: 1.5, rec: 0.6, transoms: h > 10 ? [9.4] : [] });
+        // r4-sweep: the wing's upper curtain wall read as one featureless dark-navy box; photo: mid-grey reflective glass
+        // with the rooms visible, thin dark mullions and a thin cantilevered sunshade at the top of the floor
+        if (!internal || h > 10) { glassBand(K, Rw, 0, Rw.L, 5.8, h - 0.4, { glass: wingGlass, frame, pitch: 1.5, rec: 0.35, transoms: h > 10 ? [9.4] : [] });
+          if (!internal) { K.rbox(Rw, conc, -0.3, h - 0.62, 0.0, Rw.L + 0.3, h - 0.4, 1.25); K.rbox(Rw, M.concreteDark, -0.3, h - 0.64, 1.15, Rw.L + 0.3, h - 0.36, 1.27); } }
         // colliders: outer walls with door gaps (lintel above), the taller north block's face above the south roof
         if (internal) { if (h > 10) colliders.push(K.colPoly([a, b], NI.ceil + 0.1, h)); continue; }
         let s0 = 0; for (const d of doors) { colliders.push(K.colPoly([Rw.at(s0), Rw.at(d - 1.3)], -2, h), K.colPoly([Rw.at(d - 1.3), Rw.at(d + 1.3)], 2.65, h)); s0 = d + 1.3; }
@@ -209,6 +233,7 @@ export async function build(ctx) {
   }
   const object3d = K.finish();
   object3d.name = 'martin-luther-king-jr-student-union';
+  object3d.traverse((o) => { if (o.isMesh && o.material && o.material.name === 'mlkMesh') o.castShadow = false; }); // r4-sweep: see-through mesh casts no solid shadow
   // interiors-cafe: furnished, walkable Lower Sproul dining room / food court + Cal Student Store frontage (distance-gated)
   const IN = mlkInterior(ctx, { ANG, floor: FLR, sGlass, frame, alu });
   object3d.add(IN.object3d); colliders.push(...IN.colliders); walkables.push(...IN.walkables);

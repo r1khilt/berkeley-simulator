@@ -56,6 +56,7 @@ export async function build(ctx) {
   const gMin = Math.min(...Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return groundAt(cx + RIM_OUT * Math.cos(a), cz + RIM_OUT * Math.sin(a)); }));
   const gMax = Math.max(...Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return groundAt(cx + (RIM_OUT + 1.1) * Math.cos(a), cz + (RIM_OUT + 1.1) * Math.sin(a)); }));
   const main = new Bucket(boxUV);
+  // r4-sweep: rim colour kept (a cool grey matched the photo but merged with the grey paving in-game)
   const rimMat = M.concrete.clone(); rimMat.color.set(0xd8cab2); rimMat.roughness = 0.88; rimMat.name = 'ludwigConcrete';
   const stainMat = M.concrete.clone(); stainMat.color.set(0xa99d89); stainMat.name = 'ludwigStain';
   // ring with eased (rounded) arrises on both top edges; outer face runs 1 m below grade so it never floats on the slope
@@ -79,9 +80,10 @@ export async function build(ctx) {
 
   // animated water surface: clear and pale so the basin floor shows through, with ripples spreading from each jet
   const waterMat = M.water.clone();
-  waterMat.name = 'ludwigWater'; waterMat.color.set(0x8fa6aa); waterMat.transparent = true; waterMat.opacity = 0.62; waterMat.depthWrite = false;
-  // r4-campanile: deeper teal body + sharper reflections so the pool reads as water, not a pale disc (was 0x8fa6aa @ 0.62)
-  waterMat.color.set(0x48737c); waterMat.opacity = 0.78; waterMat.roughness = 0.07; waterMat.envMapIntensity = 0.6; // sky-only env: tame grazing glare
+  // r4-sweep: deeper, more reflective water (photo: dark, mirrors sky and trees); the pale 0.62-opacity surface read as a
+  // solid white floor from eye level. The basin floor still shows faintly near the rim.
+  waterMat.name = 'ludwigWater'; waterMat.color.set(0x3e555b); waterMat.transparent = true; waterMat.opacity = 0.86; waterMat.depthWrite = false;
+  waterMat.roughness = 0.07; waterMat.envMapIntensity = 0.65; // merged r4-campanile + r4-sweep tweaks: // the sky-only env map at grazing angles still mirrored the bright sky as a white sheet
   waterMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRipXZ;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRipXZ = position.xz;');
@@ -105,7 +107,8 @@ export async function build(ctx) {
   const foamMat = new THREE.MeshStandardMaterial({ color: 0xeef3f2, emissive: 0x8a9496, emissiveIntensity: 0.2, roughness: 0.6, transparent: true, opacity: 0.7, depthWrite: false });
   foamMat.name = 'ludwigFoam';
   const jets = new THREE.Group(); jets.userData.detail = true; jets.name = 'ludwig-jets';
-  const jetGeo = new THREE.LatheGeometry([[0.06, 0], [0.045, 0.1], [0.03, 0.25], [0.022, 0.38], [0.028, 0.45], [0.018, 0.5], [0.001, 0.52]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
+  // r4-sweep: fatter, shorter aerated columns (thin 0.5 m spikes read as a ring of white candles)
+  const jetGeo = new THREE.LatheGeometry([[0.12, 0], [0.095, 0.08], [0.07, 0.2], [0.055, 0.3], [0.065, 0.36], [0.04, 0.41], [0.001, 0.44]].map(([r, y]) => new THREE.Vector2(r, y)), 12);
   const boilGeo = new THREE.SphereGeometry(0.16, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.35, 1);
   const jm2 = []; for (let i = 0; i < NJ; i++) { const a = (i / NJ) * Math.PI * 2 + 0.2; jm2.push(trs(cx + RJ * Math.cos(a), WATER_Y, cz + RJ * Math.sin(a))); }
   jets.add(instanced(jetGeo, sprayMat, jm2, null, { detail: true, shadow: false }));

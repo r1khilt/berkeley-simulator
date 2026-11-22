@@ -247,7 +247,9 @@ export async function build(ctx) {
     if (u > FB.u0 && u < FB.u1 && v > FB.v0 && v < FB.vF) return FB.yT + 0.13;  // frieze terrace
     return g(u, v);
   };
-  buildUmbrellas(K, F, { top: roofTop, soffit: white, soffit2: white2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.3, rimUp: 0.2, rimW: 0.15, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv) });
+  // r4-sweep: soffits in light board-marked concrete (the untextured white paint read as raw blockout from spawn)
+  const sofC = tone(M.concrete, 0xe8e4dc), sofC2 = tone(M.concrete, 0xd8d3c9);
+  buildUmbrellas(K, F, { top: roofTop, soffit: sofC, soffit2: sofC2, fascia: white, col: colWhite, thick: TH, thickC: 0.4, colR: 0.3, rimUp: 0.2, rimW: 0.15, lamp: M.lampGlow, colBase, skipCol: (q) => inBody(q.cu, q.cv) });
 
   // rooftop mechanical equipment and a small penthouse (LiDAR 12.9–15.0 m)
   const mech = tinted(M.concrete, 0xd0d0cc);
