@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><title>player avatar harness</title><style>html,body{margin:0;background:#9db4c8}canvas{display:block}</style></head>
+<body><script type="module">
+// r5-avatar dev harness: the player Avatar on a test course (flat, stairs up/down, a ledge) driven by a small copy of the
+// player controller, seen from the chase camera. window.run(script) simulates; window.shot() renders. ?avatar=old = before.
+import * as THREE from 'three';
+import { Avatar, Bike } from '/src/player/avatar.js';
+const qs = new URLSearchParams(location.search);
+const W = +(qs.get('w') || 960), H = +(qs.get('h') || 540);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setSize(W, H); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9c1d6); scene.fog = new THREE.Fog(0xa9c1d6, 30, 90);
+scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x7a6a55, 1.3)); const sun = new THREE.DirectionalLight(0xfff1dc, 2.8); sun.position.set(-8, 14, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 50 }); scene.add(sun); scene.add(sun.target);
+// ground: paving grid so foot sliding is visible
+const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'); x.fillStyle = '#b7aa98'; x.fillRect(0, 0, 256, 256); x.strokeStyle = '#8f846f'; x.lineWidth = 3; for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, 256); x.stroke(); x.beginPath(); x.moveTo(0, i * 64); x.lineTo(256, i * 64); x.stroke(); }
+const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(50, 50); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+// stairs up (z -8 .. -10.56), platform to z -16, stairs down to z -18.56; a 1 m ledge at x 6
+const STEP_H = 0.16, STEP_D = 0.32, NST = 8, Z0 = -8;
+const stoneM = new THREE.MeshStandardMaterial({ color: 0xc9c0b2, roughness: 0.9 });
+for (let i = 0; i < NST; i++) { const h = STEP_H * (i + 1); const m = new THREE.Mesh(new THREE.BoxGeometry(4, h, STEP_D), stoneM); m.position.set(0, h / 2, Z0 - STEP_D * (i + 0.5)); m.castShadow = m.receiveShadow = true; scene.add(m); }
+const topZ0 = Z0 - STEP_D * NST, topZ1 = topZ0 - 5.5, TOPH = STEP_H * NST;
+{ const m = new THREE.Mesh(new THREE.BoxGeometry(4, TOPH, topZ0 - topZ1), stoneM); m.position.set(0, TOPH / 2, (topZ0 + topZ1) / 2); m.castShadow = m.receiveShadow = true; scene.add(m); }
+for (let i = 0; i < NST; i++) { const h = TOPH - STEP_H * (i + 1); if (h <= 0) continue; const m = new THREE.Mesh(new THREE.BoxGeometry(4, h, STEP_D), stoneM); m.position.set(0, h / 2, topZ1 - STEP_D * (i + 0.5)); m.castShadow = m.receiveShadow = true; scene.add(m); }
+const groundAt = (px, pz, maxY = Infinity) => { let y = 0;
+  if (Math.abs(px) < 2) { if (pz <= Z0 && pz > topZ0) { const i = Math.min(NST - 1, Math.floor((Z0 - pz) / STEP_D)); y = STEP_H * (i + 1); } else if (pz <= topZ0 && pz > topZ1) y = TOPH; else if (pz <= topZ1 && pz > topZ1 - STEP_D * NST) { const i = Math.floor((topZ1 - pz) / STEP_D); y = TOPH - STEP_H * (i + 1); } }
+  return { y: y <= maxY ? y : 0, on: null }; };
+const camera = new THREE.PerspectiveCamera(+(qs.get('fov') || 60), W / H, 0.05, 300);
+// ---- a small copy of the player controller (walk / bike / fly) around the real Avatar
+const av = new Avatar({}); scene.add(av.root);
+const bike = new Bike(); bike.root.visible = false; scene.add(bike.root);
+const P = window.P = { pos: new THREE.Vector3(0, 0, 14), vel: new THREE.Vector3(), yaw: 0, camYaw: 0, camPitch: -0.12, camDist: +(qs.get('dist') || 3.2), onGround: true, airTime: 0, mode: 'walk', view: 'third', avatar: av, bike, pedal: 0, bikeSpeed: 0, bikeDist: 0, lean: 0, ph: { groundAt }, speed: 0 };
+let inp = { f: 0, s: 0, speed: 4.2, jump: false, turn: 0 };
+function step(dt) {
+  const fwd = new THREE.Vector3(-Math.sin(P.camYaw), 0, -Math.cos(P.camYaw)), right = new THREE.Vector3(Math.cos(P.camYaw), 0, -Math.sin(P.camYaw));
+  P.camYaw += inp.turn * dt;
+  if (P.mode === 'walk') {
+    const want = new THREE.Vector3().addScaledVector(fwd, inp.f).addScaledVector(right, inp.s).multiplyScalar(inp.speed); const a = P.onGround ? 14 : 3;
+    P.vel.x += THREE.MathUtils.clamp(want.x - P.vel.x, -a * dt, a * dt); P.vel.z += THREE.MathUtils.clamp(want.z - P.vel.z, -a * dt, a * dt);
+    const hs = Math.hypot(P.vel.x, P.vel.z); if (hs > 0.3) { const ty = Math.atan2(-P.vel.x, -P.vel.z); let d = ty - P.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); P.yaw += d * Math.min(1, dt * 10); }
+    if (inp.jump && P.onGround) { P.vel.y = 6.6; P.onGround = false; inp.jump = false; }
+    P.vel.y -= 22 * dt; const nx = P.pos.x + P.vel.x * dt, nz = P.pos.z + P.vel.z * dt; let ny = P.pos.y + P.vel.y * dt;
+    const g = groundAt(nx, nz, P.pos.y + 0.65);
+    if (ny <= g.y + 0.02 || (P.onGround && P.vel.y <= 0 && ny - g.y < 0.7)) { ny = g.y; P.vel.y = 0; P.onGround = true; P.airTime = 0; } else { P.onGround = false; P.airTime += dt; }
+    P.pos.set(nx, ny, nz); P.speed = hs;
+  } else if (P.mode === 'bike') {
+    P.bikeSpeed += THREE.MathUtils.clamp(inp.speed * inp.f - P.bikeSpeed, -3 * dt, 3 * dt); P.yaw += inp.s * -0.6 * dt; P.lean += (inp.s * 0.2 - P.lean) * Math.min(1, dt * 5);
+    P.vel.set(-Math.sin(P.yaw) * P.bikeSpeed, 0, -Math.cos(P.yaw) * P.bikeSpeed); P.pos.addScaledVector(P.vel, dt); P.bikeDist += P.bikeSpeed * dt; P.pedal += (P.bikeSpeed / 0.34) * dt * 0.45; P.camYaw += (P.yaw - P.camYaw) * Math.min(1, dt * 3); P.speed = P.bikeSpeed;
+  } else if (P.mode === 'fly') {
+    const want = new THREE.Vector3().addScaledVector(fwd, inp.f).multiplyScalar(inp.speed); want.y = inp.up || 0; P.vel.lerp(want, Math.min(1, dt * 4)); P.pos.addScaledVector(P.vel, dt); if (P.pos.y < 0.3) P.pos.y = 0.3;
+    if (Math.hypot(P.vel.x, P.vel.z) > 0.5) P.yaw = Math.atan2(-P.vel.x, -P.vel.z); P.onGround = false; P.speed = P.vel.length();
+  }
+  av.root.position.copy(P.pos); av.root.rotation.set(0, P.yaw, 0);
+  if (P.mode === 'fly') { const sp = Math.hypot(P.vel.x, P.vel.z); av.root.rotation.set(-0.6 * Math.min(1, sp / 30), P.yaw, 0, 'YXZ'); } // as the controls branch does
+  av.pedal = P.pedal; av.animate(dt, P.speed, P.onGround, P.mode);
+  bike.root.visible = P.mode === 'bike';
+  if (P.mode === 'bike') { bike.root.position.copy(P.pos); bike.root.rotation.set(0, P.yaw, P.lean); av.root.rotation.z = P.lean; av.root.position.y += 0.38; av.root.position.addScaledVector(new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), -0.12); bike.animate(P.bikeDist, P.pedal); }
+  av.finalize && av.finalize(dt, P);
+}
+function chase() { // player.js third-person camera
+  const head = new THREE.Vector3(P.pos.x, P.pos.y + (P.mode === 'bike' ? 1.75 : 1.6), P.pos.z); const target = head.clone().add(new THREE.Vector3(0, 0.25, 0));
+  const dist = P.mode === 'fly' ? Math.max(P.camDist, 6) : P.camDist;
+  const dir = new THREE.Vector3(Math.sin(P.camYaw) * Math.cos(P.camPitch), -Math.sin(P.camPitch), Math.cos(P.camYaw) * Math.cos(P.camPitch));
+  camera.position.copy(target).addScaledVector(dir, dist); camera.lookAt(target);
+  sun.position.set(P.pos.x - 8, 14, P.pos.z + 6); sun.target.position.copy(P.pos); sun.target.updateMatrixWorld();
+}
+window.camOverride = null;
+window.render = () => { chase(); if (window.camOverride) { const c = window.camOverride; camera.position.set(P.pos.x + c[0], P.pos.y + c[1], P.pos.z + c[2]); camera.lookAt(P.pos.x + c[3], P.pos.y + c[4], P.pos.z + c[5]); } renderer.render(scene, camera); };
+window.sim = (sec, dt = 1 / 60) => { for (let t = 0; t < sec - 1e-6; t += dt) step(dt); };
+window.setInput = (o) => Object.assign(inp, o);
+window.setMode = (m) => { P.mode = m; if (m === 'bike') P.bikeSpeed = Math.hypot(P.vel.x, P.vel.z); };
+window.reset = (x = 0, z = 14, yaw = 0) => { P.pos.set(x, groundAt(x, z).y, z); P.vel.set(0, 0, 0); P.yaw = yaw; P.camYaw = yaw; P.mode = 'walk'; P.onGround = true; inp = { f: 0, s: 0, speed: 4.2, jump: false, turn: 0 }; };
+window.av = av; window.THREE = THREE;
+// wait for the skinned body (or give up after 15 s and show the proxy)
+const t0 = performance.now(); while (qs.get('avatar') !== 'old' && !av.body && performance.now() - t0 < 15000) await new Promise((r) => setTimeout(r, 100));
+step(1 / 60); window.render(); window.ready = true;
+</script></body></html>

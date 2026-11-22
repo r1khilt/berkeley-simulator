@@ -116,6 +116,7 @@ export class Player {
     if (this.mode === 'bike') { this.bike.root.position.copy(this.pos); this.bike.root.rotation.set(0, this.yaw, this.lean); av.root.rotation.z = this.lean; av.root.position.y += 0.38; av.root.position.addScaledVector(new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)), -0.12); this.bike.animate(this.bikeDist, this.pedal); }
     av.root.visible = this.view === 'third' || this.mode === 'fly';
     if (plugin && plugin.pose) plugin.pose(this, av, dt);
+    av.finalize && av.finalize(dt, this); // r5-avatar: retarget proxy pose to the skinned body
     this.speed = speedNow;
     this._camera(dt);
     // interactions

@@ -190,6 +190,7 @@ async function boot() {
   // ---- player
   const physicsPlayer = new Player({ scene, camera, physics, dom: canvas, look: store.get('look', {}) });
   const player = physicsPlayer; BS.player = player;
+  player.avatar.setup = setupMaterials; // r5-avatar: the skinned player body loads async; give it the CSM/AO material setup
   player.sens = settings.sens; player.invertY = settings.invertY;
   setupMaterials(scene);
   const lm = new LandmarkManager({ scene, physics, heightAt, manifest, standins: bres.standinMgr, setupMaterials,
