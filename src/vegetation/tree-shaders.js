@@ -117,6 +117,18 @@ const VARY_VERT_MAIN = /* glsl */`
 }
 `;
 
+// r4-trees2: LOD cross-fade. aLodFade (per instance, set by TreeSystem): 0 = solid, t > 0 = fading in (keeps the
+// pixels whose dither value is < t), -t = fading out (keeps the complementary pixels), so during a switch the two
+// LODs together cover every pixel exactly once and nothing pops. Interleaved-gradient-noise dither.
+const LODFADE_VERT = 'attribute float aLodFade;\nflat varying float vLodFade;\n';
+const LODFADE_FRAG = 'flat varying float vLodFade;\n';
+const LODFADE_DISCARD = '\n if ( vLodFade != 0.0 ) { float lodH = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ); if ( vLodFade > 0.0 ? lodH >= vLodFade : lodH < -vLodFade ) discard; }\n';
+function lodFade(sh) { // patch a compiled shader (call after the material's own replacements)
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + LODFADE_VERT).replace('#include <begin_vertex>', '#include <begin_vertex>\nvLodFade = aLodFade;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + LODFADE_FRAG).replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>' + LODFADE_DISCARD);
+}
+const noFadeAttr = (m) => { m.defaultAttributeValues = { ...(m.defaultAttributeValues || {}), aLodFade: [0] }; return m; }; // geometries without the attribute draw solid
+
 const NORMAL_NOFLIP = THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', '');
 
 const TRANSLUCENT = /* glsl */`
@@ -184,9 +196,10 @@ export function patchLeaf(mat, uni) {
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * (1.0 - uNight); // light transmitted through the canopy: shaded crown interiors stay readable green');
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
+    lodFade(sh); // r4-trees2
   };
-  mat.customProgramCacheKey = () => 'tree-leaf-6';
-  return mat;
+  mat.customProgramCacheKey = () => 'tree-leaf-7';
+  return noFadeAttr(mat);
 }
 
 export function patchBark(mat, uni) {
@@ -221,9 +234,10 @@ export function patchBark(mat, uni) {
       .replace('#include <common>', '#include <common>\nvarying float vPx;\nvarying float vBarkTone;\n')
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vPx < 0.75) discard; // sub-pixel twig')
       .replace('#include <color_fragment>', 'diffuseColor.rgb *= vBarkTone;'); // bark ignores the foliage tint (per-tree tone only)
+    lodFade(sh); // r4-trees2
   };
-  mat.customProgramCacheKey = () => 'tree-bark-6';
-  return mat;
+  mat.customProgramCacheKey = () => 'tree-bark-7';
+  return noFadeAttr(mat);
 }
 
 // far LOD: untextured, vertex attributes aLeaf (1 crown / 0 trunk) and aAO; colour from the same ramp as the leaves
@@ -243,9 +257,10 @@ export function patchBlob(mat, uni) {
   diffuseColor.rgb *= mix( uTwigCol, bc, vLeaf ) * vAO;
 `);
     sh.uniforms.uNight = U.uNight; sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
+    lodFade(sh); // r4-trees2
   };
-  mat.customProgramCacheKey = () => 'tree-blob-4';
-  return mat;
+  mat.customProgramCacheKey = () => 'tree-blob-5';
+  return noFadeAttr(mat);
 }
 
 // shadow-pass materials: same wind; alpha test with the same coverage boost (map/alphaTest are copied from
@@ -260,9 +275,10 @@ export function makeDepthMaterials(uni, leafy) {
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <alphatest_pars_fragment>', '#include <alphatest_pars_fragment>\n' + MIPBOOST)
         .replace('#include <alphatest_fragment>', '#if defined( USE_ALPHATEST ) && defined( USE_MAP )\n diffuseColor.a *= leafMipBoost( vMapUv );\n#endif\n#include <alphatest_fragment>');
+      lodFade(sh); // r4-trees2
     };
-    m.customProgramCacheKey = () => key;
-    return m;
+    m.customProgramCacheKey = () => key + '-f';
+    return noFadeAttr(m);
   };
   return {
     depth: patch(new THREE.MeshDepthMaterial(), leafy ? 'tree-depth-leaf-4' : 'tree-depth-4'),
@@ -350,9 +366,10 @@ export function patchPuff(mat, uni, puffP) {
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += material.diffuseContribution * vec3(0.9, 1.0, 0.95) * 0.3 * (1.0 - uNight);');
     sh.uniforms.uNight = U.uNight;
     sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader;
+    lodFade(sh); // r4-trees2
   };
-  mat.customProgramCacheKey = () => 'tree-puff-4';
-  return mat;
+  mat.customProgramCacheKey = () => 'tree-puff-5';
+  return noFadeAttr(mat);
 }
 // shadow-pass materials for puffs: the billboard faces the shadow camera (i.e. the sun), so each puff casts a round,
 // leafy shadow the size of the ball
@@ -369,9 +386,10 @@ export function makePuffDepthMaterials(uni, puffP) {
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec2 vCorner;\nvarying vec3 vSphN;\nvarying float vNearFade;\n')
         .replace('#include <alphatest_fragment>', 'if ( dot( vCorner, vCorner ) > 1.0 ) discard;\n if ( fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < 0.2 ) discard; // dappled: real crowns let some sun through\n#include <alphatest_fragment>');
+      lodFade(sh); // r4-trees2
     };
-    m.customProgramCacheKey = () => key;
-    return m;
+    m.customProgramCacheKey = () => key + '-f';
+    return noFadeAttr(m);
   };
   return { depth: patch(new THREE.MeshDepthMaterial(), 'tree-puff-depth-3'), distance: patch(new THREE.MeshDistanceMaterial(), 'tree-puff-dist-3') };
 }
