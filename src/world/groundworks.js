@@ -8,6 +8,7 @@
 //                  coping (replaces streetscape's flat extrusions), road kerbs and path/plaza edging traced from the
 //                  ground SDF per 96 m tile on demand, and tree grates where trees stand in paving.
 //  ?nogw=1 disables both passes (A/B comparisons).
+import { LOD } from '../render/lod.js'; // [r7-lod]
 import * as THREE from 'three';
 import { materials, TEX_M } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
@@ -589,7 +590,8 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
       updateTiles(cp, jump ? 999 : 2); lastCP = { x: cp.x, z: cp.z };
       this._pending = false;
       if (grates) grates.userData.update(cp);
-      for (const m of statics) { const d = Math.hypot(m.position.x - cp.x, m.position.z - cp.z) - 181; m.visible = d < (m.userData.detail ? 120 : 380); }
+      const rS = LOD.on ? Math.min(380, LOD.distFor(1.0, 1.5)) : 380, rD = LOD.on ? Math.min(120, LOD.distFor(0.3, 1.5)) : 120; // [r7-lod] steps/walls (~1 m) and rails (~0.3 m) stop at ~1.5 px
+      for (const m of statics) { const d = Math.hypot(m.position.x - cp.x, m.position.z - cp.z) - 181; m.visible = d < (m.userData.detail ? rD : rS); }
     },
   };
 }

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { U, materials, boxUV } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
+import { LOD, clusterSimplify } from '../render/lod.js'; // [r7-lod] far prop geometry
 
 // ---------- distance-limited instancing for many props
 // [r6-perf] view-frustum selection for scattered props: the frustum is widened (FOV +36 deg) so a turn between refreshes
@@ -23,6 +24,11 @@ export class Scatter {
       const im = new THREE.InstancedMesh(p.geometry, p.material, cap); im.count = 0; im.frustumCulled = false; im.castShadow = this.castShadow; im.receiveShadow = true;
       if (p.depthMaterial) im.customDepthMaterial = p.depthMaterial; if (p.distanceMaterial) im.customDistanceMaterial = p.distanceMaterial;
       im.name = 'prop:' + this.name; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); group.add(im); this.meshes.push(im);
+      // [r7-lod] far twin with vertex-clustered geometry (null part when clustering wouldn't save much: it then keeps the full mesh)
+      const fg = LOD.on ? clusterSimplify(p.geometry, 8) : null; let fm = null;
+      if (fg) { fm = new THREE.InstancedMesh(fg, p.material, cap); fm.count = 0; fm.frustumCulled = false; fm.castShadow = this.castShadow; fm.receiveShadow = true; if (p.depthMaterial) fm.customDepthMaterial = p.depthMaterial; if (p.distanceMaterial) fm.customDistanceMaterial = p.distanceMaterial; fm.name = 'prop:' + this.name + ':far'; fm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); group.add(fm); }
+      (this.far || (this.far = [])).push(fm);
+      if (!p.geometry.boundingBox) p.geometry.computeBoundingBox(); const bb = p.geometry.boundingBox; this.size = Math.max(this.size || 0, bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
     }
     this.cap = cap;
   }
@@ -31,10 +37,16 @@ export class Scatter {
     // [r6-perf] beyond NEAR_KEEP m only props inside a widened view frustum are drawn (props behind the camera cost
     // vertices in the main pass and in every shadow cascade); near props stay so their shadows still fall into view
     const nk2 = SCATTER_NEAR_KEEP * SCATTER_NEAR_KEEP;
-    for (let i = 0; i < it.length && k < this.cap; i++) { const dx = it[i][0] - cp.x, dz = it[i][2] - cp.z, dd = dx * dx + dz * dz; if (dd > d2) continue;
+    // [r7-lod] past the distance where one clustering cell (size / 8) shrinks to ~1.5 px, instances use the far twins
+    const fd = this.far && this.far.some(Boolean) && LOD.on ? LOD.distFor((this.size || 1) / 8, 1.5) : Infinity, fd2 = fd * fd; let kf = 0;
+    for (let i = 0; i < it.length && k + kf < this.cap; i++) { const dx = it[i][0] - cp.x, dz = it[i][2] - cp.z, dd = dx * dx + dz * dz; if (dd > d2) continue;
       if (fr && dd > nk2) { _sp.center.set(it[i][0], it[i][1] + 2, it[i][2]); _sp.radius = 6 * (it[i][4] || 1); if (!fr.intersectsSphere(_sp)) continue; }
+      if (dd > fd2) { for (let j = 0; j < this.meshes.length; j++) (this.far[j] || this.meshes[j]).instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), (this.far[j] ? kf : this.cap - 1 - kf) * 16); kf++; continue; }
       for (const m of this.meshes) m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), k * 16); k++; }
-    for (const m of this.meshes) { m.count = k; m.instanceMatrix.needsUpdate = true; }
+    for (let j = 0; j < this.meshes.length; j++) { const m = this.meshes[j], f = this.far && this.far[j];
+      if (f) { m.count = k; f.count = kf; f.instanceMatrix.needsUpdate = true; }
+      else { if (kf) m.instanceMatrix.array.copyWithin(k * 16, (this.cap - kf) * 16, this.cap * 16); m.count = k + kf; } // parts without a far twin: far instances packed after the near ones
+      m.instanceMatrix.needsUpdate = true; }
   }
 }
 // nearest segment helper over a set of polylines (spatial hash)

@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { applyInteriorGlass } from './interiors.js'; // furnished rooms behind landmark window glass
 import { weatherLandmark } from './pbr.js'; // r4-sweep-central2: consistent base grime on mixed façades
 import { PROXY_LAYER } from '../render/perf.js'; // [r6-perf] shadow-only proxy layer
+import { lodClassOf } from '../render/lod.js'; // [r7-lod] size classes for fine details
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
@@ -102,9 +103,10 @@ function mergeStatic(root) {
     let p = o, skip = false; while (p && p !== root) { if (p.userData && (p.userData.detail || p.userData.keep)) { skip = true; break; } p = p.parent; }
     if (skip || o.morphTargetInfluences) return;
     const g = o.geometry; const sig = Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
-    const key = o.material.uuid + '|' + sig + '|' + (o.castShadow ? 1 : 0);
-    let L = groups.get(key); if (!L) groups.set(key, (L = { mat: o.material, cast: o.castShadow, items: [] }));
-    L.items.push(o);
+    const lc = lodClassOf(o, inv); // [r7-lod] tiny parts merge separately so they can drop out by projected size
+    const key = o.material.uuid + '|' + sig + '|' + (o.castShadow ? 1 : 0) + '|' + lc;
+    let L = groups.get(key); if (!L) groups.set(key, (L = { mat: o.material, cast: o.castShadow, items: [], lodSize: 0 }));
+    L.items.push(o); L.lodSize = Math.max(L.lodSize, o.userData.lodSize || 0);
   });
   let saved = 0;
   for (const L of groups.values()) {
@@ -114,7 +116,7 @@ function mergeStatic(root) {
     let merged = null; try { merged = mergeGeometries(geos, false); } catch (e) { merged = null; }
     for (const g of geos) if (g !== merged) g.dispose();
     if (!merged) continue;
-    const m = new THREE.Mesh(merged, L.mat); m.castShadow = L.cast; m.receiveShadow = true; root.add(m);
+    const m = new THREE.Mesh(merged, L.mat); m.castShadow = L.cast; m.receiveShadow = true; m.userData.lodSize = L.lodSize; root.add(m); // [r7-lod]
     for (const o of L.items) remove.push(o); saved += L.items.length - 1;
   }
   for (const o of remove) { o.parent && o.parent.remove(o); }

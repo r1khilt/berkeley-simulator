@@ -5,6 +5,7 @@ import { U } from '../materials.js';
 import { PBR, PBR_GLSL, pbrUniforms } from './pbr.js'; // gfx-materials: PBR ground
 import { GROUND_PBR_GLSL } from './pbrGround.js';
 import { GBUF } from './grading.js'; // [r6-fast] post-only alpha marker
+import { LOD } from '../render/lod.js'; // [r7-lod] screen-space error LOD
 
 export const CHUNK = 64;
 const LODS = [64, 32, 16, 8, 4];
@@ -46,7 +47,7 @@ function chunkGeometry(n, size) {
 export class CoreTerrain {
   constructor({ heights, meta, sdf, special, aux, ortho, lampMap }) {
     const c = meta.core, gt = meta.groundTex, ax = meta.aux;
-    this.meta = meta;
+    this.meta = meta; this._H = heights; // [r7-lod] chunk error tables are computed lazily from the graded heights
     this.x0 = c.x0; this.z0 = c.z0; this.nx = c.nx; this.nz = c.nz; this.step = c.step;
     const hTex = new THREE.DataTexture(heights, c.nx, c.nz, THREE.RedFormat, THREE.FloatType);
     hTex.magFilter = hTex.minFilter = THREE.NearestFilter; hTex.needsUpdate = true;
@@ -268,6 +269,7 @@ void groundShade(vec2 w, float dist){
     this._m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     // [r6-perf] same view as last frame -> same chunk list: skip the ~thousands of box tests and the instance re-upload
     if (this._lastVP && this._lastVP.equals(this._m)) return; (this._lastVP || (this._lastVP = new THREE.Matrix4())).copy(this._m);
+    this._errBudget = this.errBudgetMs ?? 2.5; this._errPending = false; // [r7-lod] ms of error tables per frame
     this._frustum.setFromProjectionMatrix(this._m);
     const counts = [0, 0, 0, 0, 0];
     const cp = camera.position; const m = new THREE.Matrix4();
@@ -276,12 +278,52 @@ void groundShade(vec2 w, float dist){
       const dx = Math.max(ch.box.min.x - cp.x, 0, cp.x - ch.box.max.x), dz = Math.max(ch.box.min.z - cp.z, 0, cp.z - ch.box.max.z), dy = Math.max(ch.box.min.y - cp.y, 0, cp.y - ch.box.max.y);
       const d = Math.hypot(dx, dz, dy * 0.5);
       const LD = this.lodDist || LOD_DIST; let l = 0; while (d > LD[l]) l++; // [r6-fast] soft tier passes tighter LOD bands (fewer sub-pixel slivers)
+      if (LOD.on) l = this._errLod(ch, l, d, LD, cp); // [r7-lod] coarser where the surface is smooth enough
       m.makeTranslation(ch.x, 0, ch.z);
       this.meshes[l].setMatrixAt(counts[l]++, m);
     }
     this.meshes.forEach((me, i) => { me.count = counts[i]; me.instanceMatrix.needsUpdate = true; });
     this.stats = counts;
+    if (this._errPending) this._lastVP.elements[0] += 1e-9; // [r7-lod] error tables still filling in: re-select next frame
   }
+  // [r7-lod] Screen-space error LOD. Each chunk lazily gets err[l] = the largest vertical gap (m) between LOD l's
+  // triangles and the full 1 m mesh (a few ms of tables per frame, spread over frames). A chunk takes the coarsest LOD
+  // whose error projects to <= errPx pixels (x LOD.bias), never finer than the old distance band, and inside the old
+  // full-detail band it also stays within errAbs metres, so decals and ribbons laid 4 cm above the ground (road markings,
+  // paving edges) can't be swallowed by a coarser mesh. Flat lawns, plazas and roads go coarse; kerbs, stairs and hill
+  // relief keep their triangles. Skirts (4 m) hide the T-junction gaps, which are bounded by the same error.
+  _errLod(ch, l, d, LD, cp) {
+    let e = ch.err;
+    if (!e) { if (this._errBudget > 0) { const t0 = performance.now(); e = this._chunkErr(ch); this._errBudget -= performance.now() - t0; } else { this._errPending = true; return l; } }
+    const tol = (this.errPx ?? 0.75) * LOD.bias * Math.max(d, 1) / LOD.K;
+    const lim = d < LD[0] ? Math.min(tol, (this.errAbs ?? 0.03) * (LOD.soft ? 1.6 : 1)) : tol;
+    let k = l; while (k < 4 && e[k + 1] <= lim) k++;
+    return k;
+  }
+  _chunkErr(ch) {
+    const H = this._H, nx = this.nx, nz = this.nz, x0 = this.x0 + 0.5 * this.step, z0 = this.z0 + 0.5 * this.step, st = this.step;
+    const hv = this._hv || (this._hv = new Float32Array(65 * 65));
+    for (let i = 0; i <= 64; i++) for (let j = 0; j <= 64; j++) { // same bilinear as coreH() in the vertex shader
+      let fx = (ch.x + j - x0) / st, fz = (ch.z + i - z0) / st; fx = Math.min(Math.max(fx, 0), nx - 1.001); fz = Math.min(Math.max(fz, 0), nz - 1.001);
+      const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, k = iz * nx + ix;
+      hv[i * 65 + j] = (H[k] * (1 - tx) + H[k + 1] * tx) * (1 - tz) + (H[k + nx] * (1 - tx) + H[k + nx + 1] * tx) * tz;
+    }
+    const err = new Float32Array(5);
+    for (let l = 1; l < 5; l++) {
+      const s = 64 / LODS[l]; let mx = err[l - 1];
+      for (let i = 0; i <= 64; i++) for (let j = 0; j <= 64; j++) {
+        const ci = Math.min(LODS[l] - 1, (i / s) | 0), cj = Math.min(LODS[l] - 1, (j / s) | 0), u = (j - cj * s) / s, v = (i - ci * s) / s;
+        const A = hv[ci * s * 65 + cj * s], B = hv[ci * s * 65 + (cj + 1) * s], C = hv[(ci + 1) * s * 65 + cj * s], D = hv[(ci + 1) * s * 65 + (cj + 1) * s];
+        let h; // chunkGeometry's alternating diagonals
+        if ((ci + cj) % 2 === 0) h = u + v <= 1 ? A + (B - A) * u + (C - A) * v : D + (C - D) * (1 - u) + (B - D) * (1 - v);
+        else h = v >= u ? A + (D - C) * u + (C - A) * v : A + (B - A) * u + (D - B) * v;
+        const dv = Math.abs(h - hv[i * 65 + j]); if (dv > mx) mx = dv;
+      }
+      err[l] = mx;
+    }
+    return (ch.err = err);
+  }
+  precomputeLod() { for (const ch of this.chunks) if (!ch.err) this._chunkErr(ch); this._lastVP = null; } // [r7-lod] QA: all tables now
 }
 
 // Mid/far rings: CPU meshes built from a sampler, textured by orthophoto in world space
@@ -342,8 +384,34 @@ uniform sampler2D uTex; uniform vec4 uTexRect; varying vec3 vWP;`).replace('#inc
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
     const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
+    const touches = hole && !(ex <= hole.x0 || tx >= hole.x1 || ez <= hole.z0 || tz >= hole.z1);
+    if (LOD.on && nx >= 8 && nz >= 8 && nx % 2 === 0 && nz % 2 === 0 && !touches) { // [r7-lod] half-resolution twin (+ edge skirts) for far tiles
+      const c = ringCoarse(sample, tx, tz, nx / 2, nz / 2, step * 2, Math.max(skirt, 8));
+      const cm = new THREE.Mesh(c.g, mat); cm.receiveShadow = true; cm.visible = false; group.add(cm);
+      (group.userData.lodTiles || (group.userData.lodTiles = [])).push({ fine: m, coarse: cm, err: c.err, box: g.boundingBox });
+    }
   }
+  // [r7-lod] a far tile shows its half-resolution twin while that twin's height error stays under ~1 px (x LOD.bias)
+  const _cp = new THREE.Vector3();
+  group.userData.updateLod = (cp) => { const T = group.userData.lodTiles; if (!T) return; const k = LOD.K / LOD.bias;
+    for (const t of T) { const d = t.box.distanceToPoint(_cp.copy(cp)); const c = t.err * k < Math.max(d, 1); t.coarse.visible = c; t.fine.visible = !c; } };
   return group;
+}
+// [r7-lod] ring tile at twice the step, with 4 edge skirts (hide T-junction gaps next to full-resolution tiles); err =
+// largest gap between the skipped full-resolution vertices and the coarse triangles
+function ringCoarse(sample, tx, tz, nx, nz, step, skirt) {
+  const pos = [], idx = []; const H = new Float32Array((nx + 1) * (nz + 1));
+  for (let i = 0; i <= nz; i++) for (let j = 0; j <= nx; j++) { const x = tx + j * step, z = tz + i * step, h = sample(x, z); H[i * (nx + 1) + j] = h; pos.push(x, h, z); }
+  for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) { const a = i * (nx + 1) + j, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+  let err = 0; const hs = step / 2;
+  for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) { const a = H[i * (nx + 1) + j], b = H[i * (nx + 1) + j + 1], c = H[(i + 1) * (nx + 1) + j], d = H[(i + 1) * (nx + 1) + j + 1]; const x = tx + j * step, z = tz + i * step;
+    err = Math.max(err, Math.abs(sample(x + hs, z) - (a + b) / 2), Math.abs(sample(x, z + hs) - (a + c) / 2), Math.abs(sample(x + hs, z + hs) - (b + c) / 2)); }
+  const edge = (list) => { for (let k = 0; k < list.length - 1; k++) { const [xa, za] = list[k], [xb, zb] = list[k + 1]; const ia = pos.length / 3, ha = sample(xa, za), hb = sample(xb, zb);
+    pos.push(xa, ha, za, xb, hb, zb, xa, ha - skirt, za, xb, hb - skirt, zb); idx.push(ia, ia + 2, ia + 1, ia + 1, ia + 2, ia + 3, ia, ia + 1, ia + 2, ia + 1, ia + 3, ia + 2); } };
+  const ex = tx + nx * step, ez = tz + nz * step, P = (n, f) => Array.from({ length: n + 1 }, (_, k) => f(k));
+  edge(P(nx, (k) => [tx + k * step, tz])); edge(P(nx, (k) => [tx + k * step, ez])); edge(P(nz, (k) => [tx, tz + k * step])); edge(P(nz, (k) => [ex, tz + k * step]));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
+  return { g, err };
 }
 
 export function makeWater(size = 140000, level = 0.7) {

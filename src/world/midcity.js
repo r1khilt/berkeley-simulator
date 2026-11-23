@@ -1,6 +1,7 @@
 // Surrounding Berkeley/Oakland buildings (outside the LiDAR core): simple extrusions coloured from the aerial photo.
 import * as THREE from 'three';
 import { U } from '../materials.js';
+import { LOD } from '../render/lod.js'; // [r7-lod]
 const WALLS = [[0.86, 0.84, 0.78], [0.80, 0.76, 0.68], [0.72, 0.74, 0.70], [0.88, 0.86, 0.82], [0.70, 0.64, 0.56], [0.62, 0.66, 0.70], [0.82, 0.74, 0.62], [0.76, 0.70, 0.66]];
 export function buildMidCity(list, heightAt) {
   const tiles = new Map();
@@ -12,8 +13,9 @@ export function buildMidCity(list, heightAt) {
     let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; }
     if (a < 0) pts.reverse();
     let base = Infinity; for (const p of pts) base = Math.min(base, heightAt(p[0], p[1])); base -= 0.5;
-    const top = base + 0.5 + h; const t = T(cx, cz);
+    const top = base + 0.5 + h; const tt = T(cx, cz);
     const w = WALLS[Math.floor(rnd() * WALLS.length)]; const r = [rc[0] / 255 * 0.8, rc[1] / 255 * 0.8, rc[2] / 255 * 0.8].map((v) => Math.pow(v, 2.2) * 1.15);
+    const emitB = (t, pts, a, cx, cz) => { // [r7-lod] one building into a tile buffer (full or far set)
     const push = (A, B, C, col, nrm) => { t.p.push(...A, ...B, ...C); for (let k = 0; k < 3; k++) { t.c.push(...col); t.n.push(...nrm); } };
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i], q = pts[(i + 1) % pts.length]; const ex = q[0] - p[0], ez = q[1] - p[1], L = Math.hypot(ex, ez) || 1; const nrm = [ez / L, 0, -ex / L];
@@ -23,6 +25,9 @@ export function buildMidCity(list, heightAt) {
     const pyr = kind === 1 && pts.length <= 8;
     if (pyr) { const apex = [cx, top + Math.min(3.0, Math.sqrt(Math.abs(a / 2)) * 0.28), cz]; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; const A = [p[0], top, p[1]], B = [q[0], top, q[1]]; const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = apex[0] - A[0], vy = apex[1] - A[1], vz = apex[2] - A[2]; let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz) || 1; if (ny < 0) { push(A, B, apex, r, [-nx / nl, -ny / nl, -nz / nl]); } else push(A, apex, B, r, [nx / nl, ny / nl, nz / nl]); } }
     else { const tri = THREE.ShapeUtils.triangulateShape(pts.map((p) => new THREE.Vector2(p[0], p[1])), []); for (const [i0, i1, i2] of tri) { const A = [pts[i0][0], top, pts[i0][1]], B = [pts[i1][0], top, pts[i1][1]], C = [pts[i2][0], top, pts[i2][1]]; const ar = (B[0] - A[0]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[0] - A[0]); if (ar > 0) push(A, C, B, r, [0, 1, 0]); else push(A, B, C, r, [0, 1, 0]); } }
+    };
+    emitB(tt, pts, a, cx, cz);
+    const sp = simplifyFootprint(pts, Math.abs(a / 2)); emitB(tt.far || (tt.far = { p: [], c: [], n: [] }), sp, sp.a2 ?? a, cx, cz); // [r7-lod] far set
   }
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
   mat.onBeforeCompile = (sh) => {
@@ -40,10 +45,41 @@ export function buildMidCity(list, heightAt) {
   };
   mat.customProgramCacheKey = () => 'midcity';
   const group = new THREE.Group(); group.name = 'midcity';
+  const lodTiles = []; // [r7-lod] per tile: full mesh + simplified far mesh, picked by projected footprint error
+  const mk = (t) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(t.c, 3)); g.computeBoundingSphere(); g.computeBoundingBox();
+    const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = false; group.add(m); return m; };
   for (const t of tiles.values()) {
     if (!t.p.length) continue;
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(t.c, 3)); g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = false; group.add(m);
+    const full = mk(t), far = t.far && t.far.p.length ? mk(t.far) : null;
+    if (far) { far.visible = false; lodTiles.push({ full, far, box: full.geometry.boundingBox }); }
   }
+  // [r7-lod] simplified footprints are within ~2 m of the real ones: switch when that error is under ~1.5 px (x LOD.bias)
+  const _v = new THREE.Vector3();
+  group.userData.updateLod = (cp) => { const dFar = LOD.on ? LOD.distFor(2.0, 1.5) : Infinity;
+    for (const L of lodTiles) { const d = L.box.distanceToPoint(_v.copy(cp)); const f = d > dFar; L.full.visible = !f; L.far.visible = f; } };
   return group;
+}
+
+// [r7-lod] far footprint: small buildings become their area-preserving oriented box (PCA axes), larger ones are
+// Douglas-Peucker simplified (1.5 m). Returns the new ring (CCW like the input) with its signed double area in .a2.
+function simplifyFootprint(pts, area) {
+  const n = pts.length; if (n <= 4) return pts;
+  let out;
+  if (area < 320) {
+    let cx = 0, cz = 0; for (const p of pts) { cx += p[0]; cz += p[1]; } cx /= n; cz /= n;
+    let sxx = 0, szz = 0, sxz = 0; for (const p of pts) { const dx = p[0] - cx, dz = p[1] - cz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; }
+    const th = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(th), uz = Math.sin(th);
+    let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const p of pts) { const dx = p[0] - cx, dz = p[1] - cz, a = dx * ux + dz * uz, b = -dx * uz + dz * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); }
+    const k = Math.sqrt(Math.min(1, area / Math.max(1e-3, (a1 - a0) * (b1 - b0)))), am = (a0 + a1) / 2, bm = (b0 + b1) / 2, ha = (a1 - a0) / 2 * k, hb = (b1 - b0) / 2 * k;
+    out = [[-ha, -hb], [ha, -hb], [ha, hb], [-ha, hb]].map(([a, b]) => [cx + (am + a) * ux - (bm + b) * uz, cz + (am + a) * uz + (bm + b) * ux]);
+  } else {
+    const keep = new Uint8Array(n); keep[0] = 1; let far = 0, fd = -1; for (let i = 1; i < n; i++) { const d = (pts[i][0] - pts[0][0]) ** 2 + (pts[i][1] - pts[0][1]) ** 2; if (d > fd) { fd = d; far = i; } } keep[far] = 1;
+    const dp = (i, j) => { if (j <= i + 1) return; const A = pts[i], B = pts[j % n]; const ex = B[0] - A[0], ez = B[1] - A[1], L = Math.hypot(ex, ez) || 1e-6; let m = -1, mi = -1;
+      for (let k = i + 1; k < j; k++) { const d = Math.abs((pts[k][0] - A[0]) * ez - (pts[k][1] - A[1]) * ex) / L; if (d > m) { m = d; mi = k; } } if (m > 1.5) { keep[mi] = 1; dp(i, mi); dp(mi, j); } };
+    dp(0, far); dp(far, n);
+    out = pts.filter((_, i) => keep[i]); if (out.length < 3) return pts;
+  }
+  let a2 = 0; for (let i = 0; i < out.length; i++) { const p = out[i], q = out[(i + 1) % out.length]; a2 += p[0] * q[1] - q[0] * p[1]; }
+  if (a2 < 0) { out.reverse(); a2 = -a2; }
+  out.a2 = a2; return out;
 }

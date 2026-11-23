@@ -35,6 +35,7 @@ import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground pa
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
 import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js';
+import { LOD } from './render/lod.js'; // [r7-lod] screen-size LOD (terrain, mid-city, trees, props, fleets, landmark details)
 import { opaqueCanvas, installSoftShading } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
 import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
@@ -61,6 +62,7 @@ if (qs.get('soft') === '1' && !qs.get('q')) settings.quality = 'low';
 if (qs.get('q')) settings.quality = qs.get('q');
 const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.5, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
 if (BS.soft) Object.assign(Q, { dpr: 0.65, shadow: 1024, cascades: 1, far: 150, trees: [32, 180], treeMax: 900 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work ([r6-fast] 0.65x internal resolution, upscaled by the browser)
+LOD.setTier(settings.quality, BS.soft); BS.LOD = LOD; // [r7-lod] per-tier LOD bias (soft 2, low 1.5, medium 1.25, high 1, ultra 0.75)
 if (BS.soft) installSoftShading(); // [r6-fast] cheap shader chunks (no IBL / normal maps / dark lamp lights), before anything compiles
 const ui = new UI(document.getElementById('ui')); ui.applySettings(settings); // ui-pro: theme + units
 onProgress((f) => ui.progress(f * 0.75));
@@ -123,9 +125,10 @@ async function boot() {
   const coreRect = { x0: c.x0, x1: c.x0 + c.nx * c.step, z0: c.z0, z1: c.z0 + c.nz * c.step };
   const tex = (img) => { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8; t.needsUpdate = true; return t; };
   const texMid = tex(orthoMid), texFar = tex(orthoFar);
-  scene.add(ringMesh({ sample: (x, z) => (core.contains(x, z) ? core.sample(x, z) : mid.sample(x, z)), x0: -2400, x1: 2400, z0: -2400, z1: 2400, hole: coreRect, step: 16, texture: texMid, texRect: metaFar.midImg, tile: 800, name: 'ringA' }));
-  scene.add(ringMesh({ sample: (x, z) => mid.sample(x, z), x0: -8000, x1: 8000, z0: -8000, z1: 8000, hole: { x0: -2400, x1: 2400, z0: -2400, z1: 2400 }, step: 64, texture: texMid, texRect: metaFar.midImg, tile: 2000, name: 'ringB' }));
-  scene.add(ringMesh({ sample: (x, z) => far.sample(x, z), x0: -60000, x1: 60000, z0: -60000, z1: 60000, hole: { x0: -8000, x1: 8000, z0: -8000, z1: 8000 }, step: 400, texture: texFar, texRect: metaFar.farImg, tile: 12000, skirt: 30, name: 'ringC' }));
+  const ringsLod = [], addRing = (g) => { ringsLod.push(g); scene.add(g); }; // [r7-lod] rings keep handles for their far-tile LOD
+  addRing(ringMesh({ sample: (x, z) => (core.contains(x, z) ? core.sample(x, z) : mid.sample(x, z)), x0: -2400, x1: 2400, z0: -2400, z1: 2400, hole: coreRect, step: 16, texture: texMid, texRect: metaFar.midImg, tile: 800, name: 'ringA' }));
+  addRing(ringMesh({ sample: (x, z) => mid.sample(x, z), x0: -8000, x1: 8000, z0: -8000, z1: 8000, hole: { x0: -2400, x1: 2400, z0: -2400, z1: 2400 }, step: 64, texture: texMid, texRect: metaFar.midImg, tile: 2000, name: 'ringB' }));
+  addRing(ringMesh({ sample: (x, z) => far.sample(x, z), x0: -60000, x1: 60000, z0: -60000, z1: 60000, hole: { x0: -8000, x1: 8000, z0: -8000, z1: 8000 }, step: 400, texture: texFar, texRect: metaFar.farImg, tile: 12000, skirt: 30, name: 'ringC' }));
   scene.add(makeWater()); phase('rings');
   await tick(); ui.progress(0.82);
   // ---- physics, landmarks, buildings
@@ -185,7 +188,7 @@ async function boot() {
     lampLights.forEach((L, i) => { const q = near[i]; if (!q) { L.userData.k = 0; L.intensity = 0; return; } const [x, z, k] = q[1]; const hh = k > 1 ? 7.5 : 3.8; L.position.set(x, heightAt(x, z) + hh, z); L.userData.k = k > 1 ? 60 : 32; L.intensity = L.userData.k * night; L.userData.ok = true; });
   };
   scene.add(buildSigns((signsData || []).filter((s) => s.n !== 'Social Research Library')).group); // [r5a] no storefront board on Haviland Hall's Beaux-Arts west front (the library is inside)
-  if (midData.length) scene.add(buildMidCity(midData, heightAt));
+  const midCity = midData.length ? buildMidCity(midData, heightAt) : null; if (midCity) scene.add(midCity); BS.midCity = midCity; // [r7-lod] keeps a handle for its far-LOD switch
   scene.add(buildSkyline(skylineData, heightAt));
   const bridges = buildBridges(); scene.add(bridges.group); phase('far');
   const grass = (settings.quality === 'low' || qs.get('nograss')) ? null : new Grass({ sdf, gt, core: { x0: c.x0, z0: c.z0 }, heightAt, count: settings.quality === 'ultra' ? 32000 : 22000 }); if (grass) scene.add(grass.mesh);
@@ -369,7 +372,10 @@ async function boot() {
       if (csm.maxFar && Math.abs(mf - csm.maxFar) / csm.maxFar > 0.15) { csm.maxFar = mf; csm.updateFrustums(); } }
     csm.update();
     if (sched) { if (csm.maxFar !== sched.lastFar) { sched.lastFar = csm.maxFar; sched.invalidate(); } sched.update(); } // [r6-perf]
+    LOD.update(renderer, camera, post && post.scale || 1); // [r7-lod] px per metre for this frame
     terrain.update(camera);
+    if (midCity) midCity.userData.updateLod(camera.position); // [r7-lod]
+    for (const r of ringsLod) r.userData.updateLod(camera.position); // [r7-lod]
     if (treeSys) { treeSys.update(camera); BS.treeLib?.update?.(dt); }
     if (streets) streets.update(camera.position, camera); // [r6-perf] + frustum
     if (ground) ground.update(camera.position); // [r4-ground]
@@ -378,6 +384,7 @@ async function boot() {
     bridges.update(U.uNight.value);
     if (life) { const lp = state === 'play' || BS.lifePlayer; life.update(dt, { camera, focus: lp ? player.pos : camera.position, date, player: lp ? player : null }); } // r4-campus-life (r4-people2: BS.lifePlayer lets headless tests drive the player without play())
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
+    LOD.landmarkDetail(lm.placed, camera); // [r7-lod] landmark fine parts drop out by projected size
     if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
     // HUD (throttled)
     if (state === 'play' && frameN % 3 === 0) hud(date);
@@ -429,7 +436,7 @@ async function boot() {
   const gpuTimer = gpu ? null : new GpuTimer(renderer.getContext()); BS.gpuTimer = gpuTimer;
   const dprMax = Math.min(devicePixelRatio, Q.dpr);
   const setScale = (k) => { if (post && post.setScale) post.setScale(k); else { const d = Math.max(0.5, dprMax * k); renderer.setPixelRatio(d); composer && composer.setPixelRatio(d); } };
-  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 0.85 : 0.72 }); BS.gov = gov; // software: the tier already renders at 0.65x; at most one more step (0.55x) [r6-fast]
+  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, lod: LOD /* [r7-lod] */, setScale: gpu ? null : setScale, minScale: BS.soft ? 0.85 : 0.72 }); BS.gov = gov; // software: the tier already renders at 0.65x; at most one more step (0.55x) [r6-fast]
   if (BS.soft) gov.target = 33.3;            // software WebGL: aim for a steady 30 fps
   if (qs.get('gov') === '0') gov.enabled = false; else if (qs.get('gov')) gov.setLevel(+qs.get('gov'), 'url');
   BS.perf = { state: () => ({ ...gov.state(), gpuMs: gpuTimer && gpuTimer.ok ? +gpuTimer.ms.toFixed(2) : null, timer: !!(gpuTimer && gpuTimer.ok), gpu: gpuInfo.renderer, cls: gpuInfo.cls, soft: BS.soft, quality: settings.quality, auto: !!settings.qualityAuto, dpr: renderer.getPixelRatio() }) };

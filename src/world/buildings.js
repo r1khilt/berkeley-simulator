@@ -385,30 +385,36 @@ void facade(vec3 wallC){
     }
     // ---- r4-generic: recessed glass. The glass sits dRev behind the wall; jambs, head and sill show with parallax
     // and cast sun shadow on the glass (fSunOcc scales direct light after the light loop).
-    float dRev = s==4 ? 0.03 : (s==0||s==9) ? 0.3 : s==10 ? 0.34 : s==1 ? 0.22 : (s==5||s==11) ? 0.09 : s==6 ? 0.1 : 0.16;
-    if (shop) dRev = door ? 0.55 : 0.12;
     vec3 Nw = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tw = vec3(-Nw.z, 0.0, Nw.x);   // Tw: direction of increasing u
     vec3 Vw = normalize(vWPosF - cameraPosition);
-    vec3 rdW = vec3(dot(Vw, Tw), Vw.y, max(-dot(Vw, Nw), 0.04));   // window space: x along u, y up, +z into the wall
-    float lx = (fu - 0.5) * bw;                                     // across the bay, 0 = opening centre
+    // [r7-lod] far facades (lodW ~ 1: a bay is a few pixels) skip the per-window work below (reveal trace, sun occlusion,
+    // sash bars, frames, sills, glass compose): it was all weighted by (1 - lodW) ~ 0 yet shaded for every pixel. A real
+    // branch, so whole far walls skip it (about a quarter of the soft-tier frame at the Glade). Near windows are unchanged.
+    bool nearW = lodW < 0.999;
+    float lx = 0.0, onGlass = 1.0, revK = 0.0, sunOcc = 1.0, gx = 0.0, gy = 0.0, bar = 0.0;
+    vec3 rdW = vec3(0.0, 0.0, 1.0), jambN = vec3(0.0), sW = vec3(0.0, 1.0, 0.0);
+    bool oldSash = s==0||s==1||s==2||s==5||s==6||s==11;
+    if (nearW) {
+    float dRev = s==4 ? 0.03 : (s==0||s==9) ? 0.3 : s==10 ? 0.34 : s==1 ? 0.22 : (s==5||s==11) ? 0.09 : s==6 ? 0.1 : 0.16;
+    if (shop) dRev = door ? 0.55 : 0.12;
+    rdW = vec3(dot(Vw, Tw), Vw.y, max(-dot(Vw, Nw), 0.04));   // window space: x along u, y up, +z into the wall
+    lx = (fu - 0.5) * bw;                                     // across the bay, 0 = opening centre
     float tG = dRev / rdW.z;
     float tX = (sign(rdW.x) * hwx - lx) / (abs(rdW.x) < 1e-4 ? 1e-4 : rdW.x);
     float tY = ((rdW.y > 0.0 ? y1 : y0) - y) / (abs(rdW.y) < 1e-4 ? 1e-4 : rdW.y);
     float tH = min(tG, min(max(tX, 0.0), max(tY, 0.0)));
     vec3 hp = vec3(lx, y, 0.0) + rdW * tH;                         // first surface hit inside the opening
-    float onGlass = (tG <= tX && tG <= tY) ? 1.0 : 0.0;
-    float revK = win * (1.0 - lodW) * (1.0 - onGlass);              // pixel shows a reveal surface
-    vec3 jambN = (tX < tY) ? -sign(rdW.x) * Tw : vec3(0.0, rdW.y > 0.0 ? -1.0 : 1.0, 0.0);
-    vec3 Ls = normalize(uSunDir); vec3 sW = vec3(dot(Ls, Tw), Ls.y, -dot(Ls, Nw));
-    float sunOcc = 1.0;
+    onGlass = (tG <= tX && tG <= tY) ? 1.0 : 0.0;
+    revK = win * (1.0 - lodW) * (1.0 - onGlass);              // pixel shows a reveal surface
+    jambN = (tX < tY) ? -sign(rdW.x) * Tw : vec3(0.0, rdW.y > 0.0 ? -1.0 : 1.0, 0.0);
+    vec3 Ls = normalize(uSunDir); sW = vec3(dot(Ls, Tw), Ls.y, -dot(Ls, Nw));
     if (sW.z < -0.02) { vec2 q = hp.xy + sW.xy * (hp.z / -sW.z); float e = 0.015 + ax;
       sunOcc = (1.0 - smoothstep(hwx - e, hwx + e, abs(q.x))) * smoothstep(y0 - e, y0 + e, q.y) * (1.0 - smoothstep(y1 - e, y1 + e, q.y)); }
     // glass-plane coordinates for sash, mullions and the room behind
-    float gx = hp.x, gy = hp.y;
+    gx = hp.x; gy = hp.y;
     float sw = (s==5||s==11) ? 0.07 : (s==0||s==1||s==2||s==9) ? 0.06 : 0.045;
     float dEdge = min(hwx - abs(gx), min(gy - y0, y1 - gy));
-    float bar = 1.0 - smoothstep(sw - ax, sw + ax, dEdge);
-    bool oldSash = s==0||s==1||s==2||s==5||s==6||s==11;
+    bar = 1.0 - smoothstep(sw - ax, sw + ax, dEdge);
     if (shop) {
       float tb = min(2.75, y1 - 0.5);
       bar = max(bar, 1.0 - smoothstep(0.03 - ay, 0.03 + ay, abs(gy - tb)));             // transom bar
@@ -418,6 +424,7 @@ void facade(vec3 wallC){
       if (2.0 * hwx > 1.35 && s != 4) bar = max(bar, 1.0 - smoothstep(0.03 - ax, 0.03 + ax, abs(abs(gx) - (2.0 * hwx > 2.6 ? hwx / 3.0 : 0.0))));
     }
     if (s == 4) bar = max(bar, 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04));
+    } // [r7-lod] nearW
     vec3 sashC = oldSash ? (bh < 0.7 ? vec3(0.82, 0.81, 0.77) : bh < 0.85 ? vec3(0.08, 0.1, 0.09) : vec3(0.3, 0.2, 0.14))
                          : (bh < 0.4 ? vec3(0.06, 0.06, 0.065) : bh < 0.7 ? vec3(0.17, 0.13, 0.1) : vec3(0.52, 0.52, 0.5));   // black / bronze / clear anodised
     // furnished interiors (interiors.js): floors share a room type; rooms span 1-4 bays; lights per room
@@ -472,6 +479,7 @@ void facade(vec3 wallC){
     float paneK = win * (1.0 - lodW) * onGlass * (1.0 - bar);
     float sashK = win * (1.0 - lodW) * onGlass * bar;
     // compose: casing trim on the wall plane, reveal surfaces, sash, then glass (blind = lit albedo, room + reflection = emissive)
+    if (nearW) { // [r7-lod] far walls: all of this is weighted by (1 - lodW) ~ 0
     col = mix(col, frameC, frame*(1.0-lodW));
     float wallShadow = 0.0, underSill = 0.0;   // extra sun shadow / AO on the wall plane (under sills / sign band)
     if (!shop && s != 4 && s != 3 && s != 10 && s != 8 && !arch) {
@@ -507,6 +515,7 @@ void facade(vec3 wallC){
     fSunOcc = mix(1.0, sunOcc, win * (1.0 - lodW)) * (1.0 - wallShadow * (1.0 - win) * (1.0 - lodW));
     fAmbOcc = mix(1.0, 0.72 + 0.28 * onGlass, win * (1.0 - lodW)) * (1.0 - 0.5 * underSill * (1.0 - lodW));
     fNrmK = mix(1.0, 0.0, paneK);
+    } // [r7-lod] nearW
     // far LOD: average window coverage (glass darkens the wall, reflects the sky at grazing angles, lit rooms glow at night)
     float cover = ww*wh;
     float covF = cv.a * 0.6;
