@@ -157,6 +157,7 @@ function buildShadowProxy(root) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere(); geo.computeBoundingBox();
     const free = function () { this.array = null; }; geo.attributes.position.onUpload(free); geo.index.onUpload(free);
+    geo.computeBoundingBox = geo.computeBoundingSphere = () => {}; // bounds are final; never recompute from the freed arrays (grapple refine, culling)
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, shadowSide: side }));
     mesh.castShadow = true; mesh.receiveShadow = false; mesh.layers.set(PROXY_LAYER); mesh.name = 'shadowProxy'; mesh.userData.shadowProxy = true; mesh.raycast = () => {};
     root.add(mesh); tris += ni / 3;

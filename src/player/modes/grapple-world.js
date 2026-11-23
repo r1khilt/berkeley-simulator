@@ -282,7 +282,7 @@ export class GrappleWorld {
       job.list.shift();
       if (c.lm) { // expand a landmark into its visible meshes
         if (!c.lm.obj) continue; const add = [];
-        c.lm.obj.traverseVisible((m) => { if (m.isMesh) { const te = this._enter(job, this._worldBox(m)); if (te != null) add.push({ t: te, mesh: m }); } });
+        c.lm.obj.traverseVisible((m) => { if (m.isMesh && !m.userData.shadowProxy) { const te = this._enter(job, this._worldBox(m)); if (te != null) add.push({ t: te, mesh: m }); } });
         if (add.length) { job.list.push(...add); job.list.sort((a, b) => a.t - b.t); }
       } else {
         const hits = rc.intersectObject(c.mesh, false);
