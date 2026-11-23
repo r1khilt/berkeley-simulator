@@ -22,7 +22,11 @@ export const LOD = {
   update(renderer, camera, scale = 1) {
     const h = renderer.domElement.height * scale;
     this.K = h / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    this.U.uFacFarD.value = this.on ? this.distFor(5, 10) : 1e9;
   },
+  // shared uniforms: uFacFarD = soft-tier facade split distance (a 5 m bay ~10 px: where the full facade has already faded
+  // its windows to the averaged far look)
+  U: { uFacFarD: { value: 1e9 } },
   // distance at which a feature of `size` metres shrinks to `px` pixels (x bias)
   distFor(size, px) { return (size * this.K) / (px * this.bias); },
 };
@@ -64,14 +68,14 @@ LOD.landmarkDetail = function (placed, camera) {
 
 // ---------------------------------------------------------------- far geometry by vertex clustering
 // Rossignac-Borrel clustering: vertices snap to a grid of `cells` steps along each bounding-box axis (thin axes keep
-// their own resolution, so a 15 cm pole stays round-ish rather than collapsing), each cluster becomes one vertex
+// their own resolution, so a 15 cm pole keeps a square-ish section rather than collapsing), each cluster becomes one vertex
 // (position averaged, normal re-normalised, other attributes from its first member) and triangles that collapse are
 // dropped. Good for props that are a few dozen pixels tall or less; returns null when it would save < 35%.
 export function clusterSimplify(geo, cells = 8) {
   const pos = geo.attributes.position; if (!pos || pos.count < 24) return null;
   if (!geo.boundingBox) geo.computeBoundingBox(); const bb = geo.boundingBox;
   const ext = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]; const big = Math.max(...ext, 1e-4);
-  const cs = ext.map((e) => Math.max(e / cells, big / (cells * 6), 1e-4));
+  const cs = ext.map((e) => Math.max(e / cells, 1e-4)); // per-axis: a thin pole keeps its own cross-section cells (grid splits at the box centre)
   const idx = geo.index ? geo.index.array : null, nTri = (idx ? idx.length : pos.count) / 3;
   const key = new Map(), remap = new Int32Array(pos.count), first = [], sum = [];
   for (let i = 0; i < pos.count; i++) {

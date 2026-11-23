@@ -138,7 +138,7 @@ export class TreeSystem {
         const s = this.speciesOf[i], ms = this.meshes[s], hero = this.heroOf[s], D = this.far2Of[s] ? (hero ? D5 : D4b) : (hero ? D4 : D3), sh = hero ? 1 : 0; // [r7-lod] hero / far2 per species (was ms.length > 3)
         let l = 0; while (l < D.length && d >= D[l]) l++;
         const cur = tier[i];
-        if (cur >= 0 && l !== cur && Math.abs(d - D[Math.min(l, cur)]) < D[Math.min(l, cur)] * hyst) l = cur; // hysteresis
+        if (cur >= 0 && Math.abs(l - cur) === 1 && Math.abs(d - D[Math.min(l, cur)]) < D[Math.min(l, cur)] * hyst) l = cur; // hysteresis ([r7-lod] adjacent LODs only: after a jump a tree used to keep a far LOD next to a near boundary)
         if (!inView) { if (l > sh) { tier[i] = -1; continue; } seen[i] = 1; put(s, sh, i, 0); tier[i] = sh; fadeP[i] = 1; continue; } // off-screen: shadow-only, cheapest shadow LOD
         seen[i] = 1;
         if (cur >= 0 && l !== cur) { from[i] = cur; fadeP[i] = 0; } // start a cross-fade

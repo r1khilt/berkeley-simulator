@@ -1,5 +1,6 @@
 // Procedural buildings from OSM footprints + LiDAR-derived heights/roofs.
 // Walls get a procedural façade shader (windows, floors, cornices, night lights); roofs get tile/shingle/membrane shaders.
+import { LOD } from '../render/lod.js'; // [r7-lod]
 import * as THREE from 'three';
 let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre-baked into roofs.json.gz)
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
@@ -15,8 +16,8 @@ let skelReady = null;
 export function initSkeleton() { if (!skelReady) skelReady = import('straight-skeleton').then((SS) => { SkeletonBuilder = SS.SkeletonBuilder || (SS.default && SS.default.SkeletonBuilder); return SkeletonBuilder.init(); }); return skelReady; }
 
 class Buf {
-  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.f = []; }
-  v(x, y, z, nx, ny, nz, u, vv, col, f) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, vv); this.c.push(col.r, col.g, col.b); this.f.push(f[0], f[1], f[2], f[3]); }
+  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.f = []; this.ce = []; this.cx = 0; this.cz = 0; } // [r7-lod] ce: building centroid per vertex
+  v(x, y, z, nx, ny, nz, u, vv, col, f) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, vv); this.c.push(col.r, col.g, col.b); this.f.push(f[0], f[1], f[2], f[3]); this.ce.push(this.cx, this.cz); }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
@@ -24,6 +25,7 @@ class Buf {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.setAttribute('aFac', new THREE.Float32BufferAttribute(this.f, 4));
+    if (this.ce.length === this.p.length / 3 * 2) g.setAttribute('aCen', new THREE.Float32BufferAttribute(this.ce, 2)); // [r7-lod]
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
   }
@@ -104,6 +106,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
     let cx = 0, cz = 0; for (let i = 0; i < p0.length; i += 2) { cx += p0[i]; cz += p0[i + 1]; } cx /= p0.length / 2 * 10; cz /= p0.length / 2 * 10;
     let ch = getChunk(cx, cz);
     if (standinIds.has(osm)) { const k = Math.floor(cx / CH) + ',' + Math.floor(cz / CH); ch = { walls: new Buf(), roofs: new Buf() }; standins.set(osm, { key: k, walls: ch.walls, roofs: ch.roofs }); }
+    ch.walls.cx = ch.roofs.cx = cx; ch.walls.cz = ch.roofs.cz = cz; // [r7-lod] centroid for the near/far facade split
     const isRed = roofCol.r > roofCol.g + 0.06 && roofCol.r > roofCol.b + 0.1;
     const bUse = buildingUse({ name: ni >= 0 ? data.names[ni] : '', style, h: Math.max(...parts.map((q) => q[0])), x: cx, z: cz, seed }); // window interiors
     let maxTop = 0;
@@ -253,14 +256,21 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
     if (ni >= 0) named.push({ name: data.names[ni], c: [cx, cz], top: maxTop, osm });
   }
   const group = new THREE.Group(); group.name = 'buildings';
-  const wallMat = makeWallMaterial(), roofMat = makeRoofMaterial();
+  // [r7-lod] software tier: every wall is drawn by two programs. The near one is the full facade; the far one is compiled
+  // with lodW = 1 (bays of a few pixels: the averaged-window look the full shader fades to anyway), so the per-window work is
+  // gone at compile time. Each building's vertices collapse in whichever program does not own it (centroid distance vs
+  // LOD.U.uFacFarD), so no pixel is shaded twice. Software rasterisers run both sides of a branch, so the nearW branch in
+  // the shader alone doesn't help them; GPUs skip it per wave and keep the single program. ?facadesplit=1|0 overrides.
+  const split = /[?&]facadesplit=1/.test(location.search) || (LOD.on && LOD.soft && !/[?&]facadesplit=0/.test(location.search));
+  const wallMat = makeWallMaterial(split ? 'near' : ''), roofMat = makeRoofMaterial(), wallFar = split ? makeWallMaterial('far') : null;
   let tris = 0; const _tg = now();
   for (const [k, c] of chunks) {
-    if (c.walls.count) { const m = new THREE.Mesh(c.walls.geometry(), wallMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.walls.count / 3; }
+    if (c.walls.count) { const m = new THREE.Mesh(c.walls.geometry(), wallMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.walls.count / 3;
+      if (wallFar) { const f = new THREE.Mesh(m.geometry, wallFar); f.castShadow = false; f.receiveShadow = true; f.name = 'facadeFar'; group.add(f); } } // [r7-lod]
     if (c.roofs.count) { const m = new THREE.Mesh(c.roofs.geometry(), roofMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.roofs.count / 3; }
   }
   T.geo = now() - _tg;
-  const standinMgr = new StandinManager(standins, wallMat, roofMat); group.add(standinMgr.group);
+  const standinMgr = new StandinManager(standins, wallMat, roofMat, wallFar); group.add(standinMgr.group); // [r7-lod] + far facade twin
   return { group, colliders, named, standinMgr, stats: { parts: nParts, skelFail: nSkelFail, tris: Math.round(tris), chunks: chunks.size, ms: { sk: Math.round(T.sk), geo: Math.round(T.geo) } }, wallMat, roofMat };
 }
 
@@ -526,9 +536,14 @@ void facade(vec3 wallC){
   fCol = col; fRough = rough;
 }`;
 
-export function makeWallMaterial() { // exported for QA hot-swap (tools)
+export function makeWallMaterial(lodPart = '') { // exported for QA hot-swap (tools); [r7-lod] lodPart '' | 'near' | 'far' (soft-tier facade split)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
+    if (lodPart) { // [r7-lod] collapse the buildings the other program owns (all of a building's vertices share aCen)
+      sh.uniforms.uFacFarD = LOD.U.uFacFarD;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aCen; uniform float uFacFarD;')
+        .replace('#include <project_vertex>', `#include <project_vertex>\n if ((distance(cameraPosition.xz, aCen) > uFacFarD) == ${lodPart === 'near' ? 'true' : 'false'}) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);`);
+    }
     sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; sh.uniforms.uSunDir = U.uSunDir; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials; r4-generic: uSunDir for window reveals
     sh.uniforms.uInteriors = IR.uInteriors; // interiors.js detail level
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
@@ -541,7 +556,8 @@ export function makeWallMaterial() { // exported for QA hot-swap (tools)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * fNrmK, 0.0)).xyz);') // gfx-materials: wall relief (not on glass); r4-generic: fNrmK mask, reveal normals
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.directDiffuse *= fSunOcc; reflectedLight.directSpecular *= fSunOcc; reflectedLight.indirectDiffuse *= fAmbOcc;'); // r4-generic: window reveal shadow + recess AO
   };
-  mat.customProgramCacheKey = () => 'facade-v6-r4-' + IR.level;
+  if (lodPart === 'far') { const ob = mat.onBeforeCompile; mat.onBeforeCompile = (sh, r) => { ob(sh, r); sh.fragmentShader = sh.fragmentShader.replace('float lodW = smoothstep(0.25, 0.6, pxu / bw * 6.0);', 'float lodW = 1.0; // [r7-lod] far program'); }; }
+  mat.customProgramCacheKey = () => 'facade-v6-r4-' + IR.level + lodPart; // [r7-lod] + lodPart
   return mat;
 }
 export function makeRoofMaterial() {
@@ -582,8 +598,8 @@ varying vec3 vWPosR, vNR;
 
 // Procedural stand-ins for buildings that have a hand-modelled landmark module: shown until (and while) the landmark is not loaded.
 class StandinManager {
-  constructor(map, wallMat, roofMat) {
-    this.map = map; this.wallMat = wallMat; this.roofMat = roofMat; this.hidden = new Set(); this.group = new THREE.Group(); this.group.name = 'standins';
+  constructor(map, wallMat, roofMat, wallFar = null) {
+    this.map = map; this.wallMat = wallMat; this.roofMat = roofMat; this.wallFar = wallFar; /* [r7-lod] */ this.hidden = new Set(); this.group = new THREE.Group(); this.group.name = 'standins';
     this.chunks = new Map(); for (const [osm, s] of map) { let c = this.chunks.get(s.key); if (!c) this.chunks.set(s.key, (c = { ids: [], meshes: [] })); c.ids.push(osm); }
     for (const k of this.chunks.keys()) this.rebuild(k);
   }
@@ -591,8 +607,9 @@ class StandinManager {
   rebuild(k) {
     const c = this.chunks.get(k); for (const m of c.meshes) { this.group.remove(m); m.geometry.dispose(); } c.meshes = [];
     for (const kind of ['walls', 'roofs']) {
-      const B = new Buf(); const app = (a, b) => { for (let i = 0; i < b.length; i++) a.push(b[i]); }; for (const id of c.ids) { if (this.hidden.has(id)) continue; const s = this.map.get(id)[kind]; app(B.p, s.p); app(B.n, s.n); app(B.uv, s.uv); app(B.c, s.c); app(B.f, s.f); }
+      const B = new Buf(); const app = (a, b) => { for (let i = 0; i < b.length; i++) a.push(b[i]); }; for (const id of c.ids) { if (this.hidden.has(id)) continue; const s = this.map.get(id)[kind]; app(B.p, s.p); app(B.n, s.n); app(B.uv, s.uv); app(B.c, s.c); app(B.f, s.f); app(B.ce, s.ce); }
       if (!B.count) continue; const m = new THREE.Mesh(B.geometry(), kind === 'walls' ? this.wallMat : this.roofMat); m.castShadow = m.receiveShadow = true; this.group.add(m); c.meshes.push(m);
+      if (kind === 'walls' && this.wallFar) { const f = new THREE.Mesh(m.geometry, this.wallFar); f.castShadow = false; f.receiveShadow = true; this.group.add(f); c.meshes.push(f); } // [r7-lod]
     }
   }
 }

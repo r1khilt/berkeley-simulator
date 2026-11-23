@@ -37,8 +37,8 @@ export class Scatter {
     // [r6-perf] beyond NEAR_KEEP m only props inside a widened view frustum are drawn (props behind the camera cost
     // vertices in the main pass and in every shadow cascade); near props stay so their shadows still fall into view
     const nk2 = SCATTER_NEAR_KEEP * SCATTER_NEAR_KEEP;
-    // [r7-lod] past the distance where one clustering cell (size / 8) shrinks to ~1.5 px, instances use the far twins
-    const fd = this.far && this.far.some(Boolean) && LOD.on ? LOD.distFor((this.size || 1) / 8, 1.5) : Infinity, fd2 = fd * fd; let kf = 0;
+    // [r7-lod] past the distance where one clustering cell (size / 8) shrinks to ~1 px, instances use the far twins
+    const fd = this.far && this.far.some(Boolean) && LOD.on ? LOD.distFor((this.size || 1) / 8, 1) : Infinity, fd2 = fd * fd; let kf = 0;
     for (let i = 0; i < it.length && k + kf < this.cap; i++) { const dx = it[i][0] - cp.x, dz = it[i][2] - cp.z, dd = dx * dx + dz * dz; if (dd > d2) continue;
       if (fr && dd > nk2) { _sp.center.set(it[i][0], it[i][1] + 2, it[i][2]); _sp.radius = 6 * (it[i][4] || 1); if (!fr.intersectsSphere(_sp)) continue; }
       if (dd > fd2) { for (let j = 0; j < this.meshes.length; j++) (this.far[j] || this.meshes[j]).instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), (this.far[j] ? kf : this.cap - 1 - kf) * 16); kf++; continue; }

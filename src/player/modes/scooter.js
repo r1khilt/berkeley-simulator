@@ -109,8 +109,8 @@ class Fleet {
     for (const g of this.groups) {
       if (g.dirty) { g.dirty = false; let n = 0, sx = 0, sz = 0; for (const list of Object.values(g.members)) for (const it of list) { sx += it.x; sz += it.z; n++; } if (n && !g.loose) { g.cx = sx / n; g.cz = sz / n; let r = 4; for (const list of Object.values(g.members)) for (const it of list) r = Math.max(r, Math.hypot(it.x - g.cx, it.z - g.cz) + 2); g.r = r; } for (const im of Object.values(g.meshes)) { im.computeBoundingSphere(); } }
       // [r7-lod] clusters hide once a scooter (~1.2 m) is under ~3 px (never beyond SHOW_DIST) and switch to clustered
-      // far geometry once a clustering cell (~15 cm) is under ~1.5 px
-      const showD = LOD.on ? Math.min(SHOW_DIST, LOD.distFor(1.2, 3)) : SHOW_DIST, farD = LOD.on ? LOD.distFor(0.15, 1.5) : Infinity;
+      // far geometry once a clustering cell (~15 cm) is under ~1 px
+      const showD = LOD.on ? Math.min(SHOW_DIST, LOD.distFor(1.2, 3)) : SHOW_DIST, farD = LOD.on ? LOD.distFor(0.15, 1) : Infinity;
       const d = g.loose ? 0 : Math.hypot(g.cx - cam.x, g.cz - cam.z) - g.r; const vis = g.loose || d < showD;
       for (const [type, im] of Object.entries(g.meshes)) { im.visible = vis && im.count > 0; im.castShadow = g.loose || d < SHADOW_DIST;
         if (vis && !g.loose) { const near = im.userData.nearGeo || (im.userData.nearGeo = im.geometry); if (!_farGeo.has(type)) _farGeo.set(type, clusterSimplify(near, 8)); const fg = _farGeo.get(type) || near; const want = d > farD ? fg : near; if (im.geometry !== want) im.geometry = want; } } g.blob.visible = vis && g.blob.count > 0 && (g.loose || d < 90);
