@@ -154,13 +154,19 @@ export function getLoader(renderer) {
   if (renderer) { if (!_ktx2 || _ktxR !== renderer) { _ktx2 = new KTX2Loader().setTranscoderPath((import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/basis/').detectSupport(renderer); _ktxR = renderer; } loader.setKTX2Loader(_ktx2); }
   return loader;
 }
+// [r6-load] one manifest fetch and one load + prep per avatar id for the whole page. The player's avatar ({only:[id]})
+// and the NPC pool used to download, parse and KTX2-transcode the same GLB twice and keep two GPU copies. A prepared
+// avatar is a read-only template (RBCharacter clones it with SkeletonUtils), so sharing it is safe.
+let _man = null; const _avs = new Map();
+export function loadRBManifest() { return _man || (_man = fetch(BASE + 'manifest.json').then((r) => { if (!r.ok) throw new Error('rb manifest ' + r.status); return r.json(); }).catch((e) => { _man = null; throw e; })); }
 async function _load(A, opts) {
-  const man = await fetch(BASE + 'manifest.json').then((r) => { if (!r.ok) throw new Error('rb manifest ' + r.status); return r.json(); });
+  const man = await loadRBManifest();
   let list = man.avatars; if (opts.only) list = list.filter((a) => opts.only.includes(a.id));
   const loader = getLoader(opts.renderer); // colour textures are KTX2 / ETC1S (GPU-compressed); transcoder in public/assets/basis/
   if (opts.mocap !== false) prepAvatar.natives = await loadRBAnims();
   const out = []; let i = 0;
-  const worker = async () => { while (i < list.length) { const e = list[i++]; try { const g = await loader.loadAsync(BASE + e.file); await idle(); const av = prepAvatar(e, g, A); out.push(av); if (opts.onAvatar) opts.onAvatar(av); } catch (err) { console.warn('rocketbox avatar failed', e.id, err); } await idle(); } };
+  const one = (e) => { let p = _avs.get(e.id); if (!p) { p = (async () => { const g = await loader.loadAsync(BASE + e.file); await idle(); return prepAvatar(e, g, A); })(); _avs.set(e.id, p); p.catch(() => _avs.delete(e.id)); } return p; };
+  const worker = async () => { while (i < list.length) { const e = list[i++]; try { const av = await one(e); out.push(av); if (opts.onAvatar) opts.onAvatar(av); } catch (err) { console.warn('rocketbox avatar failed', e.id, err); } await idle(); } };
   await Promise.all([worker(), worker()]);
   out.sort((a, b) => list.indexOf(a.e) - list.indexOf(b.e));
   return out;

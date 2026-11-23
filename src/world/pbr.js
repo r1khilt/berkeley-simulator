@@ -100,9 +100,14 @@ async function fill2D(name, m) {
   } catch (e) { console.warn('PBR 2D set', name, e.message); }
 }
 
+// [r6-load] one download per texture set: the array build (initPBR) and the 2D landmark maps (fill2D, ~10 sets) used to
+// fetch the same webp files again (granite 3x), ~6.5 MB of duplicate traffic on a cold load. Blobs are kept briefly.
+const _blobs = new Map(); let _blobTimer = 0;
 async function loadBitmap(url) {
-  const r = await fetch(url); if (!r.ok) throw new Error('pbr: ' + url + ' ' + r.status);
-  const b = await r.blob(); return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+  let p = _blobs.get(url);
+  if (!p) { p = fetch(url).then((r) => { if (!r.ok) throw new Error('pbr: ' + url + ' ' + r.status); return r.blob(); }); _blobs.set(url, p); p.catch(() => _blobs.delete(url)); }
+  clearTimeout(_blobTimer); _blobTimer = setTimeout(() => _blobs.clear(), 60000); // late adopters just refetch (HTTP-cached)
+  const b = await p; return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
 }
 function pixels(bmp, S) {
   const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d', { willReadFrequently: true });

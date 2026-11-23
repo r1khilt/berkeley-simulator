@@ -69,7 +69,11 @@ export class LandmarkManager {
   }
   _unload(l) {
     this.scene.remove(l.obj);
-    l.obj.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.geometry && o.geometry.dispose(); } });
+    // [r6-load] free what this landmark alone owns. Before, only geometries were disposed, so every load/unload cycle leaked
+    // its canvas textures (signs, interiors: 1-10 MB each), instance buffers and material programs on the GPU. During a
+    // long walk or fly the GPU process kept growing until the tab crashed.
+    try { disposeOwned(l.obj, this.scene, this._keep || (this._keep = keepSet(this.M))); } catch (e) { console.warn('landmark dispose', l.id, e); }
+    if (l.res && typeof l.res.dispose === 'function') try { l.res.dispose(); } catch (e) { console.warn('landmark dispose', l.id, e); }
     this.physics.removeTag('lm:' + l.id);
     if (l.res && l.res.ownsCollision && this.physics.muteTag) for (const id of l.replaces) this.physics.muteTag(id, false); // interiors-cafe
     this.standins && this.standins.setHidden(l.replaces, false);
@@ -117,4 +121,36 @@ function mergeStatic(root) {
   }
   for (const o of remove) { o.parent && o.parent.remove(o); }
   return saved;
+}
+
+// [r6-load] ---- disposal helpers for _unload
+const TEX_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap', 'lightMap', 'specularMap', 'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap', 'sheenColorMap', 'sheenRoughnessMap', 'transmissionMap', 'thicknessMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'specularIntensityMap', 'specularColorMap', 'gradientMap', 'matcap'];
+function matTextures(m, out) {
+  for (const k of TEX_SLOTS) { const t = m[k]; if (t && t.isTexture) out.add(t); }
+  if (m.uniforms) for (const u of Object.values(m.uniforms)) { const v = u && u.value; if (v && v.isTexture) out.add(v); }
+}
+function forMats(o, fn) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) if (m) fn(m); }
+// the shared palette (materials.js) and its textures are never disposed
+function keepSet(M) { const mats = new Set(), tex = new Set(); for (const m of Object.values(M || {})) if (m && m.isMaterial) { mats.add(m); matTextures(m, tex); } return { mats, tex }; }
+// a texture is only disposed if three.js could upload it again (a later reload reusing a module-cached texture)
+function reuploadable(t) {
+  if (t.isRenderTargetTexture || t.isDepthTexture || t.isVideoTexture || t.isFramebufferTexture || (t.userData && t.userData.keep)) return false;
+  const img = t.image; if (!img) return false;
+  if (t.isDataTexture || t.isDataArrayTexture || t.isData3DTexture) return !!img.data;
+  if (t.isCompressedTexture) return !!(t.mipmaps && t.mipmaps.length && t.mipmaps[0].data);
+  if (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) return img.width > 0; // closed bitmaps report 0
+  return true; // canvas / image element
+}
+function disposeOwned(root, scene, keep) {
+  const geos = new Set(), mats = new Set(), texs = new Set(), inst = [];
+  root.traverse((o) => { if (o.geometry) geos.add(o.geometry); if (o.material) forMats(o, (m) => { mats.add(m); matTextures(m, texs); }); if (o.isInstancedMesh || o.isBatchedMesh) inst.push(o); });
+  // what the rest of the scene still uses (root is already out of the scene): one traversal per unload
+  const liveG = new Set(), liveM = new Set(), liveT = new Set();
+  scene.traverse((o) => { if (o.geometry) liveG.add(o.geometry); if (o.material) forMats(o, (m) => { liveM.add(m); matTextures(m, liveT); }); });
+  if (scene.environment && scene.environment.isTexture) liveT.add(scene.environment);
+  if (scene.background && scene.background.isTexture) liveT.add(scene.background);
+  for (const g of geos) if (!liveG.has(g)) g.dispose();
+  for (const o of inst) if (o.dispose) o.dispose(); // instance matrix / colour buffers
+  for (const m of mats) if (!liveM.has(m) && !keep.mats.has(m)) m.dispose();
+  for (const t of texs) if (!liveT.has(t) && !keep.tex.has(t) && reuploadable(t)) t.dispose();
 }
