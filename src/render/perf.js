@@ -156,6 +156,8 @@ function makeRungs(c) {
   const R = [];
   // 1. refresh the far shadow cascades half as often (invisible)
   if (c.sched && c.csm.lights.length > 1) R.push({ name: 'shadowCache', on() { c.sched.scale = 2; }, off() { c.sched.scale = 1; } });
+  // [r7-lod] 1b. screen-size LOD bias x1.6 (terrain error, mid-city / prop / fleet / tree far LODs and landmark fine parts switch sooner; all sub-pixel to ~2 px)
+  if (c.lod) R.push({ name: 'lodBias', on() { c.lod.govBias = 1.6; }, off() { c.lod.govBias = 1; } });
   // 2. tree LOD ranges x0.8 (hero/near meshes hand over a little sooner; same cross-fade)
   if (c.trees) { const base = c.trees.lod.slice(), heroK = c.trees.heroD / base[0]; R.push({ name: 'treeLod', on() { c.trees.lod = base.map((d) => d * 0.8); c.trees.heroD = c.trees.lod[0] * heroK; c.trees.update(c.camera, true); }, off() { c.trees.lod = base.slice(); c.trees.heroD = base[0] * heroK; c.trees.update(c.camera, true); } }); }
   // 3. shadow distance x0.75

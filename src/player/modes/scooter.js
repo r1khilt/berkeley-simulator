@@ -11,6 +11,8 @@ import { SPECS, buildRig, parkedGeometry, rideMaterial, rideLightMaterial } from
 const _qi = new THREE.Quaternion();
 import { solveLimb, setWorldQuat, RideSound, groundSampler, clamp, angDiff, damp } from './ride-common.js';
 import { U } from '../../materials.js';
+import { LOD, clusterSimplify } from '../../render/lod.js'; // [r7-lod] far fleet geometry + screen-size show distance
+const _farGeo = new Map();
 
 const KEY = 'KeyU'; // "unlock": ride the nearest parked scooter (E works too)
 const REACH = 1.9; // m, how close you must be to unlock
@@ -106,8 +108,12 @@ class Fleet {
     this.refreshT -= dt;
     for (const g of this.groups) {
       if (g.dirty) { g.dirty = false; let n = 0, sx = 0, sz = 0; for (const list of Object.values(g.members)) for (const it of list) { sx += it.x; sz += it.z; n++; } if (n && !g.loose) { g.cx = sx / n; g.cz = sz / n; let r = 4; for (const list of Object.values(g.members)) for (const it of list) r = Math.max(r, Math.hypot(it.x - g.cx, it.z - g.cz) + 2); g.r = r; } for (const im of Object.values(g.meshes)) { im.computeBoundingSphere(); } }
-      const d = g.loose ? 0 : Math.hypot(g.cx - cam.x, g.cz - cam.z) - g.r; const vis = g.loose || d < SHOW_DIST;
-      for (const im of Object.values(g.meshes)) { im.visible = vis && im.count > 0; im.castShadow = g.loose || d < SHADOW_DIST; } g.blob.visible = vis && g.blob.count > 0 && (g.loose || d < 90);
+      // [r7-lod] clusters hide once a scooter (~1.2 m) is under ~3 px (never beyond SHOW_DIST) and switch to clustered
+      // far geometry once a clustering cell (~15 cm) is under ~1 px
+      const showD = LOD.on ? Math.min(SHOW_DIST, LOD.distFor(1.2, 3)) : SHOW_DIST, farD = LOD.on ? LOD.distFor(0.15, 1) : Infinity;
+      const d = g.loose ? 0 : Math.hypot(g.cx - cam.x, g.cz - cam.z) - g.r; const vis = g.loose || d < showD;
+      for (const [type, im] of Object.entries(g.meshes)) { im.visible = vis && im.count > 0; im.castShadow = g.loose || d < SHADOW_DIST;
+        if (vis && !g.loose) { const near = im.userData.nearGeo || (im.userData.nearGeo = im.geometry); if (!_farGeo.has(type)) _farGeo.set(type, clusterSimplify(near, 8)); const fg = _farGeo.get(type) || near; const want = d > farD ? fg : near; if (im.geometry !== want) im.geometry = want; } } g.blob.visible = vis && g.blob.count > 0 && (g.loose || d < 90);
       if (vis && d < 140 && this.refreshT <= 0) for (const list of Object.values(g.members)) for (const it of list) { const y0 = it.y; this.ground(it); if (Math.abs(it.y - y0) > 0.01) { this.writeMatrix(it); for (const c of it.circles) { c.y0 = it.y; c.y1 = it.y + 1.1; } } }
     }
     if (this.refreshT <= 0) this.refreshT = 2.5;
@@ -119,7 +125,7 @@ class Fleet {
 export function install(player, ctx) {
   const { scene, audio, ui, setupMaterials } = ctx;
   const ph = ctx.physics || player.ph;
-  const fleet = new Fleet(scene, ph, setupMaterials);
+  const fleet = new Fleet(scene, ph, setupMaterials); player.fleet = fleet; // [r7-lod] main.js also culls parked fleets while not in play (title flyover)
   const sound = new RideSound(audio);
   const rigs = {};
   const getRig = (type) => { if (rigs[type]) return rigs[type]; const r = buildRig(type); r.root.visible = false; scene.add(r.root); setupMaterials && setupMaterials(r.root); return (rigs[type] = r); };

@@ -1,5 +1,6 @@
 // Procedural buildings from OSM footprints + LiDAR-derived heights/roofs.
 // Walls get a procedural façade shader (windows, floors, cornices, night lights); roofs get tile/shingle/membrane shaders.
+import { LOD } from '../render/lod.js'; // [r7-lod]
 import * as THREE from 'three';
 let SkeletonBuilder = null; // loaded on demand (roof skeletons are normally pre-baked into roofs.json.gz)
 import { signedArea, pointInRing, dedupe, offsetRing } from '../lib/geom2d.js';
@@ -15,8 +16,8 @@ let skelReady = null;
 export function initSkeleton() { if (!skelReady) skelReady = import('straight-skeleton').then((SS) => { SkeletonBuilder = SS.SkeletonBuilder || (SS.default && SS.default.SkeletonBuilder); return SkeletonBuilder.init(); }); return skelReady; }
 
 class Buf {
-  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.f = []; }
-  v(x, y, z, nx, ny, nz, u, vv, col, f) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, vv); this.c.push(col.r, col.g, col.b); this.f.push(f[0], f[1], f[2], f[3]); }
+  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.f = []; this.ce = []; this.cx = 0; this.cz = 0; } // [r7-lod] ce: building centroid per vertex
+  v(x, y, z, nx, ny, nz, u, vv, col, f) { this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, vv); this.c.push(col.r, col.g, col.b); this.f.push(f[0], f[1], f[2], f[3]); this.ce.push(this.cx, this.cz); }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
@@ -24,6 +25,7 @@ class Buf {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.setAttribute('aFac', new THREE.Float32BufferAttribute(this.f, 4));
+    if (this.ce.length === this.p.length / 3 * 2) g.setAttribute('aCen', new THREE.Float32BufferAttribute(this.ce, 2)); // [r7-lod]
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
   }
@@ -104,6 +106,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
     let cx = 0, cz = 0; for (let i = 0; i < p0.length; i += 2) { cx += p0[i]; cz += p0[i + 1]; } cx /= p0.length / 2 * 10; cz /= p0.length / 2 * 10;
     let ch = getChunk(cx, cz);
     if (standinIds.has(osm)) { const k = Math.floor(cx / CH) + ',' + Math.floor(cz / CH); ch = { walls: new Buf(), roofs: new Buf() }; standins.set(osm, { key: k, walls: ch.walls, roofs: ch.roofs }); }
+    ch.walls.cx = ch.roofs.cx = cx; ch.walls.cz = ch.roofs.cz = cz; // [r7-lod] centroid for the near/far facade split
     const isRed = roofCol.r > roofCol.g + 0.06 && roofCol.r > roofCol.b + 0.1;
     const bUse = buildingUse({ name: ni >= 0 ? data.names[ni] : '', style, h: Math.max(...parts.map((q) => q[0])), x: cx, z: cz, seed }); // window interiors
     let maxTop = 0;
@@ -253,14 +256,21 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
     if (ni >= 0) named.push({ name: data.names[ni], c: [cx, cz], top: maxTop, osm });
   }
   const group = new THREE.Group(); group.name = 'buildings';
-  const wallMat = makeWallMaterial(), roofMat = makeRoofMaterial();
+  // [r7-lod] software tier: every wall is drawn by two programs. The near one is the full facade; the far one is compiled
+  // with lodW = 1 (bays of a few pixels: the averaged-window look the full shader fades to anyway), so the per-window work is
+  // gone at compile time. Each building's vertices collapse in whichever program does not own it (centroid distance vs
+  // LOD.U.uFacFarD), so no pixel is shaded twice. Software rasterisers run both sides of a branch, so the nearW branch in
+  // the shader alone doesn't help them; GPUs skip it per wave and keep the single program. ?facadesplit=1|0 overrides.
+  const split = /[?&]facadesplit=1/.test(location.search) || (LOD.on && LOD.soft && !/[?&]facadesplit=0/.test(location.search));
+  const wallMat = makeWallMaterial(split ? 'near' : ''), roofMat = makeRoofMaterial(), wallFar = split ? makeWallMaterial('far') : null;
   let tris = 0; const _tg = now();
   for (const [k, c] of chunks) {
-    if (c.walls.count) { const m = new THREE.Mesh(c.walls.geometry(), wallMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.walls.count / 3; }
+    if (c.walls.count) { const m = new THREE.Mesh(c.walls.geometry(), wallMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.walls.count / 3;
+      if (wallFar) { const f = new THREE.Mesh(m.geometry, wallFar); f.castShadow = false; f.receiveShadow = true; f.name = 'facadeFar'; f.raycast = () => {}; group.add(f); } } // [r7-lod] (raycasts use the near twin)
     if (c.roofs.count) { const m = new THREE.Mesh(c.roofs.geometry(), roofMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.roofs.count / 3; }
   }
   T.geo = now() - _tg;
-  const standinMgr = new StandinManager(standins, wallMat, roofMat); group.add(standinMgr.group);
+  const standinMgr = new StandinManager(standins, wallMat, roofMat, wallFar); group.add(standinMgr.group); // [r7-lod] + far facade twin
   return { group, colliders, named, standinMgr, stats: { parts: nParts, skelFail: nSkelFail, tris: Math.round(tris), chunks: chunks.size, ms: { sk: Math.round(T.sk), geo: Math.round(T.geo) } }, wallMat, roofMat };
 }
 
@@ -385,30 +395,36 @@ void facade(vec3 wallC){
     }
     // ---- r4-generic: recessed glass. The glass sits dRev behind the wall; jambs, head and sill show with parallax
     // and cast sun shadow on the glass (fSunOcc scales direct light after the light loop).
-    float dRev = s==4 ? 0.03 : (s==0||s==9) ? 0.3 : s==10 ? 0.34 : s==1 ? 0.22 : (s==5||s==11) ? 0.09 : s==6 ? 0.1 : 0.16;
-    if (shop) dRev = door ? 0.55 : 0.12;
     vec3 Nw = normalize(vec3(vWNF.x, 0.0, vWNF.z)); vec3 Tw = vec3(-Nw.z, 0.0, Nw.x);   // Tw: direction of increasing u
     vec3 Vw = normalize(vWPosF - cameraPosition);
-    vec3 rdW = vec3(dot(Vw, Tw), Vw.y, max(-dot(Vw, Nw), 0.04));   // window space: x along u, y up, +z into the wall
-    float lx = (fu - 0.5) * bw;                                     // across the bay, 0 = opening centre
+    // [r7-lod] far facades (lodW ~ 1: a bay is a few pixels) skip the per-window work below (reveal trace, sun occlusion,
+    // sash bars, frames, sills, glass compose): it was all weighted by (1 - lodW) ~ 0 yet shaded for every pixel. A real
+    // branch, so whole far walls skip it (about a quarter of the soft-tier frame at the Glade). Near windows are unchanged.
+    bool nearW = lodW < 0.999;
+    float lx = 0.0, onGlass = 1.0, revK = 0.0, sunOcc = 1.0, gx = 0.0, gy = 0.0, bar = 0.0;
+    vec3 rdW = vec3(0.0, 0.0, 1.0), jambN = vec3(0.0), sW = vec3(0.0, 1.0, 0.0);
+    bool oldSash = s==0||s==1||s==2||s==5||s==6||s==11;
+    if (nearW) {
+    float dRev = s==4 ? 0.03 : (s==0||s==9) ? 0.3 : s==10 ? 0.34 : s==1 ? 0.22 : (s==5||s==11) ? 0.09 : s==6 ? 0.1 : 0.16;
+    if (shop) dRev = door ? 0.55 : 0.12;
+    rdW = vec3(dot(Vw, Tw), Vw.y, max(-dot(Vw, Nw), 0.04));   // window space: x along u, y up, +z into the wall
+    lx = (fu - 0.5) * bw;                                     // across the bay, 0 = opening centre
     float tG = dRev / rdW.z;
     float tX = (sign(rdW.x) * hwx - lx) / (abs(rdW.x) < 1e-4 ? 1e-4 : rdW.x);
     float tY = ((rdW.y > 0.0 ? y1 : y0) - y) / (abs(rdW.y) < 1e-4 ? 1e-4 : rdW.y);
     float tH = min(tG, min(max(tX, 0.0), max(tY, 0.0)));
     vec3 hp = vec3(lx, y, 0.0) + rdW * tH;                         // first surface hit inside the opening
-    float onGlass = (tG <= tX && tG <= tY) ? 1.0 : 0.0;
-    float revK = win * (1.0 - lodW) * (1.0 - onGlass);              // pixel shows a reveal surface
-    vec3 jambN = (tX < tY) ? -sign(rdW.x) * Tw : vec3(0.0, rdW.y > 0.0 ? -1.0 : 1.0, 0.0);
-    vec3 Ls = normalize(uSunDir); vec3 sW = vec3(dot(Ls, Tw), Ls.y, -dot(Ls, Nw));
-    float sunOcc = 1.0;
+    onGlass = (tG <= tX && tG <= tY) ? 1.0 : 0.0;
+    revK = win * (1.0 - lodW) * (1.0 - onGlass);              // pixel shows a reveal surface
+    jambN = (tX < tY) ? -sign(rdW.x) * Tw : vec3(0.0, rdW.y > 0.0 ? -1.0 : 1.0, 0.0);
+    vec3 Ls = normalize(uSunDir); sW = vec3(dot(Ls, Tw), Ls.y, -dot(Ls, Nw));
     if (sW.z < -0.02) { vec2 q = hp.xy + sW.xy * (hp.z / -sW.z); float e = 0.015 + ax;
       sunOcc = (1.0 - smoothstep(hwx - e, hwx + e, abs(q.x))) * smoothstep(y0 - e, y0 + e, q.y) * (1.0 - smoothstep(y1 - e, y1 + e, q.y)); }
     // glass-plane coordinates for sash, mullions and the room behind
-    float gx = hp.x, gy = hp.y;
+    gx = hp.x; gy = hp.y;
     float sw = (s==5||s==11) ? 0.07 : (s==0||s==1||s==2||s==9) ? 0.06 : 0.045;
     float dEdge = min(hwx - abs(gx), min(gy - y0, y1 - gy));
-    float bar = 1.0 - smoothstep(sw - ax, sw + ax, dEdge);
-    bool oldSash = s==0||s==1||s==2||s==5||s==6||s==11;
+    bar = 1.0 - smoothstep(sw - ax, sw + ax, dEdge);
     if (shop) {
       float tb = min(2.75, y1 - 0.5);
       bar = max(bar, 1.0 - smoothstep(0.03 - ay, 0.03 + ay, abs(gy - tb)));             // transom bar
@@ -418,6 +434,7 @@ void facade(vec3 wallC){
       if (2.0 * hwx > 1.35 && s != 4) bar = max(bar, 1.0 - smoothstep(0.03 - ax, 0.03 + ax, abs(abs(gx) - (2.0 * hwx > 2.6 ? hwx / 3.0 : 0.0))));
     }
     if (s == 4) bar = max(bar, 1.0 - smoothstep(0.0, ax*2.0+0.02, abs(fract(u/bw)-0.5)*bw - hwx + 0.04));
+    } // [r7-lod] nearW
     vec3 sashC = oldSash ? (bh < 0.7 ? vec3(0.82, 0.81, 0.77) : bh < 0.85 ? vec3(0.08, 0.1, 0.09) : vec3(0.3, 0.2, 0.14))
                          : (bh < 0.4 ? vec3(0.06, 0.06, 0.065) : bh < 0.7 ? vec3(0.17, 0.13, 0.1) : vec3(0.52, 0.52, 0.5));   // black / bronze / clear anodised
     // furnished interiors (interiors.js): floors share a room type; rooms span 1-4 bays; lights per room
@@ -472,6 +489,7 @@ void facade(vec3 wallC){
     float paneK = win * (1.0 - lodW) * onGlass * (1.0 - bar);
     float sashK = win * (1.0 - lodW) * onGlass * bar;
     // compose: casing trim on the wall plane, reveal surfaces, sash, then glass (blind = lit albedo, room + reflection = emissive)
+    if (nearW) { // [r7-lod] far walls: all of this is weighted by (1 - lodW) ~ 0
     col = mix(col, frameC, frame*(1.0-lodW));
     float wallShadow = 0.0, underSill = 0.0;   // extra sun shadow / AO on the wall plane (under sills / sign band)
     if (!shop && s != 4 && s != 3 && s != 10 && s != 8 && !arch) {
@@ -507,6 +525,7 @@ void facade(vec3 wallC){
     fSunOcc = mix(1.0, sunOcc, win * (1.0 - lodW)) * (1.0 - wallShadow * (1.0 - win) * (1.0 - lodW));
     fAmbOcc = mix(1.0, 0.72 + 0.28 * onGlass, win * (1.0 - lodW)) * (1.0 - 0.5 * underSill * (1.0 - lodW));
     fNrmK = mix(1.0, 0.0, paneK);
+    } // [r7-lod] nearW
     // far LOD: average window coverage (glass darkens the wall, reflects the sky at grazing angles, lit rooms glow at night)
     float cover = ww*wh;
     float covF = cv.a * 0.6;
@@ -517,9 +536,14 @@ void facade(vec3 wallC){
   fCol = col; fRough = rough;
 }`;
 
-export function makeWallMaterial() { // exported for QA hot-swap (tools)
+export function makeWallMaterial(lodPart = '') { // exported for QA hot-swap (tools); [r7-lod] lodPart '' | 'near' | 'far' (soft-tier facade split)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
+    if (lodPart) { // [r7-lod] collapse the buildings the other program owns (all of a building's vertices share aCen)
+      sh.uniforms.uFacFarD = LOD.U.uFacFarD;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aCen; uniform float uFacFarD;')
+        .replace('#include <project_vertex>', `#include <project_vertex>\n if ((distance(cameraPosition.xz, aCen) > uFacFarD) == ${lodPart === 'near' ? 'true' : 'false'}) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);`);
+    }
     sh.uniforms.uNoise = { value: noiseTexture() }; sh.uniforms.uNight = U.uNight; sh.uniforms.uSkyZen = U.uSkyZen; sh.uniforms.uSkyHor = U.uSkyHor; sh.uniforms.uSunDir = U.uSunDir; pbrUniforms(sh.uniforms); ghUniforms(sh.uniforms); // gfx-materials; r4-generic: uSunDir for window reveals
     sh.uniforms.uInteriors = IR.uInteriors; // interiors.js detail level
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aFac; flat varying vec4 vFac; varying vec2 vUvF; varying vec3 vWPosF; varying vec3 vWNF;')
@@ -532,7 +556,8 @@ export function makeWallMaterial() { // exported for QA hot-swap (tools)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = normalize(normal + (viewMatrix * vec4(fNrm * fNrmK, 0.0)).xyz);') // gfx-materials: wall relief (not on glass); r4-generic: fNrmK mask, reveal normals
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.directDiffuse *= fSunOcc; reflectedLight.directSpecular *= fSunOcc; reflectedLight.indirectDiffuse *= fAmbOcc;'); // r4-generic: window reveal shadow + recess AO
   };
-  mat.customProgramCacheKey = () => 'facade-v6-r4-' + IR.level;
+  if (lodPart === 'far') { const ob = mat.onBeforeCompile; mat.onBeforeCompile = (sh, r) => { ob(sh, r); sh.fragmentShader = sh.fragmentShader.replace('float lodW = smoothstep(0.25, 0.6, pxu / bw * 6.0);', 'float lodW = 1.0; // [r7-lod] far program'); }; }
+  mat.customProgramCacheKey = () => 'facade-v6-r4-' + IR.level + lodPart; // [r7-lod] + lodPart
   return mat;
 }
 export function makeRoofMaterial() {
@@ -573,11 +598,11 @@ varying vec3 vWPosR, vNR;
 
 // Procedural stand-ins for buildings that have a hand-modelled landmark module: shown until (and while) the landmark is not loaded.
 class StandinManager {
-  constructor(map, wallMat, roofMat) {
+  constructor(map, wallMat, roofMat, wallFar = null) {
     // [r6-load] the stand-in source arrays live for the whole session (rebuilds on landmark load/unload): keep them as
-    // Float32Array instead of JS number arrays, about a third of the heap
-    for (const s of map.values()) for (const kind of ['walls', 'roofs']) { const b = s[kind]; if (b) for (const k of ['p', 'n', 'uv', 'c', 'f']) if (Array.isArray(b[k])) b[k] = Float32Array.from(b[k]); }
-    this.map = map; this.wallMat = wallMat; this.roofMat = roofMat; this.hidden = new Set(); this.group = new THREE.Group(); this.group.name = 'standins';
+    // Float32Array instead of JS number arrays, about a third of the heap ([r7-lod] incl. the per-vertex centroids)
+    for (const s of map.values()) for (const kind of ['walls', 'roofs']) { const b = s[kind]; if (b) for (const k of ['p', 'n', 'uv', 'c', 'f', 'ce']) if (Array.isArray(b[k])) b[k] = Float32Array.from(b[k]); }
+    this.map = map; this.wallMat = wallMat; this.roofMat = roofMat; this.wallFar = wallFar; /* [r7-lod] */ this.hidden = new Set(); this.group = new THREE.Group(); this.group.name = 'standins';
     this.chunks = new Map(); for (const [osm, s] of map) { let c = this.chunks.get(s.key); if (!c) this.chunks.set(s.key, (c = { ids: [], meshes: [] })); c.ids.push(osm); }
     for (const k of this.chunks.keys()) this.rebuild(k);
   }
@@ -585,8 +610,9 @@ class StandinManager {
   rebuild(k) {
     const c = this.chunks.get(k); for (const m of c.meshes) { this.group.remove(m); m.geometry.dispose(); } c.meshes = [];
     for (const kind of ['walls', 'roofs']) {
-      const B = new Buf(); const app = (a, b) => { for (let i = 0; i < b.length; i++) a.push(b[i]); }; for (const id of c.ids) { if (this.hidden.has(id)) continue; const s = this.map.get(id)[kind]; app(B.p, s.p); app(B.n, s.n); app(B.uv, s.uv); app(B.c, s.c); app(B.f, s.f); }
+      const B = new Buf(); const app = (a, b) => { for (let i = 0; i < b.length; i++) a.push(b[i]); }; for (const id of c.ids) { if (this.hidden.has(id)) continue; const s = this.map.get(id)[kind]; app(B.p, s.p); app(B.n, s.n); app(B.uv, s.uv); app(B.c, s.c); app(B.f, s.f); app(B.ce, s.ce); }
       if (!B.count) continue; const m = new THREE.Mesh(B.geometry(), kind === 'walls' ? this.wallMat : this.roofMat); m.castShadow = m.receiveShadow = true; this.group.add(m); c.meshes.push(m);
+      if (kind === 'walls' && this.wallFar) { const f = new THREE.Mesh(m.geometry, this.wallFar); f.castShadow = false; f.receiveShadow = true; f.raycast = () => {}; this.group.add(f); c.meshes.push(f); } // [r7-lod]
     }
   }
 }

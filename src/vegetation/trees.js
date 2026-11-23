@@ -1012,6 +1012,11 @@ function buildSpecies(id, d, season, opts) {
     } else L1.leaves = buildLeaves1(sk, d, rnd, density, (opts.lod1Budget ?? 400) - 5 - L1.bark.tris);
   }
   if (!L2.puffs) L2.blob = buildBlob(sk, d, rnd, d.arche === 'palm' ? 1 : density);
+  // [r7-lod] very-far LOD: the crown as 3-5 big puffs, no trunk (own random stream: LOD0-2 and hero are unchanged).
+  // TreeSystem switches to it once a whole crown is under ~3 px (about 2.4 km on High at 1080p, 520 m on the soft tier).
+  const L3 = {}; if (L2.puffs && opts.far2 !== false) { const r3 = mulberry32(d.seed * 15485863 + 11); const lp0 = L0.leaves && L0.leaves.p; let fit3 = null;
+    if (lp0 && lp0.length > 180) { const rads = [], ys = []; for (let i = 0; i < lp0.length; i += 3) { rads.push(Math.hypot(lp0[i], lp0[i + 2])); ys.push(lp0[i + 1]); } fit3 = { R: percentile(rads, 0.95), base: percentile(ys, 0.03) }; }
+    L3.puffs = buildPuffs(sk, d, r3, density, d.arche === 'conifer' ? 5 : 4, { core: 1, rK: 1.12, fit: fit3, aoK: 0.9, skipK: 0, fists: false }); if (!L3.puffs.count) delete L3.puffs; }
   // r4-trees2: hero LOD (own random stream, so LOD0-2 are unchanged)
   const LH = {}, useHero = opts.hero !== false && d.arche !== 'palm';
   if (useHero) { const rh = mulberry32(d.seed * 104729 + 7); LH.leaves = buildLeavesHero(sk, d, rh, density, (opts.heroBudget ?? 14000) * (d.hero?.budgetK ?? 1)); LH.bark = buildBarkHero(sk, d, LH.leaves.ros); }
@@ -1019,12 +1024,13 @@ function buildSpecies(id, d, season, opts) {
   const g0 = { bark: L0.bark.geometry(), leaves: L0.leaves.count ? L0.leaves.geometry() : null, puffs: L0.puffs?.count ? L0.puffs.geometry() : null };
   const g1 = { bark: L1.bark.geometry(), leaves: L1.leaves.count ? L1.leaves.geometry() : null };
   const g2 = L2.puffs ? { trunk: L2.trunk.geometry(), puffs: L2.puffs.geometry() } : { blob: L2.blob.geometry() };
+  const g3 = L3.puffs ? { puffs: L3.puffs.geometry() } : null; // [r7-lod]
   const puff1 = !!(L1.leaves && L1.leaves.puffs);
   const gH = useHero ? { bark: LH.bark.geometry(), leaves: LH.leaves.count ? LH.leaves.geometry() : null, puffs: null } : opts.hero !== false ? { bark: g0.bark.clone(), leaves: g0.leaves ? g0.leaves.clone() : null, puffs: g0.puffs ? g0.puffs.clone() : null } : null; // palms: hero = a copy of LOD0
 
   // ---- normalise to height 1 using LOD0's top
   const H = maxY([g0.bark, g0.leaves].filter(Boolean));
-  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs]) if (g) scaleGeo(g, 1 / H);
+  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs, g3?.puffs]) if (g) scaleGeo(g, 1 / H); // [r7-lod] + g3
   if (gH) for (const g of [gH.bark, gH.leaves, gH.puffs]) if (g) scaleGeo(g, 1 / H); // (cloned before LOD0 was scaled)
   const top1 = maxY([g1.bark, puff1 ? null : g1.leaves].filter(Boolean)), top2 = g2.blob ? maxY([g2.blob]) : 1;
   if (!puff1 && Math.abs(top1 - 1) > 0.01) for (const g of [g1.bark, g1.leaves]) if (g) scaleGeo(g, 1, 1 / top1, 1);
@@ -1039,7 +1045,7 @@ function buildSpecies(id, d, season, opts) {
     const k2 = (d.lod2K ?? 0.9) * (d.seasonal ? 0.75 + 0.25 * density : 1);
     const r = percentile(radialList(g2.blob), 0.97); if (r > 1e-4) { const s = clamp(normRadius * k2 / r, 0.5, 1.3); scaleGeo(g2.blob, s, 1, s); }
   }
-  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs, gH?.bark, gH?.leaves, gH?.puffs]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
+  for (const g of [g0.bark, g0.leaves, g0.puffs, g1.bark, g1.leaves, g2.blob, g2.trunk, g2.puffs, g3?.puffs, gH?.bark, gH?.leaves, gH?.puffs]) if (g) { g.computeBoundingBox(); g.computeBoundingSphere(); }
 
   // ---- materials (one set per species; all share the species' sway uniforms)
   const uni = makeTreeUniforms({ ...look, swayBase: clamp(crownBase * 0.55, 0.02, 0.6), typH: H });
@@ -1069,10 +1075,11 @@ function buildSpecies(id, d, season, opts) {
     lod([P(g1.bark, barkMat, 'bark', db), ...(g1.leaves ? [puff1 ? P(g1.leaves, puffMat1, 'puffs', null) : P(g1.leaves, leafMat, 'leaves', dl)] : [])]),
     g2.puffs ? lod([P(g2.trunk, barkMat, 'bark', null), P(g2.puffs, puffMat1, 'puffs', null)]) : lod([P(g2.blob, blobMat, 'far', null)]),
   ];
+  if (g3) lods.push(lod([P(g3.puffs, puffMat1, 'puffs', null)])); // [r7-lod] lods = [near, mid, far, far2]
   if (lodH) lods.unshift(lodH); // r4-trees2: lods = [hero, near, mid, far] (TreeSystem adds the hero distance)
   const trunkRadius = sk.trunks[0].rads[Math.min(1, sk.trunks[0].rads.length - 1)] / H;
   return {
-    id, name: d.name, lods, normHeight: 1, normRadius, crownBase, trunkRadius,
+    id, name: d.name, lods, far2: !!g3, normHeight: 1, normRadius, crownBase, trunkRadius, // [r7-lod] far2: lods end with the very-far puff LOD
     typical: { ...d.typical }, season, leafDensity: density, uniforms: uni, materials: [barkMat, leafMat, blobMat, ...(puffMat0 ? [puffMat0, puffMat1] : []), ...(heroMat ? [heroMat] : [])], hero: !!lodH,
   };
 }

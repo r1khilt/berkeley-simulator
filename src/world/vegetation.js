@@ -1,5 +1,6 @@
 // Instanced trees: 28k LiDAR-detected trees, species-assigned, 3 LODs, per-instance aerial-photo tint.
 import * as THREE from 'three';
+import { LOD } from '../render/lod.js'; // [r7-lod]
 export const SPECIES_IDS = ['oak', 'plane', 'planePollard', 'redwood', 'eucalyptus', 'pine', 'cedar', 'cypress', 'deciduous', 'ginkgo', 'magnolia', 'bay', 'palm', 'shrub'];
 const CELL = 96;
 export function decodeTrees(buf) {
@@ -71,10 +72,12 @@ export class TreeSystem {
     for (const c of this.cells.values()) c.idx = Uint32Array.from(c.idx);
     // instanced meshes per species x lod
     this.meshes = {}; // sid -> [lod0Meshes[], lod1Meshes[], lod2Meshes[]]
+    this.heroOf = {}; this.far2Of = {}; // [r7-lod]
     const count = new Map(); for (let i = 0; i < n; i++) count.set(this.speciesOf[i], (count.get(this.speciesOf[i]) || 0) + 1);
     for (const [spIdx, cnt] of count) {
       const sid = SPECIES_IDS[spIdx]; const spc = lib.species[sid] || lib.species.deciduous;
-      const nL = spc.lods.length, shadowL = nL > 3 ? 1 : 0; // hero and near LODs cast shadows
+      const nL = spc.lods.length, shadowL = spc.hero ? 1 : 0; // hero and near LODs cast shadows ([r7-lod] spc.hero: lods may now end with far2)
+      this.heroOf[spIdx] = !!spc.hero; this.far2Of[spIdx] = !!spc.far2;
       this.meshes[spIdx] = spc.lods.map((lod, li) => lod.parts.map((p) => {
         const m = new THREE.InstancedMesh(p.geometry, p.material, cnt);
         if (p.depthMaterial) m.customDepthMaterial = p.depthMaterial; if (p.distanceMaterial) m.customDistanceMaterial = p.distanceMaterial;
@@ -108,11 +111,14 @@ export class TreeSystem {
     // masks (tree-shaders.js aLodFade), so nothing pops and no tree stays stippled while the player stands still.
     // Switch distances have a little hysteresis so trees on a boundary don't flicker between LODs.
     const D4 = [this.heroD, this.lod[0], this.lod[1]], D3 = [this.lod[0], this.lod[1]], dm = this.maxDist ** 2, hyst = 0.03, fadeS = this.fadeS ?? 0.35;
+    // [r7-lod] species with a very-far LOD (lib far2) switch to it once a whole crown (~8 m) is under ~3 px: 13 lobes -> 4-5
+    // reads the same at that size (at ~13 px it did not: the aerial view showed the swap)
+    const dF2 = LOD.on ? Math.max(this.lod[1] * 1.25, LOD.distFor(8, 3)) : Infinity, D5 = [...D4, dF2], D4b = [...D3, dF2];
     const nearSq = this.lod[0] ** 2, n = this.t.n;
     if (!this.tier) { this.tier = new Int8Array(n).fill(-1); this.from = new Int8Array(n).fill(-1); this.fadeP = new Float32Array(n).fill(1); }
     const tier = this.tier, from = this.from, fadeP = this.fadeP;
     const fill = {}; for (const k in this.meshes) fill[k] = this.meshes[k].map(() => 0);
-    const counts = [0, 0, 0, 0]; let fading = false;
+    const counts = [0, 0, 0, 0, 0]; let fading = false; // [r7-lod] up to 5 LODs
     const put = (s, l, i, fv) => {
       const slot = fill[s][l]++;
       for (const m of this.meshes[s][l]) { m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), slot * 16); m.instanceColor.array.set(this.col.subarray(i * 3, i * 3 + 3), slot * 3); m.userData.fade.array[slot] = fv; }
@@ -130,10 +136,10 @@ export class TreeSystem {
         const i = idx[k]; if (this.hidden.has(i)) continue;
         const ddx = this.px[i] - cp.x, ddz = this.pz[i] - cp.z, ddy = (this.py[i] + this.ht[i] * 0.5 - cp.y) * 0.5;
         const d = Math.sqrt(ddx * ddx + ddz * ddz + ddy * ddy);
-        const s = this.speciesOf[i], ms = this.meshes[s], D = ms.length > 3 ? D4 : D3, sh = ms.length > 3 ? 1 : 0;
+        const s = this.speciesOf[i], ms = this.meshes[s], hero = this.heroOf[s], D = this.far2Of[s] ? (hero ? D5 : D4b) : (hero ? D4 : D3), sh = hero ? 1 : 0; // [r7-lod] hero / far2 per species (was ms.length > 3)
         let l = 0; while (l < D.length && d >= D[l]) l++;
         const cur = tier[i];
-        if (cur >= 0 && l !== cur && Math.abs(d - D[Math.min(l, cur)]) < D[Math.min(l, cur)] * hyst) l = cur; // hysteresis
+        if (cur >= 0 && Math.abs(l - cur) === 1 && Math.abs(d - D[Math.min(l, cur)]) < D[Math.min(l, cur)] * hyst) l = cur; // hysteresis ([r7-lod] adjacent LODs only: after a jump a tree used to keep a far LOD next to a near boundary)
         if (!inView) { if (l > sh) { tier[i] = -1; continue; } seen[i] = 1; put(s, sh, i, 0); tier[i] = sh; fadeP[i] = 1; continue; } // off-screen: shadow-only, cheapest shadow LOD
         seen[i] = 1;
         if (cur >= 0 && l !== cur) { from[i] = cur; fadeP[i] = 0; } // start a cross-fade
