@@ -30,11 +30,12 @@ import { buildMidCity } from './world/midcity.js';
 import { Grass } from './world/grass.js';
 import { U, materials } from './materials.js';
 import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './time.js';
-import { installGrading, contactAO, ambAlpha, GRADE } from './world/grading.js';
+import { installGrading, contactAO, ambAlpha, GRADE, GBUF } from './world/grading.js';
 import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground paint
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
-import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js'; // [r6-perf] tiers, cached shadows, adaptive quality
+import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js';
+import { opaqueCanvas } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
 import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
 
@@ -70,6 +71,7 @@ async function boot() {
   BS.gpu = gpu;
   if (!gpu && !gpuInfo.webgl2) { const e = new Error(noWebGLMessage(gpuInfo)); e.noWebGL = true; throw e; } // [r6-perf] no WebGL (e.g. Chrome 139+ with acceleration off): explain instead of failing
   const usePost = !gpu && (settings.quality === 'high' || settings.quality === 'ultra' || qs.get('post') === '1') && qs.get('post') !== '0';   // gfx-post: MSAA lives in the HDR target then
+  GBUF.on = usePost; // [r6-fast] alpha-channel G-buffer data only when rendering into the post HDR target (grading.js)
   let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: !usePost && !BS.soft /* [r6-perf] software MSAA shades every sample */, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
   if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: !usePost && !BS.soft, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
   renderer.setPixelRatio(Math.min(devicePixelRatio, Q.dpr)); renderer.setSize(innerWidth, innerHeight);
@@ -384,7 +386,7 @@ async function boot() {
     if (water) { try { water.update(dt, camera, state === 'play' ? player.pos : null); } catch (e) { console.warn('water', e); water = null; } } // r4-campanile
     if (gpuPost) gpuPost.render(U.uNight.value); /* [gfx-webgpu] */
     else if (post) post.render(dt);   // gfx-post
-    else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else renderer.render(scene, camera);
+    else if (composer) { bloom.strength = 0.03 + 0.35 * U.uNight.value; bloom.threshold = 0.99 - 0.14 * U.uNight.value; composer.render(dt); } else { renderer.render(scene, camera); opaqueCanvas(renderer); } // [r6-fast] direct path: canvas alpha = 1 (alpha-to-coverage foliage writes coverage into alpha)
   }
   function hud(date) {
     ui.clock(clockString(date), timeSt.label, timeSt); ui.modes(); // ui-pro
@@ -407,7 +409,7 @@ async function boot() {
   let composer = null, bloom = null, gpuPost = null, post = null;
   if (gpu && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) gpuPost = await gpu.makePost({ scene, camera }); // [gfx-webgpu]
   // gfx-post: HDR target + GTAO + aerial perspective + AgX look (+ bloom, SMAA on ultra). ?post=0 restores the old path.
-  if (usePost) { try { post = new PostPipeline({ renderer, scene, camera, sky, quality: settings.quality === 'ultra' ? 'ultra' : settings.quality === 'medium' ? 'medium' : 'high' }); } catch (e) { console.warn('post pipeline unavailable', e); post = null; } }
+  if (usePost) { try { post = new PostPipeline({ renderer, scene, camera, sky, quality: settings.quality === 'ultra' ? 'ultra' : settings.quality === 'medium' ? 'medium' : 'high' }); } catch (e) { console.warn('post pipeline unavailable', e); post = null; GBUF.on = false; } }
   BS.post = post;
   if (!gpu && !post && (settings.quality === 'ultra' || qs.get('bloom')) && !qs.get('nobloom')) {
     const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: 4 });

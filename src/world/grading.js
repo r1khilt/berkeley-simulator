@@ -7,6 +7,12 @@ export const GRADE = { uSat: { value: 1.08 }, uContrast: { value: 1.06 }, uWarm:
 // flare = veiling glare added in exposed scene-linear units (lifts blacks like a real lens); satOut/warm/tint = display grade.
 export const LOOK = { contrast: 1.42, slope: 1.0, power: 1.05, sat: 1.2, flare: 0.003, satOut: 1.0, satKnee: 0.15, warm: 0.012, shadowCool: 0.02 };
 export const AOU = { uCAOMin: { value: 0.5 } };   // contact-AO floor (raised when screen-space AO is on)
+// [r6-fast] GBUF.on: materials may encode post-pass data in alpha (ambient fraction, terrain marker) ONLY when the scene
+// renders into the post pipeline's HDR target. Low/Medium (and ?post=0) draw straight into the canvas, which three.js
+// always creates with alpha:true + premultipliedAlpha: alpha < 1 there made the page see-through (terrain alpha = -2 ->
+// 0), so readbacks/screenshots and some compositors (SwiftShader captures, overlay planes) showed black ground and
+// buildings. main.js sets this from usePost before the first shader compile; the encodings below read it at compile time.
+export const GBUF = { on: true };
 const f = (x) => Number(x).toFixed(5);
 // GLSL: tone map an already-exposed scene-linear colour to display-linear sRGB. `U` = use uniforms (post) instead of constants.
 export function toneGLSL(U) {
@@ -91,7 +97,7 @@ float aoH(vec2 w){ vec2 f=(w-uAOCore.xy)/uAOCore.z; if (f.x < 0.0 || f.y < 0.0 |
  float a=texelFetch(uAOH,i,0).r, b=texelFetch(uAOH,i+ivec2(1,0),0).r, c=texelFetch(uAOH,i+ivec2(0,1),0).r, d=texelFetch(uAOH,i+ivec2(1,1),0).r; return mix(mix(a,b,t.x),mix(c,d,t.x),t.y); }`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  { float hh = vWPAO.y - aoH(vWPAO.xz); float cao = mix(uCAOMin, 1.0, smoothstep(0.0, 2.2, hh)); reflectedLight.indirectDiffuse *= cao; reflectedLight.indirectSpecular *= cao; reflectedLight.directDiffuse *= mix(1.0, cao, 0.35 * (1.0 - uCAOMin) / 0.5); }`)
-      .replace('#include <opaque_fragment>', AMB_ALPHA);
+      .replace('#include <opaque_fragment>', GBUF.on ? AMB_ALPHA : '#include <opaque_fragment>'); // [r6-fast] post only
   };
   mat.customProgramCacheKey = () => k0 + '|cao2';
   mat.needsUpdate = true;
@@ -110,7 +116,7 @@ export function ambAlpha(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = function (sh, r) {
     if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r);
-    if (sh.fragmentShader.includes('bsAmb')) return;
+    if (sh.fragmentShader.includes('bsAmb') || !GBUF.on) return; // [r6-fast] post only
     sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', AMB_ALPHA);
   };
   mat.customProgramCacheKey = () => k0 + '|amba';

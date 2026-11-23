@@ -4,6 +4,7 @@ import { noiseTexture } from './noiseTex.js';
 import { U } from '../materials.js';
 import { PBR, PBR_GLSL, pbrUniforms } from './pbr.js'; // gfx-materials: PBR ground
 import { GROUND_PBR_GLSL } from './pbrGround.js';
+import { GBUF } from './grading.js'; // [r6-fast] post-only alpha marker
 
 export const CHUNK = 64;
 const LODS = [64, 32, 16, 8, 4];
@@ -241,8 +242,8 @@ void groundShade(vec2 w, float dist){
         .replace('#include <normal_fragment_maps>', '')
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
  totalEmissiveRadiance += gEmis;`)
-        .replace('#include <dithering_fragment>', `#include <dithering_fragment>
- gl_FragColor.a = -1.0 - gl_FragColor.a; // r4-ground: terrain marker for the post AO pass (post.js)`)
+        .replace('#include <dithering_fragment>', GBUF.on ? `#include <dithering_fragment>
+ gl_FragColor.a = -1.0 - gl_FragColor.a; // r4-ground: terrain marker for the post AO pass (post.js)` : '#include <dithering_fragment>') // [r6-fast] only into the post HDR target
         .replace('#include <aomap_fragment>', `#include <aomap_fragment>
  reflectedLight.indirectDiffuse *= gAO; reflectedLight.indirectSpecular *= gAO; reflectedLight.directDiffuse *= mix(1.0, gAO, 0.35);`);
     };
