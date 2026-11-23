@@ -100,16 +100,25 @@ export class CoreTerrain {
         .replace('#include <common>', `#include <common>
 uniform sampler2D uHeight; uniform vec4 uCore; uniform vec2 uCoreSize;
 attribute float aSkirt; varying vec3 vWPos;
+#ifdef BS_SOFT
+varying vec3 vGeoNr; // [r6-fast] soft tier: heightfield normal per vertex instead of 16 texel fetches per fragment
+#endif
 float coreH(vec2 w){ vec2 f=(w-uCore.xy)/uCore.z; f=clamp(f,vec2(0.0),uCoreSize-1.001); ivec2 i=ivec2(floor(f)); vec2 t=f-vec2(i);
  float a=texelFetch(uHeight,i,0).r, b=texelFetch(uHeight,i+ivec2(1,0),0).r, c=texelFetch(uHeight,i+ivec2(0,1),0).r, d=texelFetch(uHeight,i+ivec2(1,1),0).r;
  return mix(mix(a,b,t.x),mix(c,d,t.x),t.y); }`)
         .replace('#include <begin_vertex>', `vec4 wp0 = instanceMatrix * vec4(position,1.0);
  vec3 transformed = vec3(position.x, coreH(wp0.xz) - aSkirt*4.0, position.z);
- vWPos = vec3(wp0.x, transformed.y, wp0.z);`);
+ vWPos = vec3(wp0.x, transformed.y, wp0.z);
+#ifdef BS_SOFT
+ vGeoNr = vec3(coreH(wp0.xz - vec2(1.0,0.0)) - coreH(wp0.xz + vec2(1.0,0.0)), 2.0, coreH(wp0.xz - vec2(0.0,1.0)) - coreH(wp0.xz + vec2(0.0,1.0)));
+#endif`);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
 uniform sampler2D uHeight, uSdf, uSpecial, uAux, uNoise, uOrtho, uLamp, uLeaf; uniform vec4 uCore, uGround, uAuxRect, uLampRect; uniform vec2 uCoreSize; uniform float uNight, uTime;
 varying vec3 vWPos;
+#ifdef BS_SOFT
+varying vec3 vGeoNr;
+#endif
 float coreHf(vec2 w){ vec2 f=(w-uCore.xy)/uCore.z; f=clamp(f,vec2(0.0),uCoreSize-1.001); ivec2 i=ivec2(floor(f)); vec2 t=f-vec2(i);
  float a=texelFetch(uHeight,i,0).r, b=texelFetch(uHeight,i+ivec2(1,0),0).r, c=texelFetch(uHeight,i+ivec2(0,1),0).r, d=texelFetch(uHeight,i+ivec2(1,1),0).r;
  return mix(mix(a,b,t.x),mix(c,d,t.x),t.y); }
@@ -229,7 +238,11 @@ void groundShade(vec2 w, float dist){
 }`)
         .replace('void groundShade(vec2 w, float dist){', PBR_GLSL + GROUND_PBR_GLSL + '\nvoid groundShade(vec2 w, float dist){') // gfx-materials
         .replace('#include <map_fragment>', `float gDist = length(vWPos - cameraPosition);
+#ifdef BS_SOFT
+ gGeoNr = vGeoNr; // [r6-fast]
+#else
  { float e0 = 1.0; gGeoNr = vec3(coreHf(vWPos.xz - vec2(e0,0.0)) - coreHf(vWPos.xz + vec2(e0,0.0)), 2.0*e0, coreHf(vWPos.xz - vec2(0.0,e0)) - coreHf(vWPos.xz + vec2(0.0,e0))); } // r4-ground: heightfield normal once, for slope-aware texturing + lighting
+#endif
  if (uPbrOn > 0.5) groundShadePBR(vWPos.xz, gDist); else groundShade(vWPos.xz, gDist);
  diffuseColor.rgb = gCol;`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
@@ -262,7 +275,7 @@ void groundShade(vec2 w, float dist){
       if (!this._frustum.intersectsBox(ch.box)) continue;
       const dx = Math.max(ch.box.min.x - cp.x, 0, cp.x - ch.box.max.x), dz = Math.max(ch.box.min.z - cp.z, 0, cp.z - ch.box.max.z), dy = Math.max(ch.box.min.y - cp.y, 0, cp.y - ch.box.max.y);
       const d = Math.hypot(dx, dz, dy * 0.5);
-      let l = 0; while (d > LOD_DIST[l]) l++;
+      const LD = this.lodDist || LOD_DIST; let l = 0; while (d > LD[l]) l++; // [r6-fast] soft tier passes tighter LOD bands (fewer sub-pixel slivers)
       m.makeTranslation(ch.x, 0, ch.z);
       this.meshes[l].setMatrixAt(counts[l]++, m);
     }

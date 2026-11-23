@@ -35,7 +35,12 @@ const vec3 PBR_MEAN[${LAYERS.length}] = vec3[](${LAYERS.map(([, , m]) => `vec3($
 struct PS { vec3 c; float r; vec2 g; float h; };
 // one tap: c albedo (linear), r roughness, g surface slope along +u/+v of the uv used (image-up = -v), h height 0..1
 PS pbrTap(vec2 uv, float Lr) {
-  vec4 a = texture(uPbrA, vec3(uv, Lr)); vec4 n = texture(uPbrN, vec3(uv, Lr));
+  vec4 a = texture(uPbrA, vec3(uv, Lr));
+#ifdef BS_SOFT
+  vec4 n = vec4(0.5, 0.5, 0.5, 0.75); // [r6-fast] soft tier: albedo/roughness taps only (no normal/height array fetch)
+#else
+  vec4 n = texture(uPbrN, vec3(uv, Lr));
+#endif
   PS s; s.c = a.rgb; s.r = a.a; s.g = vec2(n.r * 2.0 - 1.0, 1.0 - n.g * 2.0); s.h = n.a * 2.0 - 1.0; return s;
 }
 PS pbrMix(PS a, PS b, float w) { a.c = mix(a.c, b.c, w); a.r = mix(a.r, b.r, w); a.g = mix(a.g, b.g, w); a.h = mix(a.h, b.h, w); return a; }

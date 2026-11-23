@@ -35,7 +35,7 @@ import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground pa
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
 import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js';
-import { opaqueCanvas } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
+import { opaqueCanvas, installSoftShading, cullSkinned } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
 import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
 
@@ -54,13 +54,14 @@ const gpuInfo = probeGPU(); BS.gpuInfo = gpuInfo;
 // shadow work); an explicit quality choice or ?q= is respected. ?soft=1 forces the soft tier for testing.
 // NOTE: auto-selecting the soft tier is held back (SOFT_AUTO) until the pre-existing black-ground bug of the non-post Low/Medium
 // path on software WebGL is fixed (it reproduces on unmodified main with ?q=low); until then software users keep High + the notice.
-const SOFT_AUTO = false;
+const SOFT_AUTO = true; // [r6-fast] black ground fixed (grading.js GBUF + opaqueCanvas) and the soft tier has its own cheap shading
 BS.soft = (SOFT_AUTO && gpuInfo.software && settings.qualityAuto && !qs.get('q')) || qs.get('soft') === '1';
 if (settings.qualityAuto && !qs.get('q')) settings.quality = BS.soft ? 'low' : isTouch ? 'low' : gpuInfo.cls === 'low' ? 'medium' : 'high';
 if (qs.get('soft') === '1' && !qs.get('q')) settings.quality = 'low';
 if (qs.get('q')) settings.quality = qs.get('q');
 const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.5, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
-if (BS.soft) Object.assign(Q, { dpr: 0.8, shadow: 1024, cascades: 1, far: 150, trees: [42, 240], treeMax: 1200 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work
+if (BS.soft) Object.assign(Q, { dpr: 0.65, shadow: 1024, cascades: 1, far: 150, trees: [32, 180], treeMax: 900 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work ([r6-fast] 0.65x internal resolution, upscaled by the browser)
+if (BS.soft) installSoftShading(); // [r6-fast] cheap shader chunks (no IBL / normal maps / dark lamp lights), before anything compiles
 const ui = new UI(document.getElementById('ui')); ui.applySettings(settings); // ui-pro: theme + units
 onProgress((f) => ui.progress(f * 0.75));
 
@@ -116,6 +117,7 @@ async function boot() {
   const hf = new HeightField(core, mid, far); BS.hf = hf;
   const heightAt = (x, z) => hf.heightAt(x, z);
   const terrain = new CoreTerrain({ heights, meta: metaCore, sdf, special: specRes, aux, ortho: orthoCore });
+  if (BS.soft) terrain.lodDist = [45, 110, 270, 650, 1e9]; // [r6-fast] soft tier: coarser terrain LOD sooner (sub-pixel slivers cost whole shading quads)
   scene.add(terrain.group); phase('terrainDecode');
   BS.terrain = terrain; // exposes the ground SDF (asphalt/path/grass/dirt) for surface-aware effects, e.g. horse hoof sounds
   const coreRect = { x0: c.x0, x1: c.x0 + c.nx * c.step, z0: c.z0, z1: c.z0 + c.nz * c.step };
@@ -169,6 +171,7 @@ async function boot() {
     const lt = new THREE.CanvasTexture(cv); lt.flipY = false; lt.minFilter = THREE.LinearFilter; lt.generateMipmaps = false; lt.colorSpace = THREE.NoColorSpace; lt.needsUpdate = true; terrain.uniforms.uLeaf.value = lt; }
   let streets = null;
   try { streets = await buildStreetscape({ scene, vectors, pois, heightAt, physics, skipWalls: !!gwPlan /* [r4-ground] */, rect: { x0: c.x0, z0: c.z0, w: c.nx * c.step, h: c.nz * c.step }, landmarks: manifest.landmarks /* r4-sweep-outer: keep props out of landmark footprints */ }); terrain.uniforms.uLamp.value = streets.lampTex; } catch (e) { console.warn('streetscape failed', e); }
+  if (BS.soft && streets && streets.scatters) for (const sc of streets.scatters) sc.maxDist *= 0.5; // [r6-fast] soft tier: street props draw to half range (sub-pixel at 0.65x beyond)
   BS.streets = streets; phase('streetscape');
   let ground = null; if (gwPlan) try { ground = buildGroundworks(gwPlan, { scene, heightAt, trees, treeSys, physics, pois, vectors }); BS.ground = ground; } catch (e) { console.warn('groundworks failed', e); } phase('groundworks'); // [r4-ground]
   // a few real point lights follow the player through the nearest lamps at night
@@ -191,7 +194,7 @@ async function boot() {
   BS.life = life;
   await tick(); ui.progress(0.94);
   // ---- sky + CSM shadows
-  const sky = new SkySystem({ renderer, scene, camera }); BS.sky = sky;
+  const sky = new SkySystem({ renderer, scene, camera }); BS.sky = sky; if (BS.soft) sky.noEnv = true; // [r6-fast] hemisphere ambient instead of PMREM
   if (gpu) gpu.patchSky(sky); // [gfx-webgpu]
   const useCSM = qs.get('csm') !== '0';
   class SimpleSun { // fallback: one shadowed directional light following the camera
@@ -226,7 +229,7 @@ async function boot() {
     onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); sched.invalidate(); } /* [r6-perf] */ },
     onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); } });
   BS.lm = lm;
-  if (BS.soft) { lm.loadR = 320; lm.unloadR = 500; } // [r6-perf] software: hand-built landmarks stream in a little closer (stand-ins beyond)
+  if (BS.soft) { lm.loadR = 220; lm.unloadR = 340; lm.detailR = 160; } // [r6-perf] software: hand-built landmarks stream in a little closer (stand-ins beyond) ([r6-fast] ornaments within 200 m)
   ui.note('Loading landmarks…');
   await lm.loadNow(manifest.landmarks.filter((l) => l.always).map((l) => l.id));
   const landmarks = lm.placed; BS.landmarks = landmarks; phase('landmarks');
@@ -373,6 +376,7 @@ async function boot() {
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
     bridges.update(U.uNight.value);
+    if (!usePost && frameN % 90 === 1) cullSkinned(scene); // [r6-fast] off-screen skinned meshes (avatar, horse, people) stop costing vertex skinning
     if (life) { const lp = state === 'play' || BS.lifePlayer; life.update(dt, { camera, focus: lp ? player.pos : camera.position, date, player: lp ? player : null }); } // r4-campus-life (r4-people2: BS.lifePlayer lets headless tests drive the player without play())
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
@@ -426,7 +430,7 @@ async function boot() {
   const gpuTimer = gpu ? null : new GpuTimer(renderer.getContext()); BS.gpuTimer = gpuTimer;
   const dprMax = Math.min(devicePixelRatio, Q.dpr);
   const setScale = (k) => { if (post && post.setScale) post.setScale(k); else { const d = Math.max(0.5, dprMax * k); renderer.setPixelRatio(d); composer && composer.setPixelRatio(d); } };
-  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 1 : 0.72 }); BS.gov = gov; // software: the tier already renders at 0.8x; no further scaling
+  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 0.85 : 0.72 }); BS.gov = gov; // software: the tier already renders at 0.65x; at most one more step (0.55x) [r6-fast]
   if (BS.soft) gov.target = 33.3;            // software WebGL: aim for a steady 30 fps
   if (qs.get('gov') === '0') gov.enabled = false; else if (qs.get('gov')) gov.setLevel(+qs.get('gov'), 'url');
   BS.perf = { state: () => ({ ...gov.state(), gpuMs: gpuTimer && gpuTimer.ok ? +gpuTimer.ms.toFixed(2) : null, timer: !!(gpuTimer && gpuTimer.ok), gpu: gpuInfo.renderer, cls: gpuInfo.cls, soft: BS.soft, quality: settings.quality, auto: !!settings.qualityAuto, dpr: renderer.getPixelRatio() }) };

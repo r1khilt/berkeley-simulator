@@ -163,7 +163,7 @@ function makeRungs(c) {
   // 4. MSAA 4x -> 2x in the HDR target
   if (c.post && c.post.cfg.msaa > 2) R.push({ name: 'msaa2', on() { c.post.setSamples(2); }, off() { c.post.setSamples(c.post.cfg.msaa); } });
   // 6. landmark ornament range 380 -> 220 m
-  if (c.lm) R.push({ name: 'lmDetail', on() { c.lm.detailR = 220; }, off() { c.lm.detailR = 380; } });
+  if (c.lm) { const b = c.lm.detailR ?? 380; R.push({ name: 'lmDetail', on() { c.lm.detailR = Math.min(b, 220); }, off() { c.lm.detailR = b; } }); } // [r6-fast] restore the tier's own range
   // 7. ambient occlusion off (biggest post pass)
   if (c.post && c.post.cfg.ao) R.push({ name: 'ao', on() { c.post.U.uUseAO.value = 0; c.post.aoOff = true; }, off() { c.post.U.uUseAO.value = 1; c.post.aoOff = false; } });
   // 8. shadow distance x0.55, far shadows refresh x3
