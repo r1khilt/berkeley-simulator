@@ -1013,7 +1013,7 @@ function buildSpecies(id, d, season, opts) {
   }
   if (!L2.puffs) L2.blob = buildBlob(sk, d, rnd, d.arche === 'palm' ? 1 : density);
   // [r7-lod] very-far LOD: the crown as 3-5 big puffs, no trunk (own random stream: LOD0-2 and hero are unchanged).
-  // TreeSystem switches to it where the far LOD's lobes shrink below ~2 px (about 1.1 km on High at 1080p).
+  // TreeSystem switches to it once a whole crown is under ~3 px (about 2.4 km on High at 1080p, 520 m on the soft tier).
   const L3 = {}; if (L2.puffs && opts.far2 !== false) { const r3 = mulberry32(d.seed * 15485863 + 11); const lp0 = L0.leaves && L0.leaves.p; let fit3 = null;
     if (lp0 && lp0.length > 180) { const rads = [], ys = []; for (let i = 0; i < lp0.length; i += 3) { rads.push(Math.hypot(lp0[i], lp0[i + 2])); ys.push(lp0[i + 1]); } fit3 = { R: percentile(rads, 0.95), base: percentile(ys, 0.03) }; }
     L3.puffs = buildPuffs(sk, d, r3, density, d.arche === 'conifer' ? 5 : 4, { core: 1, rK: 1.12, fit: fit3, aoK: 0.9, skipK: 0, fists: false }); if (!L3.puffs.count) delete L3.puffs; }

@@ -111,8 +111,9 @@ export class TreeSystem {
     // masks (tree-shaders.js aLodFade), so nothing pops and no tree stays stippled while the player stands still.
     // Switch distances have a little hysteresis so trees on a boundary don't flicker between LODs.
     const D4 = [this.heroD, this.lod[0], this.lod[1]], D3 = [this.lod[0], this.lod[1]], dm = this.maxDist ** 2, hyst = 0.03, fadeS = this.fadeS ?? 0.35;
-    // [r7-lod] species with a very-far LOD (lib far2) switch to it where the far crown's lobes (~2.5 m) drop below 2 px
-    const dF2 = LOD.on ? Math.max(this.lod[1] * 1.25, LOD.distFor(2.5, 2)) : Infinity, D5 = [...D4, dF2], D4b = [...D3, dF2];
+    // [r7-lod] species with a very-far LOD (lib far2) switch to it once a whole crown (~8 m) is under ~3 px: 13 lobes -> 4-5
+    // reads the same at that size (at ~13 px it did not: the aerial view showed the swap)
+    const dF2 = LOD.on ? Math.max(this.lod[1] * 1.25, LOD.distFor(8, 3)) : Infinity, D5 = [...D4, dF2], D4b = [...D3, dF2];
     const nearSq = this.lod[0] ** 2, n = this.t.n;
     if (!this.tier) { this.tier = new Int8Array(n).fill(-1); this.from = new Int8Array(n).fill(-1); this.fadeP = new Float32Array(n).fill(1); }
     const tier = this.tier, from = this.from, fadeP = this.fadeP;
