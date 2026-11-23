@@ -698,6 +698,8 @@ function dataTex(mips, srgb) {
   const t = new THREE.DataTexture(mips[0].data, mips[0].width, mips[0].height, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.mipmaps = mips; t.generateMipmaps = false; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 4; t.flipY = false; t.needsUpdate = true;
+  // [r6-load] in the game, drop the CPU mip chain once it is on the GPU (nothing reads it back)
+  if (typeof window !== 'undefined' && window.BSIM && window.BSIM.qs) t.onUpdate = () => { for (const m of t.mipmaps) m.data = null; if (t.image) t.image.data = null; };
   return t;
 }
 function coverage(rgba, n) { let c = 0; for (let i = 0; i < n; i++) if (rgba[i * 4 + 3] >= 128) c++; return c / n; }

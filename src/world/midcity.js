@@ -4,7 +4,10 @@ import { U } from '../materials.js';
 const WALLS = [[0.86, 0.84, 0.78], [0.80, 0.76, 0.68], [0.72, 0.74, 0.70], [0.88, 0.86, 0.82], [0.70, 0.64, 0.56], [0.62, 0.66, 0.70], [0.82, 0.74, 0.62], [0.76, 0.70, 0.66]];
 export function buildMidCity(list, heightAt) {
   const tiles = new Map();
-  const T = (x, z) => { const k = Math.floor(x / 1200) + ',' + Math.floor(z / 1200); let t = tiles.get(k); if (!t) tiles.set(k, (t = { p: [], c: [], n: [] })); return t; };
+  // [r6-load] typed, growable vertex buffers instead of JS number arrays (~880k triangles: the JS arrays peaked near 200 MB
+  // of heap at boot, then were copied into Float32 attributes). Normals are Int8 and colours Uint16 (both normalised,
+  // 4-wide so D3D/ANGLE needs no conversion): 24 B per vertex instead of 36, same look. Arrays are dropped after upload.
+  const T = (x, z) => { const k = Math.floor(x / 1200) + ',' + Math.floor(z / 1200); let t = tiles.get(k); if (!t) tiles.set(k, (t = new VAcc())); return t; };
   let seed = 1; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   for (const [h, kind, rc, flat] of list) {
     const pts = []; for (let i = 0; i < flat.length; i += 2) pts.push([flat[i] / 2, flat[i + 1] / 2]);
@@ -14,7 +17,7 @@ export function buildMidCity(list, heightAt) {
     let base = Infinity; for (const p of pts) base = Math.min(base, heightAt(p[0], p[1])); base -= 0.5;
     const top = base + 0.5 + h; const t = T(cx, cz);
     const w = WALLS[Math.floor(rnd() * WALLS.length)]; const r = [rc[0] / 255 * 0.8, rc[1] / 255 * 0.8, rc[2] / 255 * 0.8].map((v) => Math.pow(v, 2.2) * 1.15);
-    const push = (A, B, C, col, nrm) => { t.p.push(...A, ...B, ...C); for (let k = 0; k < 3; k++) { t.c.push(...col); t.n.push(...nrm); } };
+    const push = (A, B, C, col, nrm) => t.tri(A, B, C, col, nrm);
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i], q = pts[(i + 1) % pts.length]; const ex = q[0] - p[0], ez = q[1] - p[1], L = Math.hypot(ex, ez) || 1; const nrm = [ez / L, 0, -ex / L];
       const A = [p[0], base, p[1]], B = [q[0], base, q[1]], C = [q[0], top, q[1]], D = [p[0], top, p[1]];
@@ -41,9 +44,22 @@ export function buildMidCity(list, heightAt) {
   mat.customProgramCacheKey = () => 'midcity';
   const group = new THREE.Group(); group.name = 'midcity';
   for (const t of tiles.values()) {
-    if (!t.p.length) continue;
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(t.c, 3)); g.computeBoundingSphere();
+    if (!t.n) continue;
+    const g = new THREE.BufferGeometry(); const n = t.n;
+    g.setAttribute('position', new THREE.BufferAttribute(t.p.slice(0, n * 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(t.nr.slice(0, n * 4), 4, true)); g.setAttribute('color', new THREE.BufferAttribute(t.c.slice(0, n * 4), 4, true)); g.computeBoundingSphere();
+    for (const a of Object.values(g.attributes)) a.onUpload(dropArray); // nothing reads mid-city vertices on the CPU (not raycast)
     const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = false; group.add(m);
   }
   return group;
+}
+// [r6-load] after the GPU upload keep only an empty array of the same type (count, bounds and the GPU buffer stay)
+function dropArray() { this.array = new this.array.constructor(0); }
+class VAcc { // growable vertex accumulator: position f32x3, normal i8x4 (norm), colour u16x4 (norm)
+  constructor() { this.n = 0; this.cap = 0; this.p = null; this.nr = null; this.c = null; }
+  grow() { const cap = Math.max(3072, this.cap * 2), p = new Float32Array(cap * 3), nr = new Int8Array(cap * 4), c = new Uint16Array(cap * 4); if (this.p) { p.set(this.p); nr.set(this.nr); c.set(this.c); } Object.assign(this, { cap, p, nr, c }); }
+  tri(A, B, C, col, nrm) {
+    if (this.n + 3 > this.cap) this.grow();
+    const nx = Math.round(nrm[0] * 127), ny = Math.round(nrm[1] * 127), nz = Math.round(nrm[2] * 127), cr = Math.round(col[0] * 65535), cg = Math.round(col[1] * 65535), cb = Math.round(col[2] * 65535);
+    for (const V of [A, B, C]) { const i = this.n++; this.p[i * 3] = V[0]; this.p[i * 3 + 1] = V[1]; this.p[i * 3 + 2] = V[2]; this.nr[i * 4] = nx; this.nr[i * 4 + 1] = ny; this.nr[i * 4 + 2] = nz; this.c[i * 4] = cr; this.c[i * 4 + 1] = cg; this.c[i * 4 + 2] = cb; this.c[i * 4 + 3] = 65535; }
+  }
 }

@@ -7,6 +7,16 @@ import { applyInteriorGlass } from './interiors.js'; // furnished rooms behind l
 import { weatherLandmark } from './pbr.js'; // r4-sweep-central2: consistent base grime on mixed façades
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
+// [r6-load] module + packet fetches started ahead of _load: the boot landmarks while the world data downloads, and while
+// streaming the next few nearest candidates. On a 40 ms RTT link each landmark used to cost its own sequential round
+// trips before its build could start.
+const _pre = new Map();
+export function prefetchLandmark(id) {
+  let p = _pre.get(id); if (p) return p;
+  const imp = modules[`../landmarks/${id}.js`]; if (!imp) return null;
+  p = Promise.all([imp(), loadJSON(`landmarks/${id}.json.gz`)]); _pre.set(id, p); p.catch(() => _pre.delete(id));
+  return p;
+}
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
 export class LandmarkManager {
   constructor({ scene, physics, heightAt, manifest, standins, onLoaded, onUnloaded, setupMaterials, loadR = 430, unloadR = 680 }) {
@@ -20,19 +30,24 @@ export class LandmarkManager {
   async loadNow(ids) { for (const id of ids) { const l = this.byId.get(id); if (l && l.state === 'idle') await this._load(l); } }
   update(camPos) {
     if (this.busy) return;
-    let best = null, bd = Infinity;
+    let best = null, bd = Infinity; const cand = this._cand || (this._cand = []); cand.length = 0; // [r6-load] prefetch candidates
     for (const l of this.items) {
       const d = Math.hypot(l.anchor.x - camPos.x, l.anchor.z - camPos.z) - (l.r || 0);
       if (l.state === 'ready' && !l.always && d > this.unloadR) { this._unload(l); return; }
       if (l.state === 'idle' && (d < this.loadR || l.always) && d < bd) { bd = d; best = l; }
+      if (l.state === 'idle') { if (d < this.loadR + 150 || l.always) { if (!_pre.has(l.id)) cand.push(l, d); } else if (d > this.loadR + 200 && _pre.has(l.id)) _pre.delete(l.id); } // drop stale prefetches
     }
     const now = performance.now();
     if (best && now - (this.lastLoad || 0) > 140) { this.busy = true; this.lastLoad = now; this._load(best).finally(() => { this.busy = false; this.lastLoad = performance.now(); }); }
+    // [r6-load] keep up to 4 fetches ahead, nearest first (cand holds [item, distance] pairs flat)
+    if (cand.length && _pre.size < 4) { const order = []; for (let i = 0; i < cand.length; i += 2) order.push(i); order.sort((a, b) => cand[a + 1] - cand[b + 1]);
+      for (const i of order) { if (_pre.size >= 4) break; if (cand[i] !== best) prefetchLandmark(cand[i].id); } }
   }
   async _load(l) {
     l.state = 'loading';
     try {
-      const [mod, packet] = await Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]);
+      const pre = _pre.get(l.id); _pre.delete(l.id); // [r6-load] use a prefetch if one is in flight
+      const [mod, packet] = await (pre || Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]));
       const a = packet.anchor; const heightAt = this.heightAt;
       const groundAt = (x, z) => heightAt(a.x + x, a.z + z) - a.y;
       const res = await mod.build({ THREE, M: this.M, U, boxUV, groundAt, footprints: packet.footprints, anchor: a, packet });
