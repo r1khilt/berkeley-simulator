@@ -34,6 +34,7 @@ import { installGrading, contactAO, ambAlpha, GRADE } from './world/grading.js';
 import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground paint
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
+import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js'; // [r6-perf] tiers, cached shadows, adaptive quality
 import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
 
@@ -43,8 +44,19 @@ const BS = (window.BSIM = { qs });
 const isTouch = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
 const store = { get(k, d) { try { const v = localStorage.getItem('bsim.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('bsim.' + k, JSON.stringify(v)); } catch (e) {} } };
 const settings = Object.assign({ quality: isTouch ? 'low' : 'high', sens: 1, invertY: false, fov: 62, volume: 0.7, north: false }, store.get('settings', {}));
+// [r6-perf] Auto quality (default): the tier comes from the GPU (software WebGL -> low + lighter knobs, weak iGPU -> medium,
+// laptop iGPU / discrete -> high) and a governor trims subtle costs at runtime. Picking Low..Ultra in Settings pins it.
+// Saved settings from before Auto existed only count as a choice when they differ from the old default ('high').
+if (settings.qualityAuto === undefined) settings.qualityAuto = !store.get('settings', {}).quality || store.get('settings', {}).quality === 'high';
+const gpuInfo = probeGPU(); BS.gpuInfo = gpuInfo;
+// software rasteriser (SwiftShader / WARP / llvmpipe): in Auto it gets the light 'soft' tier (low + fewer pixels, vertices,
+// shadow work); an explicit quality choice or ?q= is respected. ?soft=1 forces the soft tier for testing.
+BS.soft = (gpuInfo.software && settings.qualityAuto && !qs.get('q')) || qs.get('soft') === '1';
+if (settings.qualityAuto && !qs.get('q')) settings.quality = BS.soft ? 'low' : isTouch ? 'low' : gpuInfo.cls === 'low' ? 'medium' : 'high';
+if (qs.get('soft') === '1' && !qs.get('q')) settings.quality = 'low';
 if (qs.get('q')) settings.quality = qs.get('q');
-const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.6, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
+const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.5, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
+if (BS.soft) Object.assign(Q, { dpr: 1, shadow: 1024, cascades: 1, far: 150, trees: [42, 240], treeMax: 1200 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work
 const ui = new UI(document.getElementById('ui')); ui.applySettings(settings); // ui-pro: theme + units
 onProgress((f) => ui.progress(f * 0.75));
 
@@ -53,6 +65,7 @@ async function boot() {
   let gpu = null;
   if (qs.get('renderer') === 'webgpu') { const r = await (await import('./gpu/webgpu.js')).createWebGPU({ canvas, qs }); if (r.renderer) gpu = r; else { canvas = r.canvas; BS.rendererFallback = r.fail; } }
   BS.gpu = gpu;
+  if (!gpu && !gpuInfo.webgl2) { const e = new Error(noWebGLMessage(gpuInfo)); e.noWebGL = true; throw e; } // [r6-perf] no WebGL (e.g. Chrome 139+ with acceleration off): explain instead of failing
   const usePost = !gpu && (settings.quality === 'high' || settings.quality === 'ultra' || qs.get('post') === '1') && qs.get('post') !== '0';   // gfx-post: MSAA lives in the HDR target then
   let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
   if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
@@ -186,6 +199,9 @@ async function boot() {
   if (qs.get('noshadow')) { for (const l of csm.lights) l.castShadow = false; }
   BS.drawStats = () => { const sm = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; renderer.info.autoReset = false; renderer.info.reset(); renderer.render(scene, camera); const main = { ...renderer.info.render }; renderer.shadowMap.enabled = sm; renderer.info.autoReset = true; return main; };
   csm.lights.forEach((l, i) => { l.shadow.normalBias = [0.07, 0.22, 0.5, 0.9][i] ?? 0.9; l.shadow.bias = [-0.0003, -0.0006, -0.001, -0.0015][i] ?? -0.0015; });
+  if (!gpu) for (const l of csm.lights) l.shadow.camera.layers.enable(PROXY_LAYER); // [r6-perf] shadow cameras also draw the landmarks' shadow-only proxies
+  const sched = (!gpu && useCSM && csm.lights && csm.lights.length && !qs.get('noshadowcache')) ? new ShadowScheduler({ csm, camera }) : null; BS.shadowSched = sched; // [r6-perf] cached / staggered cascades (?noshadowcache=1 disables)
+  const farMul = { v: 1 }; BS.farMul = farMul; // [r6-perf] governor scales the shadow distance
   const csmDone = new WeakSet();
   const aoCore = { v4: terrain.uniforms.uCore.value, size: terrain.uniforms.uCoreSize.value };
   const setupMaterials = (root) => root.traverse((o) => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (!m || csmDone.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue; csmDone.add(m); pbrWeather(m); /* gfx-materials: base grime on PBR masonry */ if (o.parent !== terrain.group && !m.transparent && o.name !== 'bay' && !(m.customProgramCacheKey && /coreTerrain|ring|bayWater|creek/.test(m.customProgramCacheKey()))) contactAO(m, terrain.uniforms.uHeight.value, aoCore); else if (!m.transparent && m.isMeshStandardMaterial) ambAlpha(m);   /* gfx-post: ambient fraction for post AO */ const prev = m.onBeforeCompile; if (!useCSM || gpu) continue; const k1 = String(m.customProgramCacheKey()); csm.setupMaterial(m); const hook = m.onBeforeCompile; m.onBeforeCompile = function (sh, r) { if (prev && prev !== THREE.Material.prototype.onBeforeCompile) prev.call(this, sh, r); hook.call(this, sh, r); }; m.customProgramCacheKey = () => k1 + '|csm'; m.needsUpdate = true; } });
@@ -199,8 +215,9 @@ async function boot() {
   player.speedScale = settings.walkSpeed ?? 1; if (settings.flySpeed) player.flySpeed = settings.flySpeed; player.camFollow = settings.camFollow !== false;
   player.onSpeedChange = (k, v, fromGame) => { settings[k === 'fly' ? 'flySpeed' : 'walkSpeed'] = v; store.set('settings', settings); if (fromGame) ui.speedChanged(k, v); };
   setupMaterials(scene);
+  if (sched) tagFarCasters(scene); // [r6-perf] big casters also draw into the far cascade
   const lm = new LandmarkManager({ scene, physics, heightAt, manifest, standins: bres.standinMgr, setupMaterials,
-    onLoaded: (l) => { player.interactions.push(...(l.inter || [])); },
+    onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); sched.invalidate(); } /* [r6-perf] */ },
     onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); } });
   BS.lm = lm;
   ui.note('Loading landmarks…');
@@ -337,12 +354,13 @@ async function boot() {
     if (state === 'play') { player.update(dt); } else if (BS.flyover) flyover(dt);
     camera.updateMatrixWorld();
     { // gfx-post: stretch the shadow range with altitude so aerial views keep building/tree shadows across the city
-      const hg = camera.position.y - heightAt(camera.position.x, camera.position.z); const mf = Math.min(Q.far * 4, Math.max(Q.far, Q.far * (1 + Math.max(0, hg - 40) / 110)));
+      const hg = camera.position.y - heightAt(camera.position.x, camera.position.z); const qf = Q.far * farMul.v; const mf = Math.min(qf * 4, Math.max(qf, qf * (1 + Math.max(0, hg - 40) / 110))); /* [r6-perf] farMul */
       if (csm.maxFar && Math.abs(mf - csm.maxFar) / csm.maxFar > 0.15) { csm.maxFar = mf; csm.updateFrustums(); } }
     csm.update();
+    if (sched) { if (csm.maxFar !== sched.lastFar) { sched.lastFar = csm.maxFar; sched.invalidate(); } sched.update(); } // [r6-perf]
     terrain.update(camera);
     if (treeSys) { treeSys.update(camera); BS.treeLib?.update?.(dt); }
-    if (streets) streets.update(camera.position);
+    if (streets) streets.update(camera.position, camera); // [r6-perf] + frustum
     if (ground) ground.update(camera.position); // [r4-ground]
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
@@ -394,20 +412,31 @@ async function boot() {
     addEventListener('resize', () => { composer.setSize(innerWidth, innerHeight); });
   }
   BS.composer = composer;
-  // dynamic resolution: keep frame time near 16-20 ms by scaling the pixel ratio
-  let ftAvg = 16, dprNow = renderer.getPixelRatio(), dprMax = Math.min(devicePixelRatio, Q.dpr), dprCheck = 0;
+  // [r6-perf] adaptive quality (render/perf.js): a governor watches GPU time (EXT_disjoint_timer_query_webgl2) or frame
+  // pacing and first trims subtle costs (far-shadow refresh, tree LOD range, shadow distance, MSAA, ornament range, AO,
+  // bloom); render scale is its last rung, upscaled bicubically in the post pass. BS.fixedDpr (tests) or ?gov=0 freezes it.
+  const gpuTimer = gpu ? null : new GpuTimer(renderer.getContext()); BS.gpuTimer = gpuTimer;
+  const dprMax = Math.min(devicePixelRatio, Q.dpr);
+  const setScale = (k) => { if (post && post.setScale) post.setScale(k); else { const d = Math.max(0.5, dprMax * k); renderer.setPixelRatio(d); composer && composer.setPixelRatio(d); } };
+  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 0.85 : 0.72 }); BS.gov = gov;
+  if (BS.soft) gov.target = 33.3;            // software WebGL: aim for a steady 30 fps
+  if (qs.get('gov') === '0') gov.enabled = false; else if (qs.get('gov')) gov.setLevel(+qs.get('gov'), 'url');
+  BS.perf = { state: () => ({ ...gov.state(), gpuMs: gpuTimer && gpuTimer.ok ? +gpuTimer.ms.toFixed(2) : null, timer: !!(gpuTimer && gpuTimer.ok), gpu: gpuInfo.renderer, cls: gpuInfo.cls, soft: BS.soft, quality: settings.quality, auto: !!settings.qualityAuto, dpr: renderer.getPixelRatio() }) };
   const loop = () => {
-    const nowT = performance.now(); const raw = nowT - last; const dt = Math.min(0.1, raw / 1000); last = nowT; frame(dt);
-    ftAvg += (Math.min(raw, 100) - ftAvg) * 0.05; dprCheck += raw;
-    if (dprCheck > 1500 && !BS.fixedDpr) { dprCheck = 0;
-      if (ftAvg > 24 && dprNow > 0.6) { dprNow = Math.max(0.6, dprNow - 0.15); renderer.setPixelRatio(dprNow); composer && composer.setPixelRatio(dprNow); }
-      else if (ftAvg < 13 && dprNow < dprMax) { dprNow = Math.min(dprMax, dprNow + 0.1); renderer.setPixelRatio(dprNow); composer && composer.setPixelRatio(dprNow); } }
+    const nowT = performance.now(); const raw = nowT - last; const dt = Math.min(0.1, raw / 1000); last = nowT;
+    if (gpuTimer) gpuTimer.begin(); frame(dt); if (gpuTimer) gpuTimer.end();
+    const cpuMs = performance.now() - nowT, g = gpuTimer ? gpuTimer.poll() : null;
+    if (BS.fixedDpr) gov.enabled = false;
+    if (gpuTimer && gpuTimer.ok) { if (g != null) gov.sample(Math.max(g, cpuMs)); } else gov.sample(raw);
   };
+  // [r6-perf] compile the scene's shader programs before the first frame (parallel where KHR_parallel_shader_compile exists),
+  // instead of stalling the first frames on ~130 synchronous links; capped so a slow driver can't hold up the title
+  if (!gpu && renderer.compileAsync && !qs.get('nowarm')) { ui.note('Preparing shaders…'); try { await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, BS.soft ? 25000 : 12000))]); } catch (e) { console.warn('shader warm-up', e); } }
   renderer.setAnimationLoop(loop);
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); csm.updateFrustums(); });
   // debug hooks for automated checks
-  BS.pause = () => renderer.setAnimationLoop(null);
-  BS.resume = () => { last = performance.now(); renderer.setAnimationLoop(loop); }; // ui-pro: for UI screenshots
+  BS.pause = () => { renderer.setAnimationLoop(null); if (sky.atmo) sky.atmo.syncRead = true; }; // [r6-perf] scripted renders read the sky reduction synchronously
+  BS.resume = () => { last = performance.now(); if (sky.atmo) sky.atmo.syncRead = false; renderer.setAnimationLoop(loop); }; // ui-pro: for UI screenshots
   BS.renderOnce = () => frame(0.016);
   BS.setView = (px, py, pz, tx, ty, tz, rel) => { BS.flyover = false; if (rel) { py += heightAt(px, pz); ty += heightAt(tx, tz); } camera.position.set(px, py, pz); camera.lookAt(tx, ty, tz); camera.updateMatrixWorld(); };
   BS.snapshot = (w = 64, h = 36) => { frame(0.016); const url = renderer.domElement.toDataURL('image/jpeg', 0.85); const g = document.createElement('canvas'); g.width = w; g.height = h; const x = g.getContext('2d'); x.drawImage(renderer.domElement, 0, 0, w, h); return { url, px: Array.from(x.getImageData(0, 0, w, h).data) }; };
@@ -419,6 +448,7 @@ async function boot() {
   console.log('BSIM timing', JSON.stringify(BS.timing));
   await Promise.race([pbrP, new Promise((r) => setTimeout(r, 8000))]); BS.pbr = PBR; // gfx-materials
   ui.progress(1); ui.ready(); BS.ready = true;
+  if (gpuInfo.software && !qs.get('nonotice')) softwareNotice(gpuInfo); // [r6-perf] one-time: how to turn graphics acceleration on
   if (qs.get('play')) startPlay();
 }
 function sunAlt(d) { const { sunPosition } = SKYFN; return sunPosition(d).altitude; }
@@ -427,4 +457,4 @@ function tick() { return new Promise((r) => requestAnimationFrame(() => r())); }
 function area(r) { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
 function segDist(px, pz, ax, az, bx, bz) { const dx = bx - ax, dz = bz - az; const l = dx * dx + dz * dz; let t = l ? ((px - ax) * dx + (pz - az) * dz) / l : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(ax + t * dx - px, az + t * dz - pz); }
 function wxName(c) { if (c == null) return ''; if (c === 0) return 'Clear'; if (c <= 2) return 'Partly cloudy'; if (c === 3) return 'Overcast'; if (c === 45 || c === 48) return 'Fog'; if (c >= 51 && c <= 57) return 'Drizzle'; if (c >= 61 && c <= 67) return 'Rain'; if (c >= 71 && c <= 77) return 'Snow'; if (c >= 80 && c <= 82) return 'Showers'; if (c >= 95) return 'Thunderstorm'; return ''; }
-boot().catch((e) => { console.error(e); BS.error = String((e && e.stack) || e); ui.note('Could not start: ' + String(e && e.message || e).slice(0, 160)); });
+boot().catch((e) => { console.error(e); BS.error = String((e && e.stack) || e); const nogl = (e && e.noWebGL) || /creating WebGL context|WebGL.*(not supported|unavailable)/i.test(String(e && e.message)); /* [r6-perf] explain a missing WebGL in full */ ui.note('Could not start: ' + (nogl ? noWebGLMessage(BS.gpuInfo) : String(e && e.message || e).slice(0, 160))); });

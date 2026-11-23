@@ -5,6 +5,10 @@ import { U, materials, boxUV } from '../materials.js';
 import { noiseTexture } from './noiseTex.js';
 
 // ---------- distance-limited instancing for many props
+// [r6-perf] view-frustum selection for scattered props: the frustum is widened (FOV +36 deg) so a turn between refreshes
+// (every 4 m or ~8 deg) never shows a prop popping in at the screen edge
+const SCATTER_NEAR_KEEP = 45; const _sp = new THREE.Sphere(); const _fr = new THREE.Frustum(); const _wc = new THREE.PerspectiveCamera(); const _pm = new THREE.Matrix4();
+function wideFrustum(cam) { _wc.fov = Math.min(170, cam.fov + 36); _wc.aspect = cam.aspect; _wc.near = 0.1; _wc.far = 5000; _wc.updateProjectionMatrix(); _pm.multiplyMatrices(_wc.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); return _fr; }
 export class Scatter {
   constructor(name, build, maxDist, castShadow = false) {
     this.name = name; this.maxDist = maxDist; this.items = []; this.parts = build ? build().parts : []; this.castShadow = castShadow; this.meshes = [];
@@ -22,9 +26,14 @@ export class Scatter {
     }
     this.cap = cap;
   }
-  update(cp) {
+  update(cp, fr = null) {
     if (!this.meshes.length) return; const d2 = this.maxDist * this.maxDist; let k = 0; const it = this.items;
-    for (let i = 0; i < it.length && k < this.cap; i++) { const dx = it[i][0] - cp.x, dz = it[i][2] - cp.z; if (dx * dx + dz * dz > d2) continue; for (const m of this.meshes) m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), k * 16); k++; }
+    // [r6-perf] beyond NEAR_KEEP m only props inside a widened view frustum are drawn (props behind the camera cost
+    // vertices in the main pass and in every shadow cascade); near props stay so their shadows still fall into view
+    const nk2 = SCATTER_NEAR_KEEP * SCATTER_NEAR_KEEP;
+    for (let i = 0; i < it.length && k < this.cap; i++) { const dx = it[i][0] - cp.x, dz = it[i][2] - cp.z, dd = dx * dx + dz * dz; if (dd > d2) continue;
+      if (fr && dd > nk2) { _sp.center.set(it[i][0], it[i][1] + 2, it[i][2]); _sp.radius = 6 * (it[i][4] || 1); if (!fr.intersectsSphere(_sp)) continue; }
+      for (const m of this.meshes) m.instanceMatrix.array.set(this.mat.subarray(i * 16, i * 16 + 16), k * 16); k++; }
     for (const m of this.meshes) { m.count = k; m.instanceMatrix.needsUpdate = true; }
   }
 }
@@ -181,7 +190,9 @@ export async function buildStreetscape({ scene, vectors, pois, heightAt, physics
   const lampTex = makeLampMap(lampPts, rect);
   return {
     group, scatters, lampTex, lampPts,
-    update(cp) { if (this._lp && cp.distanceToSquared(this._lp) < 16) return; this._lp = cp.clone(); for (const s of scatters) s.update(cp); },
+    update(cp, cam) { // [r6-perf] cam (optional): frustum-aware refresh on a 4 m move or a ~8 deg turn
+      if (this._lp && cp.distanceToSquared(this._lp) < 16 && (!cam || !this._lq || cam.quaternion.angleTo(this._lq) < 0.14)) return; this._lp = cp.clone(); if (cam) this._lq = cam.quaternion.clone();
+      const fr = cam && !/[?&]noscatcull/.test(location.search) ? wideFrustum(cam) : null; for (const s of scatters) s.update(cp, fr); },
   };
 }
 // [r4-sweep-outer] point-in-footprint test over landmark polygons (spatial hash, 32 m cells); true also within `pad` m of an edge

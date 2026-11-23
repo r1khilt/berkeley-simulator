@@ -117,6 +117,16 @@ uniform float uExposure, uBloom, uAOStrength, uAPMul, uVignette, uGrain, uTime, 
 ${DEPTH_GLSL(reversed, logd)}
 ${ATMO_GLSL}
 ${toneGLSL(true)}
+uniform float uUp; // [r6-perf] 1 when the scene was rendered below canvas resolution: Catmull-Rom upsample (sharp, no blur)
+vec4 bsCatmull(sampler2D t, vec2 uv, vec2 res){
+  vec2 sp = uv * res, tp1 = floor(sp - 0.5) + 0.5, f = sp - tp1;
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f)), w1 = 1.0 + f * f * (-2.5 + 1.5 * f), w2 = f * (0.5 + f * (2.0 - 1.5 * f)), w3 = f * f * (-0.5 + 0.5 * f);
+  vec2 w12 = w1 + w2, tc12 = (tp1 + w2 / w12) / res, tc0 = (tp1 - 1.0) / res, tc3 = (tp1 + 2.0) / res;
+  vec4 c = texture2D(t, vec2(tc12.x, tc0.y)) * (w12.x * w0.y) + texture2D(t, vec2(tc0.x, tc12.y)) * (w0.x * w12.y) + texture2D(t, tc12) * (w12.x * w12.y)
+         + texture2D(t, vec2(tc3.x, tc12.y)) * (w3.x * w12.y) + texture2D(t, vec2(tc12.x, tc3.y)) * (w12.x * w3.y);
+  float ws = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  return max(c / ws, vec4(0.0));
+}
 float bsHash(vec2 p){ p = fract(p * vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }
 float aoUp(vec2 uv, float dist){ // depth-aware 2x2 upsample of the half-res AO
   vec2 t = uv * uAORes - 0.5; vec2 f = fract(t); vec2 b = (floor(t) + 0.5) / uAORes; vec2 o = 1.0 / uAORes;
@@ -142,7 +152,7 @@ vec3 aerial(vec3 col, vec3 dir, float distM){
   return col * T + (Ls * uAPMul * F) + uNightFog * (1.0 - T);
 }
 void main(){
-  vec4 src = texture2D(tColor, vUv); vec3 col = any(isnan(src.rgb)) ? vec3(0.0) : clamp(src.rgb, 0.0, 6.0e4);
+  vec4 src = uUp > 0.5 ? bsCatmull(tColor, vUv, uRes) : texture2D(tColor, vUv); vec3 col = any(isnan(src.rgb)) ? vec3(0.0) : clamp(src.rgb, 0.0, 6.0e4);
   float d = texture2D(tDepth, vUv).r;
   if (!bsIsSky(d)) {
     float z = bsViewZ(d); vec3 p = bsViewPos(vUv, z);
@@ -206,7 +216,7 @@ export class PostPipeline {
       tColor: { value: this.sceneRT.texture }, tAO: { value: this.cfg.ao ? this.aoRT2.texture : null }, tBloom: { value: this.cfg.bloom ? this.bloomRTs[0].texture : null },
       uViewInv: { value: camera.matrixWorld }, uRes: { value: new THREE.Vector2(this.w, this.h) }, uAORes: { value: new THREE.Vector2(this.w >> 1, this.h >> 1) },
       uExposure: { value: 1 }, uBloom: { value: 0.012 }, uAOStrength: { value: 1.4 }, uAPMul: { value: 0.85 }, uVignette: { value: 0.16 }, uGrain: { value: this.cfg.grain }, uTime: { value: 0 },
-      uUseAO: { value: this.cfg.ao ? 1 : 0 }, uUseBloom: { value: this.cfg.bloom ? 1 : 0 }, uUseAP: { value: A ? 1 : 0 }, uUnknownAmb: { value: 0.65 },
+      uUseAO: { value: this.cfg.ao ? 1 : 0 }, uUp: { value: 0 }, uUseBloom: { value: this.cfg.bloom ? 1 : 0 }, uUseAP: { value: A ? 1 : 0 }, uUnknownAmb: { value: 0.65 },
       uNightFog: { value: new THREE.Color(0, 0, 0) }, uCamAltKm: { value: 0.1 },
     }, common, A || { uSkyLUT: { value: null }, uTrans: { value: null }, uSunDirW: { value: new THREE.Vector3() }, uCamR: { value: 6360.1 }, uSunTOA: { value: 1 }, uSkyBoost: { value: 1 }, uRayScat: { value: new THREE.Vector3() }, uMieScat: { value: 0 }, uMieExt: { value: 0 }, uOzone: { value: new THREE.Vector3() }, uMieG: { value: 0.8 } });
     for (const k of Object.keys(LOOK)) this.U['uLook_' + k] = { value: LOOK[k] };
@@ -223,16 +233,20 @@ export class PostPipeline {
     this.U.uRes.value.set(w, h); this.U.uAORes.value.set(hw, hh);
     if (this.smaa) { this.ldrRT.setSize(w, h); this.smaa.setSize(w, h); }
   }
+  // [r6-perf] runtime knobs for the governor (render/perf.js)
+  setScale(k) { this.scale = Math.max(0.5, Math.min(1, k)); }               // scene/AO/bloom resolution vs the canvas
+  setSamples(n) { n = Math.min(n, this.renderer.capabilities.maxSamples || 4); if (this.sceneRT.samples === n) return; this.sceneRT.samples = n; this.sceneRT.dispose(); }
   _q(p, target) { const r = this.renderer; r.setRenderTarget(target); r.render(p.scene, CAM); }
   render(dt = 0.016) {
     const r = this.renderer, cam = this.camera;
-    const size = r.getDrawingBufferSize(_v2); if (size.x !== this.w || size.y !== this.h) this.setSize(size.x, size.y);
+    const size = r.getDrawingBufferSize(_v2); const sc = this.scale || 1; const iw = Math.max(1, Math.round(size.x * sc)), ih = Math.max(1, Math.round(size.y * sc)); // [r6-perf] render scale
+    if (iw !== this.w || ih !== this.h) this.setSize(iw, ih); this.U.uUp.value = iw < size.x - 1 ? 1 : 0;
     const prevTarget = r.getRenderTarget(), prevAuto = r.autoClear;
     r.setRenderTarget(this.sceneRT); r.clear(true, true, false); r.render(this.scene, cam);
     r.autoClear = true;
-    if (this.cfg.ao) { this._q(this.aoPass, this.aoRT); this._q(this.aoBlur, this.aoRT2); }
+    if (this.cfg.ao && !this.aoOff) { this._q(this.aoPass, this.aoRT); this._q(this.aoBlur, this.aoRT2); }
     const exposure = r.toneMappingExposure;
-    if (this.cfg.bloom) {
+    if (this.cfg.bloom && !this.bloomOff) {
       const D = this.down.mat.uniforms; let src = this.sceneRT.texture, sw = this.w, sh = this.h;
       for (let i = 0; i < this.bloomRTs.length; i++) { D.tSrc.value = src; D.uTexel.value.set(1 / sw, 1 / sh); D.uFirst.value = i === 0 ? 1 : 0; D.uExposure.value = exposure; this._q(this.down, this.bloomRTs[i]); src = this.bloomRTs[i].texture; sw = this.bloomRTs[i].width; sh = this.bloomRTs[i].height; }
       const Up = this.up.mat.uniforms; let low = this.bloomRTs[this.bloomRTs.length - 1];

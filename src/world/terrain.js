@@ -252,6 +252,8 @@ void groundShade(vec2 w, float dist){
   update(camera) {
     camera.updateMatrixWorld();
     this._m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    // [r6-perf] same view as last frame -> same chunk list: skip the ~thousands of box tests and the instance re-upload
+    if (this._lastVP && this._lastVP.equals(this._m)) return; (this._lastVP || (this._lastVP = new THREE.Matrix4())).copy(this._m);
     this._frustum.setFromProjectionMatrix(this._m);
     const counts = [0, 0, 0, 0, 0];
     const cp = camera.position; const m = new THREE.Matrix4();
