@@ -56,7 +56,7 @@ if (settings.qualityAuto && !qs.get('q')) settings.quality = BS.soft ? 'low' : i
 if (qs.get('soft') === '1' && !qs.get('q')) settings.quality = 'low';
 if (qs.get('q')) settings.quality = qs.get('q');
 const Q = { low: { dpr: 1, shadow: 1024, cascades: 1, far: 260, trees: [55, 300], treeMax: 1600 }, medium: { dpr: 1.25, shadow: 2048, cascades: 2, far: 700, trees: [85, 420], treeMax: 2600 }, high: { dpr: 1.5, shadow: 2048, cascades: 3, far: 1100, trees: [115, 560], treeMax: 4000 }, ultra: { dpr: 2, shadow: 4096, cascades: 3, far: 1800, trees: [160, 800], treeMax: 6000 } }[settings.quality] || {};
-if (BS.soft) Object.assign(Q, { dpr: 1, shadow: 1024, cascades: 1, far: 150, trees: [42, 240], treeMax: 1200 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work
+if (BS.soft) Object.assign(Q, { dpr: 0.8, shadow: 1024, cascades: 1, far: 150, trees: [42, 240], treeMax: 1200 }); // [r6-perf] software WebGL: every pixel and vertex is CPU work
 const ui = new UI(document.getElementById('ui')); ui.applySettings(settings); // ui-pro: theme + units
 onProgress((f) => ui.progress(f * 0.75));
 
@@ -67,9 +67,10 @@ async function boot() {
   BS.gpu = gpu;
   if (!gpu && !gpuInfo.webgl2) { const e = new Error(noWebGLMessage(gpuInfo)); e.noWebGL = true; throw e; } // [r6-perf] no WebGL (e.g. Chrome 139+ with acceleration off): explain instead of failing
   const usePost = !gpu && (settings.quality === 'high' || settings.quality === 'ultra' || qs.get('post') === '1') && qs.get('post') !== '0';   // gfx-post: MSAA lives in the HDR target then
-  let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
-  if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: !usePost, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
+  let renderer = gpu ? gpu.renderer : new THREE.WebGLRenderer({ canvas, antialias: !usePost && !BS.soft /* [r6-perf] software MSAA shades every sample */, powerPreference: 'high-performance', reversedDepthBuffer: !qs.get('nordb') });
+  if (!gpu && !renderer.capabilities.reversedDepthBuffer) { renderer.dispose(); renderer = new THREE.WebGLRenderer({ canvas, antialias: !usePost && !BS.soft, powerPreference: 'high-performance', logarithmicDepthBuffer: true }); }
   renderer.setPixelRatio(Math.min(devicePixelRatio, Q.dpr)); renderer.setSize(innerWidth, innerHeight);
+  if (BS.soft && renderer.capabilities) renderer.capabilities.getMaxAnisotropy = () => 2; // [r6-perf] software texturing: 8x anisotropic = up to 8 trilinear taps per fetch on the CPU
   renderer.toneMapping = THREE.CustomToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   const scene = new THREE.Scene();
@@ -200,7 +201,7 @@ async function boot() {
   BS.drawStats = () => { const sm = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; renderer.info.autoReset = false; renderer.info.reset(); renderer.render(scene, camera); const main = { ...renderer.info.render }; renderer.shadowMap.enabled = sm; renderer.info.autoReset = true; return main; };
   csm.lights.forEach((l, i) => { l.shadow.normalBias = [0.07, 0.22, 0.5, 0.9][i] ?? 0.9; l.shadow.bias = [-0.0003, -0.0006, -0.001, -0.0015][i] ?? -0.0015; });
   if (!gpu) for (const l of csm.lights) l.shadow.camera.layers.enable(PROXY_LAYER); // [r6-perf] shadow cameras also draw the landmarks' shadow-only proxies
-  const sched = (!gpu && useCSM && csm.lights && csm.lights.length && !qs.get('noshadowcache')) ? new ShadowScheduler({ csm, camera }) : null; BS.shadowSched = sched; // [r6-perf] cached / staggered cascades (?noshadowcache=1 disables)
+  const sched = (!gpu && useCSM && csm.lights && csm.lights.length && !qs.get('noshadowcache')) ? new ShadowScheduler({ csm, camera }) : null; BS.shadowSched = sched; if (sched && BS.soft) sched.intervals = [2, 4, 8]; // software: even the near cascade refreshes every 2nd frame // [r6-perf] cached / staggered cascades (?noshadowcache=1 disables)
   const farMul = { v: 1 }; BS.farMul = farMul; // [r6-perf] governor scales the shadow distance
   const csmDone = new WeakSet();
   const aoCore = { v4: terrain.uniforms.uCore.value, size: terrain.uniforms.uCoreSize.value };
@@ -220,6 +221,7 @@ async function boot() {
     onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); sched.invalidate(); } /* [r6-perf] */ },
     onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); } });
   BS.lm = lm;
+  if (BS.soft) { lm.loadR = 320; lm.unloadR = 500; } // [r6-perf] software: hand-built landmarks stream in a little closer (stand-ins beyond)
   ui.note('Loading landmarks…');
   await lm.loadNow(manifest.landmarks.filter((l) => l.always).map((l) => l.id));
   const landmarks = lm.placed; BS.landmarks = landmarks; phase('landmarks');
@@ -286,12 +288,13 @@ async function boot() {
   ui.on('mapClosed', () => { if (state === 'play' && !isTouch) lockPointer(); });
   ui.on('toggleNorth', () => { settings.north = !settings.north; store.set('settings', settings); ui.notify(settings.north ? 'Minimap: north up' : 'Minimap: heading up', { icon: 'navigate', ms: 1800 }); }); // ui-pro
   const onSetting = (k, v) => {
+    if (k === 'quality') { settings.qualityAuto = v === 'auto'; if (v === 'auto') v = settings.quality; } // [r6-perf] Auto vs a pinned level
     settings[k] = v; store.set('settings', settings);
     if (k === 'sens') player.sens = v; if (k === 'invertY') player.invertY = v; if (k === 'volume') audio.setVolume(v);
     if (k === 'walkSpeed') player.speedScale = v; if (k === 'flySpeed') player.flySpeed = v; if (k === 'camFollow') player.camFollow = v; // r5-controls
     if (k === 'life' && life) life.setEnabled(v); // r4-campus-life
     if (k === 'fov') { camera.fov = v; camera.updateProjectionMatrix(); csm.updateFrustums(); }
-    if (k === 'quality') { ui.notify(`Switching to ${v} quality…`, { icon: 'gear', ms: 1500 }); setTimeout(() => location.reload(), 600); }
+    if (k === 'quality') { ui.notify(settings.qualityAuto ? 'Switching to automatic quality…' : `Switching to ${v} quality…`, { icon: 'gear', ms: 1500 }); setTimeout(() => location.reload(), 600); }
   };
   const openMap = () => ui.openMap({ px: player.pos.x, pz: player.pos.z, heading: -player.camYaw, places, search: namedB.map((b, i) => ({ id: 'bld-' + i, name: b.name, p: b.c })), onTravel: (x, z, p) => ui.fade(() => { const g = physics.groundAt(x, z); player.teleport(x, g.y, z); player.setMode(player.mode === 'fly' ? 'fly' : player.mode); }) });
   // ui-pro: time & weather popover. Any explicit time choice is remembered (and counts for this tab session).
@@ -418,7 +421,7 @@ async function boot() {
   const gpuTimer = gpu ? null : new GpuTimer(renderer.getContext()); BS.gpuTimer = gpuTimer;
   const dprMax = Math.min(devicePixelRatio, Q.dpr);
   const setScale = (k) => { if (post && post.setScale) post.setScale(k); else { const d = Math.max(0.5, dprMax * k); renderer.setPixelRatio(d); composer && composer.setPixelRatio(d); } };
-  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 0.85 : 0.72 }); BS.gov = gov;
+  const gov = new Governor({ renderer, camera, csm, sched, trees: treeSys, lm, life, grass, post, farMul, setScale: gpu ? null : setScale, minScale: BS.soft ? 1 : 0.72 }); BS.gov = gov; // software: the tier already renders at 0.8x; no further scaling
   if (BS.soft) gov.target = 33.3;            // software WebGL: aim for a steady 30 fps
   if (qs.get('gov') === '0') gov.enabled = false; else if (qs.get('gov')) gov.setLevel(+qs.get('gov'), 'url');
   BS.perf = { state: () => ({ ...gov.state(), gpuMs: gpuTimer && gpuTimer.ok ? +gpuTimer.ms.toFixed(2) : null, timer: !!(gpuTimer && gpuTimer.ok), gpu: gpuInfo.renderer, cls: gpuInfo.cls, soft: BS.soft, quality: settings.quality, auto: !!settings.qualityAuto, dpr: renderer.getPixelRatio() }) };
@@ -448,7 +451,7 @@ async function boot() {
   console.log('BSIM timing', JSON.stringify(BS.timing));
   await Promise.race([pbrP, new Promise((r) => setTimeout(r, 8000))]); BS.pbr = PBR; // gfx-materials
   ui.progress(1); ui.ready(); BS.ready = true;
-  if (gpuInfo.software && !qs.get('nonotice')) softwareNotice(gpuInfo); // [r6-perf] one-time: how to turn graphics acceleration on
+  if (gpuInfo.software && !qs.get('nonotice')) softwareNotice(gpuInfo, BS.soft); // [r6-perf] one-time: how to turn graphics acceleration on
   if (qs.get('play')) startPlay();
 }
 function sunAlt(d) { const { sunPosition } = SKYFN; return sunPosition(d).altitude; }

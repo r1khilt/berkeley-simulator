@@ -31,7 +31,7 @@ export class LandmarkManager {
     if (best && now - (this.lastLoad || 0) > 140) { this.busy = true; this.lastLoad = now; this._load(best).finally(() => { this.busy = false; this.lastLoad = performance.now(); }); }
   }
   async _load(l) {
-    l.state = 'loading';
+    l.state = 'loading'; const tl0 = performance.now(); // [r6-perf] load timing (l.loadMs)
     try {
       const [mod, packet] = await Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]);
       const a = packet.anchor; const heightAt = this.heightAt;
@@ -44,7 +44,7 @@ export class LandmarkManager {
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
       try { weatherLandmark(obj); } catch (e) { console.warn('weather', l.id, e); } // r4-sweep-central2: plain masonry gets base grime too
       this.setupMaterials && this.setupMaterials(obj);
-      if (!res.update && !(window.BSIM && window.BSIM.gpu) && !/[?&]noproxy/.test(location.search)) try { l.proxyStats = buildShadowProxy(obj); } catch (e) { console.warn('shadow proxy', l.id, e); } // [r6-perf]
+      if (!res.update && !(window.BSIM && window.BSIM.gpu) && !/[?&]noproxy/.test(location.search)) try { const tp = performance.now(); l.proxyStats = buildShadowProxy(obj); l.proxyStats.ms = +(performance.now() - tp).toFixed(1); } catch (e) { console.warn('shadow proxy', l.id, e); } // [r6-perf]
       this.scene.add(obj);
       const tag = 'lm:' + l.id, ph = this.physics;
       for (const c of res.colliders || []) {
@@ -65,7 +65,7 @@ export class LandmarkManager {
       Object.assign(l, { obj, res, details, packetAnchor: a, info: mod.info || {} });
       this.standins && this.standins.setHidden(l.replaces, true);
       if (this.physics.suspendTag) for (const id of l.replaces) this.physics.suspendTag(id, true); // new-buildings: the hidden stand-in's walls go too
-      l.state = 'ready'; this.placed.push(l);
+      l.state = 'ready'; this.placed.push(l); l.loadMs = Math.round(performance.now() - tl0);
       this.onLoaded && this.onLoaded(l);
     } catch (e) { console.warn('landmark failed', l.id, e); l.state = 'failed'; }
   }

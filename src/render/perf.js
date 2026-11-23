@@ -171,17 +171,19 @@ function makeRungs(c) {
   // 9. bloom off (day bloom is very subtle)
   if (c.post && c.post.cfg.bloom) R.push({ name: 'bloom', on() { c.post.bloomOff = true; c.post.U.uUseBloom.value = 0; }, off() { c.post.bloomOff = false; c.post.U.uUseBloom.value = 1; } });
   // 10-11. last resort: render scale 0.85 / 0.72 (bicubic upscale in the post pass; HUD stays crisp)
-  if (c.setScale) { R.push({ name: 'scale85', on() { c.setScale(0.85); }, off() { c.setScale(1); } }); if ((c.minScale ?? 0.72) < 0.85) R.push({ name: 'scale72', on() { c.setScale(0.72); }, off() { c.setScale(0.85); } }); }
+  const ms = c.minScale ?? 0.72;
+  if (c.setScale && ms <= 0.85) R.push({ name: 'scale85', on() { c.setScale(0.85); }, off() { c.setScale(1); } });
+  if (c.setScale && ms <= 0.72) R.push({ name: 'scale72', on() { c.setScale(0.72); }, off() { c.setScale(0.85); } });
   return R;
 }
 
 // ---------------------------------------------------------------- notices
 const NOTE_CSS = 'position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:60;max-width:min(560px,92vw);background:rgba(20,22,26,.92);color:#f2f2f2;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:14px 16px 12px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.35);';
-export function softwareNotice(info) {
+export function softwareNotice(info, switched = true) {
   try { if (localStorage.getItem('bsim.swNotice') === '1') return; localStorage.setItem('bsim.swNotice', '1'); } catch (e) {}
   const d = document.createElement('div'); d.setAttribute('role', 'status'); d.style.cssText = NOTE_CSS;
   const mac = /Mac/.test(navigator.platform || navigator.userAgent);
-  d.innerHTML = `<b style="display:block;margin-bottom:4px">Graphics acceleration is off</b>Your browser is drawing the campus on the CPU${info && info.renderer ? ` (${String(info.renderer).replace(/[<>&]/g, '').slice(0, 60)})` : ''}, so we've switched to a lighter look. For smooth, full-quality graphics, open <code style="background:#ffffff1a;padding:1px 5px;border-radius:4px">chrome://settings/system</code>, turn on <i>Use graphics acceleration when available</i>, then relaunch ${mac ? 'Chrome' : 'the browser'}.<div style="text-align:right;margin-top:8px"><button style="font:inherit;color:#111;background:#f2f2f2;border:0;border-radius:7px;padding:5px 14px;cursor:pointer">Got it</button></div>`;
+  d.innerHTML = `<b style="display:block;margin-bottom:4px">Graphics acceleration is off</b>Your browser is drawing the campus on the CPU${info && info.renderer ? ` (${String(info.renderer).replace(/[<>&]/g, '').slice(0, 60)})` : ''}${switched ? ", so we've switched to a lighter look" : ''}. For smooth, full-quality graphics, open <code style="background:#ffffff1a;padding:1px 5px;border-radius:4px">chrome://settings/system</code>, turn on <i>Use graphics acceleration when available</i>, then relaunch ${mac ? 'Chrome' : 'the browser'}.<div style="text-align:right;margin-top:8px"><button style="font:inherit;color:#111;background:#f2f2f2;border:0;border-radius:7px;padding:5px 14px;cursor:pointer">Got it</button></div>`;
   d.querySelector('button').onclick = () => d.remove(); document.body.appendChild(d); setTimeout(() => d.isConnected && d.remove(), 30000);
 }
 export function noWebGLMessage(info) {
