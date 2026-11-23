@@ -2,3 +2,5 @@ node_modules/
 dist/
 public/dev-data/
 *.log
+__pycache__/
+*.pyc
