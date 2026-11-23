@@ -41,18 +41,5 @@ export function installSoftShading() {
   }
 }
 
-// Skinned meshes (player avatar, horse, crowd, Big Game figures) are created with frustumCulled = false because their bind-pose
-// bounds don't follow the animation, so every one of them is skinned and shaded every frame even when it's behind the camera
-// or 400 m away (~50 ms per avatar draw on SwiftShader). Give each a padded bounding sphere (bind-pose bounds x1.6, at least
-// 2.5 m) and let three.js cull it. Called every ~90 frames on the direct (non-post) tiers so newly spawned people are caught.
-const _bb = new THREE.Box3();
-export function cullSkinned(root) {
-  root.traverse((o) => {
-    if (!o.isSkinnedMesh || o.frustumCulled || o.userData.bsCull) return;
-    o.userData.bsCull = true;
-    const g = o.geometry; if (!g || !g.attributes.position) return;
-    if (!g.boundingBox) g.computeBoundingBox(); _bb.copy(g.boundingBox);
-    const sph = new THREE.Sphere(); _bb.getBoundingSphere(sph); sph.radius = Math.max(2.5, sph.radius * 1.6);
-    o.boundingSphere = sph; o.frustumCulled = true;
-  });
-}
+// NOTE (r6-fast): culling skinned meshes with bind-pose spheres was tried and removed: the crowd's SkinnedMesh objects sit at the
+// world origin and their bones carry them around campus, so a bind-pose sphere culls visible people. Needs bone-root bounds.

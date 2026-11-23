@@ -35,7 +35,7 @@ import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground pa
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
 import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js';
-import { opaqueCanvas, installSoftShading, cullSkinned } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
+import { opaqueCanvas, installSoftShading } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
 import { DAY_DEFAULT, isDark, pacificDay, dayBase, presetHour, fmtHour } from './ui/timeofday.js'; // ui-pro: time of day
 installGrading();
 
@@ -376,7 +376,6 @@ async function boot() {
     updateLampLights(state === 'play' ? player.pos : camera.position, U.uNight.value);
     if (grass) grass.update(camera.position);
     bridges.update(U.uNight.value);
-    if (!usePost && frameN % 90 === 1) cullSkinned(scene); // [r6-fast] off-screen skinned meshes (avatar, horse, people) stop costing vertex skinning
     if (life) { const lp = state === 'play' || BS.lifePlayer; life.update(dt, { camera, focus: lp ? player.pos : camera.position, date, player: lp ? player : null }); } // r4-campus-life (r4-people2: BS.lifePlayer lets headless tests drive the player without play())
     lm.update(camera.position); lm.frame(dt, { time: date, night: U.uNight.value, camera });
     if (bigGame) bigGame.update(dt, { camera, time: date, player: state === 'play' ? player : null }); // Big Game easter egg
