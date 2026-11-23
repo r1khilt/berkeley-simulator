@@ -51,7 +51,10 @@ if (settings.qualityAuto === undefined) settings.qualityAuto = !store.get('setti
 const gpuInfo = probeGPU(); BS.gpuInfo = gpuInfo;
 // software rasteriser (SwiftShader / WARP / llvmpipe): in Auto it gets the light 'soft' tier (low + fewer pixels, vertices,
 // shadow work); an explicit quality choice or ?q= is respected. ?soft=1 forces the soft tier for testing.
-BS.soft = (gpuInfo.software && settings.qualityAuto && !qs.get('q')) || qs.get('soft') === '1';
+// NOTE: auto-selecting the soft tier is held back (SOFT_AUTO) until the pre-existing black-ground bug of the non-post Low/Medium
+// path on software WebGL is fixed (it reproduces on unmodified main with ?q=low); until then software users keep High + the notice.
+const SOFT_AUTO = false;
+BS.soft = (SOFT_AUTO && gpuInfo.software && settings.qualityAuto && !qs.get('q')) || qs.get('soft') === '1';
 if (settings.qualityAuto && !qs.get('q')) settings.quality = BS.soft ? 'low' : isTouch ? 'low' : gpuInfo.cls === 'low' ? 'medium' : 'high';
 if (qs.get('soft') === '1' && !qs.get('q')) settings.quality = 'low';
 if (qs.get('q')) settings.quality = qs.get('q');
