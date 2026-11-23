@@ -16,6 +16,10 @@ export function slimShadowMaps(lights, renderer) {
     rt.texture.name = (l.name || 'light') + '.shadowColour';
     const dt = new THREE.DepthTexture(w, h, THREE.UnsignedIntType); dt.name = (l.name || 'light') + '.shadowMap'; dt.format = THREE.DepthFormat;
     dt.compareFunction = reversed ? THREE.GreaterEqualCompare : THREE.LessEqualCompare; dt.minFilter = THREE.LinearFilter; dt.magFilter = THREE.LinearFilter;
+    // [r6-int] three sets shadow.camera._reversedDepth just before it creates a map and rebuilds the projection; with the map
+    // made here it never rebuilds it, and CSM.update() doesn't either, so a reversed depth buffer got a standard-depth
+    // shadow projection (every fragment read as shadowed: no sunlight) until the next csm.updateFrustums().
+    s.camera._reversedDepth = reversed;
     rt.depthTexture = dt; s.map = rt; s.camera.updateProjectionMatrix(); n++;
   }
   return n;
