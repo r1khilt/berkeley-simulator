@@ -21,15 +21,15 @@ export const info = {
 const _mats = {};
 function mats(M) {
   if (_mats.panel) return _mats;
-  _mats.panel = new THREE.MeshStandardMaterial({ color: 0x575b61, roughness: 0.72, name: 'durant-fibre-cement' });
-  _mats.white = tint(M, 'whitePaint', '#dcdedf', { roughness: 0.45 });
+  _mats.panel = new THREE.MeshStandardMaterial({ color: 0x393c41, roughness: 0.7, name: 'durant-fibre-cement' });
+  _mats.white = tint(M, 'whitePaint', '#d9dbdc', { roughness: 0.42, metalness: 0.05 });
   _mats.plinth = tint(M, 'concrete', '#6f747c');
   _mats.slot = tint(M, 'glass', '#22303d', { roughness: 0.05, metalness: 0.35 }); // stair-slot glass (no rooms behind it)
   _mats.slot.userData.interior = false;
   _mats.roof = tint(M, 'concrete', '#f4f3ef');
   _mats.mulch = tint(M, 'soil', '#5c4e44');
   _mats.step = tint(M, 'concrete', '#8d9095');
-  _mats.shrub = new THREE.MeshStandardMaterial({ color: 0xb4baae, roughness: 0.95, flatShading: true, name: 'durant-shrub' });
+  _mats.shrub = new THREE.MeshStandardMaterial({ color: 0x8d9886, roughness: 0.95, flatShading: true, name: 'durant-shrub' });
   _mats.leaf = new THREE.MeshStandardMaterial({ color: 0x627a40, roughness: 0.9, flatShading: true, name: 'durant-leaf' });
   _mats.solar = new THREE.MeshStandardMaterial({ color: 0x1c2533, roughness: 0.22, metalness: 0.45, name: 'durant-pv' });
   _mats.stucco = tint(M, 'stucco', '#9a9b9c');
@@ -49,7 +49,7 @@ export async function build(ctx) {
   const PANEL = X.panel, WHITE = X.white, FR = M.blackPaint, GLASS = M.windowNight;
   const colliders = [], walkables = [];
   // floor lines (local y; 0 = lowest ground on the footprint, the street corner by the museum drive)
-  const FFL = 1.7, LV = [1.7, 4.9, 7.85, 10.8, 13.75, 16.7], TOP = 17.2, BH = 0.11, IN = 0.15;
+  const FFL = 1.7, LV = [1.7, 4.9, 7.85, 10.8, 13.75, 16.7], TOP = 17.2, BH = 0.09, IN = 0.15;
   // building frame: u east along Durant, v south toward the street. Wings + waist from the OSM outline.
   const S = { u0: -9.1, u1: 9.41, v0: 1.2, v1: 17.26 }, N = { u0: -9.37, u1: 8.95, v0: -17.5, v1: -1.2 };
   const WA = { u0: -4.8, u1: 5.52 };
@@ -100,7 +100,7 @@ export async function build(ctx) {
     });
   };
   const band = (R, s0, s1, y, e0 = 0.32, e1 = 0.32) => K.rbox(R, WHITE, s0 - e0, y - BH, -IN, s1 + e1, y + BH, 0.32); // ends overlap the next face's band: wraps the corners
-  const fin = (R, s, y0 = FFL, y1 = LV[5]) => K.rbox(R, WHITE, s - 0.14, y0, -IN, s + 0.14, y1, 0.36);
+  const fin = (R, s, y0 = FFL, y1 = LV[5]) => K.rbox(R, WHITE, s - 0.12, y0, -IN, s + 0.12, y1, 0.34);
   const parapet = (R, s0, s1) => { K.rbox(R, PANEL, s0, LV[5] - 0.15, -IN, s1, TOP, 0); K.rbox(R, FR, s0, TOP, -0.3, s1, TOP + 0.05, 0.02); };
   const split = (s0, s1, n) => Array.from({ length: n }, (_, i) => [s0 + (s1 - s0) * i / n, s0 + (s1 - s0) * (i + 1) / n]);
   // a side face of 4 bays x 2 cells, staggered window/panel pairs; the glazed corner cell is at s=0 (or s=L if cornerAtEnd)
@@ -134,7 +134,7 @@ export async function build(ctx) {
     const wl = split(0, f0, 2), wr = split(f0, sl0, 2), el = split(sl1, f1, 2), er = split(f1, L, 2);
     const upper = [[...wl[0], 'W'], [...wl[1], 'P'], [...wr[0], 'P'], [...wr[1], 'W'], [...el[0], 'W'], [...el[1], 'P'], [...er[0], 'P'], [...er[1], 'W']];
     for (let k = 2; k < 5; k++) row(R, upper, k);
-    for (let k = 0; k < 2; k++) { const [y0, y1] = cellsY(k); store(R, 0, f0 - 0.14, y0, y1); store(R, f1 + 0.14, L, y0, y1); }
+    for (let k = 0; k < 2; k++) { const [y0, y1] = cellsY(k); store(R, 0, f0 - 0.12, y0, y1); store(R, f1 + 0.12, L, y0, y1); }
     band(R, 0, f0, LV[1], 0.32, 0); band(R, f1, L, LV[1], 0, 0.32);
     for (let k = 2; k < 5; k++) { band(R, 0, sl0, LV[k], 0.32, 0); band(R, sl1, L, LV[k], 0, 0.32); }
     fin(R, f0); fin(R, f1);
@@ -152,9 +152,9 @@ export async function build(ctx) {
     // glazed stair slot: full height, rising above the roof to the white-capped stair penthouse
     const SR = K.run([SL.u0 - IN, SL.v], [SL.u1 + IN, SL.v]); const md = -IN + 0.1;
     K.rbox(SR, X.slot, IN, FFL, -IN, SR.L - IN, LV[2], -IN + 0.04);
-    K.rbox(SR, X.slot, 0, LV[2], -IN, SR.L, 18.8, -IN + 0.04);
-    for (const s of [IN + 0.04, SR.L / 2, SR.L - IN - 0.04]) K.rbox(SR, FR, s - 0.04, FFL, -IN + 0.04, s + 0.04, 18.8, md);
-    for (const y of [FFL + 0.05, ...LV.slice(1, 5), 16.7]) K.rbox(SR, FR, y < LV[2] ? IN : 0, y - 0.05, -IN + 0.04, y < LV[2] ? SR.L - IN : SR.L, y + 0.05, md);
+    K.rbox(SR, X.slot, 0, LV[2], -IN, SR.L, 18.6, -IN + 0.04);
+    for (const s of [IN + 0.04, SR.L / 2, SR.L - IN - 0.04]) K.rbox(SR, FR, s - 0.04, FFL, -IN + 0.04, s + 0.04, 18.6, md);
+    for (const y of [FFL + 0.05, ...LV.slice(1, 5), 16.7, 18.55]) K.rbox(SR, FR, y < LV[2] ? IN : 0, y - 0.05, -IN + 0.04, y < LV[2] ? SR.L - IN : SR.L, y + 0.05, md);
     // the slot's sides inside the porch are glass too (a glass tower standing in the porch)
     for (const Rs of [K.run([SL.u0, PV], [SL.u0, SL.v - IN]), K.run([SL.u1, SL.v - IN], [SL.u1, PV])]) {
       K.rbox(Rs, X.slot, 0, FFL, -0.04, Rs.L, LV[2], 0);
@@ -197,8 +197,13 @@ export async function build(ctx) {
   // ---------- roof: deck, penthouses, solar ----------
   const RF = LV[5] + 0.02;
   const pent = (u0, v0, u1, v1, top, capH) => { K.box(PANEL, u0, RF, v0, u1, top - capH, v1); K.box(WHITE, u0 - 0.05, top - capH, v0 - 0.05, u1 + 0.05, top, v1 + 0.05); };
-  pent(SL.u0 - IN, 8.6, SL.u1 + IN, SL.v - IN - 0.05, 20.0, 1.2);         // front stair (its street face is the slot glass)
-  K.box(WHITE, SL.u0 - IN - 0.05, 18.8, 15.6, SL.u1 + IN + 0.05, 20.0, SL.v - IN + 0.1);
+  { // front stair penthouse: dark box behind the slot glass, under a white steel trellis cantilevered over the street
+    const u0 = SL.u0 - IN, u1 = SL.u1 + IN, v0 = 8.6, v1 = SL.v - IN - 0.05, yB = 18.6, yT = 20.0, vF = SL.v - IN + 0.35;
+    K.box(PANEL, u0, RF, v0, u1, yB, v1); K.box(PANEL, u0 - 0.02, yB, v0, u1 + 0.02, yB + 0.05, v1 + 0.04);
+    for (const [u, v] of [[u0, v0], [u1, v0], [u0, v1], [u1, v1]]) K.box(WHITE, u - 0.07, yB, v - 0.07, u + 0.07, yT - 0.2, v + 0.07);
+    for (const [a0, b0, a1, b1] of [[u0 - 0.12, v0 - 0.1, u1 + 0.12, v0 + 0.06], [u0 - 0.12, vF - 0.16, u1 + 0.12, vF], [u0 - 0.12, v0 - 0.1, u0 + 0.04, vF], [u1 - 0.04, v0 - 0.1, u1 + 0.12, vF]]) K.box(WHITE, a0, yT - 0.22, b0, a1, yT, b1);
+    for (let v = v0 + 0.45; v < vF - 0.2; v += 0.45) K.box(WHITE, u0, yT - 0.16, v - 0.035, u1, yT - 0.02, v + 0.035, { detail: true });
+  }
   pent(-1.0, -14.0, 2.0, -9.5, 20.0, 1.0);                                  // rear stair
   pent(-4.4, -2.3, -0.2, 1.9, 22.0, 0.8);                                   // elevator core
   // deck between the vent-screen walls, pergola, planters
@@ -253,10 +258,10 @@ export async function build(ctx) {
     for (const s of [-1, 1]) K.box(M.wood, u + s * 0.3 - 0.03, y - 0.3, v - 0.03, u + s * 0.3 + 0.03, y + 1.6, v + 0.03, { detail: true });
     K.box(M.wood, u - 0.33, y + 1.25, v - 0.02, u + 0.33, y + 1.31, v + 0.02, { detail: true });
   };
-  tree(5.385, 18.35, gAt(5.385, 18.35) + 0.07);
+  tree(5.385, 18.5, gAt(5.385, 18.5) + 0.07);
   // landing at porch level behind a grey planter wall to the sidewalk (shrubs and the second tree on top)
-  K.box(M.paving, LD.u0, -0.8, PL.v0, LD.u1, FFL, strip.v1);
-  K.box(X.stucco, LD.u0, -0.8, strip.v1 - 0.55, LD.u1, FFL + 0.5, strip.v1);
+  K.box(X.step, LD.u0, -0.8, PL.v0, LD.u1, FFL, strip.v1);
+  K.box(X.plinth, LD.u0, -0.8, strip.v1 - 0.55, LD.u1, FFL + 0.5, strip.v1);
   K.box(X.mulch, LD.u0 + 0.08, FFL + 0.5, strip.v1 - 0.47, LD.u1 - 0.08, FFL + 0.52, strip.v1 - 0.08);
   for (let u = LD.u0 + 0.5, i = 0; u < LD.u1 - 0.3; u += 0.9, i++) if (Math.abs(u + 5.075) > 0.6) shrub(u, strip.v1 - 0.28, FFL + 0.52, 0.3 + (i % 2) * 0.05);
   tree(-5.075, strip.v1 - 0.28, FFL + 0.52);
