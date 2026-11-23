@@ -27,7 +27,7 @@ export function buildMidCity(list, heightAt) {
     else { const tri = THREE.ShapeUtils.triangulateShape(pts.map((p) => new THREE.Vector2(p[0], p[1])), []); for (const [i0, i1, i2] of tri) { const A = [pts[i0][0], top, pts[i0][1]], B = [pts[i1][0], top, pts[i1][1]], C = [pts[i2][0], top, pts[i2][1]]; const ar = (B[0] - A[0]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[0] - A[0]); if (ar > 0) push(A, C, B, r, [0, 1, 0]); else push(A, B, C, r, [0, 1, 0]); } }
     };
     emitB(tt, pts, a, cx, cz);
-    const sp = simplifyFootprint(pts, Math.abs(a / 2)); emitB(tt.far || (tt.far = { p: [], c: [], n: [] }), sp, sp.a2 ?? a, cx, cz); // [r7-lod] far set
+    (tt.jobs || (tt.jobs = [])).push(() => { const sp = simplifyFootprint(pts, Math.abs(a / 2)); emitB(tt.far || (tt.far = { p: [], c: [], n: [] }), sp, sp.a2 ?? a, cx, cz); }); // [r7-lod] far set, built after start-up in ~3 ms slices
   }
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
   mat.onBeforeCompile = (sh) => {
@@ -50,13 +50,19 @@ export function buildMidCity(list, heightAt) {
     const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = false; group.add(m); return m; };
   for (const t of tiles.values()) {
     if (!t.p.length) continue;
-    const full = mk(t), far = t.far && t.far.p.length ? mk(t.far) : null;
-    if (far) { far.visible = false; lodTiles.push({ full, far, box: full.geometry.boundingBox }); }
+    const full = mk(t); t.p = t.c = t.n = null; lodTiles.push({ full, far: null, box: full.geometry.boundingBox, t, j: 0 }); // [r7-lod] (source arrays freed: only the far-set jobs stay)
   }
-  // [r7-lod] simplified footprints are within ~2 m of the real ones: switch when that error is under ~1.5 px (x LOD.bias)
-  const _v = new THREE.Vector3();
-  group.userData.updateLod = (cp) => { const dFar = LOD.on ? LOD.distFor(2.0, 1.5) : Infinity;
-    for (const L of lodTiles) { const d = L.box.distanceToPoint(_v.copy(cp)); const f = d > dFar; L.full.visible = !f; L.far.visible = f; } };
+  // [r7-lod] simplified footprints are within ~2 m of the real ones: switch when that error is under ~1.5 px (x LOD.bias).
+  // The far sets are built lazily (a few ms per frame, nearest-first is not needed: every tile is far from campus), so
+  // loading pays nothing; until a tile's far set exists it keeps drawing the full one.
+  const _v = new THREE.Vector3(); let todo = LOD.on ? lodTiles.slice() : [];
+  group.userData.updateLod = (cp) => {
+    if (todo.length) { const t0 = performance.now(); while (todo.length && performance.now() - t0 < 3) { const L = todo[0], jobs = L.t.jobs || [];
+      while (L.j < jobs.length && performance.now() - t0 < 3) jobs[L.j++]();
+      if (L.j >= jobs.length) { todo.shift(); L.t.jobs = null; if (L.t.far && L.t.far.p.length) { L.far = mk(L.t.far); L.far.visible = false; } L.t.far = null; } } }
+    const dFar = LOD.on ? LOD.distFor(2.0, 1.5) : Infinity;
+    for (const L of lodTiles) { if (!L.far) continue; const d = L.box.distanceToPoint(_v.copy(cp)); const f = d > dFar; L.full.visible = !f; L.far.visible = f; } };
+  group.userData.buildAllLod = () => { while (todo.length) group.userData.updateLod(new THREE.Vector3(0, 0, 0)); }; // QA: finish the far sets now
   return group;
 }
 
