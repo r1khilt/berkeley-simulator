@@ -5,6 +5,7 @@ import { loadJSON } from '../data.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyInteriorGlass } from './interiors.js'; // furnished rooms behind landmark window glass
 import { weatherLandmark } from './pbr.js'; // r4-sweep-central2: consistent base grime on mixed façades
+import { PROXY_LAYER } from '../render/perf.js'; // [r6-perf] shadow-only proxy layer
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
@@ -30,7 +31,7 @@ export class LandmarkManager {
     if (best && now - (this.lastLoad || 0) > 140) { this.busy = true; this.lastLoad = now; this._load(best).finally(() => { this.busy = false; this.lastLoad = performance.now(); }); }
   }
   async _load(l) {
-    l.state = 'loading';
+    l.state = 'loading'; const tl0 = performance.now(); // [r6-perf] load timing (l.loadMs)
     try {
       const [mod, packet] = await Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]);
       const a = packet.anchor; const heightAt = this.heightAt;
@@ -43,6 +44,7 @@ export class LandmarkManager {
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
       try { weatherLandmark(obj); } catch (e) { console.warn('weather', l.id, e); } // r4-sweep-central2: plain masonry gets base grime too
       this.setupMaterials && this.setupMaterials(obj);
+      if (!res.update && !(window.BSIM && window.BSIM.gpu) && !/[?&]noproxy/.test(location.search)) try { const tp = performance.now(); l.proxyStats = buildShadowProxy(obj); l.proxyStats.ms = +(performance.now() - tp).toFixed(1); } catch (e) { console.warn('shadow proxy', l.id, e); } // [r6-perf]
       this.scene.add(obj);
       const tag = 'lm:' + l.id, ph = this.physics;
       for (const c of res.colliders || []) {
@@ -63,7 +65,7 @@ export class LandmarkManager {
       Object.assign(l, { obj, res, details, packetAnchor: a, info: mod.info || {} });
       this.standins && this.standins.setHidden(l.replaces, true);
       if (this.physics.suspendTag) for (const id of l.replaces) this.physics.suspendTag(id, true); // new-buildings: the hidden stand-in's walls go too
-      l.state = 'ready'; this.placed.push(l);
+      l.state = 'ready'; this.placed.push(l); l.loadMs = Math.round(performance.now() - tl0);
       this.onLoaded && this.onLoaded(l);
     } catch (e) { console.warn('landmark failed', l.id, e); l.state = 'failed'; }
   }
@@ -82,7 +84,7 @@ export class LandmarkManager {
     const cp = env.camera.position;
     for (const l of this.placed) {
       const d = Math.hypot(l.anchor.x - cp.x, l.anchor.z - cp.z);
-      const show = d < 380 + (l.r || 0);
+      const show = d < (this.detailR ?? 380) + (l.r || 0); // [r6-perf] governor may shorten the ornament range
       for (const o of l.details) o.visible = show;
       if (l.res && l.res.update && d < 2500) { try { l.res.update(dt, env); } catch (e) { l.res.update = null; console.warn(e); } }
     }
@@ -117,4 +119,48 @@ function mergeStatic(root) {
   }
   for (const o of remove) { o.parent && o.parent.remove(o); }
   return saved;
+}
+
+// [r6-perf] Shadow proxy: the static, opaque shadow casters of a landmark merged into one position-only mesh per shadow
+// side, drawn only by the shadow cameras (PROXY_LAYER). Each cascade then draws a landmark in 1-2 calls instead of one
+// per material (about 1,600 -> 400 shadow draw calls at Sproul). The visible meshes stop casting. Alpha-tested,
+// transparent, multi-material, instanced, skinned, custom-depth and detail/keep parts keep casting themselves, and
+// animated landmarks (res.update) are skipped. Vertex data lives on the GPU only (freed from JS after upload).
+const _pv = new THREE.Vector3();
+function buildShadowProxy(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), m4 = new THREE.Matrix4();
+  const sides = new Map();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.castShadow || o.customDepthMaterial || o.morphTargetInfluences || Array.isArray(o.material)) return;
+    let p = o; while (p && p !== root) { if (!p.visible || (p.userData && (p.userData.detail || p.userData.keep))) return; p = p.parent; }
+    const m = o.material, g = o.geometry;
+    if (!m || !m.visible || m.transparent || m.alphaTest > 0 || m.alphaMap || m.alphaToCoverage || m.displacementMap || (m.clippingPlanes && m.clippingPlanes.length)) return;
+    if (!g || !g.attributes.position || g.drawRange.start > 0 || g.drawRange.count !== Infinity) return;
+    const side = m.shadowSide != null ? m.shadowSide : m.side === THREE.FrontSide ? THREE.BackSide : m.side === THREE.BackSide ? THREE.FrontSide : THREE.DoubleSide;
+    let L = sides.get(side); if (!L) sides.set(side, (L = []));
+    L.push(o);
+  });
+  let casters = 0, tris = 0;
+  for (const [side, list] of sides) {
+    let nv = 0, ni = 0; for (const o of list) { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+    if (!nv || !ni) continue;
+    const pos = new Float32Array(nv * 3), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let vb = 0, ib = 0;
+    for (const o of list) {
+      const g = o.geometry, pa = g.attributes.position; m4.multiplyMatrices(inv, o.matrixWorld);
+      for (let i = 0; i < pa.count; i++) { _pv.fromBufferAttribute(pa, i).applyMatrix4(m4); pos[(vb + i) * 3] = _pv.x; pos[(vb + i) * 3 + 1] = _pv.y; pos[(vb + i) * 3 + 2] = _pv.z; }
+      if (g.index) { const ia = g.index.array; for (let k = 0; k < g.index.count; k++) idx[ib + k] = ia[k] + vb; ib += g.index.count; }
+      else { for (let k = 0; k < pa.count; k++) idx[ib + k] = vb + k; ib += pa.count; }
+      vb += pa.count; o.castShadow = false; casters++;
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeBoundingSphere(); geo.computeBoundingBox();
+    const free = function () { this.array = null; }; geo.attributes.position.onUpload(free); geo.index.onUpload(free);
+    geo.computeBoundingBox = geo.computeBoundingSphere = () => {}; // bounds are final; never recompute from the freed arrays (grapple refine, culling)
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, shadowSide: side }));
+    mesh.castShadow = true; mesh.receiveShadow = false; mesh.layers.set(PROXY_LAYER); mesh.name = 'shadowProxy'; mesh.userData.shadowProxy = true; mesh.raycast = () => {};
+    root.add(mesh); tris += ni / 3;
+  }
+  return { casters, tris: Math.round(tris), proxies: sides.size };
 }

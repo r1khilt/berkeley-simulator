@@ -50,6 +50,9 @@ void groundShadePBR(vec2 w, float dist) {
   float fade = clamp(dist / 120.0, 0.0, 1.0);
   float near = 1.0 - (uPbrHQ > 0.5 ? smoothstep(180.0, 280.0, dist) : smoothstep(110.0, 170.0, dist));
   float det = 1.0 - smoothstep(25.0, 90.0, dist);         // small decals (joints, cracks, gum)
+#ifdef BS_SOFT
+  near = 1.0 - smoothstep(45.0, 75.0, dist); det = 1.0 - smoothstep(12.0, 40.0, dist); // [r6-fast] soft tier: texture taps only near the camera (mean colours beyond)
+#endif
   float edgeN = (n1.g - 0.5) * 0.9 + (n2.b - 0.5) * 0.35;
   float dA = (s.r - 0.5) * 6.0, dP = (s.g - 0.5) * 6.0, dG = (s.b - 0.5) * 6.0, dD = (s.a - 0.5) * 6.0;
   // r4-ground: maintained beds (special id 8) get a crisp, clean edge; natural areas keep the organic wobble

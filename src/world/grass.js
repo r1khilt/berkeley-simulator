@@ -1,5 +1,6 @@
 // Instanced grass blades around the camera on lawns (from the ground SDF grass channel), with wind and distance fade.
 import * as THREE from 'three';
+import { GBUF } from './grading.js'; // [r6-fast]
 import { U } from '../materials.js';
 function bladeClump() {
   const pos = [], col = [];
@@ -35,7 +36,7 @@ export class Grass {
  float w = sin(uTime*1.8 + wpI.x*0.35 + wpI.z*0.27) * 0.5 + sin(uTime*3.1 + wpI.x*1.3) * 0.25;
  transformed.x += aTip * w * 0.05 * (0.4 + uWind); transformed.z += aTip * w * 0.03 * (0.4 + uWind);`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTip;')
-        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = -1.0 - gl_FragColor.a; // r4-ground: lawn = terrain for the post AO pass').replace('#include <color_fragment>', `#include <color_fragment>
+        .replace('#include <dithering_fragment>', GBUF.on ? '#include <dithering_fragment>\n gl_FragColor.a = -1.0 - gl_FragColor.a; // r4-ground: lawn = terrain for the post AO pass' : '#include <dithering_fragment>') /* [r6-fast] post only */.replace('#include <color_fragment>', `#include <color_fragment>
  diffuseColor.rgb *= mix(0.55, 1.3, vTip);`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
  normal = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);`);
     };

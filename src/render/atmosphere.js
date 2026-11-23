@@ -157,9 +157,18 @@ export class Atmosphere {
     const key = `${(sunAlt * 2000) | 0}|${(altKm * 20) | 0}|${this.haze.toFixed(3)}`;
     this.U.uSunDirW.value.copy(sunDir);
     if (key !== this.lastKey) { this.lastKey = key; this.U.uCamR.value = RG + altKm; this.U.uSunAlt.value = sunAlt; this._run(this.passSky, this.skyRT); this.changed = true;
-      if (this.canRead) { try { this._run(this.passRed, this.redRT); this.renderer.readRenderTargetPixels(this.redRT, 0, 0, 4, 1, this.redBuf); const b = this.redBuf;
-        if (Number.isFinite(b[0])) { this.skyIrr.setRGB(b[0], b[1], b[2]); this.horizon.setRGB(b[4], b[5], b[6]); this.zenith.setRGB(b[8], b[9], b[10]); this.lowSky.setRGB(b[12], b[13], b[14]); } } catch (e) { this.canRead = false; } }
+      this.redKey = null; // [r6-perf] reduce + read back below (async while the game loop runs)
     } else this.changed = false;
+    // [r6-perf] the 4x1 reduction used to be read back synchronously, which stalled the frame on everything the GPU had
+    // queued (seconds on software WebGL, a hitch on laptops) whenever the sun or camera altitude crossed a step. The
+    // read is now asynchronous (PBO + fence); the sky colours follow a frame or two later. syncRead (set while the game
+    // loop is paused, e.g. scripted screenshots) keeps the old immediate behaviour.
+    if (this.canRead && this.redKey !== key && !this.reading) { try {
+      this.redKey = key; this._run(this.passRed, this.redRT);
+      const apply = (b) => { if (Number.isFinite(b[0])) { this.skyIrr.setRGB(b[0], b[1], b[2]); this.horizon.setRGB(b[4], b[5], b[6]); this.zenith.setRGB(b[8], b[9], b[10]); this.lowSky.setRGB(b[12], b[13], b[14]); } };
+      if (this.syncRead || !this.renderer.readRenderTargetPixelsAsync) { this.renderer.readRenderTargetPixels(this.redRT, 0, 0, 4, 1, this.redBuf); apply(this.redBuf); }
+      else { this.reading = true; this.renderer.readRenderTargetPixelsAsync(this.redRT, 0, 0, 4, 1, this.redBuf).then((b) => { this.reading = false; apply(b || this.redBuf); }, () => { this.reading = false; this.canRead = false; }); }
+    } catch (e) { this.canRead = false; this.reading = false; } }
     this.sunTrans.copy(this.transmittance(altKm, sunAlt));
     return this.changed;
   }

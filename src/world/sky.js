@@ -205,6 +205,17 @@ export class SkySystem {
     this.physExposure = physExp;
     const wN = smooth(0.12, 0.62, night);
     this.renderer.toneMappingExposure = Math.exp(Math.log(physExp) * (1 - wN) + Math.log(nightExp) * wN) * (this.exposureMul || 1);
+    // [r6-fast] soft tier (software WebGL): no PMREM environment (its cube-UV lookups dominate every fragment there). The
+    // hemisphere light carries the same irradiance the environment dome gives (sky above, lit ground below, x envIntensity);
+    // the soft shader chunks (render/soft.js) also use it for a cheap reflection term.
+    if (this.noEnv) {
+      const eI = this.envIntensity ?? 0.7, ds = (c, k) => { const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; return c.setRGB(l + (c.r - l) * k, l + (c.g - l) * k, l + (c.b - l) * k); };
+      const Eup = ds(irr.clone().multiplyScalar(K * skyMul), 0.65).addScalar(greyL * Math.PI).add(zN.clone().multiplyScalar(nk * Math.PI));
+      const Edn = ga.clone().multiplyScalar(Eg).addScalar(greyL * Math.PI).add(gN.clone().multiplyScalar(nk * Math.PI));
+      this.hemi.color.copy(Eup.multiplyScalar(eI)); this.hemi.groundColor.copy(Edn.multiplyScalar(eI)); this.hemi.intensity = 1;
+      this.scene.environment = null;
+      return { alt, night, warm, dayI };
+    }
     // environment (PMREM) refresh when the sky changed noticeably
     const envKey = `${Math.round(alt * 2)}|${Math.round(sp.azimuth * 60)}|${Math.round(cover * 20)}|${Math.round(haze * 4)}|${Math.round(night * 20)}`;
     const nowMs = performance.now();   // wall-clock throttle (PMREM costs a few ms); also correct for scripted single-frame renders

@@ -477,9 +477,9 @@ export class UI {
     const sw = (k, on) => `<label class="switch"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}><i></i></label>`;
     this.panel(`${this._head('Settings')}
       <section><h3>Graphics</h3>
-        <div class="row"><span>Quality</span>${seg('quality', s.quality, [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}</div>
+        <div class="row"><span>Quality</span>${seg('quality', s.qualityAuto ? 'auto' : s.quality, [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}</div>
         <div class="row"><span>People</span>${sw('life', s.life !== false)}</div>
-        <p class="row-note">Changing quality reloads the page.</p></section>
+        <p class="row-note">Auto picks a level for your graphics hardware and adjusts it as you play. Changing quality reloads the page.</p></section>
       <section><h3>Movement</h3>
         <div class="row"><span>Walk speed</span>${range('walkSpeed', 0.5, 2, 0.05, s.walkSpeed ?? 1)}</div>
         <div class="row"><span>Fly speed</span>${range('flySpeed', 0, 1000, 1, toLog(s.flySpeed ?? 25))}</div>
