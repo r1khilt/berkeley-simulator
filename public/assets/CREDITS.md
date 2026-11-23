@@ -2,6 +2,7 @@
 
 ## PBR surface textures (`public/assets/pbr/`, gfx-materials)
 All CC0 (public domain). Downloaded at 1K, then de-tiled, colour-calibrated and packed to WebP by `tools/bake_pbr.py`.
+`public/assets/pbr/512/` holds half-size copies of the same sets for the low/medium quality tiers (`tools/pbr_half.py`).
 
 | Game layer | Source asset | Site |
 |---|---|---|

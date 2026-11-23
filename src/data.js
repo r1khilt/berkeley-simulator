@@ -11,14 +11,16 @@ async function fetchBytes(name, expectGz = true) {
   const len = +res.headers.get('content-length') || 0;
   total += len || 1e6;
   let body = res.body;
-  // count compressed bytes as they arrive
-  const counter = new TransformStream({ transform(chunk, ctl) { loaded += chunk.byteLength; emit(); ctl.enqueue(chunk); } });
+  // count compressed bytes as they arrive. [r6-load] With Content-Encoding (deploy/server.py serves brotli) the stream
+  // carries decoded bytes, larger than content-length: count them at an assumed ~4:1 ratio, capped at len.
+  const coded = !!res.headers.get('content-encoding') && len > 0; let got = 0;
+  const counter = new TransformStream({ transform(chunk, ctl) { if (coded) { const add = Math.min(len - got, chunk.byteLength / 4); got += add; loaded += add; } else loaded += chunk.byteLength; emit(); ctl.enqueue(chunk); } });
   body = body.pipeThrough(counter);
   // if the server already decoded (content-encoding gzip), the stream is plain; detect by magic bytes
   const reader = body.getReader(); const chunks = []; let size = 0;
   for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); size += value.byteLength; }
   let buf = new Uint8Array(size); let o = 0; for (const c of chunks) { buf.set(c, o); o += c.byteLength; }
-  if (!len) { total += size - 1e6; emit(); }
+  if (!len) { total += size - 1e6; emit(); } else if (coded && got < len) { loaded += len - got; emit(); }
   if (expectGz && buf[0] === 0x1f && buf[1] === 0x8b) {
     const ds = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
     buf = new Uint8Array(await new Response(ds).arrayBuffer());

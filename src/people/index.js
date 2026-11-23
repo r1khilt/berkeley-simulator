@@ -43,7 +43,10 @@ class People {
       const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xffffff, name: 'people:blob' });
       this.blobs = new THREE.InstancedMesh(g, m, Math.max(1, this.K)); this.blobs.count = 0; this.blobs.frustumCulled = false; this.blobs.renderOrder = 1; this.blobs.name = 'people:blobs'; this.group.add(this.blobs); this._bm = new THREE.Matrix4(); this._bq = new THREE.Quaternion(); this._bs = new THREE.Vector3(); this._bp = new THREE.Vector3(); }
     this.useRB = qs.get('rb') !== '0'; // r4-people3: ?rb=0 keeps the procedural Quaternius people
-    if (this.K > 0 && qs.get('people') !== '0') loadPeopleAssets().then((A) => { this._build(A); this._rbLoad(A); }).catch((e) => console.warn('people assets failed', e));
+    // [r6-load] in the game, people assets (~2 MB of GLBs + clips) load after BSIM.ready instead of competing with the world data
+    const goPeople = () => loadPeopleAssets().then((A) => { this._build(A); this._rbLoad(A); }).catch((e) => console.warn('people assets failed', e));
+    const waitPeople = () => { const B = typeof window !== 'undefined' && window.BSIM; if (!B || !B.qs || B.ready || B.error) goPeople(); else setTimeout(waitPeople, 250); };
+    if (this.K > 0 && qs.get('people') !== '0') waitPeople();
   }
   _build(A) {
     A.palette = { SKIN, HAIR, SHOE }; this.assets = A;

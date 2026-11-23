@@ -574,6 +574,9 @@ varying vec3 vWPosR, vNR;
 // Procedural stand-ins for buildings that have a hand-modelled landmark module: shown until (and while) the landmark is not loaded.
 class StandinManager {
   constructor(map, wallMat, roofMat) {
+    // [r6-load] the stand-in source arrays live for the whole session (rebuilds on landmark load/unload): keep them as
+    // Float32Array instead of JS number arrays, about a third of the heap
+    for (const s of map.values()) for (const kind of ['walls', 'roofs']) { const b = s[kind]; if (b) for (const k of ['p', 'n', 'uv', 'c', 'f']) if (Array.isArray(b[k])) b[k] = Float32Array.from(b[k]); }
     this.map = map; this.wallMat = wallMat; this.roofMat = roofMat; this.hidden = new Set(); this.group = new THREE.Group(); this.group.name = 'standins';
     this.chunks = new Map(); for (const [osm, s] of map) { let c = this.chunks.get(s.key); if (!c) this.chunks.set(s.key, (c = { ids: [], meshes: [] })); c.ids.push(osm); }
     for (const k of this.chunks.keys()) this.rebuild(k);

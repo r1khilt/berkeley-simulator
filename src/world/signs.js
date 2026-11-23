@@ -12,7 +12,7 @@ function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^=
 export function buildSigns(signs) {
   const group = new THREE.Group(); group.name = 'signs';
   if (!signs || !signs.length) return { group };
-  const CW = 512, CH = 64, COLS = 8, ROWS = Math.ceil(signs.length / COLS); const W = CW * COLS, H = Math.min(4096, 1 << Math.ceil(Math.log2(ROWS * CH)));
+  const CW = 512, CH = 64, COLS = 8, ROWS = Math.ceil(signs.length / COLS); const W = CW * COLS, H = Math.min(4096, ROWS * CH); // [r6-load] exact height (WebGL2 mips NPOT): 3648 px, not 4096
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   const pos = [], uv = [], nor = [], aw = [], awc = [];
   const fonts = ['600 40px Georgia, serif', '700 38px "Helvetica Neue", Arial, sans-serif', '600 40px "Trebuchet MS", sans-serif', 'italic 600 40px Georgia, serif', '800 36px Arial Black, Arial, sans-serif'];
@@ -46,6 +46,7 @@ export function buildSigns(signs) {
     }
   });
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.needsUpdate = true;
+  tex.onUpdate = () => { cv.width = cv.height = 1; }; // [r6-load] the 4096x3648 canvas (57 MB) is not needed once the atlas is on the GPU
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.computeBoundingSphere();
   const mat = nightGlow(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.9, roughness: 0.55, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0.8);
   const m = new THREE.Mesh(g, mat); m.name = 'shopSigns'; m.receiveShadow = true; group.add(m);

@@ -11,7 +11,7 @@ import { gradeTerrain, buildGroundworks, reseatTrees } from './world/groundworks
 import { SkySystem, fetchWeather } from './world/sky.js';
 import { buildBuildings, initSkeleton } from './world/buildings.js';
 import { decodeTrees, TreeSystem } from './world/vegetation.js';
-import { LandmarkManager, loadManifest, normId } from './world/landmarks.js';
+import { LandmarkManager, loadManifest, normId, prefetchLandmark } from './world/landmarks.js'; // [r6-load] prefetchLandmark
 import { Physics } from './player/physics.js';
 import { Player } from './player/player.js';
 import { installModes } from './player/modes/index.js';
@@ -33,6 +33,7 @@ import { pacificParts, pacificHour, dateAtPacificHour, clockString } from './tim
 import { installGrading, contactAO, ambAlpha, GRADE, GBUF } from './world/grading.js';
 import { paintSites } from './world/sitePaint.js'; // r4-moffitt: site ground paint
 import { initPBR, PBR, pbrWeather } from './world/pbr.js'; // gfx-materials: PBR surface textures
+import { slimShadowMaps } from './render/shadowmem.js'; // [r6-load] shadow-map memory
 import { PostPipeline } from './render/post.js';   // gfx-post: photographic post pipeline (high/ultra)
 import { probeGPU, ShadowScheduler, tagFarCasters, GpuTimer, Governor, softwareNotice, noWebGLMessage, PROXY_LAYER } from './render/perf.js';
 import { opaqueCanvas, installSoftShading } from './render/soft.js'; // [r6-fast] cheap tier + opaque canvas // [r6-perf] tiers, cached shadows, adaptive quality
@@ -87,6 +88,14 @@ async function boot() {
   ui.note('Loading terrain, buildings and trees…');
   const [metaCore, metaFar] = await Promise.all([loadJSON('meta_core.json'), loadJSON('meta_far.json')]);
   const manifestP = loadManifest();
+  // [r6-load] boot landmarks: fetch their modules + packets now, alongside the world data, instead of one by one after it
+  const nearBoot = (l) => Math.min(Math.hypot(l.anchor.x + 156, l.anchor.z - 246), Math.hypot(l.anchor.x, l.anchor.z)) - (l.r || 0) < 450;
+  manifestP.then((m) => { for (const l of m.landmarks) if (l.always && (nearBoot(l) || qs.get('lmboot') === 'all')) prefetchLandmark(l.id); }).catch(() => {});
+  // [r6-load] build the tree library (~5 s of canvas and pixel work that needs no data) while the world data downloads
+  const treeOpts = { season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024, puffs: qs.get('treepuffs') !== '0', puffK: { low: 0.7, medium: 0.85, ultra: 1.25 }[settings.quality] ?? 1, hero: settings.quality !== 'low' && qs.get('treehero') !== '0', heroBudget: { medium: 8000, ultra: 16000 }[settings.quality] ?? 10000 };
+  const mkTreeLib = async (early) => { const m = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js'); return { lib: early && m.createTreeLibraryAsync ? await m.createTreeLibraryAsync(treeOpts) : m.createTreeLibrary(treeOpts), TREE_REF_TINT: m.TREE_REF_TINT }; };
+  const treeLibP = qs.get('treeearly') === '0' ? null : mkTreeLib(true); // ?treeearly=0: old behaviour (synchronous build in the trees step)
+  if (treeLibP) treeLibP.catch(() => {}); // awaited (and reported) in the trees step
   const [terrRes, sdfRes, specRes, auxRes, midRes, farRes, bjson, treeBin, vectors, orthoCore, orthoMid, orthoFar, pois, skylineData, signsData, midData] = await Promise.all([
     loadBin('terrain_core.bin.gz'), loadBin('ground_sdf.bin.gz'), loadBin('ground_special.bin.gz'), loadBin('ground_aux.bin.gz'),
     loadBin('terrain_mid.bin.gz'), loadBin('terrain_far.bin.gz'), loadJSON('buildings.json.gz'), loadBin('trees.bin.gz'), loadJSON('vectors.json.gz'),
@@ -152,8 +161,7 @@ async function boot() {
   let treeSys = null;
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
-    const { createTreeLibrary, TREE_REF_TINT } = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js');
-    const lib = createTreeLibrary({ season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024, puffs: qs.get('treepuffs') !== '0', puffK: { low: 0.7, medium: 0.85, ultra: 1.25 }[settings.quality] ?? 1, hero: settings.quality !== 'low' && qs.get('treehero') !== '0', heroBudget: { medium: 8000, ultra: 16000 }[settings.quality] ?? 10000 }); phase('treeLib'); // r4-trees: volumetric puff crowns (?treepuffs=0 = round-3 cards/blobs); r4-trees2: hero 3D-cluster LOD near the player (?treehero=0 = off)
+    const { lib, TREE_REF_TINT } = await (treeLibP || mkTreeLib(false)); phase('treeLib'); // [r6-load] started at the top of boot (options in treeOpts) // r4-trees: volumetric puff crowns (?treepuffs=0 = round-3 cards/blobs); r4-trees2: hero 3D-cluster LOD near the player (?treehero=0 = off)
     treeSys = new TreeSystem({ lib, trees, refTint: TREE_REF_TINT, lodDistances: Q.trees, maxDist: Q.treeMax });
     BS.treeLib = lib;
     // hide trees inside landmark footprints
@@ -209,6 +217,7 @@ async function boot() {
   BS.drawStats = () => { const sm = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; renderer.info.autoReset = false; renderer.info.reset(); renderer.render(scene, camera); const main = { ...renderer.info.render }; renderer.shadowMap.enabled = sm; renderer.info.autoReset = true; return main; };
   csm.lights.forEach((l, i) => { l.shadow.normalBias = [0.07, 0.22, 0.5, 0.9][i] ?? 0.9; l.shadow.bias = [-0.0003, -0.0006, -0.001, -0.0015][i] ?? -0.0015; });
   if (!gpu) for (const l of csm.lights) l.shadow.camera.layers.enable(PROXY_LAYER); // [r6-perf] shadow cameras also draw the landmarks' shadow-only proxies
+  if (!gpu) try { slimShadowMaps(csm.lights, renderer); } catch (e) { console.warn('slim shadow maps', e); } // [r6-load] R8 colour attachment (src/render/shadowmem.js)
   const sched = (!gpu && useCSM && csm.lights && csm.lights.length && !qs.get('noshadowcache')) ? new ShadowScheduler({ csm, camera }) : null; BS.shadowSched = sched; if (sched && BS.soft) sched.intervals = [2, 4, 8]; // software: even the near cascade refreshes every 2nd frame // [r6-perf] cached / staggered cascades (?noshadowcache=1 disables)
   const farMul = { v: 1 }; BS.farMul = farMul; // [r6-perf] governor scales the shadow distance
   const csmDone = new WeakSet();
@@ -227,11 +236,14 @@ async function boot() {
   if (sched) tagFarCasters(scene); // [r6-perf] big casters also draw into the far cascade
   const lm = new LandmarkManager({ scene, physics, heightAt, manifest, standins: bres.standinMgr, setupMaterials,
     onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); sched.invalidate(); } /* [r6-perf] */ },
-    onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); } });
+    onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); if (sched) sched.invalidate(); /* [r6-int] cached cascades drop the unloaded landmark's shadow (its stand-in casts again) */ } });
   BS.lm = lm;
   if (BS.soft) { lm.loadR = 220; lm.unloadR = 340; lm.detailR = 160; } // [r6-perf] software: hand-built landmarks stream in a little closer (stand-ins beyond) ([r6-fast] ornaments within 200 m)
   ui.note('Loading landmarks…');
-  await lm.loadNow(manifest.landmarks.filter((l) => l.always).map((l) => l.id));
+  // [r6-load] only the always-on landmarks near spawn and the first title shot block BSIM.ready (Sather Gate/Tower, Doe, Evans).
+  // The far skyline ones (Stadium, Greek Theatre, I-House, LHS, Big C: 0.6-1.5 km out) stream in right after, nearest
+  // first; lm.update treats `always` as in range at any distance and never unloads them.
+  await lm.loadNow(manifest.landmarks.filter((l) => l.always && (nearBoot(l) || qs.get('lmboot') === 'all')).map((l) => l.id));
   const landmarks = lm.placed; BS.landmarks = landmarks; phase('landmarks');
   const audio = new Audio(); audio.setVolume(settings.volume); BS.audio = audio;
   player.onStep = (k) => audio.step(k, player.speed);
@@ -458,7 +470,7 @@ async function boot() {
   phase('rest'); BS.timing = { phases: PH, load: Math.round(tLoad - t0), build: Math.round(performance.now() - tLoad), buildings: bres.stats, reversed: renderer.capabilities.reversedDepthBuffer, landmarks: lm.placed.length + '/' + lm.items.length, trees: trees.n };
   console.log('BSIM timing', JSON.stringify(BS.timing));
   await Promise.race([pbrP, new Promise((r) => setTimeout(r, 8000))]); BS.pbr = PBR; // gfx-materials
-  ui.progress(1); ui.ready(); BS.ready = true;
+  ui.progress(1); ui.ready(); BS.ready = true; lm.ready = true; // [r6-load] lm.ready: landmark loads time-slice from now on
   if (gpuInfo.software && !qs.get('nonotice')) softwareNotice(gpuInfo, BS.soft); // [r6-perf] one-time: how to turn graphics acceleration on
   if (qs.get('play')) startPlay();
 }

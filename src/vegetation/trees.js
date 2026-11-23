@@ -1084,6 +1084,17 @@ export function createTreeLibrary({ season = 'late-autumn', leafTexSize = 2048, 
   if (!SEASONS.includes(season)) throw new Error(`createTreeLibrary: unknown season '${season}' (${SEASONS.join(', ')})`);
   const species = {};
   for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget, puffs, puffK, hero, heroBudget }); }
+  return makeLibrary(species, season);
+}
+// [r6-load] same library, built one species per task so main.js can run it while the world data downloads (the main thread
+// is otherwise idle then). Yielding between species keeps fetch streams draining and the progress bar moving.
+export async function createTreeLibraryAsync({ season = 'late-autumn', leafTexSize = 2048, alphaToCoverage = true, lod0Budget = 3000, lod1Budget = 400, only = null, puffs = true, puffK = 1, hero = true, heroBudget = 14000 } = {}) {
+  if (!SEASONS.includes(season)) throw new Error(`createTreeLibrary: unknown season '${season}' (${SEASONS.join(', ')})`);
+  const species = {};
+  for (const [id, d] of Object.entries(SPECIES_DEF)) { if (only && !only.includes(id)) continue; await new Promise((r) => setTimeout(r, 0)); species[id] = buildSpecies(id, d, season, { leafTexSize, alphaToCoverage, lod0Budget, lod1Budget, puffs, puffK, hero, heroBudget }); }
+  return makeLibrary(species, season);
+}
+function makeLibrary(species, season) {
   let lastTime = U.uTime.value, clock = 0;
   const baseDir = TREE_WIND_DIR.value.clone();
   return {

@@ -528,6 +528,7 @@ export function buildGroundworks(plan, { scene, heightAt, trees, treeSys, physic
     if (b.key === 'rail') mesh.userData.detail = true;
     group.add(mesh); statics.push(mesh);
   }
+  buckets.clear(); // [r6-load] the per-bucket JS vertex arrays (~57 MB of heap) stayed reachable through the update() closures
   // ---- tree grates where trunks stand in paving (Sproul Plaza, Dwinelle Plaza, streets)
   let grates = null;
   if (trees) {

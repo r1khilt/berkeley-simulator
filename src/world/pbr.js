@@ -90,7 +90,7 @@ async function fill2D(name, m) {
   try {
     const S = PBR.res, S2 = PBR.res2;
     const base = (import.meta.env && import.meta.env.BASE_URL || '/') + 'assets/pbr/';
-    const [ba, bn] = await Promise.all([loadBitmap(base + m.src + '_a.webp'), loadBitmap(base + m.src + '_n.webp')]);
+    const [ba, bn] = await Promise.all([loadSet(base, m.src + '_a.webp', S), loadSet(base, m.src + '_n.webp', S)]);
     const pa = pixels(ba, S), pn = pixels(bn, S);
     if (name === 'ashlar') {
       const ga = canvasFrom(pa, S, 'rgb', S, m.target).getContext('2d').getImageData(0, 0, S, S).data;
@@ -105,9 +105,17 @@ async function fill2D(name, m) {
   } catch (e) { console.warn('PBR 2D set', name, e.message); }
 }
 
+// [r6-load] the 512 px tiers (low/medium) fetch the half-size copies in assets/pbr/512/ (tools/pbr_half.py): 2.2 MB instead
+// of 9.2 MB for pixels the browser used to throw away; falls back to the full-size file if a copy is missing.
+function loadSet(base, file, S) { return S <= 512 ? loadBitmap(base + '512/' + file).catch(() => loadBitmap(base + file)) : loadBitmap(base + file); }
+// [r6-load] one download per texture set: the array build (initPBR) and the 2D landmark maps (fill2D, ~10 sets) used to
+// fetch the same webp files again (granite 3x), ~6.5 MB of duplicate traffic on a cold load. Blobs are kept briefly.
+const _blobs = new Map(); let _blobTimer = 0;
 async function loadBitmap(url) {
-  const r = await fetch(url); if (!r.ok) throw new Error('pbr: ' + url + ' ' + r.status);
-  const b = await r.blob(); return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+  let p = _blobs.get(url);
+  if (!p) { p = fetch(url).then((r) => { if (!r.ok) throw new Error('pbr: ' + url + ' ' + r.status); return r.blob(); }); _blobs.set(url, p); p.catch(() => _blobs.delete(url)); }
+  clearTimeout(_blobTimer); _blobTimer = setTimeout(() => _blobs.clear(), 60000); // late adopters just refetch (HTTP-cached)
+  const b = await p; return createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
 }
 function pixels(bmp, S) {
   const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d', { willReadFrequently: true });
@@ -181,7 +189,7 @@ export function initPBR(quality = 'high') {
   const t0 = performance.now();
   PBR.ready = (async () => {
     const n = LAYERS.length;
-    const bmps = await Promise.all(LAYERS.flatMap(([nm]) => [loadBitmap(base + nm + '_a.webp'), loadBitmap(base + nm + '_n.webp')]));
+    const bmps = await Promise.all(LAYERS.flatMap(([nm]) => [loadSet(base, nm + '_a.webp', S), loadSet(base, nm + '_n.webp', S)]));
     const A = new Uint8Array(S * S * 4 * n), Nn = new Uint8Array(S * S * 4 * n);
     for (let i = 0; i < n; i++) {
       const nm = LAYERS[i][0];

@@ -29,7 +29,11 @@ export class Avatar {
     this.phase = 0; this.blend = { walk: 0, run: 0, air: 0, bike: 0 }; this.pedal = 0;
     // r5-avatar: skinned body (async); the proxy figure shows until it is ready
     this.body = null; this._setup = null; this._finSeen = false; this.onBody = null;
-    if (SKINNED) this._loadBody().catch((e) => console.warn('player body failed, keeping the procedural avatar', e));
+    // [r6-load] in the game the skinned body (people GLBs, clips, KTX2 transcoder: ~3 MB) waits for BSIM.ready so it does
+    // not compete with the world data on a slow connection; the proxy figure covers the gap (nobody sees the player
+    // before Explore). Harness pages without BSIM load right away.
+    if (SKINNED) { const go = () => this._loadBody().catch((e) => console.warn('player body failed, keeping the procedural avatar', e));
+      const wait = () => { const B = typeof window !== 'undefined' && window.BSIM; if (!B || !B.qs || B.ready || B.error) go(); else setTimeout(wait, 250); }; wait(); }
   }
   // r5-avatar: main.js hands over its material setup (CSM shadows, contact AO) for the async body
   set setup(fn) { this._setup = fn; if (fn && this.body) fn(this.body.root); }
@@ -41,7 +45,7 @@ export class Avatar {
     // Rocketbox avatars (src/people/rocketbox.js, r4-people3) when present: the same realistic people as the near NPCs
     let RB = null; const mods = import.meta.glob('../people/rocketbox.js');
     if (AV_QS.get('rb') !== '0' && mods['../people/rocketbox.js']) {
-      try { RB = await mods['../people/rocketbox.js'](); const man = await fetch(RB_BASE + 'manifest.json').then((r) => (r.ok ? r.json() : null));
+      try { RB = await mods['../people/rocketbox.js'](); const man = RB.loadRBManifest ? await RB.loadRBManifest().catch(() => null) : await fetch(RB_BASE + 'manifest.json').then((r) => (r.ok ? r.json() : null)); // [r6-load] shared manifest fetch
         if (!RB.prepAvatar || !man || !man.avatars || !man.avatars.length) RB = null; else { AVATARS.length = 0; for (const e of man.avatars) AVATARS.push({ id: e.id, sex: e.sex, file: e.file, name: e.name }); } }
       catch (e) { console.warn('rocketbox player avatar unavailable', e); RB = null; }
     }

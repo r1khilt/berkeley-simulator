@@ -100,9 +100,15 @@ const BARK = {
   },
 };
 
+// [r6-load] in the game, drop a texture's CPU copy (level 0 + mip chain) once it is on the GPU: ~2.7 MB per 1024x512
+// atlas, ~80 MB over the tree library. createTreeLibrary draws every atlas at boot, before the first frame uploads them;
+// a cache hit on a freed atlas rebuilds it (only harness pages ever do that).
+const inGame = () => typeof window !== 'undefined' && !!(window.BSIM && window.BSIM.qs);
+export function freeAfterUpload(t) { if (!inGame()) return t; const prev = t.onUpdate; t.onUpdate = function () { if (prev) prev.call(this, t); if (t.mipmaps) for (const m of t.mipmaps) m.data = null; if (t.image && t.image.data) t.image.data = null; t.userData.freed = true; }; return t; }
+const live = (t) => t && !(t.userData && t.userData.freed);
 const _bark = {};
 export function barkTexture(kind) {
-  if (_bark[kind]) return _bark[kind];
+  if (_bark[kind] && live(_bark[kind].map) && live(_bark[kind].normalMap)) return _bark[kind];
   const W = 256, H = 512, f = BARK[kind];
   const col = new Uint8Array(W * H * 4), hg = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -121,7 +127,7 @@ export function barkTexture(kind) {
     const t = new THREE.DataTexture(data, W, H, THREE.RGBAFormat);
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
-    t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; return t;
+    t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; return freeAfterUpload(t);
   };
   return (_bark[kind] = { map: mk(col, true), normalMap: mk(nm, false) });
 }
@@ -431,7 +437,7 @@ const _leaf = {};
 // leaves for a cell of SPRIGS[kind].M metres (3D leaf clusters are built from many of these, see tree-hero.js)
 export function leafTexture(kind, S = 2048, sprig = false) {
   const key = kind + ':' + S + (sprig ? ':sprig' : '');
-  if (_leaf[key]) return _leaf[key];
+  if (live(_leaf[key])) return _leaf[key];
   const SP = sprig ? SPRIGS[kind] ?? { M: (LEAF_KINDS[kind]?.cellM ?? 1) * 0.5 } : null;
   const W = S, H = S / 2, cs = S / 2, M = SP ? SP.M : LEAF_KINDS[kind]?.cellM ?? 1;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -468,7 +474,7 @@ export function leafTexture(kind, S = 2048, sprig = false) {
   t.generateMipmaps = false;
   t.anisotropy = 8; t.needsUpdate = true;
   t.userData.coverage = cov / (d.length / 4); t.userData.meanShade = mr / 255; t.userData.cellM = M;
-  return (_leaf[key] = t);
+  return (_leaf[key] = freeAfterUpload(t));
 }
 
 // ---------- r4-trees: leaf-cluster "puff" atlas ----------
@@ -480,7 +486,7 @@ export function leafTexture(kind, S = 2048, sprig = false) {
 const _puff = {};
 export function puffTexture(kind, S = 1024, ballM = 3, srcS = S) {
   const key = kind + ':' + S + ':' + ballM;
-  if (_puff[key]) return _puff[key];
+  if (live(_puff[key])) return _puff[key];
   // source = the (cached) leaf atlas the cards already use, so no second atlas is drawn
   const src = leafTexture(kind, srcS); const W = S, H = S / 2, cs = S / 2, M = LEAF_KINDS[kind]?.cellM ?? 1, ss = srcS / 2;
   const sc = document.createElement('canvas'); sc.width = srcS; sc.height = srcS / 2;
@@ -540,5 +546,5 @@ export function puffTexture(kind, S = 1024, ballM = 3, srcS = S) {
   t.mipmaps = buildCoverageMips(level0, W, H, 0.42); t.generateMipmaps = false;
   t.anisotropy = 4; t.needsUpdate = true;
   t.userData.ballM = ballM;
-  return (_puff[key] = t);
+  return (_puff[key] = freeAfterUpload(t));
 }

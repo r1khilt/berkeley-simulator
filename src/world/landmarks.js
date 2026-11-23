@@ -8,6 +8,16 @@ import { weatherLandmark } from './pbr.js'; // r4-sweep-central2: consistent bas
 import { PROXY_LAYER } from '../render/perf.js'; // [r6-perf] shadow-only proxy layer
 const modules = import.meta.glob('../landmarks/*.js');
 export const normId = (s) => String(s).replace(/^way\//, 'w/').replace(/^relation\//, 'r/').replace(/^node\//, 'n/');
+// [r6-load] module + packet fetches started ahead of _load: the boot landmarks while the world data downloads, and while
+// streaming the next few nearest candidates. On a 40 ms RTT link each landmark used to cost its own sequential round
+// trips before its build could start.
+const _pre = new Map();
+export function prefetchLandmark(id) {
+  let p = _pre.get(id); if (p) return p;
+  const imp = modules[`../landmarks/${id}.js`]; if (!imp) return null;
+  p = Promise.all([imp(), loadJSON(`landmarks/${id}.json.gz`)]); _pre.set(id, p); p.catch(() => _pre.delete(id));
+  return p;
+}
 export async function loadManifest() { try { return await loadJSON('landmarks/manifest.json'); } catch (e) { console.warn('no landmark manifest', e); return { landmarks: [] }; } }
 export class LandmarkManager {
   constructor({ scene, physics, heightAt, manifest, standins, onLoaded, onUnloaded, setupMaterials, loadR = 430, unloadR = 680 }) {
@@ -21,24 +31,31 @@ export class LandmarkManager {
   async loadNow(ids) { for (const id of ids) { const l = this.byId.get(id); if (l && l.state === 'idle') await this._load(l); } }
   update(camPos) {
     if (this.busy) return;
-    let best = null, bd = Infinity;
+    let best = null, bd = Infinity; const cand = this._cand || (this._cand = []); cand.length = 0; // [r6-load] prefetch candidates
     for (const l of this.items) {
       const d = Math.hypot(l.anchor.x - camPos.x, l.anchor.z - camPos.z) - (l.r || 0);
       if (l.state === 'ready' && !l.always && d > this.unloadR) { this._unload(l); return; }
       if (l.state === 'idle' && (d < this.loadR || l.always) && d < bd) { bd = d; best = l; }
+      if (l.state === 'idle') { if (d < this.loadR + 150 || l.always) { if (!_pre.has(l.id)) cand.push(l, d); } else if (d > this.loadR + 200 && _pre.has(l.id)) _pre.delete(l.id); } // drop stale prefetches
     }
     const now = performance.now();
     if (best && now - (this.lastLoad || 0) > 140) { this.busy = true; this.lastLoad = now; this._load(best).finally(() => { this.busy = false; this.lastLoad = performance.now(); }); }
+    // [r6-load] keep up to 4 fetches ahead, nearest first (cand holds [item, distance] pairs flat)
+    if (cand.length && _pre.size < 4) { const order = []; for (let i = 0; i < cand.length; i += 2) order.push(i); order.sort((a, b) => cand[a + 1] - cand[b + 1]);
+      for (const i of order) { if (_pre.size >= 4) break; if (cand[i] !== best) prefetchLandmark(cand[i].id); } }
   }
   async _load(l) {
     l.state = 'loading'; const tl0 = performance.now(); // [r6-perf] load timing (l.loadMs)
     try {
-      const [mod, packet] = await Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]);
+      const pre = _pre.get(l.id); _pre.delete(l.id); // [r6-load] use a prefetch if one is in flight
+      const [mod, packet] = await (pre || Promise.all([modules[`../landmarks/${l.id}.js`](), loadJSON(`landmarks/${l.id}.json.gz`)]));
       const a = packet.anchor; const heightAt = this.heightAt;
       const groundAt = (x, z) => heightAt(a.x + x, a.z + z) - a.y;
       const res = await mod.build({ THREE, M: this.M, U, boxUV, groundAt, footprints: packet.footprints, anchor: a, packet });
       const obj = res.object3d; obj.position.set(a.x, a.y, a.z); obj.name = 'landmark:' + l.id;
+      if (this.ready) await yieldTask(); // [r6-load] after BSIM.ready: build, merge and material setup run as separate tasks (shorter hitches)
       if (!res.update) mergeStatic(obj);
+      if (this.ready) await yieldTask();
       if (!/[?      try { applyInteriorGlass(obj,]nointerior/.test(location.search)) try { applyInteriorGlass(obj, { id: l.id, name: (mod.info && mod.info.name) || l.name, tag: packet.footprints && packet.footprints[0] && packet.footprints[0].tags && packet.footprints[0].tags.building, M: this.M }); } catch (e) { console.warn('interiors', l.id, e); } // window interiors
       obj.traverse((o) => { if (o.isMesh) { if (o.castShadow !== false) o.castShadow = true; o.receiveShadow = true; } });
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
@@ -46,6 +63,7 @@ export class LandmarkManager {
       this.setupMaterials && this.setupMaterials(obj);
       if (!res.update && !(window.BSIM && window.BSIM.gpu) && !/[?&]noproxy/.test(location.search)) try { const tp = performance.now(); l.proxyStats = buildShadowProxy(obj); l.proxyStats.ms = +(performance.now() - tp).toFixed(1); } catch (e) { console.warn('shadow proxy', l.id, e); } // [r6-perf]
       this.scene.add(obj);
+      if (this.ready) await warmPrograms(obj, this.scene); // [r6-load] compile its shaders off the main thread before it is drawn
       const tag = 'lm:' + l.id, ph = this.physics;
       for (const c of res.colliders || []) {
         if (c.type === 'poly') ph.addRing(c.pts.map(([x, z]) => [x + a.x, z + a.z]), (c.y0 ?? -5) + a.y, (c.y1 ?? 100) + a.y, tag);
@@ -71,7 +89,11 @@ export class LandmarkManager {
   }
   _unload(l) {
     this.scene.remove(l.obj);
-    l.obj.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.geometry && o.geometry.dispose(); } });
+    // [r6-load] free what this landmark alone owns. Before, only geometries were disposed, so every load/unload cycle leaked
+    // its canvas textures (signs, interiors: 1-10 MB each), instance buffers and material programs on the GPU. During a
+    // long walk or fly the GPU process kept growing until the tab crashed.
+    try { disposeOwned(l.obj, this.scene, this._keep || (this._keep = keepSet(this.M))); } catch (e) { console.warn('landmark dispose', l.id, e); }
+    if (l.res && typeof l.res.dispose === 'function') try { l.res.dispose(); } catch (e) { console.warn('landmark dispose', l.id, e); }
     this.physics.removeTag('lm:' + l.id);
     if (l.res && l.res.ownsCollision && this.physics.muteTag) for (const id of l.replaces) this.physics.muteTag(id, false); // interiors-cafe
     this.standins && this.standins.setHidden(l.replaces, false);
@@ -163,4 +185,48 @@ function buildShadowProxy(root) {
     root.add(mesh); tris += ni / 3;
   }
   return { casters, tris: Math.round(tris), proxies: sides.size };
+}
+
+// [r6-load] ---- disposal helpers for _unload
+const TEX_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap', 'lightMap', 'specularMap', 'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap', 'sheenColorMap', 'sheenRoughnessMap', 'transmissionMap', 'thicknessMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'specularIntensityMap', 'specularColorMap', 'gradientMap', 'matcap'];
+function matTextures(m, out) {
+  for (const k of TEX_SLOTS) { const t = m[k]; if (t && t.isTexture) out.add(t); }
+  if (m.uniforms) for (const u of Object.values(m.uniforms)) { const v = u && u.value; if (v && v.isTexture) out.add(v); }
+}
+function forMats(o, fn) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) if (m) fn(m); }
+// the shared palette (materials.js) and its textures are never disposed
+function keepSet(M) { const mats = new Set(), tex = new Set(); for (const m of Object.values(M || {})) if (m && m.isMaterial) { mats.add(m); matTextures(m, tex); } return { mats, tex }; }
+// a texture is only disposed if three.js could upload it again (a later reload reusing a module-cached texture)
+function reuploadable(t) {
+  if (t.isRenderTargetTexture || t.isDepthTexture || t.isVideoTexture || t.isFramebufferTexture || (t.userData && t.userData.keep)) return false;
+  const img = t.image; if (!img) return false;
+  if (t.isDataTexture || t.isDataArrayTexture || t.isData3DTexture) return !!img.data;
+  if (t.isCompressedTexture) return !!(t.mipmaps && t.mipmaps.length && t.mipmaps[0].data);
+  if (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) return img.width > 0; // closed bitmaps report 0
+  return true; // canvas / image element
+}
+function disposeOwned(root, scene, keep) {
+  const geos = new Set(), mats = new Set(), texs = new Set(), inst = [];
+  root.traverse((o) => { if (o.geometry) geos.add(o.geometry); if (o.material) forMats(o, (m) => { mats.add(m); matTextures(m, texs); }); if (o.isInstancedMesh || o.isBatchedMesh) inst.push(o); });
+  // what the rest of the scene still uses (root is already out of the scene): one traversal per unload
+  const liveG = new Set(), liveM = new Set(), liveT = new Set();
+  scene.traverse((o) => { if (o.geometry) liveG.add(o.geometry); if (o.material) forMats(o, (m) => { liveM.add(m); matTextures(m, liveT); }); });
+  if (scene.environment && scene.environment.isTexture) liveT.add(scene.environment);
+  if (scene.background && scene.background.isTexture) liveT.add(scene.background);
+  for (const g of geos) if (!liveG.has(g)) g.dispose();
+  for (const o of inst) if (o.dispose) o.dispose(); // instance matrix / colour buffers
+  for (const m of mats) if (!liveM.has(m) && !keep.mats.has(m)) m.dispose();
+  for (const t of texs) if (!liveT.has(t) && !keep.tex.has(t) && reuploadable(t)) t.dispose();
+}
+
+// [r6-load] streaming helpers. yieldTask lets a frame render between the heavy steps of a landmark load.
+const yieldTask = () => new Promise((r) => setTimeout(r, 0));
+// With KHR_parallel_shader_compile, compile a new landmark's programs in the background while it stays hidden (its
+// stand-ins keep showing), so the first frame that draws it doesn't block on shader links. Without the extension
+// three.js would compile synchronously anyway, so skip it then.
+async function warmPrograms(obj, scene) {
+  const B = typeof window !== 'undefined' && window.BSIM; const R = B && B.renderer, cam = B && B.camera;
+  if (!R || !R.isWebGLRenderer || !cam || !R.compileAsync || !R.extensions || !R.extensions.has('KHR_parallel_shader_compile')) return;
+  const vis = obj.visible; obj.visible = false;
+  try { await Promise.race([R.compileAsync(obj, cam, scene), new Promise((r) => setTimeout(r, 5000))]); } catch (e) { /* draw it anyway */ } finally { obj.visible = vis; }
 }
