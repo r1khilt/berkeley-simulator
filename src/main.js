@@ -73,8 +73,9 @@ async function boot() {
   manifestP.then((m) => { for (const l of m.landmarks) if (l.always && (nearBoot(l) || qs.get('lmboot') === 'all')) prefetchLandmark(l.id); }).catch(() => {});
   // [r6-load] build the tree library (~5 s of canvas and pixel work that needs no data) while the world data downloads
   const treeOpts = { season: 'late-autumn', leafTexSize: settings.quality === 'low' ? 512 : 1024, puffs: qs.get('treepuffs') !== '0', puffK: { low: 0.7, medium: 0.85, ultra: 1.25 }[settings.quality] ?? 1, hero: settings.quality !== 'low' && qs.get('treehero') !== '0', heroBudget: { medium: 8000, ultra: 16000 }[settings.quality] ?? 10000 };
-  const treeLibP = (async () => { const m = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js'); return { lib: m.createTreeLibraryAsync ? await m.createTreeLibraryAsync(treeOpts) : m.createTreeLibrary(treeOpts), TREE_REF_TINT: m.TREE_REF_TINT }; })();
-  treeLibP.catch(() => {}); // awaited (and reported) in the trees step
+  const mkTreeLib = async (early) => { const m = qs.get('trees') === 'ez' ? await import('./vegetation/ezlib.js') : await import('./vegetation/trees.js'); return { lib: early && m.createTreeLibraryAsync ? await m.createTreeLibraryAsync(treeOpts) : m.createTreeLibrary(treeOpts), TREE_REF_TINT: m.TREE_REF_TINT }; };
+  const treeLibP = qs.get('treeearly') === '0' ? null : mkTreeLib(true); // ?treeearly=0: old behaviour (synchronous build in the trees step)
+  if (treeLibP) treeLibP.catch(() => {}); // awaited (and reported) in the trees step
   const [terrRes, sdfRes, specRes, auxRes, midRes, farRes, bjson, treeBin, vectors, orthoCore, orthoMid, orthoFar, pois, skylineData, signsData, midData] = await Promise.all([
     loadBin('terrain_core.bin.gz'), loadBin('ground_sdf.bin.gz'), loadBin('ground_special.bin.gz'), loadBin('ground_aux.bin.gz'),
     loadBin('terrain_mid.bin.gz'), loadBin('terrain_far.bin.gz'), loadJSON('buildings.json.gz'), loadBin('trees.bin.gz'), loadJSON('vectors.json.gz'),
@@ -139,7 +140,7 @@ async function boot() {
   let treeSys = null;
   try {
     // gfx-trees: ?trees=ez selects the EZ-Tree photographic library (src/vegetation/ezlib.js), ?trees=proc the procedural one
-    const { lib, TREE_REF_TINT } = await treeLibP; phase('treeLib'); // [r6-load] started at the top of boot (options in treeOpts) // r4-trees: volumetric puff crowns (?treepuffs=0 = round-3 cards/blobs); r4-trees2: hero 3D-cluster LOD near the player (?treehero=0 = off)
+    const { lib, TREE_REF_TINT } = await (treeLibP || mkTreeLib(false)); phase('treeLib'); // [r6-load] started at the top of boot (options in treeOpts) // r4-trees: volumetric puff crowns (?treepuffs=0 = round-3 cards/blobs); r4-trees2: hero 3D-cluster LOD near the player (?treehero=0 = off)
     treeSys = new TreeSystem({ lib, trees, refTint: TREE_REF_TINT, lodDistances: Q.trees, maxDist: Q.treeMax });
     BS.treeLib = lib;
     // hide trees inside landmark footprints
@@ -429,7 +430,7 @@ async function boot() {
   phase('rest'); BS.timing = { phases: PH, load: Math.round(tLoad - t0), build: Math.round(performance.now() - tLoad), buildings: bres.stats, reversed: renderer.capabilities.reversedDepthBuffer, landmarks: lm.placed.length + '/' + lm.items.length, trees: trees.n };
   console.log('BSIM timing', JSON.stringify(BS.timing));
   await Promise.race([pbrP, new Promise((r) => setTimeout(r, 8000))]); BS.pbr = PBR; // gfx-materials
-  ui.progress(1); ui.ready(); BS.ready = true;
+  ui.progress(1); ui.ready(); BS.ready = true; lm.ready = true; // [r6-load] lm.ready: landmark loads time-slice from now on
   if (qs.get('play')) startPlay();
 }
 function sunAlt(d) { const { sunPosition } = SKYFN; return sunPosition(d).altitude; }

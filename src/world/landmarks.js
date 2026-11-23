@@ -52,13 +52,16 @@ export class LandmarkManager {
       const groundAt = (x, z) => heightAt(a.x + x, a.z + z) - a.y;
       const res = await mod.build({ THREE, M: this.M, U, boxUV, groundAt, footprints: packet.footprints, anchor: a, packet });
       const obj = res.object3d; obj.position.set(a.x, a.y, a.z); obj.name = 'landmark:' + l.id;
+      if (this.ready) await yieldTask(); // [r6-load] after BSIM.ready: build, merge and material setup run as separate tasks (shorter hitches)
       if (!res.update) mergeStatic(obj);
+      if (this.ready) await yieldTask();
       if (!/[?      try { applyInteriorGlass(obj,]nointerior/.test(location.search)) try { applyInteriorGlass(obj, { id: l.id, name: (mod.info && mod.info.name) || l.name, tag: packet.footprints && packet.footprints[0] && packet.footprints[0].tags && packet.footprints[0].tags.building, M: this.M }); } catch (e) { console.warn('interiors', l.id, e); } // window interiors
       obj.traverse((o) => { if (o.isMesh) { if (o.castShadow !== false) o.castShadow = true; o.receiveShadow = true; } });
       const details = []; obj.traverse((o) => { if (o.userData && o.userData.detail) { details.push(o); o.traverse((m) => { if (m.isMesh) m.castShadow = false; }); } });
       try { weatherLandmark(obj); } catch (e) { console.warn('weather', l.id, e); } // r4-sweep-central2: plain masonry gets base grime too
       this.setupMaterials && this.setupMaterials(obj);
       this.scene.add(obj);
+      if (this.ready) await warmPrograms(obj, this.scene); // [r6-load] compile its shaders off the main thread before it is drawn
       const tag = 'lm:' + l.id, ph = this.physics;
       for (const c of res.colliders || []) {
         if (c.type === 'poly') ph.addRing(c.pts.map(([x, z]) => [x + a.x, z + a.z]), (c.y0 ?? -5) + a.y, (c.y1 ?? 100) + a.y, tag);
@@ -168,4 +171,16 @@ function disposeOwned(root, scene, keep) {
   for (const o of inst) if (o.dispose) o.dispose(); // instance matrix / colour buffers
   for (const m of mats) if (!liveM.has(m) && !keep.mats.has(m)) m.dispose();
   for (const t of texs) if (!liveT.has(t) && !keep.tex.has(t) && reuploadable(t)) t.dispose();
+}
+
+// [r6-load] streaming helpers. yieldTask lets a frame render between the heavy steps of a landmark load.
+const yieldTask = () => new Promise((r) => setTimeout(r, 0));
+// With KHR_parallel_shader_compile, compile a new landmark's programs in the background while it stays hidden (its
+// stand-ins keep showing), so the first frame that draws it doesn't block on shader links. Without the extension
+// three.js would compile synchronously anyway, so skip it then.
+async function warmPrograms(obj, scene) {
+  const B = typeof window !== 'undefined' && window.BSIM; const R = B && B.renderer, cam = B && B.camera;
+  if (!R || !R.isWebGLRenderer || !cam || !R.compileAsync || !R.extensions || !R.extensions.has('KHR_parallel_shader_compile')) return;
+  const vis = obj.visible; obj.visible = false;
+  try { await Promise.race([R.compileAsync(obj, cam, scene), new Promise((r) => setTimeout(r, 5000))]); } catch (e) { /* draw it anyway */ } finally { obj.visible = vis; }
 }
