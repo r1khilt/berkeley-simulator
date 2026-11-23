@@ -266,7 +266,7 @@ export function buildBuildings(data, { replaced = new Set(), standinIds = new Se
   let tris = 0; const _tg = now();
   for (const [k, c] of chunks) {
     if (c.walls.count) { const m = new THREE.Mesh(c.walls.geometry(), wallMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.walls.count / 3;
-      if (wallFar) { const f = new THREE.Mesh(m.geometry, wallFar); f.castShadow = false; f.receiveShadow = true; f.name = 'facadeFar'; group.add(f); } } // [r7-lod]
+      if (wallFar) { const f = new THREE.Mesh(m.geometry, wallFar); f.castShadow = false; f.receiveShadow = true; f.name = 'facadeFar'; f.raycast = () => {}; group.add(f); } } // [r7-lod] (raycasts use the near twin)
     if (c.roofs.count) { const m = new THREE.Mesh(c.roofs.geometry(), roofMat); m.castShadow = m.receiveShadow = true; group.add(m); tris += c.roofs.count / 3; }
   }
   T.geo = now() - _tg;
@@ -609,7 +609,7 @@ class StandinManager {
     for (const kind of ['walls', 'roofs']) {
       const B = new Buf(); const app = (a, b) => { for (let i = 0; i < b.length; i++) a.push(b[i]); }; for (const id of c.ids) { if (this.hidden.has(id)) continue; const s = this.map.get(id)[kind]; app(B.p, s.p); app(B.n, s.n); app(B.uv, s.uv); app(B.c, s.c); app(B.f, s.f); app(B.ce, s.ce); }
       if (!B.count) continue; const m = new THREE.Mesh(B.geometry(), kind === 'walls' ? this.wallMat : this.roofMat); m.castShadow = m.receiveShadow = true; this.group.add(m); c.meshes.push(m);
-      if (kind === 'walls' && this.wallFar) { const f = new THREE.Mesh(m.geometry, this.wallFar); f.castShadow = false; f.receiveShadow = true; this.group.add(f); c.meshes.push(f); } // [r7-lod]
+      if (kind === 'walls' && this.wallFar) { const f = new THREE.Mesh(m.geometry, this.wallFar); f.castShadow = false; f.receiveShadow = true; f.raycast = () => {}; this.group.add(f); c.meshes.push(f); } // [r7-lod]
     }
   }
 }

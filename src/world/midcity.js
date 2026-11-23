@@ -1,7 +1,7 @@
 // Surrounding Berkeley/Oakland buildings (outside the LiDAR core): simple extrusions coloured from the aerial photo.
 import * as THREE from 'three';
 import { U } from '../materials.js';
-import { LOD } from '../render/lod.js'; // [r7-lod]
+import { LOD, gpuOnly } from '../render/lod.js'; // [r7-lod]
 const WALLS = [[0.86, 0.84, 0.78], [0.80, 0.76, 0.68], [0.72, 0.74, 0.70], [0.88, 0.86, 0.82], [0.70, 0.64, 0.56], [0.62, 0.66, 0.70], [0.82, 0.74, 0.62], [0.76, 0.70, 0.66]];
 export function buildMidCity(list, heightAt) {
   const tiles = new Map();
@@ -46,8 +46,8 @@ export function buildMidCity(list, heightAt) {
   mat.customProgramCacheKey = () => 'midcity';
   const group = new THREE.Group(); group.name = 'midcity';
   const lodTiles = []; // [r7-lod] per tile: full mesh + simplified far mesh, picked by projected footprint error
-  const mk = (t) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(t.c, 3)); g.computeBoundingSphere(); g.computeBoundingBox();
-    const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = false; group.add(m); return m; };
+  const mk = (t) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(t.c, 3)); g.computeBoundingSphere(); g.computeBoundingBox(); gpuOnly(g); // [r7-lod] JS copies freed after upload
+    const m = new THREE.Mesh(g, mat); m.raycast = () => {}; m.receiveShadow = true; m.castShadow = false; group.add(m); return m; };
   for (const t of tiles.values()) {
     if (!t.p.length) continue;
     const full = mk(t); t.p = t.c = t.n = null; lodTiles.push({ full, far: null, box: full.geometry.boundingBox, t, j: 0 }); // [r7-lod] (source arrays freed: only the far-set jobs stay)

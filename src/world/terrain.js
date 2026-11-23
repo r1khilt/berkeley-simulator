@@ -5,7 +5,7 @@ import { U } from '../materials.js';
 import { PBR, PBR_GLSL, pbrUniforms } from './pbr.js'; // gfx-materials: PBR ground
 import { GROUND_PBR_GLSL } from './pbrGround.js';
 import { GBUF } from './grading.js'; // [r6-fast] post-only alpha marker
-import { LOD } from '../render/lod.js'; // [r7-lod] screen-space error LOD
+import { LOD, gpuOnly } from '../render/lod.js'; // [r7-lod] screen-space error LOD
 
 export const CHUNK = 64;
 const LODS = [64, 32, 16, 8, 4];
@@ -384,10 +384,11 @@ uniform sampler2D uTex; uniform vec4 uTexRect; varying vec3 vWP;`).replace('#inc
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
     const m = new THREE.Mesh(g, mat); m.receiveShadow = true; group.add(m);
+    if (LOD.on) { const bb = g.boundingBox.clone(); gpuOnly(g); g.boundingBox = bb; m.raycast = () => {}; } // [r7-lod] ring tiles: JS copies freed after upload
     const touches = hole && !(ex <= hole.x0 || tx >= hole.x1 || ez <= hole.z0 || tz >= hole.z1);
     if (LOD.on && nx >= 8 && nz >= 8 && nx % 2 === 0 && nz % 2 === 0 && !touches) { // [r7-lod] half-resolution twin (+ edge skirts) for far tiles
       const c = ringCoarse(sample, tx, tz, nx / 2, nz / 2, step * 2, Math.max(skirt, 8));
-      const cm = new THREE.Mesh(c.g, mat); cm.receiveShadow = true; cm.visible = false; group.add(cm);
+      const cm = new THREE.Mesh(gpuOnly(c.g), mat); cm.receiveShadow = true; cm.visible = false; cm.raycast = () => {}; group.add(cm);
       (group.userData.lodTiles || (group.userData.lodTiles = [])).push({ fine: m, coarse: cm, err: c.err, box: g.boundingBox });
     }
   }

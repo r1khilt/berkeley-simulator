@@ -109,3 +109,13 @@ export function clusterSimplify(geo, cells = 8) {
   g.setIndex(n > 65535 ? new THREE.Uint32BufferAttribute(out, 1) : new THREE.Uint16BufferAttribute(out, 1));
   g.computeBoundingBox(); g.computeBoundingSphere(); g.userData.lodFrom = nTri; return g;
 }
+
+// [r7-lod] static far geometry that nothing reads back on the CPU (mid-city blocks, ring tiles): free the JS-side copies
+// once WebGL has them (same pattern as the r6 shadow proxies). Bounds must already be computed; they are frozen.
+export function gpuOnly(g) {
+  if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox();
+  const free = function () { this.array = null; };
+  for (const a of Object.values(g.attributes)) a.onUpload(free); if (g.index) g.index.onUpload(free);
+  g.computeBoundingBox = g.computeBoundingSphere = () => {};
+  return g;
+}
