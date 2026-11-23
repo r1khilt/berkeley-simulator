@@ -125,7 +125,7 @@ class Fleet {
 export function install(player, ctx) {
   const { scene, audio, ui, setupMaterials } = ctx;
   const ph = ctx.physics || player.ph;
-  const fleet = new Fleet(scene, ph, setupMaterials);
+  const fleet = new Fleet(scene, ph, setupMaterials); player.fleet = fleet; // [r7-lod] main.js also culls parked fleets while not in play (title flyover)
   const sound = new RideSound(audio);
   const rigs = {};
   const getRig = (type) => { if (rigs[type]) return rigs[type]; const r = buildRig(type); r.root.visible = false; scene.add(r.root); setupMaterials && setupMaterials(r.root); return (rigs[type] = r); };

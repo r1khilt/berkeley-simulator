@@ -366,6 +366,7 @@ async function boot() {
     csm.lightDirection.copy(sky.lightDir).negate();
     for (const l of csm.lights) { l.color.copy(sky.sunColor); l.intensity = sky.sunIntensity; }
     if (state === 'play') { player.update(dt); } else if (BS.flyover) flyover(dt);
+    if (state !== 'play' && player.fleet) player.fleet.update(dt, camera.position); // [r7-lod] parked-scooter culling + far LOD also on the title flyover (it only ran inside player.update)
     camera.updateMatrixWorld();
     { // gfx-post: stretch the shadow range with altitude so aerial views keep building/tree shadows across the city
       const hg = camera.position.y - heightAt(camera.position.x, camera.position.z); const qf = Q.far * farMul.v; const mf = Math.min(qf * 4, Math.max(qf, qf * (1 + Math.max(0, hg - 40) / 110))); /* [r6-perf] farMul */
