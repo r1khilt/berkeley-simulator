@@ -235,8 +235,8 @@ async function boot() {
   setupMaterials(scene);
   if (sched) tagFarCasters(scene); // [r6-perf] big casters also draw into the far cascade
   const lm = new LandmarkManager({ scene, physics, heightAt, manifest, standins: bres.standinMgr, setupMaterials,
-    onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); sched.invalidate(); } /* [r6-perf] */ },
-    onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); if (sched) sched.invalidate(); /* [r6-int] cached cascades drop the unloaded landmark's shadow (its stand-in casts again) */ } });
+    onLoaded: (l) => { player.interactions.push(...(l.inter || [])); if (sched && l.obj) { tagFarCasters(l.obj); if (bres.standinMgr && bres.standinMgr.group) tagFarCasters(bres.standinMgr.group); sched.invalidate(); } /* [r6-perf] [r6-int] the stand-in chunk rebuilt by setHidden() casts into the far cascade again */ },
+    onUnloaded: (l) => { player.interactions = player.interactions.filter((it) => it.landmark !== l.id); if (sched) { if (bres.standinMgr && bres.standinMgr.group) tagFarCasters(bres.standinMgr.group); sched.invalidate(); } /* [r6-int] cached cascades drop the unloaded landmark's shadow; the rebuilt stand-in chunk casts into the far cascade again */ } });
   BS.lm = lm;
   if (BS.soft) { lm.loadR = 220; lm.unloadR = 340; lm.detailR = 160; } // [r6-perf] software: hand-built landmarks stream in a little closer (stand-ins beyond) ([r6-fast] ornaments within 200 m)
   ui.note('Loading landmarks…');
