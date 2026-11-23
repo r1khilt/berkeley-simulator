@@ -27,6 +27,10 @@ import urllib.parse
 ROOT = os.path.realpath(sys.argv[1] if len(sys.argv) > 1 else os.environ.get('SITE_DIR') or os.path.dirname(os.path.abspath(__file__)))
 PORT = int(os.environ.get('PORT', '8080'))
 IDENTITY_ONLY = os.environ.get('BSIM_IDENTITY') == '1'
+# [r6-int] The app host stamps each published file with its upload time, in no fixed order, so a <file>.br written together
+# with <file> can look a few seconds older than it. deploy/stage.sh always rebuilds and recompresses everything together,
+# so a variant up to SKEW seconds older than its source still counts as fresh (a hand-edited source after that does not).
+SKEW = float(os.environ.get('BSIM_VARIANT_SKEW', '600'))
 TYPES = {
     '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
     '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.wasm': 'application/wasm', '.glb': 'model/gltf-binary',
@@ -106,7 +110,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     v = full + suffix
                     try:
                         vs = os.stat(v)
-                        if vs.st_mtime >= st.st_mtime:
+                        if vs.st_mtime >= st.st_mtime - SKEW:
                             enc, body_path, st_body = coding, v, vs
                             break
                     except OSError:
